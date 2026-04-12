@@ -18,10 +18,7 @@ export function useContactos() {
     }
 
     const contactsRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS);
-    const q = query(
-      contactsRef,
-      orderBy('creadoEl', 'desc')
-    );
+    const q = query(contactsRef);
 
     const unsubscribe = onSnapshot(
       q,

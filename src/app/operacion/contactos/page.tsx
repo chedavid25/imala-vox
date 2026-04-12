@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/select";
 
 export default function ContactosPage() {
-  const { contactos, loading } = useContactos();
+  const { contactos, loading, error: fetchError } = useContactos();
   const { currentWorkspaceId } = useWorkspaceStore();
   const [searchTerm, setSearchTerm] = useState("");
   const [isImporting, setIsImporting] = useState(false);
@@ -219,6 +219,12 @@ export default function ContactosPage() {
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
+
+      {fetchError && (
+        <div className="p-4 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm">
+          Error al cargar contactos: {fetchError.message}. Verifica que tengas permisos en Firebase.
+        </div>
+      )}
 
       {loading || isImporting ? (
         <div className="h-64 flex flex-col items-center justify-center text-[var(--text-tertiary-light)] gap-4 bg-[var(--bg-card)]/50 rounded-2xl border border-dashed border-[var(--border-light)]">
