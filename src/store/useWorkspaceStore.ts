@@ -9,7 +9,7 @@ interface WorkspaceState {
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set) => ({
-  currentWorkspaceId: null,
+  currentWorkspaceId: 'default-workspace', // Valor por defecto para desarrollo
   workspace: null,
   setWorkspaceId: (id) => set({ currentWorkspaceId: id }),
   setWorkspace: (workspace) => set({ workspace }),

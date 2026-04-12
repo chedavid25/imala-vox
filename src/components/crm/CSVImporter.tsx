@@ -21,36 +21,38 @@ export function CSVImporter({ onImport }: CSVImporterProps) {
       skipEmptyLines: true,
       complete: (results) => {
         const mappedContacts = results.data.map((row: any) => {
-          // Mapeo Inteligente de Columnas (Google Contacts y Variaciones)
-          const nombre = row["Name"] || 
-                         row["Nombre"] || 
-                         `${row["Given Name"] || ""} ${row["Family Name"] || ""}`.trim() || 
-                         row["Display Name"] || 
-                         "Sin Nombre";
+          // Normalización para búsqueda flexible de encabezados
+          const getValue = (labels: string[]) => {
+            const keys = Object.keys(row);
+            const foundKey = keys.find(k => 
+              labels.some(l => k.toLowerCase().trim() === l.toLowerCase().trim())
+            );
+            return foundKey ? row[foundKey] : null;
+          };
 
-          const telefono = row["Mobile"] || 
-                           row["Phone"] || 
-                           row["Teléfono"] || 
-                           row["Phone 1 - Value"] || 
-                           "";
+          // Mapeo Inteligente Extendido
+          const nombreDirecto = getValue(["Name", "Nombre", "Display Name", "Full Name", "Complete Name"]);
+          const nombreParticionado = `${getValue(["Given Name", "First Name", "Nombre Pila"]) || ""} ${getValue(["Family Name", "Last Name", "Apellido"]) || ""}`.trim();
+          
+          const nombre = nombreDirecto || nombreParticionado || "Sin Nombre";
 
-          const email = row["Email"] || 
-                        row["E-mail"] || 
-                        row["Correo electrónico"] || 
-                        row["E-mail 1 - Value"] || 
-                        "";
+          const telefono = getValue([
+            "Mobile", "Phone", "Teléfono", "Celular", 
+            "Phone 1 - Value", "Mobile Phone", "Primary Phone"
+          ]) || "";
 
-          // Intento de mapeo de cumpleaños
-          const cumple = row["Birthday"] || row["Birthday"] || row["Fecha de nacimiento"] || row["Anniversary"] || "";
+          const email = getValue([
+            "Email", "E-mail", "Correo", "Correo electrónico", 
+            "E-mail 1 - Value", "Email Address"
+          ]) || "";
 
           return {
-            nombre,
-            telefono,
-            email,
-            relacionTag: 'Lead' as const, // Default para importación, el usuario puede cambiarlo
+            nombre: String(nombre),
+            telefono: String(telefono),
+            email: String(email),
+            relacionTag: 'Lead' as const,
             aiBlocked: false,
             creadoEl: Timestamp.now(),
-            // Aquí podríamos procesar el 'cumple' si quisiéramos guardarlo en un campo específico
           };
         });
 
