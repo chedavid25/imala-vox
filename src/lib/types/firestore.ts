@@ -61,6 +61,7 @@ export interface Contacto {
   relacionTag: 'Personal' | 'Laboral' | 'Lead';
   aiBlocked: boolean; // Automático si relacionTag === 'Personal'
   etiquetas: string[];
+  fechaNacimiento?: string; // Formato YYYY-MM-DD
   creadoEl: Timestamp;
 }
 

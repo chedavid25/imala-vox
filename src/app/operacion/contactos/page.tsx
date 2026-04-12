@@ -13,13 +13,13 @@ import { COLLECTIONS, Contacto } from "@/lib/types/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogClose,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import {
@@ -42,6 +42,7 @@ export default function ContactosPage() {
     nombre: "",
     telefono: "",
     email: "",
+    fechaNacimiento: "",
     relacionTag: "Lead" as "Personal" | "Laboral" | "Lead",
   });
 
@@ -55,25 +56,31 @@ export default function ContactosPage() {
     
     setIsImporting(true);
     try {
-      const batch = writeBatch(db);
       const contactsRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS);
+      const CHUNK_SIZE = 400; // Límite de Firestore batch es 500
       
-      newContacts.forEach((contactData) => {
-        const newDocRef = doc(contactsRef);
-        // Regla Crítica: aiBlocked si es Personal
-        const aiBlocked = contactData.relacionTag === 'Personal';
+      for (let i = 0; i < newContacts.length; i += CHUNK_SIZE) {
+        const chunk = newContacts.slice(i, i + CHUNK_SIZE);
+        const batch = writeBatch(db);
         
-        batch.set(newDocRef, {
-          ...contactData,
-          aiBlocked,
-          creadoEl: Timestamp.now()
+        chunk.forEach((contactData) => {
+          const newDocRef = doc(contactsRef);
+          const aiBlocked = contactData.relacionTag === 'Personal';
+          
+          batch.set(newDocRef, {
+            ...contactData,
+            aiBlocked,
+            creadoEl: Timestamp.now()
+          });
         });
-      });
 
-      await batch.commit();
-      console.log(`${newContacts.length} contactos importados exitosamente.`);
+        await batch.commit();
+      }
+      
+      alert(`¡Éxito! Se importaron ${newContacts.length} contactos correctamente.`);
     } catch (error) {
       console.error("Error en importación masiva:", error);
+      alert("Hubo un error al importar los contactos. Revisa la consola.");
     } finally {
       setIsImporting(false);
     }
@@ -93,7 +100,7 @@ export default function ContactosPage() {
         creadoEl: Timestamp.now()
       });
 
-      setNewContact({ nombre: "", telefono: "", email: "", relacionTag: "Lead" });
+      setNewContact({ nombre: "", telefono: "", email: "", fechaNacimiento: "", relacionTag: "Lead" });
     } catch (error) {
       console.error("Error agregando contacto manual:", error);
     } finally {
@@ -112,15 +119,13 @@ export default function ContactosPage() {
           <CSVImporter onImport={handleBulkImport} />
           
           <Dialog>
-            <DialogTrigger 
-              render={
-                <Button className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-10 px-5 shadow-lg shadow-[var(--accent)]/20">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Nuevo Contacto
-                </Button>
-              }
-            />
-            <DialogContent className="sm:max-w-[425px] bg-[var(--bg-card)] border-[var(--border-light)]">
+            <DialogTrigger render={
+              <Button className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-10 px-5 shadow-lg shadow-[var(--accent)]/20">
+                <Plus className="w-4 h-4 mr-2" />
+                Nuevo Contacto
+              </Button>
+            } />
+            <DialogContent className="sm:max-w-[425px] bg-[var(--bg-card)] border-[var(--border-light)] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="text-[var(--text-primary-light)]">Agregar Contacto</DialogTitle>
                 <DialogDescription className="text-[var(--text-secondary-light)]">
@@ -134,6 +139,7 @@ export default function ContactosPage() {
                     id="name" 
                     value={newContact.nombre}
                     onChange={(e) => setNewContact({...newContact, nombre: e.target.value})}
+                    placeholder="Ej: Juan Pérez"
                     className="col-span-3 h-9 bg-[var(--bg-input)] border-[var(--border-light)]" 
                   />
                 </div>
@@ -143,6 +149,28 @@ export default function ContactosPage() {
                     id="phone" 
                     value={newContact.telefono}
                     onChange={(e) => setNewContact({...newContact, telefono: e.target.value})}
+                    placeholder="Ej: +54 9 11..."
+                    className="col-span-3 h-9 bg-[var(--bg-input)] border-[var(--border-light)]" 
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="email" className="text-right text-[13px] text-[var(--text-secondary-light)]">Email</Label>
+                  <Input 
+                    id="email" 
+                    type="email"
+                    value={newContact.email}
+                    onChange={(e) => setNewContact({...newContact, email: e.target.value})}
+                    placeholder="ejemplo@mail.com"
+                    className="col-span-3 h-9 bg-[var(--bg-input)] border-[var(--border-light)]" 
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="birthday" className="text-right text-[13px] text-[var(--text-secondary-light)]">Cumpleaños</Label>
+                  <Input 
+                    id="birthday" 
+                    type="date"
+                    value={newContact.fechaNacimiento}
+                    onChange={(e) => setNewContact({...newContact, fechaNacimiento: e.target.value})}
                     className="col-span-3 h-9 bg-[var(--bg-input)] border-[var(--border-light)]" 
                   />
                 </div>
@@ -157,27 +185,25 @@ export default function ContactosPage() {
                         <SelectValue placeholder="Selecciona el tipo" />
                       </SelectTrigger>
                       <SelectContent className="bg-[var(--bg-card)] border-[var(--border-light)]">
-                        <SelectItem value="Lead">Lead</SelectItem>
-                        <SelectItem value="Laboral">Laboral</SelectItem>
-                        <SelectItem value="Personal">Personal</SelectItem>
+                        <SelectItem value="Lead">Lead (Cliente)</SelectItem>
+                        <SelectItem value="Laboral">Laboral (Colega)</SelectItem>
+                        <SelectItem value="Personal">Personal (Privado)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
               </div>
               <DialogFooter>
-                <DialogClose
-                  render={
-                    <Button 
-                      onClick={handleManualAdd} 
-                      disabled={isAdding || !newContact.nombre || !newContact.telefono}
-                      className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)]"
-                    >
-                      {isAdding ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                      Guardar Contacto
-                    </Button>
-                  }
-                />
+                <DialogClose render={
+                  <Button 
+                    onClick={handleManualAdd} 
+                    disabled={isAdding || !newContact.nombre || !newContact.telefono}
+                    className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] w-full sm:w-auto"
+                  >
+                    {isAdding ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                    Guardar Contacto
+                  </Button>
+                } />
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -195,12 +221,23 @@ export default function ContactosPage() {
       </div>
 
       {loading || isImporting ? (
-        <div className="h-64 flex flex-col items-center justify-center text-[var(--text-tertiary-light)] gap-2">
-          <Loader2 className="w-8 h-8 animate-spin text-[var(--accent)]" />
-          <p className="text-sm font-medium">{isImporting ? "Procesando importación masiva..." : "Cargando contactos..."}</p>
+        <div className="h-64 flex flex-col items-center justify-center text-[var(--text-tertiary-light)] gap-4 bg-[var(--bg-card)]/50 rounded-2xl border border-dashed border-[var(--border-light)]">
+          <Loader2 className="w-10 h-10 animate-spin text-[var(--accent)]" />
+          <div className="text-center">
+            <p className="text-sm font-semibold text-[var(--text-primary-light)]">{isImporting ? "Procesando importación masiva..." : "Cargando contactos..."}</p>
+            {isImporting && <p className="text-xs text-[var(--text-secondary-light)] mt-1">Esto puede tardar unos segundos dependiendo del tamaño del archivo.</p>}
+          </div>
         </div>
       ) : (
-        <ContactTable contactos={filteredContactos} />
+        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-light)] shadow-sm overflow-hidden">
+          <ContactTable contactos={filteredContactos} />
+          {filteredContactos.length === 0 && (
+            <div className="p-20 text-center space-y-2">
+              <p className="text-[var(--text-primary-light)] font-medium">No se encontraron contactos</p>
+              <p className="text-sm text-[var(--text-tertiary-light)]">Intenta con otro término de búsqueda o importa un archivo CSV.</p>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
