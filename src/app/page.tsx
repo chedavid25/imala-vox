@@ -1,65 +1,76 @@
-import Image from "next/image";
+import React from "react";
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="max-w-4xl mx-auto py-12 px-6">
+      <div className="space-y-1">
+        <h2 className="text-[32px] font-bold text-[var(--text-primary-light)] tracking-tight">
+          Hola, David
+        </h2>
+        <p className="text-lg text-[var(--text-secondary-light)]">
+          Impulsa tu atención al cliente con agentes inteligentes.
+        </p>
+      </div>
+
+      <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <StatsCard 
+          title="Conversaciones IA" 
+          value="156" 
+          total="2,000" 
+          percentage={7.8} 
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+        <StatsCard 
+          title="Contactos CRM" 
+          value="432" 
+          total="5,000" 
+          percentage={8.6} 
+        />
+      </div>
+
+      <div className="mt-12">
+        <h3 className="text-lg font-semibold text-[var(--text-primary-light)] mb-4">
+          Acciones rápidas
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <QuickAction title="Nuevo Agente" description="Configura una nueva personalidad" />
+          <QuickAction title="Cargar Recurso" description="Agrega PDFs o URLs al cerebro" />
+          <QuickAction title="Ver Catálogo" description="Gestiona tus objetos y propiedades" />
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </div>
+    </div>
+  );
+}
+
+function StatsCard({ title, value, total, percentage }: { title: string, value: string, total: string, percentage: number }) {
+  return (
+    <div className="bg-[var(--bg-card)] border border-[var(--border-light)] p-6 rounded-xl">
+      <div className="flex justify-between items-start mb-4">
+        <h4 className="text-[13px] font-medium text-[var(--text-secondary-light)] uppercase tracking-wider">
+          {title}
+        </h4>
+        <span className="text-xs font-medium text-[var(--success)]">+12% vs ayer</span>
+      </div>
+      <div className="flex items-baseline gap-2 mb-2">
+        <span className="text-3xl font-bold text-[var(--text-primary-light)]">{value}</span>
+        <span className="text-sm text-[var(--text-tertiary-light)]">/ {total}</span>
+      </div>
+      <div className="w-full h-2 bg-[var(--bg-input)] rounded-full overflow-hidden">
+        <div 
+          className="h-full bg-[var(--success)] rounded-full" 
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function QuickAction({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="bg-[var(--bg-card)] border border-[var(--border-light)] p-4 rounded-xl hover:border-[var(--border-light-strong)] cursor-pointer transition-colors group">
+      <h4 className="text-sm font-semibold text-[var(--text-primary-light)] group-hover:text-[var(--accent-text)] transition-colors">
+        {title}
+      </h4>
+      <p className="text-[13px] text-[var(--text-secondary-light)]">{description}</p>
     </div>
   );
 }
