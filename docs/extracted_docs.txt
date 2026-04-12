@@ -1,0 +1,987 @@
+--- DOCUMENTO: Imala_Vox_Especificacion_Tecnica_v1 (1).docx ---
+IMALÁ VOX
+Especificación Técnica del Sistema
+SaaS de gestión de agentes inteligentes para WhatsApp e Instagram / Facebook
+Versión: 1.0   |   Fecha: Abril 2025
+Proyecto: Imalá Vox   |   Propietario: David — Imalá
+Confidencial — uso interno y desarrollo
+1. Resumen ejecutivo
+Imalá Vox es un SaaS multi-tenant de gestión de agentes de inteligencia artificial para WhatsApp Business API, Instagram y Facebook Messenger. Está orientado a profesionales independientes, inmobiliarias y empresas medianas que necesitan automatizar su atención al cliente con IA sin perder el control humano de las conversaciones.
+El sistema opera bajo una arquitectura de tres columnas: panel lateral de navegación, bandeja central de operaciones e inbox, y panel derecho de contexto CRM. Técnicamente se construye sobre Next.js, Tailwind CSS, shadcn/ui y Firebase (Firestore + Auth + Storage + Cloud Functions).
+OBJETIVO PRINCIPAL: Permitir que cualquier profesional configure un agente de IA que responda en WhatsApp de forma autónoma, con acceso a un catálogo de productos o propiedades, una base de conocimiento personalizada y reglas de negocio específicas — sin conocimientos técnicos.
+2. Stack tecnológico
+Capa
+Tecnología
+Justificación
+Frontend
+Next.js 14 + TypeScript
+SSR, rutas de API, rendimiento
+Estilos
+Tailwind CSS + shadcn/ui
+Diseño consistente, componentes accesibles
+Base de datos
+Firebase Firestore
+NoSQL en tiempo real, multi-tenant nativo
+Autenticación
+Firebase Auth
+Email/contraseña + Google OAuth
+Almacenamiento
+Firebase Storage
+Fotos de objetos, documentos de recursos
+Funciones del servidor
+Firebase Cloud Functions
+Webhooks, lógica de billing, cron jobs
+IA
+Anthropic Claude API (claude-sonnet-4-20250514)
+Agente conversacional, estructuración de objetos
+Mensajería
+Meta Cloud API (WhatsApp + IG + FB)
+Canal oficial, sin intermediarios
+Facturación
+MercadoPago Suscripciones API
+Cobro recurrente en ARS
+Cotización
+API Bluelytics
+Dólar blue para conversión de precios
+Scraping
+Puppeteer en Cloud Functions
+Extracción de portales inmobiliarios
+3. Arquitectura multi-tenant
+Cada cliente del SaaS opera en un espacio de trabajo (workspace) completamente aislado en Firestore. La unidad raíz es el documento espaciosDeTrabajo/{esId}, del cual cuelgan todas las subcolecciones de datos del cliente.
+3.1 Colecciones principales de Firestore
+Colección
+Descripción
+Nivel
+plataforma/config
+Configuración global: planes, límites, tarifas de exceso
+SuperAdmin
+eventosPlataforma
+Log de actividad del sistema completo
+SuperAdmin
+espaciosDeTrabajo/{esId}
+Un documento por cliente — raíz del tenant
+Workspace
+espaciosDeTrabajo/{esId}/miembros
+Usuarios con acceso al workspace y sus roles
+Subcolección
+espaciosDeTrabajo/{esId}/contactos
+CRM completo con etiqueta de relación y flag aiBlocked
+Subcolección
+espaciosDeTrabajo/{esId}/conversaciones
+Hilos de chat por canal (WA, IG, FB)
+Subcolección
+espaciosDeTrabajo/{esId}/conversaciones/{cId}/mensajes
+Mensajes individuales por conversación
+Sub-subcolección
+espaciosDeTrabajo/{esId}/objetos
+Catálogo de propiedades y productos
+Subcolección
+espaciosDeTrabajo/{esId}/canales
+Configuración de cada canal conectado (token, pageId)
+Subcolección
+espaciosDeTrabajo/{esId}/recursos
+Base de conocimiento (PDFs, URLs, texto)
+Subcolección
+espaciosDeTrabajo/{esId}/workflows
+Flujos de automatización con nodos y condiciones
+Subcolección
+espaciosDeTrabajo/{esId}/difusiones
+Campañas de mensajería masiva
+Subcolección
+espaciosDeTrabajo/{esId}/eventosFact
+Historial de pagos y eventos de facturación
+Subcolección
+3.2 Estructura del documento espaciosDeTrabajo/{esId}
+nombre: string   |   propietarioEmail: string   |   propietarioUid: string
+plan: 'starter' | 'pro' | 'agencia'
+estado: 'prueba' | 'activo' | 'pago_vencido' | 'cancelado'
+pruebaTerminaEl: Timestamp | null
+periodoVigenteHasta: Timestamp
+uso: { convCount: number, contactCount: number, objectCount: number }
+usoReiniciaEl: Timestamp
+facturacion: { metodo: 'mercadopago', moneda: 'ARS', precioUSD: number, precioARS: number,
+   cotizacionUsada: number, precioFijadoEl: Timestamp, proximaActualizacion: Timestamp,
+   mpSuscripcionId: string, ciclo: 'mensual' | 'anual' }
+creadoEl: Timestamp   |   actualizadoEl: Timestamp
+4. Planes y límites del servicio
+Característica
+Starter — $29 USD
+Pro — $79 USD
+Agencia — $179 USD
+Usuarios (seats)
+1
+5
+15
+Número WhatsApp
+1
+2
+5
+Canales Instagram / Facebook
+No incluido
+Incluido
+Incluido
+Conversaciones IA por mes
+500
+2.000
+10.000 + exceso proporcional
+Contactos en CRM
+1.000
+5.000
+Ilimitados
+Objetos en catálogo
+30
+200
+Ilimitados
+Agentes IA
+1 básico
+3 personalizables
+10 personalizables
+Base de conocimiento
+Incluida
+Incluida
+Avanzada
+Difusión masiva
+No
+Hasta 1.000 destinatarios
+Sin límite
+Workflows visuales
+No
+Hasta 5 activos
+Ilimitados
+Scraper de portales
+No
+Sí
+Sí
+Acceso a API
+No
+No
+Sí — webhooks
+Período de prueba
+No
+7 días gratis sin tarjeta
+No
+Precio anual
+$24 USD/mes
+$66 USD/mes
+$149 USD/mes
+4.1 Tarifas adicionales
+Add-on
+Precio
+Disponibilidad
++500 conversaciones IA
+$9 USD/mes — acumulables
+Todos los planes
++1 número WhatsApp adicional
+$12 USD/mes por número
+Todos los planes
++Canal Instagram o Facebook
+$8 USD/mes por canal extra
+Plan Starter (Pro y Agencia lo incluyen)
++5 usuarios adicionales
+$15 USD/mes
+Plan Pro solamente
+Exceso de conversaciones Agencia
+$1.80 USD cada 100 conversaciones extras
+Plan Agencia — cobro automático
+5. Facturación con MercadoPago
+5.1 Estrategia de precios en ARS
+Los precios del sistema están denominados en dólares estadounidenses (USD). Los clientes argentinos pagan en pesos argentinos (ARS) a través de MercadoPago. La conversión se realiza utilizando la cotización del dólar blue (informal) más un spread del 10%, actualizado trimestralmente.
+Parámetro
+Valor
+Fuente de cotización
+API Bluelytics — promedio de últimos 7 días del dólar blue (value_sell)
+Spread aplicado
++10% sobre la cotización blue
+Frecuencia de ajuste
+Trimestral — enero, abril, julio y octubre
+Aviso previo al cliente
+15 días antes de cada ajuste trimestral
+Umbral ajuste extraordinario
+Si el blue sube más del 30% dentro del trimestre
+Aviso ajuste extraordinario
+7 días de anticipación
+Fallback de cotización
+dolarapi.com si Bluelytics no responde
+Comisión MercadoPago
+~4.99% por transacción procesada
+5.2 Flujo técnico de suscripción en MercadoPago
+El cliente selecciona plan y ciclo. La Cloud Function calcularPrecioARS() consulta Bluelytics y calcula el monto.
+Se crea una suscripción preaprobada con la API de MP Suscripciones con el monto calculado en ARS.
+MP envía webhook subscription_authorized_payment al cobrar. La Cloud Function actualiza estado → 'activo' en Firestore.
+En caso de fallo: MP reintenta 2 veces. Al segundo fallo: estado → 'pago_vencido'. A los 7 días: estado → 'cancelado'.
+En cada ajuste trimestral: se cancela la suscripción MP anterior y se crea una nueva con el precio actualizado. MP no permite modificar el monto de una suscripción existente.
+Al mejorar de plan: se cancela la suscripción actual y se crea una nueva con el precio del plan superior al tipo del día.
+IMPORTANTE: MercadoPago no prorratea automáticamente en cambios de plan.
+Al subir de plan, el cliente paga el nuevo plan completo desde el día del cambio.
+Podés compensarlo otorgando días de crédito manualmente desde el SuperAdmin.
+6. Canales de mensajería — Meta Cloud API
+6.1 Canales soportados
+Canal
+Plan requerido
+API utilizada
+Costo de mensajes
+WhatsApp Business
+Todos los planes
+WhatsApp Cloud API (Meta)
+Meta factura directo al cliente
+Instagram Messenger
+Pro y Agencia
+Messenger Platform API (Meta)
+Meta factura directo al cliente
+Facebook Messenger
+Pro y Agencia
+Messenger Platform API (Meta)
+Meta factura directo al cliente
+CRÍTICO: Los costos de mensajería de Meta son completamente independientes de Imalá Vox.
+El cliente conecta su propia cuenta de Meta Business y Meta le factura directamente por:
+  • Conversaciones de marketing (difusiones): ~$0.03-0.05 USD por conversación en Argentina
+  • Conversaciones de servicio: 1.000/mes gratuitas, luego costo mínimo
+Imalá Vox actúa como software que usa la cuenta Meta del cliente — no como intermediario de mensajes.
+6.2 Tipos de conversaciones Meta (para informar al cliente)
+Tipo
+Cuándo se genera
+Costo aproximado ARG
+Servicio
+El usuario escribe primero — ventana de 24hs
+1.000/mes gratis, luego ~$0.01 USD
+Marketing
+El negocio envía difusiones o templates promo
+~$0.03-0.05 USD por conversación
+Utilidad
+Confirmaciones, recordatorios automáticos
+~$0.02 USD por conversación
+Autenticación
+Códigos de verificación OTP
+~$0.01 USD por conversación
+7. Módulos del sistema
+7.1 OPERACIÓN
+Bandeja de entrada (Inbox)
+Vista principal de todas las conversaciones activas del workspace.
+Filtros por canal (WA / IG / FB), estado (abierto / resuelto / bot), agente asignado y etiquetas.
+Indicador visual de estado del agente IA en cada conversación (activo / pausado / bloqueado por contacto Personal).
+Transferencia manual de conversación entre agente IA y operador humano.
+Composer con soporte para texto, imágenes, documentos y drag-and-drop de objetos del catálogo.
+Contactos (CRM híbrido)
+Importación desde CSV/Excel y sincronización desde Google Contacts.
+Etiqueta de relación obligatoria por contacto: Personal | Laboral | Lead.
+Campo aiBlocked: boolean — se activa automáticamente cuando relacionTag === 'Personal'.
+El agente IA verifica aiBlocked antes de emitir cualquier respuesta. Si es true, no responde.
+Etiquetas de interés personalizables para segmentación de difusiones.
+Vista de historial completo de conversaciones por contacto.
+Difusión masiva
+Creación de audiencias basadas en etiquetas de interés.
+Exclusión automática de contactos con relacionTag === 'Personal' — no puede ser desactivada.
+Uso de templates aprobados por Meta para mensajes de marketing.
+Programación de envíos con fecha y hora.
+Estadísticas por campaña: enviados, entregados, leídos, respondidos.
+7.2 CEREBRO
+Catálogo de objetos
+Dos tipos: propiedad (inmueble) y producto (e-commerce o servicio).
+Carga dual:
+Scraping: el usuario pega una URL (Argenprop, ZonaProp, MercadoLibre) y Puppeteer extrae título, precio, fotos, descripción y características.
+Lienzo libre: el usuario arrastra fotos y pega texto — Claude API estructura los datos en campos normalizados.
+Campos normalizados: título, precio, descripción, fotos[] (Storage URLs), características{} (m², ambientes, etc.), urlFuente, estado.
+La ObjectCard en el panel derecho permite arrastrar el objeto al chat — se envía automáticamente una ficha técnica formateada al cliente.
+Base de conocimiento
+Carga de archivos PDF, Word y URLs de sitios web como fuente de verdad del agente.
+Switch de modo estricto (strictMode): si está activo, el agente solo responde con información de los recursos cargados — no genera respuestas por conocimiento propio.
+Soporte para múltiples recursos simultáneos — el agente los consulta como contexto en cada respuesta.
+Scraper de sitios web
+Gestión de URLs de portales configurados para scraping periódico.
+Actualización automática del catálogo cuando se detectan cambios en las propiedades/productos fuente.
+7.3 AJUSTES
+Configuración del agente IA
+Nombre, avatar y personalidad del agente.
+Instrucciones de sistema personalizadas (prompt del agente).
+Horario de atención — fuera del horario, el agente puede responder un mensaje predefinido o escalar.
+Respuesta automática de fuera de horario.
+Límite de escalada: número de mensajes sin resolución antes de notificar a un operador humano.
+Canales
+Conexión de número de WhatsApp Business a través del flujo oficial de Meta Cloud API.
+Conexión de página de Instagram y/o Facebook Business.
+Estado de conexión en tiempo real (activo / desconectado / token vencido).
+Workflows
+Constructor visual de nodos (basado en React Flow).
+Tipos de nodo: disparador (trigger), condición, acción, espera, notificación, escalada.
+Triggers disponibles: mensaje recibido, inactividad N minutos, nueva palabra clave, cambio de etiqueta.
+Acciones disponibles: cambiar estado, asignar agente, enviar template, actualizar etiqueta, notificar por email.
+Etiquetas con lógica de IA
+Etiquetas manuales y etiquetas sugeridas automáticamente por el agente según el contenido de la conversación.
+Reglas de etiquetado automático basadas en palabras clave o intención detectada.
+8. Jerarquía de componentes React
+8.1 Layout raíz
+AppLayout
+  ├── BarraLateral (colapsable, 240px / 64px)
+  │     ├── SelectorEspacio
+  │     ├── GrupoNavegacion (OPERACIÓN / CEREBRO / AJUSTES)
+  │     │     └── ItemNavegacion
+  │     └── BannerMejoraPlan
+  ├── PanelPrincipal (flex-1, scroll independiente)
+  │     └── [Vista activa según ruta]
+  └── PanelContexto (320px, colapsable)
+        ├── PanelCRM
+        ├── PanelBibliotecaObjetos
+        ├── PanelEstadoIA
+        └── PanelEtiquetas
+8.2 Vistas principales
+OPERACIÓN:
+  BandejaEntrada → ListaConversaciones + VentanaChat + ComposerMensaje
+  Contactos → TablaContactos + FormContacto + FiltrosRelacion
+  Difusion → ListaDifusiones + CreadorAudiencia + EstadisticasCampania
+CEREBRO:
+  Catalogo → GrillaObjetos + FormObjeto + ScraperURL + CanvasLibre
+  BaseConocimiento → ListaRecursos + CargaArchivo + ToggleStrictMode
+  Scraper → GestionURLs + LogActualizaciones
+AJUSTES:
+  ConfigAgente → FormPersonalidad + HorarioAtencion + RespuestasDefecto
+  Canales → TarjetaCanal + FlujoCOnexionMeta
+  Workflows → ConstructorNodos (React Flow) + ListaWorkflows
+  Etiquetas → GestorEtiquetas + ReglasSugeridas
+8.3 Componentes compartidos (UI primitives)
+EtiquetaRelacion — badge de color según Personal / Laboral / Lead
+IndicadorIA — dot animado de estado del agente (activo / pausado / bloqueado)
+ObjectCard — tarjeta de catálogo con drag handle para soltar en el chat
+CanalBadge — ícono + color por canal (verde WA / naranja IG / azul FB)
+LimiteBarra — barra de progreso de uso con color según % (verde / naranja / rojo)
+PaletaComandos — búsqueda global (⌘K) de contactos, conversaciones y objetos
+8.4 Hooks / Estado (Zustand + Firebase)
+useConversaciones — suscripción en tiempo real a la colección conversaciones del workspace
+useContactos — CRM con filtros reactivos y cache local
+useObjetos — catálogo con soporte para drag-and-drop
+useAgente — configuración y estado del agente IA activo
+useWorkflows — lista y estado de flujos activos
+useLimitesPlan — lee uso actual vs límites del plan en tiempo real
+useFacturacion — estado de suscripción MP y próxima fecha de cobro
+9. Cloud Functions principales
+Función
+Disparador
+Responsabilidad
+recibirMensajeWhatsApp
+Webhook POST /webhook/whatsapp
+Recibe mensajes entrantes, crea conversación si no existe, verifica aiBlocked, llama al agente IA
+recibirMensajeMeta
+Webhook POST /webhook/meta
+Igual que WA pero para IG y FB Messenger
+procesarRespuestaIA
+Llamada interna desde recibirMensaje*
+Consulta Claude API con contexto + base conocimiento + objetos relevantes
+checkLimitesPlantilla
+Antes de cada acción del agente
+Lee uso actual vs plataforma/config.planes — bloquea si supera límite
+incrementarContadorConv
+Cuando el agente responde
+Incrementa uso.convCount en el workspace — atómico con transacción Firestore
+reiniciarUsoMensual
+Cron — día 1 de cada período
+Resetea uso.convCount a 0 — calcula exceso Agencia y genera cobro adicional
+calcularAjusteARS
+Cron — 15 días antes del trimestre
+Consulta Bluelytics, calcula nuevo precioARS con spread 10%, envía email de aviso
+aplicarAjusteARS
+Cron — día 1 del trimestre
+Actualiza precioARS en Firestore, cancela suscripción MP anterior, crea nueva
+monitorearVariacionBlue
+Cron — todos los lunes
+Compara cotización actual vs cotizacionUsada — si variación > 30% dispara ajuste extraordinario
+webhookMercadoPago
+POST /webhook/mercadopago
+Recibe eventos de pago MP, actualiza estado del workspace según resultado
+scrapearURL
+Llamada del usuario desde Catálogo
+Ejecuta Puppeteer, extrae datos de la propiedad, llama a Claude API para estructurar
+estructurarObjetoIA
+Llamada interna desde scrapearURL o Canvas libre
+Envía datos crudos a Claude API, recibe JSON normalizado del objeto
+10. Panel SuperAdmin
+Acceso exclusivo para David (UID del propietario del sistema). Disponible en la ruta /superadmin, protegida por un Custom Claim de Firebase Auth (role: 'superadmin').
+10.1 Secciones del SuperAdmin
+Sección
+Contenido
+Filtros disponibles
+Resumen
+MRR, espacios activos, en prueba, cancelaciones, distribución por plan, alertas
+Período: este mes / trimestre / año + rango personalizado
+Espacios de trabajo
+Tabla de todos los clientes con plan, estado, uso, método de facturación
+Plan, estado, método de pago, rango de fechas, búsqueda por nombre
+Facturación
+ARR proyectado, cobrado por período, excesos pendientes, log de pagos
+Rango de fechas, método (MP / futuro Stripe), tipo de evento
+Uso y límites
+Barras de progreso por workspace para conversaciones y contactos
+Período + filtro por plan
+Registro de eventos
+Log cronológico de todos los eventos del sistema
+Tipo de evento, rango de fechas, espacio de trabajo específico
+10.2 Acciones disponibles desde el SuperAdmin
+Cambiar el plan de un workspace manualmente (upgrade / downgrade).
+Extender el período de prueba de un cliente.
+Cancelar o reactivar una suscripción manualmente.
+Ver el detalle completo de un workspace: uso, canales conectados, agentes, historial de pagos.
+Enviar email de notificación manual a un cliente.
+Ajustar el precioARS de un cliente específico (excepción individual).
+11. Plan de fases de desarrollo
+Fase
+Contenido
+Duración estimada
+Fase 0 — Scaffolding
+Next.js + Firebase init, estructura de colecciones, Firebase Auth, layout de tres columnas, sidebar funcional, rutas base
+1 semana
+Fase 1 — Operación básica
+Bandeja de entrada funcional conectada a WhatsApp Cloud API (webhooks), Contactos con CSV import + etiquetado, aiBlocked operativo, agente IA básico
+2 semanas
+Fase 2 — Catálogo de objetos
+ObjectCard + ObjectForm, scraper de Argenprop/ZonaProp con Puppeteer, Canvas drag & drop, Claude API para estructuración, drag-to-chat
+2 semanas
+Fase 3 — Cerebro completo
+Base de conocimiento con carga de PDFs/URLs, strictMode, integración de recursos en contexto del agente, canales IG y FB
+2 semanas
+Fase 4 — Difusión + Workflows
+Constructor visual React Flow, audiencias con exclusión de Personales, broadcast scheduler, acciones automáticas
+2 semanas
+Fase 5 — Billing completo
+Suscripciones MercadoPago, lógica de planes y límites, SuperAdmin, cron de ajuste ARS trimestral, trial 7 días Pro
+2 semanas
+Fase 6 — Polish + Lanzamiento
+Onboarding guiado, notificaciones de límite, emails automáticos (aviso ajuste ARS, vencimiento trial, pago fallido), PWA
+1 semana
+RECOMENDACIÓN PARA CLAUDE CODE: Iniciar siempre leyendo este documento como contexto.
+Comando sugerido de inicio en Antigravity:
+  'Iniciá el proyecto Imalá Vox según la especificación técnica adjunta.
+  Fase 0: scaffolding Next.js 14 + TypeScript + Tailwind + shadcn/ui + Firebase.
+  Creá la estructura de colecciones en Firestore y el layout de tres columnas.'
+12. Reglas de negocio críticas
+Estas reglas NO son opcionales. Deben implementarse desde el inicio y nunca pueden ser desactivadas por el cliente.
+Regla
+Descripción
+Implementación
+Exclusión de contactos Personales
+El agente IA NUNCA responde a contactos con relacionTag === 'Personal'
+Campo aiBlocked en Firestore — verificado en procesarRespuestaIA antes de llamar a Claude API
+Exclusión en difusiones
+Las difusiones NUNCA incluyen contactos con relacionTag === 'Personal'
+Filtro obligatorio en la Cloud Function de difusión — no configurable desde el frontend
+Límites de plan
+El agente no responde si uso.convCount >= límite del plan
+checkLimitesPlantilla verificado antes de cada respuesta del agente
+Atomicidad del contador
+El incremento de convCount debe ser atómico
+Transacción Firestore — no actualización simple — para evitar race conditions
+Cotización validada
+Nunca aplicar ajuste ARS sin cotización confirmada
+Si Bluelytics y dolarapi.com fallan, el ajuste se pospone 24hs y se reintenta
+Precio USD como fuente de verdad
+precioARS es siempre un campo derivado — nunca la fuente de verdad
+Todos los reportes del SuperAdmin trabajan en USD
+Webhook Meta verificado
+Solo procesar webhooks con X-Hub-Signature-256 válida
+Verificación HMAC en la Cloud Function — rechazar si no coincide
+IMALÁ VOX — Especificación Técnica v1.0
+Documento confidencial · Imalá · Abril 2025
+
+--- DOCUMENTO: Imala_Vox_Sistema_Disenio_v1.docx ---
+IMALÁ VOX
+Sistema de Diseño — Anexo Estético v1.0
+Tokens de diseño · Paleta · Tipografía · Layout · Reglas de componentes
+ANEXO ESTÉTICO — complementa Imala_Vox_Especificacion_Tecnica_v1.docx
+Claude Code debe tener AMBOS documentos como contexto antes de generar cualquier componente UI.
+Referencia visual principal: plantilla EchoAI Dashboard (imágenes adjuntas al proyecto).
+Referencias de producto: Linear.app · Vercel Dashboard · Resend.com
+Filosofía: alta densidad de información, mucho aire, un solo color de acento brillante.
+13. Filosofía visual
+Imalá Vox tiene una identidad visual de herramienta de ingeniería, no de app de consumo. El usuario debe sentir que usa algo serio, rápido y bien construido. Las referencias son Linear.app (densidad + precision) y Vercel (dark mode + tipografía poderosa).
+Principio
+Descripción
+Anti-patrón a evitar
+Oscuro por defecto
+La sidebar y los paneles de configuración viven en dark. El área de chat es clara para facilitar la lectura de mensajes.
+Modo claro total o dark total — el contraste entre zonas es parte del diseño
+Un solo acento
+El verde lima #C8FF00 es el ÚNICO color de acción primaria. Botones CTA, badges activos, indicadores de IA encendida.
+Usar el acento decorativamente o en múltiples elementos a la vez
+Bordes finos 1px
+Todos los separadores y bordes de cards son de 1px. Nunca sombras — solo bordes.
+Box shadows, cards flotantes con blur, efectos de profundidad
+Tipografía como jerarquía
+Los headings son pesados (700). El cuerpo es regular (400). No hay pesos intermedios decorativos.
+Usar bold en texto de cuerpo para destacar — usar color o tamaño en cambio
+Aire controlado
+Padding generoso dentro de los componentes. Los elementos nunca se tocan entre sí.
+Comprimir elementos para mostrar más información — preferir paginación o scroll
+Sin gradientes
+Los fondos son planos. Los estados se comunican con color sólido, no con gradientes.
+Gradientes de fondo, glassmorphism, efectos de blur decorativos
+14. Paleta de colores — tokens oficiales
+Todos los colores del sistema están definidos como CSS custom properties en globals.css. Ningún componente debe usar valores hexadecimales directos — siempre var(--nombre-token).
+14.1 Fondos (backgrounds)
+Color
+Token CSS
+Hex
+Zona
+Notas
+   
+--bg-sidebar
+#1F1F1E
+Sidebar izquierda
+Color base de toda la navegación lateral
+   
+--bg-sidebar-hover
+#2A2A28
+Hover / ítem activo sidebar
++1 tono para estados interactivos
+   
+--bg-sidebar-deep
+#161615
+Secciones colapsadas / tooltips
+Más oscuro que el sidebar base
+   
+--bg-main
+#F5F5F4
+Área principal (chat, vistas)
+Blanco cálido — no frío puro
+   
+--bg-card
+#FFFFFF
+Cards, burbujas de mensaje
+Contraste limpio sobre --bg-main
+   
+--bg-input
+#EFEFED
+Inputs, textareas en área clara
+Distinguible del fondo sin ser intrusivo
+   
+--bg-accent-subtle
+#F0FDF4
+Fondos de badges activos (área clara)
+Verde muy lavado para estados positivos
+14.2 Texto
+Color
+Token CSS
+Hex
+Zona
+Notas
+   
+--text-primary-dark
+#EDEDED
+Texto principal en sidebar
+No blanco puro — evita vibración sobre fondo oscuro
+   
+--text-secondary-dark
+#8A8A85
+Texto secundario / muted en sidebar
+Cálido, no el gris frío estándar
+   
+--text-tertiary-dark
+#555552
+Placeholders, timestamps en sidebar
+Apenas visible — solo información contextual
+   
+--text-primary-light
+#1A1A18
+Texto principal en área clara
+Negro cálido — no #000000
+   
+--text-secondary-light
+#6B6B67
+Texto secundario en área clara
+Labels, subtítulos, metadata
+   
+--text-tertiary-light
+#A3A39E
+Placeholders en área clara
+Muted máximo
+14.3 Acento y estados
+Color
+Token CSS
+Hex
+Zona
+Notas
+   
+--accent
+#C8FF00
+Botones CTA, badges activos, IA encendida
+ÚNICO color de acción primaria — usar con criterio
+   
+--accent-hover
+#B8EF00
+Hover sobre elementos accent
+10% más oscuro que --accent
+   
+--accent-active
+#A0D400
+Click / estado presionado
+20% más oscuro que --accent
+   
+--accent-text
+#1A1A18
+Texto sobre fondo accent
+Negro cálido — el verde lima necesita texto oscuro
+   
+--success
+#22C55E
+Estados de éxito, pagos OK
+Verde semántico — distinto del accent
+   
+--error
+#EF4444
+Errores, pagos fallidos, límite superado
+Rojo estándar
+   
+--warning
+#F59E0B
+Advertencias, trial por vencer
+Ámbar cálido
+   
+--info
+#3B82F6
+Información, canal Facebook
+Azul informativo
+14.4 Bordes
+Color
+Token CSS
+Hex
+Zona
+Notas
+   
+--border-dark
+#2A2A28
+Bordes en zona oscura (sidebar)
+Visible pero discreto sobre #1F1F1E
+   
+--border-light
+#E5E5E3
+Bordes en zona clara (área principal)
+Gris cálido sobre #F5F5F4
+   
+--border-light-strong
+#D4D4D0
+Bordes enfatizados / inputs focused
+Separadores de sección importantes
+   
+--border-dark-strong
+#3A3A38
+Bordes enfatizados en zona oscura
+Para cards o modales sobre sidebar
+15. Tipografía
+La tipografía principal es Geist Sans, la fuente de Vercel. Es moderna, técnica y extremadamente legible en interfaces densas. Se carga desde el paquete npm geist o desde Google Fonts como alternativa.
+Rol
+Fuente
+Peso
+Tamaño
+Uso
+Display / Hero
+Geist Sans
+700 (Bold)
+32–48px
+Headings de bienvenida tipo 'Hola, David'
+Heading 1
+Geist Sans
+600 (SemiBold)
+24px
+Títulos de sección principal
+Heading 2
+Geist Sans
+600 (SemiBold)
+18px
+Subtítulos de panel
+Heading 3
+Geist Sans
+500 (Medium)
+15px
+Labels de grupos en sidebar
+Cuerpo principal
+Geist Sans
+400 (Regular)
+14px
+Mensajes de chat, texto de formularios
+Cuerpo secundario
+Geist Sans
+400 (Regular)
+13px
+Descripciones, metadata, timestamps
+Caption / Label
+Geist Sans
+400 (Regular)
+12px
+Badges, etiquetas, contadores
+Monoespaciado
+Geist Mono
+400 (Regular)
+13px
+IDs, tokens, código, números de cuenta
+Instalación: npm install geist
+En Next.js layout.tsx:
+  import { GeistSans, GeistMono } from 'geist/font'
+  export default function RootLayout({ children }) {
+    return <html className={`${GeistSans.variable} ${GeistMono.variable}`}>
+  }
+Fallback si Geist no está disponible: Inter, system-ui, sans-serif
+REGLA CRÍTICA — nunca usar font-weight: 600 o 700 en texto de cuerpo para 'destacar'.
+Para jerarquía dentro del cuerpo usar: tamaño mayor, color --text-primary vs --text-secondary, o el token --accent.
+Bold en cuerpo de texto rompe la legibilidad del sistema tipográfico.
+16. Layout del dashboard
+16.1 Estructura de tres columnas
+Columna
+Ancho normal
+Ancho colapsado
+Contenido
+Sidebar izquierda
+240px (fijo)
+64px (solo íconos)
+Navegación, selector de espacio, upgrade banner
+Panel principal
+flex-1 (resto del ancho)
+flex-1
+Vista activa: inbox, contactos, catálogo, ajustes
+Panel de contexto derecho
+320px (fijo)
+0px (oculto)
+CRM del contacto, biblioteca de objetos, estado IA
+El ancho mínimo soportado es 1280px. En pantallas menores el panel de contexto se colapsa automáticamente. No hay versión mobile del dashboard — es una herramienta de escritorio.
+16.2 Sidebar — anatomía
+Logo + nombre del espacio de trabajo (con selector dropdown para multi-workspace futuro)
+Sección OPERACIÓN: Bandeja de entrada · Contactos · Difusión
+Sección CEREBRO: Catálogo · Base de conocimiento · Scraper
+Sección AJUSTES: Agente IA · Canales · Workflows · Etiquetas
+Footer fijo: avatar del usuario + nombre + rol + acceso a configuración personal
+Banner de upgrade (solo en plan Starter) — fondo #2A2A28, botón accent #C8FF00
+16.3 Cabecera del panel principal
+Altura: 52px fija
+Contenido izquierdo: nombre de la vista activa (Geist Sans 600, 15px)
+Contenido derecho: acciones contextuales (botón primario con --accent si existe acción principal)
+Separador inferior: 1px --border-light
+Fondo: --bg-main (mismo que el panel — no hay diferencia de tono)
+16.4 Espaciado — sistema de 4px
+Token
+Valor
+Uso típico
+--space-1
+4px
+Gap mínimo entre elementos inline
+--space-2
+8px
+Padding interno de badges y chips
+--space-3
+12px
+Gap entre ítems de lista
+--space-4
+16px
+Padding horizontal de sidebar items
+--space-5
+20px
+Padding interno de cards pequeñas
+--space-6
+24px
+Padding interno de cards estándar
+--space-8
+32px
+Separación entre secciones
+--space-12
+48px
+Padding de vistas vacías (empty states)
+17. Reglas de componentes clave
+17.1 Botones
+Variante
+Fondo
+Texto
+Borde
+Uso
+Primario (CTA)
+--accent (#C8FF00)
+--accent-text (#1A1A18)
+Ninguno
+Una sola acción principal por vista
+Secundario
+Transparente
+--text-primary-dark o light según zona
+1px --border-dark o --border-light
+Acciones secundarias, cancelar
+Destructivo
+Transparente
+--error (#EF4444)
+1px --error
+Eliminar, revocar acceso
+Ghost
+Transparente
+--text-secondary
+Ninguno
+Acciones terciarias, íconos de toolbar
+Deshabilitado
+--bg-input
+--text-tertiary
+1px --border-light
+Cualquier botón en estado disabled
+El botón primario con --accent (#C8FF00) debe aparecer UNA SOLA VEZ por vista.
+Si hay múltiples acciones posibles, solo una es primaria. Las demás son secundarias o ghost.
+Nunca usar --accent como color de fondo en elementos que no sean botones CTA o badges de estado activo.
+17.2 Inputs y formularios
+Fondo: --bg-input (#EFEFED) en zona clara / --bg-sidebar-hover (#2A2A28) en zona oscura
+Borde: 1px --border-light en reposo / 1px --accent en foco — sin box-shadow
+Border-radius: 8px para inputs estándar / 6px para inputs compactos
+Altura: 36px para inputs de línea / auto para textareas
+Placeholder: --text-tertiary-light o --text-tertiary-dark según zona
+Label: siempre encima del input, Geist Sans 13px, --text-secondary
+17.3 Cards
+Fondo: --bg-card (#FFFFFF) sobre --bg-main (#F5F5F4)
+Borde: 1px --border-light (#E5E5E3)
+Border-radius: 12px para cards de contenido / 8px para cards compactas
+Padding interno: --space-6 (24px) estándar / --space-5 (20px) compacto
+Sin sombra — la separación del fondo la da el borde 1px
+En hover: borde pasa a --border-light-strong (#D4D4D0) — sin cambio de fondo
+17.4 Badges y etiquetas de estado
+Badge
+Fondo
+Texto
+Uso
+Activo / IA encendida
+#C8FF00 (--accent)
+#1A1A18 (--accent-text)
+Agente IA respondiendo, plan activo
+Personal (contacto)
+#2A2A28
+#8A8A85
+Contacto marcado como Personal — IA bloqueada
+Lead
+#0F172A
+#3B82F6
+Contacto en etapa de prospección
+Laboral
+#0F172A
+#22C55E
+Contacto de trabajo no personal
+Prueba / Trial
+#1E1B4B
+#818CF8
+Plan en período de prueba
+Pago vencido
+#1F0A0A
+#EF4444
+Suscripción con pago fallido
+Cancelado
+#1A1A18
+#555552
+Cuenta cancelada
+Canal WhatsApp
+#052E16
+#22C55E
+Indicador de canal WA activo
+Canal Instagram
+#2D1A0A
+#F97316
+Indicador de canal IG activo
+Canal Facebook
+#0A1628
+#3B82F6
+Indicador de canal FB activo
+17.5 Indicador de estado del agente IA
+Dot animado (pulse CSS) de 8px de diámetro junto al nombre del agente en el chat.
+Verde lima (#C8FF00) con animación de pulso — agente activo respondiendo.
+Gris (#555552) sin animación — agente pausado manualmente.
+Rojo (#EF4444) sin animación — agente bloqueado (contacto Personal o límite alcanzado).
+Ámbar (#F59E0B) sin animación — agente en horario fuera de atención.
+17.6 ObjectCard (tarjeta de catálogo)
+Fondo: --bg-card con borde 1px --border-light
+Imagen de portada: 100% de ancho, aspect ratio 16:9, object-fit cover, border-radius 8px 8px 0 0
+Precio: Geist Sans 600, 16px, --text-primary-light
+Título: Geist Sans 500, 14px, --text-primary-light, máximo 2 líneas con ellipsis
+Características clave: Geist Sans 400, 12px, --text-secondary-light (m², ambientes, etc.)
+Drag handle: ícono de 6 puntos (⋮⋮) en esquina superior derecha, visible solo en hover
+Al arrastrar al chat: el sistema ensambla y envía automáticamente la ficha técnica completa al cliente de WhatsApp
+17.7 Barra de límite de plan (LimiteBarra)
+Fondo de la barra: --bg-input (#EFEFED)
+Relleno 0–70%: --success (#22C55E)
+Relleno 70–90%: --warning (#F59E0B)
+Relleno 90–100%: --error (#EF4444) con animación de pulso suave
+Al llegar al 100%: modal de upgrade con botón primario accent
+18. Archivo de tokens — globals.css
+Este es el archivo completo que Claude Code debe crear en /app/globals.css durante la Fase 0. Contiene todos los tokens del sistema como CSS custom properties.
+/* ================================================
+   IMALÁ VOX — Design Tokens v1.0
+   Generado desde Sistema de Diseño Anexo v1.0
+   ================================================ */
+:root {
+  /* --- FONDOS --- */
+  --bg-sidebar:          #1F1F1E;
+  --bg-sidebar-hover:    #2A2A28;
+  --bg-sidebar-deep:     #161615;
+  --bg-main:             #F5F5F4;
+  --bg-card:             #FFFFFF;
+  --bg-input:            #EFEFED;
+  --bg-accent-subtle:    #F0FDF4;
+  /* --- TEXTO --- */
+  --text-primary-dark:   #EDEDED;
+  --text-secondary-dark: #8A8A85;
+  --text-tertiary-dark:  #555552;
+  --text-primary-light:  #1A1A18;
+  --text-secondary-light:#6B6B67;
+  --text-tertiary-light: #A3A39E;
+  /* --- ACENTO Y ESTADOS --- */
+  --accent:              #C8FF00;
+  --accent-hover:        #B8EF00;
+  --accent-active:       #A0D400;
+  --accent-text:         #1A1A18;
+  --success:             #22C55E;
+  --error:               #EF4444;
+  --warning:             #F59E0B;
+  --info:                #3B82F6;
+  /* --- BORDES --- */
+  --border-dark:         #2A2A28;
+  --border-dark-strong:  #3A3A38;
+  --border-light:        #E5E5E3;
+  --border-light-strong: #D4D4D0;
+  /* --- ESPACIADO --- */
+  --space-1: 4px;   --space-2: 8px;
+  --space-3: 12px;  --space-4: 16px;
+  --space-5: 20px;  --space-6: 24px;
+  --space-8: 32px;  --space-12: 48px;
+  /* --- RADIOS --- */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+  /* --- TIPOGRAFÍA --- */
+  --font-sans: 'Geist Sans', Inter, system-ui, sans-serif;
+  --font-mono: 'Geist Mono', 'Fira Code', monospace;
+  /* --- LAYOUT --- */
+  --sidebar-width:        240px;
+  --sidebar-collapsed:    64px;
+  --context-panel-width:  320px;
+  --header-height:        52px;
+  --min-app-width:        1280px;
+}
+/* Animación de pulso para indicador de IA activa */
+@keyframes ia-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.6; transform: scale(1.3); }
+}
+.ia-activa { animation: ia-pulse 2s ease-in-out infinite; }
+19. Prompt de inicio para Claude Code
+Este es el texto exacto para iniciar el proyecto en Antigravity. Pegarlo como primer mensaje junto con los dos documentos adjuntos (Especificación Técnica v1 + este Anexo Estético v1).
+Tenés dos documentos de referencia adjuntos:
+  1. Imala_Vox_Especificacion_Tecnica_v1.docx — arquitectura, módulos, Firestore, Cloud Functions
+  2. Imala_Vox_Sistema_Disenio_v1.docx — tokens de diseño, paleta, tipografía, componentes
+Iniciá el proyecto Imalá Vox — FASE 0: Scaffolding.
+Tareas de la Fase 0:
+  1. Crear proyecto Next.js 14 con TypeScript, Tailwind CSS y shadcn/ui
+  2. Instalar dependencias: firebase, geist, zustand, react-flow, @anthropic-ai/sdk
+  3. Crear /app/globals.css con los tokens de diseño del Anexo Estético (Sección 18)
+  4. Crear la estructura de colecciones en Firestore según Sección 3 de la Especificación
+  5. Configurar Firebase Auth con email/contraseña
+  6. Crear el layout de tres columnas (BarraLateral 240px + PanelPrincipal + PanelContexto 320px)
+     aplicando exactamente los tokens: --bg-sidebar para sidebar, --bg-main para área central
+  7. Crear el archivo /lib/planLimits.ts con los límites de cada plan según Sección 4
+  8. Crear la Cloud Function checkLimitesPlantilla() según Sección 9
+Referencia estética: plantilla EchoAI Dashboard — sidebar oscura #1F1F1E,
+área central clara #F5F5F4, botones accent #C8FF00, tipografía Geist Sans.
+Inspiración de producto: Linear.app + Vercel Dashboard.
+Al terminar la Fase 0, mostrar la estructura de archivos creada y
+confirmar que el layout se ve correctamente antes de avanzar a Fase 1.
+ORDEN DE LECTURA DE DOCUMENTOS para Claude Code:
+  Primero leer la Especificación Técnica (arquitectura, datos, lógica de negocio).
+  Luego leer el Anexo Estético (diseño, tokens, componentes).
+  Ante cualquier duda de UI, el Anexo Estético tiene prioridad sobre decisiones propias.
+  Ante cualquier duda de lógica, la Especificación Técnica tiene prioridad.
+IMALÁ VOX — Sistema de Diseño v1.0
+Documento confidencial · Imalá · Abril 2025
+
