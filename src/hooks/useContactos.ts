@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, query, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { COLLECTIONS, Contacto } from '@/lib/types/firestore';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';

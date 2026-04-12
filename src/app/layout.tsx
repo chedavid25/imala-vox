@@ -9,6 +9,8 @@ export const metadata: Metadata = {
   description: "Gestión inteligente de conversaciones para WhatsApp, Instagram y Facebook.",
 };
 
+import { Toaster } from "@/components/ui/sonner";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -20,6 +22,7 @@ export default function RootLayout({
         <AppLayout>
           {children}
         </AppLayout>
+        <Toaster richColors position="top-right" />
       </body>
     </html>
   );

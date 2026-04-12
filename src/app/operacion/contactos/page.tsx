@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { toast } from "sonner";
 
 export default function ContactosPage() {
   const { contactos, loading, error: fetchError } = useContactos();
@@ -90,11 +91,11 @@ export default function ContactosPage() {
         console.log(`Lote ${Math.floor(i / CHUNK_SIZE) + 1} completado.`);
       }
       
-      alert(`¡Éxito! Se importaron ${newContacts.length} contactos correctamente.`);
+      toast.success(`¡Éxito! Se importaron ${newContacts.length} contactos correctamente.`);
     } catch (error: any) {
       console.error("CRITICAL ERROR en importación masiva:", error);
       setImportError(error.message || "Error desconocido durante la importación.");
-      alert("Hubo un error al importar. Revisa el aviso rojo en pantalla.");
+      toast.error("Hubo un error al importar. Revisa el aviso rojo en pantalla.");
     } finally {
       setIsImporting(false);
     }
@@ -115,9 +116,11 @@ export default function ContactosPage() {
         creadoEl: Timestamp.now()
       });
 
+      toast.success("Contacto agregado correctamente");
       setNewContact({ nombre: "", telefono: "", email: "", fechaNacimiento: "", relacionTag: "Lead" });
     } catch (error) {
       console.error("Error agregando contacto manual:", error);
+      toast.error("No se pudo agregar el contacto");
     } finally {
       setIsAdding(false);
     }
