@@ -111,12 +111,14 @@ export default function ContactosPage() {
           <CSVImporter onImport={handleBulkImport} />
           
           <Dialog>
-            <DialogTrigger asChild>
-              <Button className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-10 px-5 shadow-lg shadow-[var(--accent)]/20">
-                <Plus className="w-4 h-4 mr-2" />
-                Nuevo Contacto
-              </Button>
-            </DialogTrigger>
+            <DialogTrigger 
+              render={
+                <Button className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-10 px-5 shadow-lg shadow-[var(--accent)]/20">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nuevo Contacto
+                </Button>
+              }
+            />
             <DialogContent className="sm:max-w-[425px] bg-[var(--bg-card)] border-[var(--border-light)]">
               <DialogHeader>
                 <DialogTitle className="text-[var(--text-primary-light)]">Agregar Contacto</DialogTitle>
@@ -163,16 +165,18 @@ export default function ContactosPage() {
                 </div>
               </div>
               <DialogFooter>
-                <DialogTrigger asChild>
-                  <Button 
-                    onClick={handleManualAdd} 
-                    disabled={isAdding || !newContact.nombre || !newContact.telefono}
-                    className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)]"
-                  >
-                    {isAdding ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                    Guardar Contacto
-                  </Button>
-                </DialogTrigger>
+                <DialogClose
+                  render={
+                    <Button 
+                      onClick={handleManualAdd} 
+                      disabled={isAdding || !newContact.nombre || !newContact.telefono}
+                      className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)]"
+                    >
+                      {isAdding ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                      Guardar Contacto
+                    </Button>
+                  }
+                />
               </DialogFooter>
             </DialogContent>
           </Dialog>
