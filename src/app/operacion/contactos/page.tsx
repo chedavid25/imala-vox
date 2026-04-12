@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { ContactTable } from "@/components/crm/ContactTable";
 import { CSVImporter } from "@/components/crm/CSVImporter";
 import { useContactos } from "@/hooks/useContactos";
-import { Plus, Search, Loader2 } from "lucide-react";
+import { Plus, Search, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { db } from "@/lib/firebase";
@@ -29,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function ContactosPage() {
   const { contactos, loading, error: fetchError } = useContactos();
@@ -36,6 +37,7 @@ export default function ContactosPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isImporting, setIsImporting] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
 
   // Estado del formulario de nuevo contacto
   const [newContact, setNewContact] = useState({
@@ -55,32 +57,44 @@ export default function ContactosPage() {
     if (!currentWorkspaceId || newContacts.length === 0) return;
     
     setIsImporting(true);
+    setImportError(null);
+    console.log(`Iniciando importación de ${newContacts.length} contactos...`);
+
     try {
       const contactsRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS);
-      const CHUNK_SIZE = 400; // Límite de Firestore batch es 500
+      const CHUNK_SIZE = 400; 
       
       for (let i = 0; i < newContacts.length; i += CHUNK_SIZE) {
         const chunk = newContacts.slice(i, i + CHUNK_SIZE);
         const batch = writeBatch(db);
+        
+        console.log(`Procesando lote ${Math.floor(i / CHUNK_SIZE) + 1}...`);
         
         chunk.forEach((contactData) => {
           const newDocRef = doc(contactsRef);
           const aiBlocked = contactData.relacionTag === 'Personal';
           
           batch.set(newDocRef, {
-            ...contactData,
+            nombre: contactData.nombre || "Sin nombre",
+            telefono: contactData.telefono || "Sin teléfono",
+            email: contactData.email || "",
+            fechaNacimiento: contactData.fechaNacimiento || "",
+            relacionTag: contactData.relacionTag || "Lead",
             aiBlocked,
+            etiquetas: contactData.etiquetas || [],
             creadoEl: Timestamp.now()
           });
         });
 
         await batch.commit();
+        console.log(`Lote ${Math.floor(i / CHUNK_SIZE) + 1} completado.`);
       }
       
       alert(`¡Éxito! Se importaron ${newContacts.length} contactos correctamente.`);
-    } catch (error) {
-      console.error("Error en importación masiva:", error);
-      alert("Hubo un error al importar los contactos. Revisa la consola.");
+    } catch (error: any) {
+      console.error("CRITICAL ERROR en importación masiva:", error);
+      setImportError(error.message || "Error desconocido durante la importación.");
+      alert("Hubo un error al importar. Revisa el aviso rojo en pantalla.");
     } finally {
       setIsImporting(false);
     }
@@ -97,6 +111,7 @@ export default function ContactosPage() {
       await addDoc(contactsRef, {
         ...newContact,
         aiBlocked,
+        etiquetas: [],
         creadoEl: Timestamp.now()
       });
 
@@ -221,9 +236,23 @@ export default function ContactosPage() {
       </div>
 
       {fetchError && (
-        <div className="p-4 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm">
-          Error al cargar contactos: {fetchError.message}. Verifica que tengas permisos en Firebase.
-        </div>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 h-4" />
+          <AlertTitle>Error de Conexión</AlertTitle>
+          <AlertDescription>
+            No se pudieron cargar los contactos: {fetchError.message}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {importError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 h-4" />
+          <AlertTitle>Error de Importación</AlertTitle>
+          <AlertDescription>
+            {importError}
+          </AlertDescription>
+        </Alert>
       )}
 
       {loading || isImporting ? (

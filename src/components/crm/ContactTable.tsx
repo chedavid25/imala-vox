@@ -25,20 +25,23 @@ import { db } from "@/lib/firebase";
 import { doc, deleteDoc } from "firebase/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { COLLECTIONS } from "@/lib/types/firestore";
+import { cn } from "@/lib/utils";
 
 interface ContactTableProps {
   contactos: (Contacto & { id: string })[];
 }
 
 export function ContactTable({ contactos }: ContactTableProps) {
-  const { currentWorkspaceId } = useWorkspaceStore();
+  const { currentWorkspaceId, selectedContactId, setSelectedContactId } = useWorkspaceStore();
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (event: React.MouseEvent, id: string) => {
+    event.stopPropagation(); // Evitar seleccionar la fila al borrar
     if (!currentWorkspaceId || !confirm("¿Estás seguro de que deseas eliminar este contacto?")) return;
     
     try {
       const contactRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS, id);
       await deleteDoc(contactRef);
+      if (selectedContactId === id) setSelectedContactId(null);
     } catch (error) {
       console.error("Error eliminando contacto:", error);
       alert("No se pudo eliminar el contacto.");
@@ -68,7 +71,16 @@ export function ContactTable({ contactos }: ContactTableProps) {
             </TableRow>
           ) : (
             contactos.map((contacto) => (
-              <TableRow key={contacto.id} className="border-[var(--border-light)] hover:bg-[var(--bg-main)]/50 transition-colors group">
+              <TableRow 
+                key={contacto.id} 
+                className={cn(
+                  "border-[var(--border-light)] transition-colors group cursor-pointer",
+                  selectedContactId === contacto.id 
+                    ? "bg-[var(--accent)]/10 hover:bg-[var(--accent)]/15" 
+                    : "hover:bg-[var(--bg-main)]/50"
+                )}
+                onClick={() => setSelectedContactId(contacto.id)}
+              >
                 <TableCell className="font-semibold text-[var(--text-primary-light)] text-[13px]">
                   {contacto.nombre}
                 </TableCell>
@@ -122,7 +134,7 @@ export function ContactTable({ contactos }: ContactTableProps) {
                         Editar contacto
                       </DropdownMenuItem>
                       <DropdownMenuItem 
-                        onClick={() => handleDelete(contacto.id)}
+                        onClick={(e) => handleDelete(e, contacto.id)}
                         className="text-[13px] text-[var(--error)] focus:bg-[var(--error)]/10 cursor-pointer"
                       >
                         <Trash2 className="w-4 h-4 mr-2" />
