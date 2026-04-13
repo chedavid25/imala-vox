@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Table,
   TableBody,
@@ -37,7 +37,19 @@ import {
 } from "@/components/ui/select";
 import { EtiquetaRelacion } from "@/components/ui/EtiquetaRelacion";
 import { Contacto } from "@/lib/types/firestore";
-import { Shield, ShieldOff, MoreHorizontal, Pencil, Trash2, Mail, Calendar, Loader2 } from "lucide-react";
+import { 
+  Shield, 
+  ShieldOff, 
+  MoreHorizontal, 
+  Pencil, 
+  Trash2, 
+  Mail, 
+  Calendar, 
+  Loader2,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
 import { doc, deleteDoc, updateDoc } from "firebase/firestore";
@@ -50,13 +62,49 @@ interface ContactTableProps {
   contactos: (Contacto & { id: string })[];
 }
 
+type SortConfig = {
+  key: keyof Contacto | "id";
+  direction: "asc" | "desc";
+} | null;
+
 export function ContactTable({ contactos }: ContactTableProps) {
   const { currentWorkspaceId, selectedContactId, setSelectedContactId } = useWorkspaceStore();
   
+  // Estado para ordenamiento
+  const [sortConfig, setSortConfig] = useState<SortConfig>(null);
+
   // Estado para edición
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editingContact, setEditingContact] = useState<(Contacto & { id: string }) | null>(null);
+
+  // Lógica de ordenamiento
+  const sortedContactos = useMemo(() => {
+    let sortableItems = [...contactos];
+    if (sortConfig !== null) {
+      sortableItems.sort((a, b) => {
+        const aValue = a[sortConfig.key] || "";
+        const bValue = b[sortConfig.key] || "";
+        
+        if (aValue < bValue) {
+          return sortConfig.direction === "asc" ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === "asc" ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableItems;
+  }, [contactos, sortConfig]);
+
+  const requestSort = (key: keyof Contacto | "id") => {
+    let direction: "asc" | "desc" = "asc";
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === "asc") {
+      direction = "desc";
+    }
+    setSortConfig({ key, direction });
+  };
 
   const handleDelete = async (event: React.MouseEvent, id: string) => {
     event.stopPropagation();
@@ -119,30 +167,85 @@ export function ContactTable({ contactos }: ContactTableProps) {
     }
   };
 
+  const SortIndicator = ({ columnKey }: { columnKey: keyof Contacto | "id" }) => {
+    if (sortConfig?.key !== columnKey) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-30" />;
+    return sortConfig.direction === "asc" 
+      ? <ArrowUp className="w-3 h-3 ml-1 text-[var(--accent)]" /> 
+      : <ArrowDown className="w-3 h-3 ml-1 text-[var(--accent)]" />;
+  };
+
   return (
     <>
       <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-card)] overflow-hidden shadow-sm">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent border-[var(--border-light)] bg-[var(--bg-main)]/30">
-              <TableHead className="text-[var(--text-secondary-light)] font-semibold text-[12px] uppercase h-10">Nombre</TableHead>
-              <TableHead className="text-[var(--text-secondary-light)] font-semibold text-[12px] uppercase h-10">Teléfono</TableHead>
-              <TableHead className="text-[var(--text-secondary-light)] font-semibold text-[12px] uppercase h-10">Email</TableHead>
-              <TableHead className="text-[var(--text-secondary-light)] font-semibold text-[12px] uppercase h-10">Cumpleaños</TableHead>
-              <TableHead className="text-[var(--text-secondary-light)] font-semibold text-[12px] uppercase h-10">Relación</TableHead>
-              <TableHead className="text-[var(--text-secondary-light)] font-semibold text-[12px] uppercase h-10">IA</TableHead>
-              <TableHead className="text-[var(--text-secondary-light)] font-semibold text-[12px] uppercase h-10 text-right">Acciones</TableHead>
+              <TableHead 
+                className="text-[var(--text-secondary-light)] font-semibold text-[11px] uppercase h-10 cursor-pointer hover:text-[var(--text-primary-light)] transition-colors group"
+                onClick={() => requestSort("nombre")}
+              >
+                <div className="flex items-center">
+                  Nombre
+                  <SortIndicator columnKey="nombre" />
+                </div>
+              </TableHead>
+              <TableHead 
+                className="text-[var(--text-secondary-light)] font-semibold text-[11px] uppercase h-10 cursor-pointer hover:text-[var(--text-primary-light)] transition-colors group"
+                onClick={() => requestSort("telefono")}
+              >
+                <div className="flex items-center">
+                  Teléfono
+                  <SortIndicator columnKey="telefono" />
+                </div>
+              </TableHead>
+              <TableHead 
+                className="text-[var(--text-secondary-light)] font-semibold text-[11px] uppercase h-10 cursor-pointer hover:text-[var(--text-primary-light)] transition-colors group"
+                onClick={() => requestSort("email")}
+              >
+                <div className="flex items-center">
+                  Email
+                  <SortIndicator columnKey="email" />
+                </div>
+              </TableHead>
+              <TableHead 
+                className="text-[var(--text-secondary-light)] font-semibold text-[11px] uppercase h-10 cursor-pointer hover:text-[var(--text-primary-light)] transition-colors group"
+                onClick={() => requestSort("fechaNacimiento")}
+              >
+                <div className="flex items-center">
+                  Cumpleaños
+                  <SortIndicator columnKey="fechaNacimiento" />
+                </div>
+              </TableHead>
+              <TableHead 
+                className="text-[var(--text-secondary-light)] font-semibold text-[11px] uppercase h-10 cursor-pointer hover:text-[var(--text-primary-light)] transition-colors group"
+                onClick={() => requestSort("relacionTag")}
+              >
+                <div className="flex items-center">
+                  Relación
+                  <SortIndicator columnKey="relacionTag" />
+                </div>
+              </TableHead>
+              <TableHead 
+                className="text-[var(--text-secondary-light)] font-semibold text-[11px] uppercase h-10 cursor-pointer hover:text-[var(--text-primary-light)] transition-colors group"
+                onClick={() => requestSort("aiBlocked")}
+              >
+                <div className="flex items-center">
+                  IA
+                  <SortIndicator columnKey="aiBlocked" />
+                </div>
+              </TableHead>
+              <TableHead className="text-[var(--text-secondary-light)] font-semibold text-[11px] uppercase h-10 text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {contactos.length === 0 ? (
+            {sortedContactos.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="h-32 text-center text-[var(--text-tertiary-light)] text-[13px]">
                   No se encontraron contactos.
                 </TableCell>
               </TableRow>
             ) : (
-              contactos.map((contacto) => (
+              sortedContactos.map((contacto) => (
                 <TableRow 
                   key={contacto.id} 
                   className={cn(
@@ -162,7 +265,7 @@ export function ContactTable({ contactos }: ContactTableProps) {
                   <TableCell className="text-[var(--text-tertiary-light)] text-[13px]">
                     {contacto.email ? (
                       <div className="flex items-center gap-1.5">
-                        <Mail className="w-3 h-3" />
+                        <Mail className="size-3" />
                         {contacto.email}
                       </div>
                     ) : "-"}
@@ -170,7 +273,7 @@ export function ContactTable({ contactos }: ContactTableProps) {
                   <TableCell className="text-[var(--text-tertiary-light)] text-[13px]">
                      {contacto.fechaNacimiento ? (
                       <div className="flex items-center gap-1.5">
-                        <Calendar className="w-3 h-3" />
+                        <Calendar className="size-3" />
                         {contacto.fechaNacimiento}
                       </div>
                     ) : "-"}
@@ -180,13 +283,13 @@ export function ContactTable({ contactos }: ContactTableProps) {
                   </TableCell>
                   <TableCell>
                     {contacto.aiBlocked ? (
-                      <div className="flex items-center gap-1.5 text-[var(--error)] text-[12px] font-bold">
-                        <ShieldOff className="w-3.5 h-3.5" />
+                      <div className="flex items-center gap-1.5 text-[var(--error)] text-[11px] font-bold">
+                        <ShieldOff className="size-3.5" />
                         BLOQUEADA
                       </div>
                     ) : (
-                      <div className="flex items-center gap-1.5 text-[var(--success)] text-[12px] font-bold">
-                        <Shield className="w-3.5 h-3.5" />
+                      <div className="flex items-center gap-1.5 text-[var(--success)] text-[11px] font-bold">
+                        <Shield className="size-3.5" />
                         ACTIVA
                       </div>
                     )}
@@ -311,7 +414,7 @@ export function ContactTable({ contactos }: ContactTableProps) {
               disabled={isSaving || !editingContact?.nombre || !editingContact?.telefono}
               className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)]"
             >
-              {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              {isSaving ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
               Guardar Cambios
             </Button>
           </DialogFooter>

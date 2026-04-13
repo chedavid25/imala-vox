@@ -8,7 +8,7 @@ import { Plus, Search, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { db } from "@/lib/firebase";
-import { collection, doc, writeBatch, Timestamp, addDoc } from "firebase/firestore";
+import { collection, doc, writeBatch, Timestamp, addDoc, query, where, getDocs, or, and } from "firebase/firestore";
 import { COLLECTIONS, Contacto } from "@/lib/types/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import {
@@ -59,43 +59,76 @@ export default function ContactosPage() {
     
     setIsImporting(true);
     setImportError(null);
-    console.log(`Iniciando importación de ${newContacts.length} contactos...`);
+    let importedCount = 0;
+    let skippedCount = 0;
+
+    console.log(`Iniciando importación de ${newContacts.length} contactos con detección de duplicados...`);
 
     try {
       const contactsRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS);
-      const CHUNK_SIZE = 400; 
+      const CHUNK_SIZE = 50; 
       
       for (let i = 0; i < newContacts.length; i += CHUNK_SIZE) {
         const chunk = newContacts.slice(i, i + CHUNK_SIZE);
         const batch = writeBatch(db);
         
-        console.log(`Procesando lote ${Math.floor(i / CHUNK_SIZE) + 1}...`);
+        console.log(`Verificando lote ${Math.floor(i / CHUNK_SIZE) + 1}...`);
         
-        chunk.forEach((contactData) => {
-          const newDocRef = doc(contactsRef);
-          const aiBlocked = contactData.relacionTag === 'Personal';
+        const validationPromises = chunk.map(async (contactData) => {
+          const nombre = contactData.nombre || "Sin nombre";
+          const telefono = contactData.telefono || "";
+          const email = contactData.email || "";
+
+          const conditions = [];
+          if (telefono) conditions.push(where("telefono", "==", telefono));
+          if (email) conditions.push(where("email", "==", email));
+
+          if (conditions.length === 0) return { shouldAdd: true, data: contactData };
+
+          const q = query(
+            contactsRef, 
+            or(...conditions)
+          );
           
-          batch.set(newDocRef, {
-            nombre: contactData.nombre || "Sin nombre",
-            telefono: contactData.telefono || "Sin teléfono",
-            email: contactData.email || "",
-            fechaNacimiento: contactData.fechaNacimiento || "",
-            relacionTag: contactData.relacionTag || "Lead",
-            aiBlocked,
-            etiquetas: contactData.etiquetas || [],
-            creadoEl: Timestamp.now()
-          });
+          const snap = await getDocs(q);
+          return { shouldAdd: snap.empty, data: contactData };
+        });
+
+        const results = await Promise.all(validationPromises);
+        
+        results.forEach(({ shouldAdd, data }) => {
+          if (shouldAdd) {
+            const newDocRef = doc(contactsRef);
+            const aiBlocked = data.relacionTag === 'Personal';
+            
+            batch.set(newDocRef, {
+              nombre: data.nombre || "Sin nombre",
+              telefono: data.telefono || "Sin teléfono",
+              email: data.email || "",
+              fechaNacimiento: data.fechaNacimiento || "",
+              relacionTag: data.relacionTag || "Lead",
+              aiBlocked,
+              etiquetas: data.etiquetas || [],
+              creadoEl: Timestamp.now()
+            });
+            importedCount++;
+          } else {
+            skippedCount++;
+          }
         });
 
         await batch.commit();
-        console.log(`Lote ${Math.floor(i / CHUNK_SIZE) + 1} completado.`);
       }
       
-      toast.success(`¡Éxito! Se importaron ${newContacts.length} contactos correctamente.`);
+      if (skippedCount > 0) {
+        toast.success(`Importación terminada: ${importedCount} agregados. Se omitieron ${skippedCount} duplicados (mismo teléfono o email).`);
+      } else {
+        toast.success(`¡Éxito! Se importaron ${importedCount} contactos correctamente.`);
+      }
     } catch (error: any) {
       console.error("CRITICAL ERROR en importación masiva:", error);
       setImportError(error.message || "Error desconocido durante la importación.");
-      toast.error("Hubo un error al importar. Revisa el aviso rojo en pantalla.");
+      toast.error("Hubo un error al importar.");
     } finally {
       setIsImporting(false);
     }
@@ -107,6 +140,24 @@ export default function ContactosPage() {
     setIsAdding(true);
     try {
       const contactsRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS);
+      
+      const conditions = [where("telefono", "==", newContact.telefono)];
+      if (newContact.email) conditions.push(where("email", "==", newContact.email));
+
+      // Consultamos si el teléfono o el email ya existen (sin importar el nombre)
+      const q = query(
+        contactsRef,
+        or(...conditions)
+      );
+
+      const snap = await getDocs(q);
+      
+      if (!snap.empty) {
+        toast.error("Este contacto ya existe (mismo teléfono o email).");
+        setIsAdding(false);
+        return;
+      }
+
       const aiBlocked = newContact.relacionTag === 'Personal';
 
       await addDoc(contactsRef, {
