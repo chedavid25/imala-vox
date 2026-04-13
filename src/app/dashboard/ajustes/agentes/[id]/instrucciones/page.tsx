@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { useParams } from "next/navigation";
+import { mejorarInstruccionesAction } from "@/app/actions/ai";
 
 const SNIPPETS = [
   { label: "Seguir pasos", icon: ListOrdered, text: "Seguí estos pasos en orden:\n1. \n2. \n3. " },
@@ -33,6 +34,7 @@ export default function InstruccionesAgente() {
   const [instrucciones, setInstrucciones] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -91,6 +93,31 @@ export default function InstruccionesAgente() {
     }
   };
 
+  const handleOptimize = async () => {
+    if (!instrucciones || instrucciones.trim().length < 10) {
+      toast.error("Escribe al menos una idea breve para poder optimizarla.");
+      return;
+    }
+
+    setIsOptimizing(true);
+    const toastId = toast.loading("La IA está analizando y mejorando tus instrucciones...");
+
+    try {
+      const result = await mejorarInstruccionesAction(instrucciones);
+      
+      if (result.success && result.reply) {
+        setInstrucciones(result.reply);
+        toast.success("¡Instrucciones optimizadas con éxito!", { id: toastId });
+      } else {
+        toast.error(result.error || "No se pudo optimizar el texto", { id: toastId });
+      }
+    } catch (err) {
+      toast.error("Error en la conexión con el optimizador", { id: toastId });
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center h-64">
@@ -129,13 +156,29 @@ export default function InstruccionesAgente() {
             {SNIPPETS.map((s, idx) => (
               <button
                 key={idx}
+                disabled={isOptimizing}
                 onClick={() => insertSnippet(s.text)}
-                className="flex items-center gap-2 px-3 py-1.5 text-[12px] font-semibold text-[var(--text-secondary-light)] hover:bg-[var(--bg-card)] hover:text-[var(--accent)] rounded-lg transition-all border border-transparent hover:border-[var(--border-light)] shadow-sm"
+                className="flex items-center gap-2 px-3 py-1.5 text-[12px] font-semibold text-[var(--text-secondary-light)] hover:bg-[var(--bg-card)] hover:text-[var(--accent)] rounded-lg transition-all border border-transparent hover:border-[var(--border-light)] shadow-sm disabled:opacity-50"
               >
                 <s.icon className="w-3.5 h-3.5" />
                 {s.label}
               </button>
             ))}
+            
+            <div className="h-4 w-[1px] bg-[var(--border-light)] mx-1 self-center" />
+
+            <button
+              onClick={handleOptimize}
+              disabled={isOptimizing}
+              className="flex items-center gap-2 px-4 py-1.5 text-[12px] font-bold text-[var(--accent-text)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-all shadow-md hover:shadow-[var(--accent)]/20 disabled:opacity-50 animate-in fade-in zoom-in duration-300"
+            >
+              {isOptimizing ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="w-3.5 h-3.5" />
+              )}
+              {isOptimizing ? "Optimizando..." : "Mejorar con IA"}
+            </button>
           </div>
 
           <div className="relative group">
@@ -143,6 +186,7 @@ export default function InstruccionesAgente() {
               ref={textareaRef}
               value={instrucciones}
               onChange={(e) => setInstrucciones(e.target.value)}
+              disabled={isOptimizing}
               placeholder="Escribe aquí las instrucciones maestras para tu agente..."
               className="min-h-[500px] bg-[var(--bg-card)] border-[var(--border-light)] focus-visible:ring-1 focus-visible:ring-[var(--accent)] text-sm leading-relaxed p-6 rounded-2xl shadow-inner resize-none font-medium text-[var(--text-primary-light)]"
               maxLength={8000}

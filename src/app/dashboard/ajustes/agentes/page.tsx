@@ -69,7 +69,7 @@ export default function AgentesPage() {
         nombre: newAgente.nombre,
         avatar: null,
         activo: true,
-        instrucciones: "Eres un asistente amable...",
+        instrucciones: "Eres un asistente amable y profesional.\n\nREGLAS:\n- No uses emojis en tus respuestas.\n- Responde en texto plano, sin negritas ni asteriscos.\n- Sé breve y directo.",
         rolPublico: "Clientes del negocio",
         rolAgente: newAgente.rolAgente,
         modoDefault: 'copiloto',
@@ -186,35 +186,34 @@ export default function AgentesPage() {
                   <Bot className="w-6 h-6 text-[var(--accent)]" />
                 </div>
                 <div className={cn(
-                  "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase flex items-center gap-1.5 shadow-sm border",
+                  "px-3 py-1.5 rounded-full text-[10px] font-bold uppercase flex items-center gap-2 shadow-xl border transition-all duration-300",
                   agente.activo 
-                    ? "bg-[var(--bg-sidebar)] text-[var(--accent)] border-[var(--accent)]/30" 
-                    : "bg-[var(--bg-sidebar)] text-[var(--text-tertiary-dark)] border-[var(--border-dark)]"
+                    ? "bg-[#1A1A18] text-[var(--accent)] border-[var(--accent)]/30 ring-4 ring-[var(--accent)]/5" 
+                    : "bg-[#1A1A18] text-[var(--text-tertiary-dark)] border-white/5 opacity-50"
                 )}>
-                  <Activity className={cn("w-3 h-3", agente.activo ? "text-[var(--accent)]" : "text-[var(--text-tertiary-dark)]")} />
-                  {agente.activo ? "Activo" : "Inactivo"}
+                  <Activity className={cn("w-3 h-3 animate-pulse", agente.activo ? "text-[var(--accent)]" : "text-[var(--text-tertiary-dark)]")} />
+                  {agente.activo ? "En línea" : "Desconectado"}
                 </div>
               </div>
               
               <div className="space-y-1 mb-6">
-                <h3 className="text-lg font-bold text-[var(--text-primary-light)] group-hover:text-[var(--accent)] transition-colors">
+                <h3 className="text-lg font-bold text-[var(--text-primary-light)] group-hover:text-[var(--accent-active)] transition-colors">
                   {agente.nombre}
                 </h3>
-                <p className="text-xs text-[var(--text-tertiary-light)] font-medium line-clamp-1">
+                <p className="text-xs text-[var(--text-secondary-light)] font-medium line-clamp-1">
                   {agente.rolAgente}
                 </p>
               </div>
 
-              <div className="flex items-center justify-between pt-6 border-t border-[var(--border-light)]">
-                <div className="flex -space-x-2">
-                  <div className="w-6 h-6 rounded-full bg-[var(--bg-input)] border-2 border-[var(--bg-card)] flex items-center justify-center overflow-hidden">
-                    <UserCircle2 className="w-4 h-4 text-[var(--text-tertiary-light)]" />
-                  </div>
+              <div className="flex items-center justify-between pt-5 border-t border-[var(--border-light)]/60">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-[var(--accent)]" />
+                  <span className="text-[10px] font-bold text-[var(--text-tertiary-light)] uppercase tracking-wider">Base lista</span>
                 </div>
                 <Button 
-                  variant="outline" 
+                  variant="ghost" 
                   size="sm" 
-                  className="h-8 px-4 text-[12px] font-bold bg-[var(--bg-sidebar)] text-[var(--accent)] border-[var(--accent)]/50 hover:bg-[var(--bg-sidebar-hover)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition-all shadow-sm"
+                  className="border border-[var(--border-light-strong)] bg-transparent text-[var(--text-primary-light)] hover:bg-[var(--bg-input)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)] transition-all font-semibold rounded-[var(--radius-md)] h-8 px-4 text-[12px] translate-y-1"
                 >
                   Configurar
                 </Button>

@@ -4,7 +4,7 @@ import React from "react";
 import { useParams } from "next/navigation";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { TestChat } from "@/components/ai/TestChat";
-import { Bot, Sparkles, MessageSquare, Info } from "lucide-react";
+import { Bot, Sparkles, MessageSquare, Info, Box } from "lucide-react";
 
 export default function AgentePlaygroundPage() {
   const { currentWorkspaceId } = useWorkspaceStore();
@@ -38,8 +38,8 @@ export default function AgentePlaygroundPage() {
         <div className="lg:col-span-5 xl:col-span-4 space-y-6">
           <div className="bg-[var(--bg-input)]/30 border border-[var(--border-light)] p-8 rounded-[2.5rem] space-y-6">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-[var(--accent)]/10 flex items-center justify-center text-[var(--accent)]">
-                <Info className="w-5 h-5" />
+              <div className="w-10 h-10 rounded-2xl bg-[var(--bg-sidebar)] border border-[var(--accent)]/30 flex items-center justify-center text-[var(--accent)] shadow-sm">
+                <Box className="w-5 h-5" />
               </div>
               <h3 className="text-sm font-bold text-[var(--text-primary-light)]">Información Útil</h3>
             </div>

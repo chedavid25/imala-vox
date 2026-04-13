@@ -41,7 +41,7 @@ export function ContextPanel() {
         {/* Sección de Identidad */}
         <section className="space-y-4">
           <div className="flex flex-col items-center text-center space-y-2">
-            <div className="w-16 h-16 rounded-full bg-[var(--accent)]/10 flex items-center justify-center border-2 border-[var(--accent)]/20">
+            <div className="w-16 h-16 rounded-full bg-[var(--bg-sidebar)] border-2 border-[var(--accent)]/30 flex items-center justify-center shadow-md">
               <User className="w-8 h-8 text-[var(--accent)]" />
             </div>
             <div>

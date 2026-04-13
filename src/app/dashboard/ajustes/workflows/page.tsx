@@ -74,8 +74,8 @@ export default function WorkflowsPage() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div className="flex items-start gap-5">
                 <div className={cn(
-                  "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0",
-                  wf.active ? "bg-[var(--accent)]/10 text-[var(--accent)]" : "bg-[var(--bg-input)] text-[var(--text-tertiary-light)]"
+                  "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm",
+                  wf.active ? "bg-[var(--bg-sidebar)] border border-[var(--accent)]/30 text-[var(--accent)]" : "bg-[var(--bg-input)] text-[var(--text-tertiary-light)]"
                 )}>
                   <Zap className="w-6 h-6" />
                 </div>
@@ -113,7 +113,7 @@ export default function WorkflowsPage() {
 
         <div className="p-12 border-2 border-dashed border-[var(--border-light)] rounded-3xl flex flex-col items-center justify-center text-center space-y-4 bg-[var(--bg-card)]/30 group hover:border-[var(--accent)]/40 transition-all cursor-pointer">
           <div className="w-14 h-14 rounded-2xl bg-[var(--bg-input)] flex items-center justify-center group-hover:bg-[var(--accent)] transition-all">
-            <Plus className="w-7 h-7 text-[var(--text-tertiary-light)] group-hover:text-white" />
+            <Plus className="w-7 h-7 text-[var(--text-tertiary-light)] group-hover:text-[var(--accent-text)]" />
           </div>
           <div className="space-y-1">
             <h4 className="text-base font-bold text-[var(--text-primary-light)]">Explorar Plantillas de Automatización</h4>

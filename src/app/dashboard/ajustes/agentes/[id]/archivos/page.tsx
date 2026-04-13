@@ -177,42 +177,73 @@ export default function AgenteArchivosPage() {
         ) : (
           archivosGlobales.map((archivo) => {
             const isActive = !!activosMap[archivo.id];
+            const isProcessing = archivo.estado === 'procesando' || archivo.estado === 'pendiente';
+            const hasError = archivo.estado === 'error';
+
             return (
               <div 
                 key={archivo.id}
                 className={cn(
-                  "flex items-center justify-between p-5 rounded-2xl border transition-all",
-                  isActive 
-                    ? "bg-[var(--bg-card)] border-[var(--accent)]/30 shadow-sm" 
-                    : "bg-[var(--bg-card)]/50 border-[var(--border-light)] grayscale opacity-70 hover:opacity-100 hover:grayscale-0"
+                  "flex items-center justify-between p-4 rounded-2xl border transition-all duration-200",
+                  !isActive 
+                    ? "bg-[var(--bg-card)] border-[var(--border-light-strong)] opacity-60 hover:opacity-100" 
+                    : isProcessing
+                      ? "bg-[var(--bg-card)] border-[var(--border-light-strong)] opacity-80"
+                      : hasError
+                        ? "bg-[var(--bg-card)] border-[var(--error)]/30"
+                        : "bg-[var(--bg-card)] border-[var(--accent)]/30 shadow-sm"
                 )}
               >
                 <div className="flex items-center gap-4 min-w-0">
                   <div className={cn(
-                    "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border",
-                    isActive ? "bg-[var(--accent)]/10 border-[var(--accent)]/20" : "bg-[var(--bg-input)] border-[var(--border-light)]"
+                    "w-10 h-10 rounded-xl border flex items-center justify-center transition-all duration-300",
+                    isActive 
+                      ? "bg-[var(--bg-sidebar)] border border-[var(--accent)]/30 shadow-sm" 
+                      : "bg-[var(--bg-input)] border-[var(--border-light)]"
                   )}>
-                    <FileIcon className={cn("w-6 h-6", isActive ? "text-[var(--accent)]" : "text-[var(--text-tertiary-light)]")} />
+                    <FileIcon className={cn(
+                      "w-5 h-5", 
+                      isActive && !hasError ? "text-[var(--accent)]" : "text-[var(--text-tertiary-light)]"
+                    )} />
                   </div>
-                  <div className="min-w-0">
-                    <h4 className="text-sm font-bold text-[var(--text-primary-light)] truncate">
-                      {archivo.titulo || archivo.archivoNombre}
-                    </h4>
+
+                  <div className="flex flex-col gap-0.5 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-[var(--text-primary-light)] truncate">
+                        {archivo.titulo || archivo.archivoNombre}
+                      </span>
+                      
+                      {isProcessing ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[var(--bg-input)] border border-[var(--border-light)] text-[9px] font-bold text-[var(--text-secondary-light)] uppercase tracking-wider">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          Procesando
+                        </span>
+                      ) : isActive && !hasError ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[var(--accent)]/10 border border-[var(--accent)]/20 text-[9px] font-bold text-[var(--accent)] uppercase tracking-wider">
+                          <CheckCircle2 className="w-3 h-3" />
+                          Activo
+                        </span>
+                      ) : hasError ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[var(--error)]/10 border border-[var(--error)]/20 text-[9px] font-bold text-[var(--error)] uppercase tracking-wider">
+                          <AlertCircle className="w-3 h-3" />
+                          Error
+                        </span>
+                      ) : null}
+                    </div>
+                    
                     <p className="text-[11px] text-[var(--text-tertiary-light)] font-medium truncate max-w-[300px]">
-                      {archivo.descripcion || "Sin descripción específica"}
+                      {archivo.descripcion || "Archivo de entrenamiento entrenable"}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-6 shrink-0">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className="flex items-center gap-2.5 bg-[var(--bg-input)]/50 px-3 py-1.5 rounded-full border border-[var(--border-light)] shadow-inner">
                     <span className={cn(
-                      "text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider border transition-colors",
-                      isActive 
-                        ? "bg-[var(--bg-sidebar)] text-[var(--accent)] border-[var(--accent)]/40" 
-                        : "text-[var(--text-tertiary-light)] border-[var(--border-light)]"
+                      "text-[10px] font-bold uppercase tracking-tight",
+                      isActive ? "text-[var(--accent-active)]" : "text-[var(--text-tertiary-light)]"
                     )}>
-                      {isActive ? "Activo" : "Inactivo"}
+                      {isActive ? 'Activado' : 'Inactivo'}
                     </span>
                     <Switch 
                       checked={isActive}

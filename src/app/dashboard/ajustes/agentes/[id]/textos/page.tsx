@@ -155,19 +155,40 @@ export default function AgenteTextosPage() {
               <div 
                 key={t.id}
                 className={cn(
-                  "p-5 rounded-3xl border transition-all flex flex-col justify-between",
-                  isActive ? "bg-[var(--bg-card)] border-[var(--accent)]/30 shadow-md" : "bg-[var(--bg-card)]/40 border-[var(--border-light)] opacity-60"
+                  "p-4 rounded-2xl border transition-all flex flex-col justify-between duration-200",
+                  !isActive 
+                    ? "bg-[var(--bg-card)] border-[var(--border-light-strong)] opacity-60 hover:opacity-100" 
+                    : "bg-[var(--bg-card)] border-[var(--accent)]/30 shadow-sm"
                 )}
               >
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-2">
-                      <Type className={cn("w-4 h-4", isActive ? "text-[var(--accent)]" : "text-[var(--text-tertiary-light)]")} />
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        "w-10 h-10 rounded-xl border flex items-center justify-center transition-all duration-300",
+                        isActive 
+                          ? "bg-[var(--bg-sidebar)] border border-[var(--accent)]/30 shadow-sm" 
+                          : "bg-[var(--bg-input)] border-[var(--border-light)]"
+                      )}>
+                        <Type className={cn(
+                          "w-5 h-5", 
+                          isActive ? "text-[var(--accent)]" : "text-[var(--text-tertiary-light)]"
+                        )} />
+                      </div>
                       <h4 className="text-sm font-bold truncate max-w-[150px]">{t.titulo}</h4>
                     </div>
-                    <Switch checked={isActive} onCheckedChange={() => toggleTexto(t.id, isActive)} />
+                    
+                    <div className="flex items-center gap-2">
+                      <span className={cn(
+                        "text-[10px] font-bold uppercase tracking-tight",
+                        isActive ? "text-[var(--accent-active)]" : "text-[var(--text-tertiary-light)]"
+                      )}>
+                        {isActive ? 'Activado' : 'Inactivo'}
+                      </span>
+                      <Switch checked={isActive} onCheckedChange={() => toggleTexto(t.id, isActive)} />
+                    </div>
                   </div>
-                  <p className="text-[11px] font-medium leading-relaxed line-clamp-3 text-[var(--text-secondary-light)]">
+                  <p className="text-[11px] font-medium leading-relaxed line-clamp-3 text-[var(--text-secondary-light)] px-1">
                     {t.contenidoTexto}
                   </p>
                 </div>

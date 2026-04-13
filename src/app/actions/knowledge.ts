@@ -1,8 +1,9 @@
 "use server";
 
 import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
 import { COLLECTIONS } from "@/lib/types/firestore";
+import { ejecutarScrapingProfundo } from "@/lib/scraper";
 
 // Polyfill para evitar error "DOMMatrix is not defined" en pdf-parse
 if (typeof global.DOMMatrix === "undefined") {
@@ -71,6 +72,63 @@ export async function subirYProcesarArchivoAction(
     return {
       success: false,
       error: error.message || "Error al procesar el archivo."
+    };
+  }
+}
+
+export async function scrapearWebAction(
+  wsId: string,
+  recursoId: string,
+  url: string
+) {
+  try {
+    if (!wsId || !recursoId || !url) throw new Error("Faltan parámetros de scraping.");
+
+    const docRef = doc(db, COLLECTIONS.ESPACIOS, wsId, COLLECTIONS.CONOCIMIENTO, recursoId);
+
+    // 1. Marcar como procesando
+    await updateDoc(docRef, { 
+      estado: 'procesando',
+      errorMensaje: null 
+    });
+
+    console.log(`Iniciando scraping profundo para: ${url}`);
+    
+    // 2. Ejecutar el scraper (Nivel 1: Lista, Nivel 2: Detalles)
+    const result = await ejecutarScrapingProfundo(url);
+
+    if (!result.success) {
+      throw new Error(result.error || "Error desconocido durante el scraping.");
+    }
+
+    // 3. Finalizar y guardar
+    await updateDoc(docRef, {
+      contenidoTexto: result.mainText,
+      estado: 'activo',
+      ultimoScrapeo: serverTimestamp(),
+      actualizadoEl: serverTimestamp()
+    });
+
+    return {
+      success: true,
+      message: `Scraping completado. Se indexaron ${result.propertyCount} propiedades.`
+    };
+
+  } catch (error: any) {
+    console.error("Error en scrapearWebAction:", error);
+    
+    // Registrar el error en el documento para que el usuario lo vea
+    if (recursoId && wsId) {
+      const docRef = doc(db, COLLECTIONS.ESPACIOS, wsId, COLLECTIONS.CONOCIMIENTO, recursoId);
+      await updateDoc(docRef, { 
+        estado: 'error',
+        errorMensaje: error.message 
+      });
+    }
+
+    return {
+      success: false,
+      error: error.message || "Error al procesar el sitio web."
     };
   }
 }

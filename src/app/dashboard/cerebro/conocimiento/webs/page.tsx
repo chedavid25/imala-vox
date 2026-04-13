@@ -15,6 +15,7 @@ import {
   getDocs,
   updateDoc
 } from "firebase/firestore";
+import { scrapearWebAction } from "@/app/actions/knowledge";
 import { COLLECTIONS, RecursoConocimiento } from "@/lib/types/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { 
@@ -26,6 +27,7 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
+  Eye,
   Link as LinkIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -68,6 +70,8 @@ export default function WebsGlobalPage() {
     frecuencia: "manual"
   });
 
+  const [viewingWeb, setViewingWeb] = useState<RecursoConocimiento | null>(null);
+
   useEffect(() => {
     if (!currentWorkspaceId) return;
 
@@ -89,7 +93,7 @@ export default function WebsGlobalPage() {
     if (!currentWorkspaceId || !newWeb.url) return;
     setIsAdding(true);
     try {
-      await addDoc(collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONOCIMIENTO), {
+      const docRef = await addDoc(collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONOCIMIENTO), {
         tipo: 'web',
         titulo: newWeb.url.replace(/^https?:\/\//, ''),
         webUrl: newWeb.url,
@@ -102,9 +106,19 @@ export default function WebsGlobalPage() {
         ultimoScrapeo: null,
         creadoPor: "admin"
       });
-      toast.success("Sitio web programado para indexación");
+
+      const urlToScrape = newWeb.url;
+      toast.success("Web registrada. Iniciando lectura profunda...");
       setNewWeb({ url: "", descripcion: "", modo: "single", frecuencia: "manual" });
       setStep(1);
+
+      // Disparar scraping en segundo plano
+      const res = await scrapearWebAction(currentWorkspaceId, docRef.id, urlToScrape);
+      if (res.success) {
+        toast.success(res.message);
+      } else {
+        toast.error("Error en lectura: " + res.error);
+      }
     } catch (err) {
       toast.error("Error al registrar el sitio");
     } finally {
@@ -123,6 +137,17 @@ export default function WebsGlobalPage() {
       toast.success("Sitio eliminado");
     } catch (err) {
       toast.error("Error al eliminar");
+    }
+  };
+
+  const handleRefresh = async (id: string, url: string) => {
+    if (!currentWorkspaceId) return;
+    toast.info("Actualizando información del sitio...");
+    const res = await scrapearWebAction(currentWorkspaceId, id, url);
+    if (res.success) {
+      toast.success(res.message);
+    } else {
+      toast.error("Error al actualizar: " + res.error);
     }
   };
 
@@ -244,6 +269,33 @@ export default function WebsGlobalPage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Modal para ver contenido extraído */}
+        <Dialog open={!!viewingWeb} onOpenChange={() => setViewingWeb(null)}>
+          <DialogContent className="bg-[var(--bg-card)] border-[var(--border-light)] max-w-4xl max-h-[80vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Globe className="w-5 h-5 text-[var(--accent)]" />
+                Contenido Extraído: {viewingWeb?.titulo}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto mt-4 p-4 bg-[var(--bg-input)] rounded-2xl border border-[var(--border-light)]">
+              {viewingWeb?.contenidoTexto ? (
+                <pre className="text-xs whitespace-pre-wrap font-mono text-[var(--text-secondary-light)] leading-relaxed">
+                  {viewingWeb.contenidoTexto}
+                </pre>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center opacity-50 space-y-2 py-20">
+                  <AlertCircle className="w-10 h-10" />
+                  <p className="text-sm">No hay contenido extraído aún o el proceso falló.</p>
+                </div>
+              )}
+            </div>
+            <DialogFooter className="pt-4">
+              <Button onClick={() => setViewingWeb(null)} className="bg-[var(--accent)] text-[var(--accent-text)]">Cerrar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {loading ? (
@@ -295,8 +347,24 @@ export default function WebsGlobalPage() {
               </div>
 
               <div className="flex items-center gap-2 w-full sm:w-auto justify-end border-t sm:border-t-0 pt-3 sm:pt-0 border-[var(--border-light)]">
-                <Button variant="ghost" size="sm" className="text-xs h-8 text-[var(--text-tertiary-light)] hover:text-[var(--accent)]">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => handleRefresh(w.id, w.webUrl!)}
+                  disabled={w.estado === 'procesando'}
+                  className="text-xs h-8 text-[var(--text-tertiary-light)] hover:text-[var(--accent)]"
+                >
+                  {w.estado === 'procesando' && <Loader2 className="w-3 h-3 animate-spin mr-1" />}
                   Actualizar
+                </Button>
+
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => setViewingWeb(w)}
+                  className="w-8 h-8 rounded-full text-[var(--text-tertiary-light)] hover:text-[var(--accent)]"
+                >
+                  <Eye className="w-4 h-4" />
                 </Button>
                 <Button 
                   variant="ghost" 

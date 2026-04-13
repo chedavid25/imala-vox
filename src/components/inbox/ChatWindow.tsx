@@ -125,7 +125,7 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage, onLoadMore }
         {conversacion.aiActive && (conversacion.modoIA === 'copiloto' || !conversacion.modoIA) && (
           <div className="animate-in slide-in-from-bottom-2 fade-in duration-300">
             {isGenerating ? (
-              <div className="flex items-center gap-3 p-3 bg-[var(--accent)]/5 border border-[var(--accent)]/10 rounded-2xl">
+              <div className="flex items-center gap-3 p-3 bg-[var(--bg-input)]/30 border border-[var(--border-light)] rounded-2xl shadow-sm">
                  <Loader2 className="w-4 h-4 animate-spin text-[var(--accent)]" />
                  <span className="text-xs font-medium text-[var(--text-secondary-light)] italic">Claude está pensando una respuesta...</span>
               </div>
@@ -205,7 +205,11 @@ function MessageItem({ message }: { message: any }) {
           {message.text}
         </div>
         <div className="flex items-center gap-1.5 mt-1 px-1">
-          {isBot && <Bot className="w-3 h-3 text-[var(--text-tertiary-light)]" />}
+          {isBot && (
+            <div className="flex items-center justify-center w-4 h-4 rounded bg-[var(--bg-sidebar)] border border-[var(--accent)]/30 text-[var(--accent)]">
+              <Bot className="w-2.5 h-2.5" />
+            </div>
+          )}
           <span className="text-[10px] text-[var(--text-tertiary-light)] font-medium">
             {format(message.creadoEl?.toDate() || new Date(), 'HH:mm', { locale: es })}
           </span>

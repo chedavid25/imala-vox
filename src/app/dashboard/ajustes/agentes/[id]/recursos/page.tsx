@@ -138,18 +138,27 @@ export default function AgenteRecursosPage() {
             <div 
               key={r.id}
               className={cn(
-                "bg-[var(--bg-card)] border rounded-3xl p-6 transition-all space-y-4",
-                r.estado === 'activo' ? "border-[var(--border-light)] shadow-sm" : "border-[var(--border-light)] opacity-60 grayscale"
+                "bg-[var(--bg-card)] border rounded-3xl p-6 transition-all space-y-4 shadow-sm",
+                r.estado === 'activo' 
+                  ? "border-slate-300 shadow-md scale-[1.01]" 
+                  : "border-slate-300 shadow-md opacity-70 grayscale hover:opacity-100 hover:grayscale-0 hover:border-slate-400"
               )}
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-2xl bg-[var(--bg-input)] flex items-center justify-center border border-[var(--border-light)]">
-                    <ImageIcon className="w-8 h-8 text-[var(--accent)]" />
+                  <div className={cn(
+                    "w-16 h-16 rounded-2xl flex items-center justify-center border transition-all duration-300",
+                    r.estado === 'activo' 
+                      ? "bg-[#1A1A18] border-[#333330] shadow-xl shadow-black/20" 
+                      : "bg-[var(--bg-input)] border-[var(--border-light)]"
+                  )}>
+                    <ImageIcon className={cn("w-8 h-8", r.estado === 'activo' ? "text-[var(--accent)]" : "text-[var(--text-tertiary-light)]")} />
                   </div>
                   <div>
                     <h4 className="text-sm font-bold text-[var(--text-primary-light)] truncate max-w-[150px]">{r.titulo}</h4>
-                    <p className="text-[10px] font-bold text-[var(--text-tertiary-light)] uppercase tracking-wider">{r.archivoNombre?.split('.').pop() || 'Archivo'}</p>
+                    <span className="inline-block px-2 py-0.5 rounded-full bg-[var(--bg-input)] text-[var(--text-tertiary-light)] text-[9px] font-bold uppercase tracking-wider border border-[var(--border-light)]">
+                        {r.archivoNombre?.split('.').pop() || 'Archivo'}
+                    </span>
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-2">

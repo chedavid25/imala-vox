@@ -153,39 +153,86 @@ export default function AgenteWebsPage() {
         ) : (
           filteredWebs.map(w => {
             const isActive = !!activosMap[w.id];
+            const isProcessing = w.estado === 'indexando' || w.estado === 'pendiente';
+            const hasError = w.estado === 'error';
+            
+            // Extracción de dominio para la URL corta
+            let domain = w.webUrl;
+            try {
+              const urlObj = new URL(w.webUrl);
+              domain = urlObj.hostname;
+            } catch(e) {}
+
             return (
               <div 
                 key={w.id}
                 className={cn(
-                  "p-5 rounded-3xl border transition-all flex items-center justify-between",
-                  isActive ? "bg-[var(--bg-card)] border-[var(--accent)]/30 shadow-md" : "bg-[var(--bg-card)]/40 border-[var(--border-light)] opacity-60"
+                  "flex items-center justify-between p-4 rounded-2xl border transition-all duration-200",
+                  !isActive 
+                    ? "bg-[var(--bg-card)] border-[var(--border-light-strong)] opacity-60 hover:opacity-100" 
+                    : isProcessing
+                      ? "bg-[var(--bg-card)] border-[var(--border-light-strong)] opacity-80"
+                      : hasError
+                        ? "bg-[var(--bg-card)] border-[var(--error)]/30"
+                        : "bg-[var(--bg-card)] border-[var(--accent)]/30 shadow-sm"
                 )}
               >
                 <div className="flex items-center gap-4 min-w-0">
                   <div className={cn(
-                    "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border",
-                    isActive ? "bg-[var(--accent)]/10 border-[var(--accent)]/20" : "bg-[var(--bg-input)] border-[var(--border-light)]"
+                    "w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 transition-colors",
+                    isActive && !hasError
+                      ? "bg-[var(--bg-sidebar)] border-[var(--accent)]/30 shadow-sm"
+                      : "bg-[var(--bg-input)] border-[var(--border-light)]"
                   )}>
-                    <Globe className={cn("w-6 h-6", isActive ? "text-[var(--accent)]" : "text-[var(--text-tertiary-light)]")} />
+                    <Globe className={cn(
+                      "w-5 h-5", 
+                      isActive && !hasError ? "text-[var(--accent)]" : "text-[var(--text-tertiary-light)]"
+                    )} />
                   </div>
-                  <div className="min-w-0">
-                    <h4 className="text-sm font-bold text-[var(--text-primary-light)] truncate max-w-[300px]">{w.webUrl}</h4>
-                    <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">
-                      {w.estado === 'activo' ? (
-                        <span className="flex items-center gap-1 text-[var(--success)]">
-                          <CheckCircle2 className="w-3 h-3" /> Indexado
+
+                  <div className="flex flex-col gap-0.5 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-[var(--text-primary-light)] truncate">
+                        {domain}
+                      </span>
+                      
+                      {isProcessing ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[var(--bg-input)] border border-[var(--border-light)] text-[9px] font-bold text-[var(--text-secondary-light)] uppercase tracking-wider">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          Procesando
                         </span>
-                      ) : (
-                        <span className="flex items-center gap-1 text-[var(--accent)]">
-                          <Clock className="w-3 h-3" /> Procesando
+                      ) : isActive && !hasError ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[var(--accent)]/10 border border-[var(--accent)]/20 text-[9px] font-bold text-[var(--accent)] uppercase tracking-wider">
+                          <CheckCircle2 className="w-3 h-3" />
+                          Activo
                         </span>
-                      )}
+                      ) : hasError ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[var(--error)]/10 border border-[var(--error)]/20 text-[9px] font-bold text-[var(--error)] uppercase tracking-wider">
+                          <AlertCircle className="w-3 h-3" />
+                          Error
+                        </span>
+                      ) : null}
                     </div>
+                    
+                    <span className="text-[11px] text-[var(--text-tertiary-light)] truncate max-w-[300px] font-medium">
+                      {w.webUrl}
+                    </span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-6">
-                   <Switch checked={isActive} onCheckedChange={() => toggleWeb(w.id, isActive)} />
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className="flex items-center gap-2.5 bg-[var(--bg-input)]/50 px-3 py-1.5 rounded-full border border-[var(--border-light)]">
+                    <span className={cn(
+                      "text-[10px] font-bold uppercase tracking-tight",
+                      isActive ? "text-[var(--accent-active)]" : "text-[var(--text-tertiary-light)]"
+                    )}>
+                      {isActive ? 'Activado' : 'Inactivo'}
+                    </span>
+                    <Switch 
+                      checked={isActive}
+                      onCheckedChange={() => toggleWeb(w.id, isActive)}
+                    />
+                  </div>
                 </div>
               </div>
             );

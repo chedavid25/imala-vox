@@ -116,8 +116,49 @@ export const procesarRespuestaIA = functions.https.onCall(async (data, context) 
   // 3. Validar límites de tokens
   // 4. Enviar mensaje respuesta vía WhatsApp Cloud API
   
+
   return { 
     status: 'success', 
     message: 'Esqueleto procesado — esperando implementación de Fase 2 (Cognitive).' 
   };
+});
+
+/**
+ * autoActualizarWebs
+ * Disparador: Programado (Cada 24 horas - 03:00 AM)
+ * Responsabilidad: Busca webs con frecuencia 'diaria', 'semanal' o 'mensual' y lanza re-escaneo.
+ */
+export const autoActualizarWebs = functions.pubsub.schedule('0 3 * * *')
+  .timeZone('America/Argentina/Buenos_Aires')
+  .onRun(async (context) => {
+    console.log("Iniciando tarea programada de actualización de webs...");
+    
+    const workspaces = await admin.firestore().collection("espaciosDeTrabajo").get();
+    
+    for (const ws of workspaces.docs) {
+      const websSnapshot = await ws.ref.collection("baseConocimiento")
+        .where("tipo", "==", "web")
+        .where("frecuenciaActualizacion", "in", ["diaria", "semanal", "mensual"])
+        .get();
+
+      for (const webDoc of websSnapshot.docs) {
+        const data = webDoc.data();
+        const ultimaVez = data.ultimoScrapeo?.toDate() || new Date(0);
+        const hoy = new Date();
+        const diffDias = Math.floor((hoy.getTime() - ultimaVez.getTime()) / (1000 * 3600 * 24));
+
+        let debeActualizar = false;
+        if (data.frecuenciaActualizacion === 'diaria' && diffDias >= 1) debeActualizar = true;
+        if (data.frecuenciaActualizacion === 'semanal' && diffDias >= 7) debeActualizar = true;
+        if (data.frecuenciaActualizacion === 'mensual' && diffDias >= 30) debeActualizar = true;
+
+        if (debeActualizar) {
+          console.log(`Programando re-escaneo para: ${data.webUrl}`);
+          await webDoc.ref.update({ estado: 'pendiente' });
+          // NOTA: Aquí se llamaría a la lógica de scraping centralizada
+        }
+      }
+    }
+    
+    return null;
 });

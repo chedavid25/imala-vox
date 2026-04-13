@@ -4,7 +4,7 @@ import React from "react";
 import { 
   MessageSquare, 
   Instagram, 
-  Send, 
+  MessageCircle, 
   Plus, 
   CheckCircle2, 
   Loader2,
@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 const CANALES = [
   { id: 'wa', nombre: 'WhatsApp Business', icon: MessageSquare, color: '#25D366', status: 'connected', cuenta: '+54 9 11 2233-4455' },
   { id: 'ig', nombre: 'Instagram Direct', icon: Instagram, color: '#E1306C', status: 'connected', cuenta: '@imalavox_ok' },
-  { id: 'tg', nombre: 'Telegram Bot', icon: Send, color: '#0088cc', status: 'disconnected', cuenta: '-' },
+  { id: 'fb', nombre: 'Facebook Messenger', icon: MessageCircle, color: '#1877F2', status: 'disconnected', cuenta: '-' },
 ];
 
 export default function CanalesPage() {
@@ -53,34 +53,46 @@ export default function CanalesPage() {
                 <div className="flex items-center gap-2">
                   <h3 className="text-base font-bold text-[var(--text-primary-light)]">{canal.nombre}</h3>
                   <Badge 
-                    variant="outline" 
                     className={cn(
-                      "text-[9px] font-bold uppercase",
-                      canal.status === 'connected' ? "bg-[var(--success)]/5 text-[var(--success)] border-[var(--success)]/20" : "bg-[var(--text-tertiary-light)]/5 text-[var(--text-tertiary-light)] border-[var(--border-light)]"
+                      "text-[9px] font-black uppercase px-2 py-0.5 rounded-full border shadow-sm transition-all duration-500",
+                      canal.status === 'connected' 
+                        ? "bg-[#1A1A18] text-[#C8FF00] border-[#C8FF00]/20 ring-4 ring-[#C8FF00]/5" 
+                        : "bg-[#1A1A18] text-[var(--text-tertiary-dark)] border-white/5 opacity-50"
                     )}
                   >
-                    {canal.status === 'connected' ? 'Conectado' : 'Desconectado'}
+                    <div className={cn("w-1.5 h-1.5 rounded-full mr-1.5", canal.status === 'connected' ? "bg-[#C8FF00] animate-pulse" : "bg-gray-500")} />
+                    {canal.status === 'connected' ? 'En línea' : 'Desconectado'}
                   </Badge>
                 </div>
-                <p className="text-xs text-[var(--text-tertiary-light)] font-medium">
-                  {canal.cuenta !== '-' ? `Cuenta: ${canal.cuenta}` : 'Sin cuenta vinculada'}
+                <p className="text-[11px] text-[var(--text-tertiary-light)] font-medium">
+                  {canal.cuenta !== '-' ? canal.cuenta : 'Esperando vinculación...'}
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-3">
               <div className="hidden sm:flex flex-col items-end mr-4">
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-[var(--success)] uppercase tracking-wider mb-1">
-                  <Activity className="w-3 h-3" />
-                  Sistema Online
-                </div>
-                <p className="text-[11px] text-[var(--text-tertiary-light)] font-medium">Último pulso: hace 2 min</p>
+                {canal.status === 'connected' ? (
+                  <>
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#C8FF00] uppercase tracking-wider mb-0.5">
+                      <Activity className="w-3 h-3 animate-pulse" />
+                      Sistema Activo
+                    </div>
+                    <p className="text-[11px] text-[var(--text-tertiary-light)] font-medium">Último pulso: hace 2 min</p>
+                  </>
+                ) : (
+                  <span className="text-[10px] text-[var(--text-tertiary-light)] font-bold uppercase tracking-widest">Sin conexión</span>
+                )}
               </div>
-              <Button variant="outline" size="sm" className="h-9 border-[var(--border-light)] hover:bg-[var(--bg-input)]">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="border border-[var(--border-light-strong)] bg-transparent text-[var(--text-primary-light)] hover:bg-[var(--bg-input)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)] transition-all font-semibold rounded-[var(--radius-md)] h-9 px-5 text-[12px]"
+              >
                 Configurar
               </Button>
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
-                <MoreVertical className="w-4 h-4" />
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-[var(--bg-input)]">
+                <MoreVertical className="w-4 h-4 text-[var(--text-tertiary-light)]" />
               </Button>
             </div>
           </div>

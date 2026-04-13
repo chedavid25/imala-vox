@@ -10,7 +10,7 @@ interface IndicadorIAProps {
 
 export function IndicadorIA({ status, className }: IndicadorIAProps) {
   const config = {
-    activo: "bg-[#C8FF00] ia-activa",
+    activo: "bg-[var(--accent)] ia-activa",
     pausado: "bg-[#555552]",
     bloqueado: "bg-[#EF4444]",
     fuera_horario: "bg-[#F59E0B]",
@@ -25,7 +25,7 @@ export function IndicadorIA({ status, className }: IndicadorIAProps) {
       )} />
       <span className={cn(
         "text-[12px] font-bold capitalize tracking-tight",
-        status === 'activo' ? "text-[#8db300]" : "text-[var(--text-secondary-light)]"
+        status === 'activo' ? "text-[var(--text-primary-light)]" : "text-[var(--text-secondary-light)]"
       )}>
         {status.replace('_', ' ')}
       </span>

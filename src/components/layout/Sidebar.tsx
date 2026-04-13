@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -22,18 +22,33 @@ import {
   Clock,
   MessageSquare,
   ShieldCheck,
-  Zap
+  Zap,
+  LogOut,
+  User as UserIcon,
+  ChevronsUpDown
 } from "lucide-react";
+import { auth } from "@/lib/firebase";
+import { signOut, onAuthStateChanged, User } from "firebase/auth";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuGroup,
+  DropdownMenuItem, 
+  DropdownMenuLabel, 
+  DropdownMenuSeparator, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
+import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
 
   // Detectar si estamos dentro de la configuración de un agente específico
-  // Ruta: /dashboard/ajustes/agentes/[id]/...
   const isAgentSubRoute = pathname.includes("/dashboard/ajustes/agentes/") && 
                           pathname.split("/").length > 4;
   
+  const { currentAgentName } = useWorkspaceStore();
   const agentId = isAgentSubRoute ? pathname.split("/")[4] : null;
 
   if (isAgentSubRoute) {
@@ -47,7 +62,7 @@ export function Sidebar() {
             <ChevronLeft className="w-4 h-4" />
           </button>
           <h2 className="text-[var(--text-primary-dark)] font-bold text-sm tracking-tight truncate">
-            Agente: {agentId?.slice(0, 8)}...
+            Agente: {currentAgentName || (agentId ? `${agentId.slice(0, 8)}...` : "Agente")}
           </h2>
         </div>
 
@@ -146,13 +161,14 @@ export function Sidebar() {
     );
   }
 
+  // Estructura normal del Sidebar
   return (
-    <aside className="w-[var(--sidebar-width)] h-screen bg-[var(--bg-sidebar)] border-r border-[var(--border-dark)] flex flex-col shrink-0">
+    <aside className="w-[var(--sidebar-width)] h-screen bg-[var(--bg-sidebar)] border-r border-[var(--border-dark)] flex flex-col shrink-0 relative z-20">
       <div className="p-4 border-b border-[var(--border-dark)] h-[var(--header-height)] flex items-center">
         <h2 className="text-[var(--text-primary-dark)] font-bold text-lg tracking-tight">Imalá Vox</h2>
       </div>
       
-      <nav className="flex-1 p-3 space-y-6 overflow-y-auto">
+      <nav className="flex-1 p-3 space-y-6 overflow-y-auto custom-scrollbar">
         {/* OPERACIÓN */}
         <div className="space-y-1">
           <div className="px-3 py-2 text-[11px] font-bold text-[var(--text-tertiary-dark)] uppercase tracking-wider">
@@ -247,17 +263,75 @@ export function Sidebar() {
 }
 
 function SidebarFooter() {
+  const [user, setUser] = useState<User | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const { workspace } = useWorkspaceStore();
+  const router = useRouter();
+
+  useEffect(() => {
+    setMounted(true);
+    const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
+    return () => unsubscribe();
+  }, []);
+
+  if (!mounted) return null;
+
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+      router.push("/auth");
+    } catch (e) {
+      console.error("Error signing out:", e);
+    }
+  };
+
+  const userName = user?.displayName || (user?.email?.split('@')[0]) || "Usuario";
+  const initial = userName.charAt(0).toUpperCase();
+
   return (
-    <div className="p-4 border-t border-[var(--border-dark)] bg-[var(--bg-sidebar-deep)]">
-      <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-full bg-[var(--bg-sidebar-hover)] flex items-center justify-center border border-[var(--border-dark)]">
-          <CircleUser className="w-5 h-5 text-[var(--text-secondary-dark)]" />
-        </div>
-        <div className="text-xs truncate">
-          <p className="text-[var(--text-primary-dark)] font-semibold truncate">David Pc</p>
-          <p className="text-[var(--text-tertiary-dark)] font-medium">Plan Agencia</p>
-        </div>
-      </div>
+    <div className="p-2 border-t border-[var(--border-dark)] bg-[var(--bg-sidebar-deep)]">
+      <DropdownMenu>
+        <DropdownMenuTrigger>
+          <div className="flex items-center gap-3 w-full p-2 hover:bg-[var(--bg-sidebar-hover)] rounded-xl transition-all group outline-none cursor-pointer">
+            <div className="w-9 h-9 rounded-full bg-[#C8FF00] flex items-center justify-center shrink-0 border border-black/5">
+              <span className="text-black font-black text-sm leading-none">{initial}</span>
+            </div>
+            <div className="text-xs truncate flex-1 text-left">
+              <p className="text-[var(--text-primary-dark)] font-semibold truncate leading-tight">
+                {userName}
+              </p>
+              <p className="text-[var(--text-tertiary-dark)] font-bold uppercase tracking-tighter text-[9px] mt-0.5 opacity-80">
+                Plan {workspace?.plan || 'Free'}
+              </p>
+            </div>
+            <ChevronsUpDown className="w-4 h-4 text-[var(--text-tertiary-dark)] group-hover:text-[var(--text-secondary-dark)] transition-colors mr-1" />
+          </div>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56 bg-[var(--bg-sidebar)] border-[var(--border-dark)] text-[var(--text-primary-dark)] rounded-2xl shadow-2xl p-2 z-50">
+          <DropdownMenuGroup>
+            <DropdownMenuLabel className="px-3 py-2 text-[10px] font-bold text-[var(--text-tertiary-dark)] uppercase tracking-widest opacity-70">
+              Mi Cuenta
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator className="bg-[var(--border-dark)] mx-1 my-1" />
+            <DropdownMenuItem className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[var(--bg-sidebar-hover)] focus:bg-[var(--bg-sidebar-hover)] cursor-pointer outline-none transition-all">
+              <UserIcon className="w-4 h-4 text-[var(--text-secondary-dark)]" />
+              <span className="text-sm font-medium">Perfil</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[var(--bg-sidebar-hover)] focus:bg-[var(--bg-sidebar-hover)] cursor-pointer outline-none transition-all">
+              <Settings2 className="w-4 h-4 text-[var(--text-secondary-dark)]" />
+              <span className="text-sm font-medium">Ajustes</span>
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator className="bg-[var(--border-dark)] mx-1 my-1" />
+          <DropdownMenuItem 
+            onClick={handleSignOut}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-500/10 focus:bg-red-500/10 text-red-400 cursor-pointer outline-none transition-all"
+          >
+            <LogOut className="w-4 h-4" />
+            <span className="text-sm font-bold">Cerrar sesión</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }
@@ -285,3 +359,4 @@ function NavItem({ label, href, icon: Icon, active = false }: NavItemProps) {
     </Link>
   );
 }
+

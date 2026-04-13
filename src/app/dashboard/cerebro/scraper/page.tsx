@@ -20,7 +20,7 @@ export default function ScraperPage() {
           <div className="bg-[var(--bg-card)] border border-[var(--border-light)] p-8 rounded-3xl space-y-6 shadow-sm">
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-[var(--accent)]/10 flex items-center justify-center text-[var(--accent)]">
+                <div className="w-8 h-8 rounded-lg bg-[var(--bg-sidebar)] border border-[var(--accent)]/30 flex items-center justify-center text-[var(--accent)] shadow-sm">
                   <Play className="w-4 h-4 fill-current" />
                 </div>
                 <h3 className="text-base font-bold text-[var(--text-primary-light)]">Lanzar nuevo escaneo</h3>
