@@ -133,9 +133,9 @@ export default function AgenteArchivosPage() {
           </p>
         </div>
         <div className="text-right space-y-2">
-          <div className="flex items-center gap-2 justify-end">
-            <Layers className="w-4 h-4 text-[var(--accent)]" />
-            <span className="text-xs font-bold text-[var(--text-secondary-light)]">
+          <div className="flex items-center gap-2.5 justify-end bg-[var(--bg-sidebar)] px-3 py-1.5 rounded-full border border-[var(--accent)]/30 shadow-sm">
+            <Layers className="w-3.5 h-3.5 text-[var(--accent)]" />
+            <span className="text-[11px] font-bold text-[var(--accent)] uppercase tracking-tight">
               {currentActiveCount} / {limits.archivosActivosPorAgente} Activos
             </span>
           </div>
@@ -148,11 +148,11 @@ export default function AgenteArchivosPage() {
         </div>
       </div>
 
-      <div className="bg-[var(--accent)]/5 border border-[var(--accent)]/10 p-5 rounded-2xl flex gap-4">
-        <div className="shrink-0"><Info className="w-5 h-5 text-[var(--accent)]" /></div>
+      <div className="bg-[var(--bg-sidebar)] border border-[var(--accent)]/20 p-5 rounded-2xl flex gap-4 shadow-md">
+        <div className="shrink-0 pt-0.5"><Info className="w-5 h-5 text-[var(--accent)]" /></div>
         <div className="space-y-1">
-          <p className="text-[13px] font-bold text-[var(--text-primary-light)]">Arquitectura de Recursos Compartidos</p>
-          <p className="text-xs text-[var(--text-secondary-light)] leading-relaxed">
+          <p className="text-[13px] font-bold text-[var(--text-primary-dark)] tracking-tight">Arquitectura de Recursos Compartidos</p>
+          <p className="text-xs text-[var(--text-secondary-dark)] leading-relaxed">
             Los archivos se suben una vez a nivel workspace y se activan selectivamente por agente. 
             Cualquier cambio en el archivo original se reflejará en todos los agentes que lo tengan activo.
           </p>
@@ -206,7 +206,12 @@ export default function AgenteArchivosPage() {
 
                 <div className="flex items-center gap-6 shrink-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold text-[var(--text-tertiary-light)] uppercase tracking-wider">
+                    <span className={cn(
+                      "text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider border transition-colors",
+                      isActive 
+                        ? "bg-[var(--bg-sidebar)] text-[var(--accent)] border-[var(--accent)]/40" 
+                        : "text-[var(--text-tertiary-light)] border-[var(--border-light)]"
+                    )}>
                       {isActive ? "Activo" : "Inactivo"}
                     </span>
                     <Switch 

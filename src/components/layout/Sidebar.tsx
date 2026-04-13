@@ -54,7 +54,7 @@ export function Sidebar() {
         <nav className="flex-1 p-3 space-y-4 overflow-y-auto">
           {/* IDENTIDAD */}
           <div className="space-y-1">
-            <div className="px-3 py-2 text-[10px] font-bold text-[var(--text-tertiary-dark)] uppercase tracking-wider opacity-50">
+            <div className="px-3 py-2 text-[11px] font-medium text-[var(--text-secondary-dark)] uppercase tracking-[0.06em] opacity-80">
               Identidad
             </div>
             <NavItem 
@@ -79,7 +79,7 @@ export function Sidebar() {
 
           {/* CONOCIMIENTO */}
           <div className="space-y-1">
-            <div className="px-3 py-2 text-[10px] font-bold text-[var(--text-tertiary-dark)] uppercase tracking-wider opacity-50">
+            <div className="px-3 py-2 text-[11px] font-medium text-[var(--text-secondary-dark)] uppercase tracking-[0.06em] opacity-80">
               Conocimiento
             </div>
             <NavItem 
@@ -110,7 +110,7 @@ export function Sidebar() {
 
           {/* COMPORTAMIENTO */}
           <div className="space-y-1">
-            <div className="px-3 py-2 text-[10px] font-bold text-[var(--text-tertiary-dark)] uppercase tracking-wider opacity-50">
+            <div className="px-3 py-2 text-[11px] font-medium text-[var(--text-secondary-dark)] uppercase tracking-[0.06em] opacity-80">
               Comportamiento
             </div>
             <NavItem 
@@ -129,7 +129,7 @@ export function Sidebar() {
 
           {/* PRUEBAS */}
           <div className="space-y-1">
-            <div className="px-3 py-2 text-[10px] font-bold text-[var(--accent)] uppercase tracking-wider opacity-80">
+            <div className="px-3 py-2 text-[11px] font-medium text-[var(--text-secondary-dark)] uppercase tracking-[0.06em] opacity-80">
               Validación
             </div>
             <NavItem 
@@ -274,13 +274,13 @@ function NavItem({ label, href, icon: Icon, active = false }: NavItemProps) {
     <Link
       href={href}
       className={cn(
-        "flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-200",
+        "flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] transition-all duration-200 group border-l-3",
         active 
-          ? "bg-[var(--accent)] text-[var(--accent-text)] shadow-lg shadow-[var(--accent)]/10" 
-          : "text-[var(--text-secondary-dark)] hover:bg-[var(--bg-sidebar-hover)] hover:text-[var(--text-primary-dark)]"
+          ? "bg-[var(--bg-sidebar-hover)] text-[var(--accent)] border-l-[var(--accent)] font-medium shadow-lg shadow-black/10" 
+          : "text-[var(--text-secondary-dark)] hover:bg-[var(--bg-sidebar-hover)] hover:text-[var(--text-primary-dark)] border-l-transparent font-normal"
       )}
     >
-      <Icon className={cn("w-4 h-4", active ? "text-[var(--accent-text)]" : "text-current")} />
+      <Icon className={cn("w-4 h-4 transition-colors", active ? "text-[var(--accent)]" : "text-current group-hover:text-[var(--text-primary-dark)]")} />
       <span>{label}</span>
     </Link>
   );

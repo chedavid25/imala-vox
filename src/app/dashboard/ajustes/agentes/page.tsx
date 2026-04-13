@@ -105,7 +105,7 @@ export default function AgentesPage() {
 
         <Dialog>
           <DialogTrigger render={
-            <Button className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] shadow-sm">
+            <Button className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] shadow-sm font-semibold rounded-[var(--radius-md)]">
               <Plus className="w-4 h-4 mr-2" />
               Nuevo Agente
             </Button>
@@ -182,14 +182,16 @@ export default function AgentesPage() {
               className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-2xl p-6 hover:shadow-xl hover:shadow-[var(--accent)]/5 transition-all cursor-pointer group"
             >
               <div className="flex justify-between items-start mb-6">
-                <div className="w-12 h-12 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center group-hover:bg-[var(--accent)] transition-colors">
-                  <Bot className="w-6 h-6 text-[var(--accent)] group-hover:text-[var(--accent-text)]" />
+                <div className="w-12 h-12 rounded-xl bg-[var(--bg-sidebar)] flex items-center justify-center border border-[var(--accent)]/20 group-hover:border-[var(--accent)]/50 transition-colors shadow-sm">
+                  <Bot className="w-6 h-6 text-[var(--accent)]" />
                 </div>
                 <div className={cn(
-                  "px-2 py-1 rounded-full text-[10px] font-bold uppercase flex items-center gap-1",
-                  agente.activo ? "bg-[var(--success)]/10 text-[var(--success)]" : "bg-[var(--text-tertiary-light)]/10 text-[var(--text-tertiary-light)]"
+                  "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase flex items-center gap-1.5 shadow-sm border",
+                  agente.activo 
+                    ? "bg-[var(--bg-sidebar)] text-[var(--accent)] border-[var(--accent)]/30" 
+                    : "bg-[var(--bg-sidebar)] text-[var(--text-tertiary-dark)] border-[var(--border-dark)]"
                 )}>
-                  <Activity className="w-3 h-3" />
+                  <Activity className={cn("w-3 h-3", agente.activo ? "text-[var(--accent)]" : "text-[var(--text-tertiary-dark)]")} />
                   {agente.activo ? "Activo" : "Inactivo"}
                 </div>
               </div>
@@ -209,7 +211,11 @@ export default function AgentesPage() {
                     <UserCircle2 className="w-4 h-4 text-[var(--text-tertiary-light)]" />
                   </div>
                 </div>
-                <Button variant="ghost" size="sm" className="h-8 text-xs font-bold text-[var(--accent)] hover:bg-[var(--accent)]/10">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 px-4 text-[12px] font-bold bg-[var(--bg-sidebar)] text-[var(--accent)] border-[var(--accent)]/50 hover:bg-[var(--bg-sidebar-hover)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition-all shadow-sm"
+                >
                   Configurar
                 </Button>
               </div>

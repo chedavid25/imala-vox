@@ -175,8 +175,8 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
             {isTyping ? <Loader2 className="w-4 h-4 animate-spin text-white" /> : <Send className="w-4 h-4" />}
           </Button>
         </form>
-        <p className="text-[9px] text-center mt-3 text-[var(--text-tertiary-light)] font-bold uppercase tracking-widest opacity-60">
-            Claude 3.5 Sonnet &bull; Prompt Caching Enabled
+        <p className="text-[11px] text-center mt-3 text-[var(--text-tertiary-dark)] font-medium uppercase tracking-[0.04em] opacity-80">
+            CLAUDE SONNET 4.6 &bull; PROMPT CACHING ENABLED
         </p>
       </div>
     </div>

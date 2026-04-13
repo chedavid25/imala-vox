@@ -75,7 +75,7 @@
   --success:             #22C55E;
   --error:               #EF4444;
   --warning:             #F59E0B;
-  --info:                #3B82F6;
+  --info:                var(--text-secondary-light); /* Neutralizado según pedido */
 
   /* --- BORDES --- */
   --border-dark:         #2A2A28;

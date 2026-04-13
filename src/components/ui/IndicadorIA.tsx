@@ -19,10 +19,14 @@ export function IndicadorIA({ status, className }: IndicadorIAProps) {
   return (
     <div className={cn("flex items-center gap-2", className)}>
       <div className={cn(
-        "w-2 h-2 rounded-full",
-        config[status]
+        "w-2 h-2 rounded-full ring-2 ring-offset-1",
+        config[status],
+        status === 'activo' ? "ring-[var(--accent)]/30" : "ring-transparent"
       )} />
-      <span className="text-[12px] font-medium text-[var(--text-secondary-light)] capitalize">
+      <span className={cn(
+        "text-[12px] font-bold capitalize tracking-tight",
+        status === 'activo' ? "text-[#8db300]" : "text-[var(--text-secondary-light)]"
+      )}>
         {status.replace('_', ' ')}
       </span>
     </div>

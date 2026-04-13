@@ -174,20 +174,25 @@ export default function ArchivosGlobalPage() {
                   <div className="flex items-center gap-3 text-[11px] font-medium text-[var(--text-tertiary-light)]">
                     <span>{formatSize(archivo.archivoTamano)}</span>
                     <span className="opacity-30">•</span>
-                    <span className="flex items-center gap-1">
+                    <span className="flex items-center gap-1.5 bg-[var(--bg-sidebar)] px-2 py-0.5 rounded-md border border-[var(--border-dark)]">
                       {archivo.estado === 'activo' ? (
-                        <CheckCircle2 className="w-3 h-3 text-[var(--success)]" />
+                        <CheckCircle2 className="w-3 h-3 text-[var(--accent)]" />
                       ) : archivo.estado === 'procesando' ? (
                         <Loader2 className="w-3 h-3 animate-spin text-[var(--accent)]" />
                       ) : (
                         <AlertCircle className="w-3 h-3 text-[var(--error)]" />
                       )}
-                      {archivo.estado.charAt(0).toUpperCase() + archivo.estado.slice(1)}
+                      <span className={cn(
+                        "text-[10px] uppercase font-bold tracking-tight",
+                        archivo.estado === 'activo' ? "text-[var(--accent)]" : "text-[var(--text-tertiary-dark)]"
+                      )}>
+                        {archivo.estado}
+                      </span>
                     </span>
                     <span className="opacity-30">•</span>
-                    <Badge variant="outline" className="h-5 px-1.5 text-[9px] border-[var(--border-light)] text-[var(--text-tertiary-light)] font-bold">
+                    <div className="flex items-center gap-1.5 bg-[var(--accent)] text-[var(--accent-text)] px-2 py-0.5 rounded-md text-[10px] font-bold shadow-sm">
                       Usado por {archivo.usageCount} agentes
-                    </Badge>
+                    </div>
                   </div>
                 </div>
               </div>
