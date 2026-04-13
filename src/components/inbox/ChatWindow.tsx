@@ -1,12 +1,23 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Virtuoso } from "react-virtuoso";
-import { IndicadorIA } from "@/components/ui/IndicadorIA";
 import { CanalBadge } from "@/components/ui/CanalBadge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, User, Bot } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { 
+  Send, 
+  User, 
+  Bot, 
+  Sparkles, 
+  Check, 
+  X, 
+  Loader2,
+  Zap,
+  UserCheck
+} from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 interface ChatWindowProps {
   conversacion: any;
@@ -17,12 +28,28 @@ interface ChatWindowProps {
 
 export function ChatWindow({ conversacion, mensajes, onSendMessage, onLoadMore }: ChatWindowProps) {
   const [inputText, setInputText] = useState("");
+  const [sugerenciaIa, setSugerenciaIa] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
   const virtuosoRef = useRef<any>(null);
 
   const handleSend = () => {
     if (!inputText.trim()) return;
     onSendMessage(inputText);
     setInputText("");
+    setSugerenciaIa(null);
+  };
+
+  const handleToggleIA = async (active: boolean) => {
+    // Lógica para actualizar Firestore...
+    console.log("Toggle IA:", active);
+    // Simular actualización vía prop o método
+  };
+
+  const aceptarSugerencia = () => {
+    if (sugerenciaIa) {
+      setInputText(sugerenciaIa);
+      setSugerenciaIa(null);
+    }
   };
 
   if (!conversacion) {
@@ -36,10 +63,10 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage, onLoadMore }
   return (
     <div className="flex-1 flex flex-col h-full bg-[var(--bg-card)]">
       {/* Header del Chat */}
-      <header className="h-[var(--header-height)] border-b border-[var(--border-light)] px-6 flex items-center justify-between shrink-0">
+      <header className="h-[var(--header-height)] border-b border-[var(--border-light)] px-6 flex items-center justify-between shrink-0 bg-[var(--bg-card)] shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-[var(--bg-input)] flex items-center justify-center">
-            <User className="w-5 h-5 text-[var(--text-tertiary-light)]" />
+          <div className="w-10 h-10 rounded-xl bg-[var(--bg-input)] flex items-center justify-center border border-[var(--border-light)]">
+            <User className="w-6 h-6 text-[var(--text-tertiary-light)]" />
           </div>
           <div>
             <h3 className="text-sm font-bold text-[var(--text-primary-light)]">
@@ -47,9 +74,31 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage, onLoadMore }
             </h3>
             <div className="flex items-center gap-2">
               <CanalBadge canal={conversacion.canal || 'whatsapp'} className="scale-75 origin-left" />
-              <IndicadorIA status={conversacion.iaStatus || 'activo'} className="scale-75 origin-left" />
+              <div className="flex items-center gap-1.5 ml-1">
+                <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", conversacion.aiActive ? "bg-[var(--success)]" : "bg-[var(--text-tertiary-light)]")} />
+                <span className="text-[10px] font-bold text-[var(--text-tertiary-light)] uppercase tracking-wider">
+                  {conversacion.aiActive ? "IA Activa" : "Solo Humano"}
+                </span>
+              </div>
             </div>
           </div>
+        </div>
+
+        <div className="flex items-center gap-4 bg-[var(--bg-input)]/50 px-4 py-2 rounded-2xl border border-[var(--border-light)]">
+           <div className="flex items-center gap-2">
+              {conversacion.modoIA === 'auto' ? <Zap className="w-3.5 h-3.5 text-[var(--accent)]" /> : <UserCheck className="w-3.5 h-3.5 text-[var(--accent)]" />}
+              <span className="text-[10px] font-bold text-[var(--text-secondary-light)] uppercase tracking-tight">
+                Modo: {conversacion.modoIA || 'Copiloto'}
+              </span>
+           </div>
+           <div className="w-px h-4 bg-[var(--border-light)]" />
+           <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-[var(--text-tertiary-light)] uppercase">IA</span>
+              <Switch 
+                checked={conversacion.aiActive}
+                onCheckedChange={handleToggleIA}
+              />
+           </div>
         </div>
       </header>
 
@@ -69,21 +118,61 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage, onLoadMore }
         />
       </div>
 
-      {/* Composer de Mensajes */}
-      <div className="p-4 border-t border-[var(--border-light)] bg-[var(--bg-card)]">
-        <div className="flex items-center gap-2 bg-[var(--bg-input)] rounded-lg px-3 py-1">
+      {/* Composer de Mensajes con Sugerencia de IA */}
+      <div className="p-4 border-t border-[var(--border-light)] bg-[var(--bg-card)] space-y-3">
+        
+        {/* Sugerencia de Copiloto IA */}
+        {conversacion.aiActive && (conversacion.modoIA === 'copiloto' || !conversacion.modoIA) && (
+          <div className="animate-in slide-in-from-bottom-2 fade-in duration-300">
+            {isGenerating ? (
+              <div className="flex items-center gap-3 p-3 bg-[var(--accent)]/5 border border-[var(--accent)]/10 rounded-2xl">
+                 <Loader2 className="w-4 h-4 animate-spin text-[var(--accent)]" />
+                 <span className="text-xs font-medium text-[var(--text-secondary-light)] italic">Claude está pensando una respuesta...</span>
+              </div>
+            ) : (
+              <div className="p-4 bg-[var(--bg-input)] border border-[var(--accent)]/20 rounded-2xl relative group shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2 text-[var(--accent)]">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest">Sugerencia Inteligente</span>
+                  </div>
+                  <div className="flex gap-1">
+                    <button onClick={() => setSugerenciaIa(null)} className="p-1 hover:bg-white rounded-md transition-colors"><X className="w-3 h-3 text-[var(--text-tertiary-light)]" /></button>
+                  </div>
+                </div>
+                <p className="text-[13px] text-[var(--text-primary-light)] leading-relaxed mb-3">
+                  {sugerenciaIa || "No hay sugerencias nuevas. Envía un mensaje para activar la IA."}
+                </p>
+                {sugerenciaIa && (
+                  <div className="flex justify-end">
+                    <Button 
+                      size="sm" 
+                      onClick={aceptarSugerencia}
+                      className="bg-[var(--accent)] text-[var(--accent-text)] text-[11px] h-7 font-bold px-3 rounded-xl"
+                    >
+                      <Check className="w-3 h-3 mr-1.5" />
+                      Usar sugerencia
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 bg-[var(--bg-input)] rounded-2xl px-4 py-1.5 border border-[var(--border-light)] focus-within:border-[var(--accent)]/50 transition-all shadow-inner">
           <Input 
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="Escribe un mensaje..."
-            className="border-none bg-transparent shadow-none focus-visible:ring-0 text-sm h-10"
+            placeholder="Responder como humano..."
+            className="border-none bg-transparent shadow-none focus-visible:ring-0 text-sm h-10 font-medium"
           />
           <Button 
             size="icon" 
             onClick={handleSend}
             disabled={!inputText.trim()}
-            className="rounded-full w-8 h-8 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] shrink-0"
+            className="rounded-xl w-9 h-9 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] shrink-0 shadow-md"
           >
             <Send className="w-4 h-4" />
           </Button>
@@ -124,9 +213,4 @@ function MessageItem({ message }: { message: any }) {
       </div>
     </div>
   );
-}
-
-// Utility to merge classes
-function cn(...inputs: any[]) {
-  return inputs.filter(Boolean).join(" ");
 }

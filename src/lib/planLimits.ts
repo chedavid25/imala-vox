@@ -6,6 +6,17 @@ export interface PlanLimits {
   crmContacts: number | 'unlimited';
   catalogObjects: number | 'unlimited';
   agentsIA: number;
+  
+  // Límites Fase 2 (Cognitive)
+  archivosActivosPorAgente: number;
+  archivosWorkspace: number;
+  textosActivosPorAgente: number;
+  textosWorkspace: number;
+  sitiosActivosPorAgente: number;
+  sitiosWorkspace: number;
+  etiquetasPorAgente: number;
+  recursosMB: number;
+
   knowledgeBase: boolean;
   massBroadcast: number | 'unlimited';
   visualWorkflows: number | 'unlimited';
@@ -24,6 +35,14 @@ export const PLAN_LIMITS: Record<'starter' | 'pro' | 'agencia', PlanLimits> = {
     crmContacts: 1000,
     catalogObjects: 30,
     agentsIA: 1,
+    archivosActivosPorAgente: 5,
+    archivosWorkspace: 10,
+    textosActivosPorAgente: 10,
+    textosWorkspace: 15,
+    sitiosActivosPorAgente: 2,
+    sitiosWorkspace: 5,
+    etiquetasPorAgente: 10,
+    recursosMB: 50,
     knowledgeBase: true,
     massBroadcast: 0,
     visualWorkflows: 0,
@@ -40,6 +59,14 @@ export const PLAN_LIMITS: Record<'starter' | 'pro' | 'agencia', PlanLimits> = {
     crmContacts: 5000,
     catalogObjects: 200,
     agentsIA: 3,
+    archivosActivosPorAgente: 20,
+    archivosWorkspace: 50,
+    textosActivosPorAgente: 20,
+    textosWorkspace: 40,
+    sitiosActivosPorAgente: 10,
+    sitiosWorkspace: 20,
+    etiquetasPorAgente: 30,
+    recursosMB: 200,
     knowledgeBase: true,
     massBroadcast: 1000,
     visualWorkflows: 5,
@@ -52,10 +79,18 @@ export const PLAN_LIMITS: Record<'starter' | 'pro' | 'agencia', PlanLimits> = {
     seats: 15,
     whatsappNumbers: 5,
     channelsIGFB: true,
-    convCountIA: 10000, // + exceso proporcional
+    convCountIA: 10000,
     crmContacts: 'unlimited',
     catalogObjects: 'unlimited',
     agentsIA: 10,
+    archivosActivosPorAgente: 100,
+    archivosWorkspace: 300,
+    textosActivosPorAgente: 50,
+    textosWorkspace: 150,
+    sitiosActivosPorAgente: 30,
+    sitiosWorkspace: 100,
+    etiquetasPorAgente: 100,
+    recursosMB: 1000,
     knowledgeBase: true,
     massBroadcast: 'unlimited',
     visualWorkflows: 'unlimited',

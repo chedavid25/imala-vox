@@ -2,19 +2,149 @@
 
 import React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { 
   Inbox, 
   Users, 
   Megaphone, 
   LayoutGrid, 
-  BrainCircuit,
-  CircleUser
+  Brain,
+  BookOpen,
+  Globe,
+  Bot,
+  Link2,
+  GitBranch,
+  Tag,
+  Settings2,
+  ChevronLeft,
+  CircleUser,
+  Clock,
+  MessageSquare,
+  ShieldCheck,
+  Zap
 } from "lucide-react";
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  // Detectar si estamos dentro de la configuración de un agente específico
+  // Ruta: /dashboard/ajustes/agentes/[id]/...
+  const isAgentSubRoute = pathname.includes("/dashboard/ajustes/agentes/") && 
+                          pathname.split("/").length > 4;
+  
+  const agentId = isAgentSubRoute ? pathname.split("/")[4] : null;
+
+  if (isAgentSubRoute) {
+    return (
+      <aside className="w-[var(--sidebar-width)] h-screen bg-[var(--bg-sidebar)] border-r border-[var(--border-dark)] flex flex-col shrink-0 animate-in slide-in-from-left duration-300">
+        <div className="p-4 border-b border-[var(--border-dark)] h-[var(--header-height)] flex items-center gap-2">
+          <button 
+            onClick={() => router.push("/dashboard/ajustes/agentes")}
+            className="p-1 hover:bg-[var(--bg-sidebar-hover)] rounded-md transition-colors text-[var(--text-tertiary-dark)]"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <h2 className="text-[var(--text-primary-dark)] font-bold text-sm tracking-tight truncate">
+            Agente: {agentId?.slice(0, 8)}...
+          </h2>
+        </div>
+
+        <nav className="flex-1 p-3 space-y-4 overflow-y-auto">
+          {/* IDENTIDAD */}
+          <div className="space-y-1">
+            <div className="px-3 py-2 text-[10px] font-bold text-[var(--text-tertiary-dark)] uppercase tracking-wider opacity-50">
+              Identidad
+            </div>
+            <NavItem 
+              label="Instrucciones" 
+              href={`/dashboard/ajustes/agentes/${agentId}/instrucciones`}
+              icon={MessageSquare}
+              active={pathname.includes("/instrucciones")}
+            />
+            <NavItem 
+              label="Rol y público" 
+              href={`/dashboard/ajustes/agentes/${agentId}/rol`}
+              icon={CircleUser}
+              active={pathname.includes("/rol")}
+            />
+            <NavItem 
+              label="Horario" 
+              href={`/dashboard/ajustes/agentes/${agentId}/horario`}
+              icon={Clock}
+              active={pathname.includes("/horario")}
+            />
+          </div>
+
+          {/* CONOCIMIENTO */}
+          <div className="space-y-1">
+            <div className="px-3 py-2 text-[10px] font-bold text-[var(--text-tertiary-dark)] uppercase tracking-wider opacity-50">
+              Conocimiento
+            </div>
+            <NavItem 
+              label="Archivos" 
+              href={`/dashboard/ajustes/agentes/${agentId}/archivos`}
+              icon={BookOpen}
+              active={pathname.includes("/archivos")}
+            />
+            <NavItem 
+              label="Recursos" 
+              href={`/dashboard/ajustes/agentes/${agentId}/recursos`}
+              icon={Zap}
+              active={pathname.includes("/recursos")}
+            />
+            <NavItem 
+              label="Textos" 
+              href={`/dashboard/ajustes/agentes/${agentId}/textos`}
+              icon={MessageSquare}
+              active={pathname.includes("/textos")}
+            />
+            <NavItem 
+              label="Sitios web" 
+              href={`/dashboard/ajustes/agentes/${agentId}/webs`}
+              icon={Globe}
+              active={pathname.includes("/webs")}
+            />
+          </div>
+
+          {/* COMPORTAMIENTO */}
+          <div className="space-y-1">
+            <div className="px-3 py-2 text-[10px] font-bold text-[var(--text-tertiary-dark)] uppercase tracking-wider opacity-50">
+              Comportamiento
+            </div>
+            <NavItem 
+              label="Etiquetas" 
+              href={`/dashboard/ajustes/agentes/${agentId}/etiquetas`}
+              icon={Tag}
+              active={pathname.includes("/etiquetas")}
+            />
+            <NavItem 
+              label="Modo y escalada" 
+              href={`/dashboard/ajustes/agentes/${agentId}/modo`}
+              icon={ShieldCheck}
+              active={pathname.includes("/modo")}
+            />
+          </div>
+
+          {/* PRUEBAS */}
+          <div className="space-y-1">
+            <div className="px-3 py-2 text-[10px] font-bold text-[var(--accent)] uppercase tracking-wider opacity-80">
+              Validación
+            </div>
+            <NavItem 
+              label="Chat de Prueba" 
+              href={`/dashboard/ajustes/agentes/${agentId}/playground`}
+              icon={Zap}
+              active={pathname.includes("/playground")}
+            />
+          </div>
+        </nav>
+
+        <SidebarFooter />
+      </aside>
+    );
+  }
 
   return (
     <aside className="w-[var(--sidebar-width)] h-screen bg-[var(--bg-sidebar)] border-r border-[var(--border-dark)] flex flex-col shrink-0">
@@ -22,60 +152,113 @@ export function Sidebar() {
         <h2 className="text-[var(--text-primary-dark)] font-bold text-lg tracking-tight">Imalá Vox</h2>
       </div>
       
-      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        <div className="px-3 py-2 text-[11px] font-semibold text-[var(--text-tertiary-dark)] uppercase tracking-wider">
-          Operación
+      <nav className="flex-1 p-3 space-y-6 overflow-y-auto">
+        {/* OPERACIÓN */}
+        <div className="space-y-1">
+          <div className="px-3 py-2 text-[11px] font-bold text-[var(--text-tertiary-dark)] uppercase tracking-wider">
+            Operación
+          </div>
+          <NavItem 
+            label="Bandeja de entrada" 
+            href="/dashboard/operacion/inbox" 
+            icon={Inbox} 
+            active={pathname.startsWith("/dashboard/operacion/inbox")} 
+          />
+          <NavItem 
+            label="Contactos" 
+            href="/dashboard/operacion/contactos" 
+            icon={Users} 
+            active={pathname.startsWith("/dashboard/operacion/contactos")} 
+          />
+          <NavItem 
+            label="Difusión" 
+            href="/dashboard/operacion/difusion" 
+            icon={Megaphone} 
+            active={pathname.startsWith("/dashboard/operacion/difusion")} 
+          />
         </div>
         
-        <NavItem 
-          label="Bandeja de entrada" 
-          href="/operacion/inbox" 
-          icon={Inbox} 
-          active={pathname === "/operacion/inbox"} 
-        />
-        <NavItem 
-          label="Contactos" 
-          href="/operacion/contactos" 
-          icon={Users} 
-          active={pathname === "/operacion/contactos"} 
-        />
-        <NavItem 
-          label="Difusión" 
-          href="/operacion/difusion" 
-          icon={Megaphone} 
-          active={pathname === "/operacion/difusion"} 
-        />
-        
-        <div className="pt-6 px-3 py-2 text-[11px] font-semibold text-[var(--text-tertiary-dark)] uppercase tracking-wider">
-          Cerebro
+        {/* CEREBRO */}
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 px-3 py-2">
+            <Brain className="w-3.5 h-3.5 text-[var(--accent)]" />
+            <div className="text-[11px] font-bold text-[var(--text-tertiary-dark)] uppercase tracking-wider">
+              Cerebro
+            </div>
+          </div>
+          <NavItem 
+            label="Catálogo" 
+            href="/dashboard/cerebro/catalogo" 
+            icon={LayoutGrid} 
+            active={pathname.startsWith("/dashboard/cerebro/catalogo")} 
+          />
+          <NavItem 
+            label="Base de conocimiento" 
+            href="/dashboard/cerebro/conocimiento" 
+            icon={BookOpen} 
+            active={pathname.startsWith("/dashboard/cerebro/conocimiento")} 
+          />
+          <NavItem 
+            label="Scraper" 
+            href="/dashboard/cerebro/scraper" 
+            icon={Globe} 
+            active={pathname.startsWith("/dashboard/cerebro/scraper")} 
+          />
         </div>
-        
-        <NavItem 
-          label="Catálogo" 
-          href="/cerebro/catalogo" 
-          icon={LayoutGrid} 
-          active={pathname === "/cerebro/catalogo"} 
-        />
-        <NavItem 
-          label="Base de conocimiento" 
-          href="/cerebro/conocimiento" 
-          icon={BrainCircuit} 
-          active={pathname === "/cerebro/conocimiento"} 
-        />
+
+        {/* AJUSTES */}
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 px-3 py-2">
+            <Settings2 className="w-3.5 h-3.5 text-[var(--accent)]" />
+            <div className="text-[11px] font-bold text-[var(--text-tertiary-dark)] uppercase tracking-wider">
+              Ajustes
+            </div>
+          </div>
+          <NavItem 
+            label="Agentes IA" 
+            href="/dashboard/ajustes/agentes" 
+            icon={Bot} 
+            active={pathname.startsWith("/dashboard/ajustes/agentes") && !isAgentSubRoute} 
+          />
+          <NavItem 
+            label="Canales" 
+            href="/dashboard/ajustes/canales" 
+            icon={Link2} 
+            active={pathname.startsWith("/dashboard/ajustes/canales")} 
+          />
+          <NavItem 
+            label="Workflows" 
+            href="/dashboard/ajustes/workflows" 
+            icon={GitBranch} 
+            active={pathname.startsWith("/dashboard/ajustes/workflows")} 
+          />
+          <NavItem 
+            label="Etiquetas CRM" 
+            href="/dashboard/ajustes/etiquetas" 
+            icon={Tag} 
+            active={pathname.startsWith("/dashboard/ajustes/etiquetas")} 
+          />
+        </div>
       </nav>
 
-      <div className="p-4 border-t border-[var(--border-dark)] bg-[var(--bg-sidebar-deep)]">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-[var(--bg-sidebar-hover)] flex items-center justify-center border border-[var(--border-dark)]">
-            <CircleUser className="w-5 h-5 text-[var(--text-secondary-dark)]" />
-          </div>
-          <div className="text-xs truncate">
-            <p className="text-[var(--text-primary-dark)] font-semibold truncate">David Pc</p>
-            <p className="text-[var(--text-tertiary-dark)] font-medium">Plan Agencia</p>
-          </div>
+      <SidebarFooter />
+    </aside>
+  );
+}
+
+function SidebarFooter() {
+  return (
+    <div className="p-4 border-t border-[var(--border-dark)] bg-[var(--bg-sidebar-deep)]">
+      <div className="flex items-center gap-3">
+        <div className="w-9 h-9 rounded-full bg-[var(--bg-sidebar-hover)] flex items-center justify-center border border-[var(--border-dark)]">
+          <CircleUser className="w-5 h-5 text-[var(--text-secondary-dark)]" />
+        </div>
+        <div className="text-xs truncate">
+          <p className="text-[var(--text-primary-dark)] font-semibold truncate">David Pc</p>
+          <p className="text-[var(--text-tertiary-dark)] font-medium">Plan Agencia</p>
         </div>
       </div>
-    </aside>
+    </div>
   );
 }
 
