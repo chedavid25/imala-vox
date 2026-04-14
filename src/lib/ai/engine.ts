@@ -51,8 +51,8 @@ export async function procesarMensajeConIA({
       ],
       messages: [
         ...historial.map(m => ({
-          role: m.from === 'user' ? 'user' : 'assistant',
-          content: m.text
+          role: (m.from === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+          content: m.text as string
         })),
         { role: "user", content: textoUsuario }
       ]

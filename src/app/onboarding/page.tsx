@@ -40,11 +40,29 @@ export default function OnboardingPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         router.push("/auth");
       } else {
         setUserName(user.displayName?.split(" ")[0] || "en Imalá Vox");
+
+        // Verificar si ya tiene workspace para evitar duplicados
+        try {
+          const { collection, query, where, getDocs, limit } = await import('firebase/firestore');
+          const q = query(
+            collection(db, COLLECTIONS.ESPACIOS),
+            where('propietarioUid', '==', user.uid),
+            limit(1)
+          );
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            // Ya tiene workspace, redirigir al dashboard
+            router.push('/dashboard/operacion/inbox');
+            return;
+          }
+        } catch (err) {
+          console.error('Error verificando workspace:', err);
+        }
       }
     });
 
@@ -138,7 +156,7 @@ export default function OnboardingPage() {
 
           <div className="space-y-2">
             <Label className="text-sm font-bold text-[var(--text-secondary-light)] ml-1">¿A qué rubro pertenece?</Label>
-            <Select value={rubro} onValueChange={setRubro}>
+            <Select value={rubro} onValueChange={(v) => setRubro(v ?? '')}>
               <SelectTrigger className="h-12 border-[var(--border-light)] bg-white rounded-2xl flex items-center pr-4">
                 <SelectValue placeholder="Selecciona tu actividad" />
               </SelectTrigger>

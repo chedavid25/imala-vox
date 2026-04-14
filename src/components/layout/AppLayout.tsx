@@ -90,6 +90,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
         }
       } else {
         setIsSessionLoading(false);
+        if (!isPublicRoute) {
+          router.push("/auth");
+        }
       }
     });
 

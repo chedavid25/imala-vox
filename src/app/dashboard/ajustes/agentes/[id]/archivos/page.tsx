@@ -177,7 +177,7 @@ export default function AgenteArchivosPage() {
         ) : (
           archivosGlobales.map((archivo) => {
             const isActive = !!activosMap[archivo.id];
-            const isProcessing = archivo.estado === 'procesando' || archivo.estado === 'pendiente';
+            const isProcessing = archivo.estado === 'procesando';
             const hasError = archivo.estado === 'error';
 
             return (

@@ -86,7 +86,7 @@ export function ContextPanel() {
           <div className="bg-[var(--bg-input)]/50 border border-[var(--border-light)] rounded-xl p-4">
             <div className="flex items-center justify-between mb-4">
               <span className="text-[13px] font-medium text-[var(--text-secondary-light)]">Agente Autónomo</span>
-              <IndicadorIA status={selectedContact?.aiBlocked ? 'error' : 'activo'} />
+              <IndicadorIA status={selectedContact?.aiBlocked ? 'bloqueado' : 'activo'} />
             </div>
             <p className="text-[12px] text-[var(--text-tertiary-light)] leading-relaxed italic">
               {selectedContact?.aiBlocked 

@@ -117,9 +117,14 @@ export interface Agente {
   strictMode: boolean;
   horarioActivo: boolean;
   horario?: {
-    diasActivos: string[];
-    horaInicio: string;            // "09:00"
-    horaFin: string;               // "18:00"
+    diasActivos: string[];         // ['lun','mar','mie','jue','vie','sab','dom']
+    horaInicio: string;            // "09:00" — horario base L-V
+    horaFin: string;               // "18:00" — horario base L-V
+    // Horarios especiales fin de semana (opcional)
+    sabadoHoraInicio?: string;     // Si está vacío, usa el horario base
+    sabadoHoraFin?: string;
+    domingoHoraInicio?: string;
+    domingoHoraFin?: string;
     mensajeFueraHorario: string;
   };
   escalada: {

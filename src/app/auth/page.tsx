@@ -45,9 +45,19 @@ export default function AuthPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
+      const result = await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
+      // Verificar si ya tiene workspace
+      const { collection, query, where, getDocs, limit } = await import('firebase/firestore');
+      const { db } = await import('@/lib/firebase');
+      const { COLLECTIONS } = await import('@/lib/types/firestore');
+      const q = query(
+        collection(db, COLLECTIONS.ESPACIOS),
+        where('propietarioUid', '==', result.user.uid),
+        limit(1)
+      );
+      const snap = await getDocs(q);
       toast.success("¡Bienvenido de nuevo!");
-      router.push("/onboarding");
+      router.push(snap.empty ? "/onboarding" : "/dashboard/operacion/inbox");
     } catch (error: any) {
       console.error("Error login:", error);
       toast.error(error.message || "Error al iniciar sesión");
@@ -60,6 +70,10 @@ export default function AuthPage() {
     e.preventDefault();
     if (registerPassword !== confirmPassword) {
       toast.error("Las contraseñas no coinciden");
+      return;
+    }
+    if (registerPassword.length < 8) {
+      toast.error("La contraseña debe tener al menos 8 caracteres");
       return;
     }
     
@@ -82,9 +96,18 @@ export default function AuthPage() {
     const provider = new GoogleAuthProvider();
     try {
       const result = await signInWithPopup(auth, provider);
-      // Tras el login de Google, forzamos paso por onboarding para asegurar que tenga un equipo
+      // Verificar si ya tiene workspace
+      const { collection, query, where, getDocs, limit } = await import('firebase/firestore');
+      const { db } = await import('@/lib/firebase');
+      const { COLLECTIONS } = await import('@/lib/types/firestore');
+      const q = query(
+        collection(db, COLLECTIONS.ESPACIOS),
+        where('propietarioUid', '==', result.user.uid),
+        limit(1)
+      );
+      const snap = await getDocs(q);
       toast.success(`¡Hola, ${result.user.displayName}!`);
-      router.push("/onboarding");
+      router.push(snap.empty ? '/onboarding' : '/dashboard/operacion/inbox');
     } catch (error: any) {
       console.error("Error Google login:", error);
       toast.error("Error al iniciar sesión con Google");

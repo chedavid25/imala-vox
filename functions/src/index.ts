@@ -170,7 +170,7 @@ export const autoActualizarWebs = functions.pubsub.schedule('0 3 * * *')
       }
     }
     
-    return null;
+    return;
 });
 
 /**

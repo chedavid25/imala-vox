@@ -1,15 +1,9 @@
-import { db } from "@/lib/firebase";
-import { 
-  collection, 
-  getDocs, 
-  getDoc, 
-  doc, 
-  query, 
-  where, 
-  orderBy, 
-  limit,
-  documentId 
-} from "firebase/firestore";
+/**
+ * construirSystemPrompt — corre en el servidor (Server Action).
+ * Usa Firebase Admin SDK para bypassear las reglas de seguridad de Firestore
+ * y acceder a los datos del workspace sin necesitar token de usuario.
+ */
+import { adminDb } from "@/lib/firebase-admin";
 import { COLLECTIONS, Agente, RecursoConocimiento } from "@/lib/types/firestore";
 
 /**
@@ -22,38 +16,39 @@ import { COLLECTIONS, Agente, RecursoConocimiento } from "@/lib/types/firestore"
  */
 export async function construirSystemPrompt(wsId: string, agenteId: string): Promise<string> {
   // 1. Obtener datos básicos del agente
-  const agenteSnap = await getDoc(doc(db, COLLECTIONS.ESPACIOS, wsId, COLLECTIONS.AGENTES, agenteId));
-  if (!agenteSnap.exists()) throw new Error("Agente no encontrado");
+  const agenteSnap = await adminDb
+    .collection(COLLECTIONS.ESPACIOS).doc(wsId)
+    .collection(COLLECTIONS.AGENTES).doc(agenteId)
+    .get();
+
+  if (!agenteSnap.exists) throw new Error("Agente no encontrado");
   const agente = agenteSnap.data() as Agente;
 
   // 2. Obtener recursos de conocimiento ACTIVOS para este agente
-  const activosSnap = await getDocs(
-    query(
-      collection(db, COLLECTIONS.ESPACIOS, wsId, COLLECTIONS.AGENTES, agenteId, COLLECTIONS.CONOCIMIENTO_ACTIVO),
-      where("activo", "==", true)
-    )
-  );
+  const activosSnap = await adminDb
+    .collection(COLLECTIONS.ESPACIOS).doc(wsId)
+    .collection(COLLECTIONS.AGENTES).doc(agenteId)
+    .collection(COLLECTIONS.CONOCIMIENTO_ACTIVO)
+    .where("activo", "==", true)
+    .get();
 
-  // 3. Cargar el contenido real de esos recursos de forma masiva (Evita N+1)
-  const idsRecursos = activosSnap.docs.map(d => d.data().recursoId || d.id);
-  
+  // 3. Cargar el contenido real de esos recursos (paralelizado, evita N+1)
+  const idsRecursos = activosSnap.docs.map(d => (d.data().recursoId as string) || d.id);
+
   let recursosValidos: RecursoConocimiento[] = [];
-  
+
   if (idsRecursos.length > 0) {
-    // Firestore permite hasta 30 IDs en un 'in' query
-    const chunks = [];
-    for (let i = 0; i < idsRecursos.length; i += 30) {
-      chunks.push(idsRecursos.slice(i, i + 30));
-    }
+    // Admin SDK permite getAll() que es más eficiente que queries 'in'
+    const docRefs = idsRecursos.map(id =>
+      adminDb
+        .collection(COLLECTIONS.ESPACIOS).doc(wsId)
+        .collection(COLLECTIONS.CONOCIMIENTO).doc(id)
+    );
 
-    const snaps = await Promise.all(chunks.map(chunk => 
-      getDocs(query(
-        collection(db, COLLECTIONS.ESPACIOS, wsId, COLLECTIONS.CONOCIMIENTO),
-        where(documentId(), "in", chunk)
-      ))
-    ));
-
-    recursosValidos = snaps.flatMap(s => s.docs.map(d => ({ ...d.data(), id: d.id } as RecursoConocimiento)));
+    const recursoSnaps = await adminDb.getAll(...docRefs);
+    recursosValidos = recursoSnaps
+      .filter(s => s.exists)
+      .map(s => ({ ...s.data(), id: s.id } as RecursoConocimiento));
   }
 
   // Separar recursos de entrenamiento vs recursos para enviar (multimedia)
@@ -61,21 +56,20 @@ export async function construirSystemPrompt(wsId: string, agenteId: string): Pro
   const multimedia = recursosValidos.filter(r => r.tipo === 'recurso');
 
   // 4. Cargar etiquetas del agente
-  const etiquetasSnap = await getDocs(
-    query(
-      collection(db, COLLECTIONS.ESPACIOS, wsId, COLLECTIONS.AGENTES, agenteId, COLLECTIONS.ETIQUETAS_AGENTE),
-      where("activa", "==", true)
-    )
-  );
+  const etiquetasSnap = await adminDb
+    .collection(COLLECTIONS.ESPACIOS).doc(wsId)
+    .collection(COLLECTIONS.AGENTES).doc(agenteId)
+    .collection(COLLECTIONS.ETIQUETAS_AGENTE)
+    .where("activa", "==", true)
+    .get();
 
   // 5. Cargar objetos/propiedades activos (limitado para no saturar contexto)
-  const objetosSnap = await getDocs(
-    query(
-      collection(db, COLLECTIONS.ESPACIOS, wsId, COLLECTIONS.OBJETOS),
-      where("estado", "==", "disponible"),
-      limit(40)
-    )
-  );
+  const objetosSnap = await adminDb
+    .collection(COLLECTIONS.ESPACIOS).doc(wsId)
+    .collection(COLLECTIONS.OBJETOS)
+    .where("estado", "==", "disponible")
+    .limit(40)
+    .get();
 
   // ENSAMBLADO DEL PROMPT FINAL
   return `
@@ -116,9 +110,19 @@ ${etiquetasSnap.docs.length > 0
 - Sé breve, profesional y directo.
 - NO uses formato de negritas ni asteriscos (**) para resaltar texto. Responde en texto plano.
 - Si no tienes la información exacta, NO LA INVENTES. Especialmente en precios o disponibilidad.
-${agente.strictMode 
-  ? "- MODO ESTRICTO: Solo estás autorizado a usar la información de la 'BASE DE CONOCIMIENTO'. Si la respuesta no está allí, dile al cliente que lo consultarás con un asesor humano." 
+${agente.strictMode
+  ? "- MODO ESTRICTO: Solo estás autorizado a usar la información de la 'BASE DE CONOCIMIENTO'. Si la respuesta no está allí, dile al cliente que lo consultarás con un asesor humano."
   : "- Si la información no está en el conocimiento, usa el sentido común pero aclara que es una respuesta general."}
 - Si el cliente pide hablar con un humano o manifiesta frustración más de una vez, escala la conversación amablemente.
+${agente.horarioActivo && agente.horario
+  ? (() => {
+      const h = agente.horario!;
+      let horarioDesc = `Horario Lun-Vie: ${h.horaInicio}-${h.horaFin}`;
+      if (h.sabadoHoraInicio) horarioDesc += ` | Sáb: ${h.sabadoHoraInicio}-${h.sabadoHoraFin}`;
+      if (h.domingoHoraInicio) horarioDesc += ` | Dom: ${h.domingoHoraInicio}-${h.domingoHoraFin}`;
+      horarioDesc += `. Mensaje fuera: '${h.mensajeFueraHorario}'`;
+      return `- HORARIO DE ATENCIÓN: ${horarioDesc}`;
+    })()
+  : ""}
 `.trim();
 }

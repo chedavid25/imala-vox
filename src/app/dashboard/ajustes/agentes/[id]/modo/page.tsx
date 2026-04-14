@@ -62,6 +62,19 @@ export default function AgenteModoEscaladaPage() {
 
   const handleSave = async () => {
     if (!currentWorkspaceId || !agentId) return;
+
+    // Validar que mensajesSinResolucion sea >= 1
+    if (!data.escalada?.mensajesSinResolucion || data.escalada.mensajesSinResolucion < 1) {
+      toast.error('El mínimo de mensajes sin resolución es 1');
+      return;
+    }
+
+    // Validar que mensajeEscalada no esté vacío
+    if (!data.escalada.mensajeEscalada?.trim()) {
+      toast.error('El mensaje de escalada no puede estar vacío');
+      return;
+    }
+
     setSaving(true);
     try {
       const docRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.AGENTES, agentId as string);

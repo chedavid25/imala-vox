@@ -1,4 +1,9 @@
-import puppeteer, { Browser, Page } from "puppeteer";
+// puppeteer solo está disponible en Firebase Functions (Node.js).
+// Este archivo no debe ser importado desde el frontend Next.js.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Browser = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Page = any;
 
 /**
  * Motor de Scraping Inmobiliario Profundo
@@ -17,6 +22,9 @@ export async function ejecutarScrapingProfundo(url: string, maxProperties: numbe
   
   try {
     // 1. Lanzar el navegador con mejores argumentos de camuflaje
+    // Require dinámico: en Functions existe puppeteer, en el frontend no se llega aquí
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const puppeteer = require('puppeteer');
     browser = await puppeteer.launch({
       headless: true,
       args: [
@@ -74,11 +82,11 @@ export async function ejecutarScrapingProfundo(url: string, maxProperties: numbe
       let foundButton = false;
 
       for (const btn of buttons) {
-        const text = await btn.evaluate(el => el.textContent?.toLowerCase() || "");
+        const text = await btn.evaluate((el: Element) => el.textContent?.toLowerCase() || "");
         if (text.includes("ver más") || text.includes("cargar más")) {
           const isIntersecting = await btn.isIntersectingViewport();
           if (!isIntersecting) {
-            await btn.evaluate(el => el.scrollIntoView());
+            await btn.evaluate((el: Element) => el.scrollIntoView());
             await new Promise(r => setTimeout(r, 1000));
           }
           console.log("Pulsando botón detectado:", text);

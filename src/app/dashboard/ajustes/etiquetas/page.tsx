@@ -158,7 +158,7 @@ export default function CRMTagsPage() {
             </div>
             <DialogFooter>
               <DialogClose render={
-                <Button onClick={handleCreate} disabled={setIsAdding || !newTag.nombre} className="bg-[var(--accent)] text-[var(--accent-text)]">
+                <Button onClick={handleCreate} disabled={isAdding || !newTag.nombre} className="bg-[var(--accent)] text-[var(--accent-text)]">
                   {isAdding && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
                   Confirmar
                 </Button>

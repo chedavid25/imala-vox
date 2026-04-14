@@ -243,7 +243,7 @@ export default function WebsGlobalPage() {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label>Frecuencia de actualización</Label>
-                    <Select value={newWeb.frecuencia} onValueChange={v => setNewWeb({...newWeb, frecuencia: v})}>
+                    <Select value={newWeb.frecuencia} onValueChange={v => setNewWeb({...newWeb, frecuencia: v ?? 'manual'})}>
                       <SelectTrigger className="bg-[var(--bg-input)] border-[var(--border-light)]">
                         <SelectValue />
                       </SelectTrigger>
@@ -320,7 +320,7 @@ export default function WebsGlobalPage() {
                 <div className="min-w-0 space-y-1">
                   <div className="flex items-center gap-2">
                     <h4 className="text-sm font-bold text-[var(--text-primary-light)] truncate max-w-[300px]">{w.webUrl}</h4>
-                    <a href={w.webUrl!} target="_blank" rel="noopener noreferrer" className="text-[var(--text-tertiary-light)] hover:text-[var(--accent)] transition-colors">
+                    <a href={w.webUrl ?? '#'} target="_blank" rel="noopener noreferrer" className="text-[var(--text-tertiary-light)] hover:text-[var(--accent)] transition-colors">
                       <ExternalLink className="w-3 h-3" />
                     </a>
                   </div>

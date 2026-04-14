@@ -153,14 +153,16 @@ export default function AgenteWebsPage() {
         ) : (
           filteredWebs.map(w => {
             const isActive = !!activosMap[w.id];
-            const isProcessing = w.estado === 'indexando' || w.estado === 'pendiente';
+            const isProcessing = w.estado === 'procesando';
             const hasError = w.estado === 'error';
             
             // Extracción de dominio para la URL corta
-            let domain = w.webUrl;
+            let domain = w.webUrl || '';
             try {
-              const urlObj = new URL(w.webUrl);
-              domain = urlObj.hostname;
+              if (w.webUrl) {
+                const urlObj = new URL(w.webUrl);
+                domain = urlObj.hostname;
+              }
             } catch(e) {}
 
             return (

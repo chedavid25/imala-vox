@@ -2,37 +2,50 @@
 
 import React, { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
-import { 
-  collection, 
-  onSnapshot, 
-  query, 
-  where, 
-  doc, 
-  setDoc, 
-  deleteDoc, 
+import { auth } from "@/lib/firebase";
+import {
+  collection,
+  onSnapshot,
+  query,
+  where,
+  doc,
+  setDoc,
+  deleteDoc,
   serverTimestamp,
   updateDoc,
-  increment
+  increment,
+  addDoc
 } from "firebase/firestore";
 import { COLLECTIONS, RecursoConocimiento } from "@/lib/types/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
-import { 
-  Type, 
-  Loader2, 
+import {
+  Type,
+  Loader2,
   Info,
   Layers,
-  Search
+  Search,
+  Plus,
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useParams, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { PLAN_LIMITS } from "@/lib/planLimits";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 export default function AgenteTextosPage() {
-  const { currentWorkspaceId } = useWorkspaceStore();
+  const { currentWorkspaceId, workspace } = useWorkspaceStore();
   const { id: agentId } = useParams();
   const router = useRouter();
 
@@ -41,7 +54,15 @@ export default function AgenteTextosPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const limits = PLAN_LIMITS['agencia']; 
+  // Dialog "Nuevo Texto"
+  const [showNewDialog, setShowNewDialog] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newContent, setNewContent] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  // Usar plan real del workspace
+  const planKey = (workspace?.plan || 'starter') as keyof typeof PLAN_LIMITS;
+  const limits = PLAN_LIMITS[planKey];
   const currentActiveCount = Object.values(activosMap).filter(v => v).length;
 
   useEffect(() => {
@@ -104,6 +125,67 @@ export default function AgenteTextosPage() {
     }
   };
 
+  const crearNuevoTexto = async () => {
+    if (!currentWorkspaceId || !agentId) return;
+    if (!newTitle.trim() || !newContent.trim()) {
+      toast.error("El título y el contenido son obligatorios");
+      return;
+    }
+    if (currentActiveCount >= limits.textosActivosPorAgente) {
+      toast.error(`Has alcanzado el límite de ${limits.textosActivosPorAgente} textos activos.`);
+      return;
+    }
+
+    setCreating(true);
+    try {
+      const uid = auth.currentUser?.uid;
+      if (!uid) throw new Error("Usuario no autenticado");
+
+      // 1. Crear en baseConocimiento
+      const baseRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONOCIMIENTO);
+      const nuevoDocRef = await addDoc(baseRef, {
+        tipo: 'texto',
+        titulo: newTitle.trim(),
+        contenidoTexto: newContent.trim(),
+        descripcion: '',
+        estado: 'activo',
+        creadoPor: uid,
+        creadoEl: serverTimestamp(),
+        actualizadoEl: serverTimestamp()
+      });
+
+      // 2. Activar para este agente en conocimientoActivo
+      const activeRef = doc(
+        db,
+        COLLECTIONS.ESPACIOS, currentWorkspaceId,
+        COLLECTIONS.AGENTES, agentId as string,
+        COLLECTIONS.CONOCIMIENTO_ACTIVO, nuevoDocRef.id
+      );
+      await setDoc(activeRef, {
+        recursoId: nuevoDocRef.id,
+        activo: true,
+        orden: currentActiveCount,
+        agregadoEl: serverTimestamp()
+      });
+
+      // 3. Incrementar configuracionVersion del agente
+      await updateDoc(
+        doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.AGENTES, agentId as string),
+        { configuracionVersion: increment(1), actualizadoEl: serverTimestamp() }
+      );
+
+      toast.success("Texto creado y activado para este agente");
+      setShowNewDialog(false);
+      setNewTitle("");
+      setNewContent("");
+    } catch (err) {
+      console.error("Error creando texto:", err);
+      toast.error("Error al crear texto");
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const filteredTextos = textosGlobales.filter(t => 
     t.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
     t.contenidoTexto.toLowerCase().includes(searchTerm.toLowerCase())
@@ -113,6 +195,56 @@ export default function AgenteTextosPage() {
 
   return (
     <div className="p-8 max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
+      {/* Dialog Nuevo Texto */}
+      <Dialog open={showNewDialog} onOpenChange={setShowNewDialog}>
+        <DialogContent className="sm:max-w-lg bg-[var(--bg-card)] border-[var(--border-light)] rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-[var(--text-primary-light)]">
+              Nuevo Texto
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label className="text-sm font-bold text-[var(--text-secondary-light)]">Título</Label>
+              <Input
+                placeholder="Ej: Política de devoluciones"
+                value={newTitle}
+                onChange={e => setNewTitle(e.target.value)}
+                className="bg-[var(--bg-input)] border-[var(--border-light)] rounded-xl"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-bold text-[var(--text-secondary-light)]">Contenido</Label>
+              <Textarea
+                placeholder="Escribe aquí el texto que el agente debe conocer..."
+                value={newContent}
+                onChange={e => setNewContent(e.target.value)}
+                className="bg-[var(--bg-input)] border-[var(--border-light)] resize-none rounded-xl"
+                style={{ minHeight: '160px' }}
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowNewDialog(false)}
+              className="border-[var(--border-light)]"
+              disabled={creating}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={crearNuevoTexto}
+              disabled={creating || !newTitle.trim() || !newContent.trim()}
+              className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-bold"
+            >
+              {creating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+              Crear y Activar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex justify-between items-end">
         <div className="space-y-1">
           <h1 className="text-2xl font-bold text-[var(--text-primary-light)]">Textos Planos del Agente</h1>
@@ -138,6 +270,13 @@ export default function AgenteTextosPage() {
             className="pl-10 bg-[var(--bg-card)] border-[var(--border-light)]"
           />
         </div>
+        <Button
+          onClick={() => setShowNewDialog(true)}
+          className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-bold"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Nuevo Texto
+        </Button>
         <Button onClick={() => router.push("/dashboard/cerebro/conocimiento/textos")} variant="outline" className="border-[var(--border-light)]">
           Gestionar Pool Global
         </Button>

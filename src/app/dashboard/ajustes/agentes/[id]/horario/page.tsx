@@ -45,6 +45,10 @@ export default function AgenteHorarioPage() {
       diasActivos: ["lun", "mar", "mie", "jue", "vie"],
       horaInicio: "09:00",
       horaFin: "18:00",
+      sabadoHoraInicio: "09:00",
+      sabadoHoraFin: "13:00",
+      domingoHoraInicio: "10:00",
+      domingoHoraFin: "13:00",
       mensajeFueraHorario: "Hola! En este momento no estamos atendiendo. Dejanos tu consulta y te responderemos a la brevedad."
     }
   });
@@ -137,10 +141,11 @@ export default function AgenteHorarioPage() {
         </div>
 
         <div className={cn("space-y-8 transition-all duration-300", !data.horarioActivo && "opacity-40 grayscale pointer-events-none")}>
+          {/* Días Laborables */}
           <div className="space-y-4">
-            <Label className="text-sm font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">Días de atención</Label>
+            <Label className="text-sm font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">Días laborables (Lun - Vie)</Label>
             <div className="flex flex-wrap gap-2">
-              {DIAS.map(dia => {
+              {DIAS.slice(0, 5).map(dia => {
                 const isSelected = data.horario?.diasActivos.includes(dia.id);
                 return (
                   <button
@@ -148,8 +153,8 @@ export default function AgenteHorarioPage() {
                     onClick={() => toggleDia(dia.id)}
                     className={cn(
                       "px-4 py-2 rounded-xl text-sm font-bold border transition-all",
-                      isSelected 
-                        ? "bg-[var(--accent)] border-[var(--accent)] text-[var(--accent-text)] shadow-md" 
+                      isSelected
+                        ? "bg-[var(--accent)] border-[var(--accent)] text-[var(--accent-text)] shadow-md"
                         : "bg-[var(--bg-input)] border-[var(--border-light)] text-[var(--text-tertiary-light)] hover:border-[var(--border-light-strong)]"
                     )}
                   >
@@ -158,38 +163,122 @@ export default function AgenteHorarioPage() {
                 );
               })}
             </div>
+
+            {/* Horario base L-V */}
+            {data.horario?.diasActivos?.some(d => ['lun','mar','mie','jue','vie'].includes(d)) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6 pt-4 border-t border-[var(--border-light)]">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Sun className="w-4 h-4 text-[var(--accent)]" />
+                    <Label className="text-sm font-bold text-[var(--text-primary-light)]">Hora de Apertura</Label>
+                  </div>
+                  <Input
+                    type="time"
+                    value={data.horario?.horaInicio}
+                    onChange={e => setData({...data, horario: {...data.horario!, horaInicio: e.target.value}})}
+                    className="bg-[var(--bg-input)] border-[var(--border-light)]"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Moon className="w-4 h-4 text-[var(--accent)]" />
+                    <Label className="text-sm font-bold text-[var(--text-primary-light)]">Hora de Cierre</Label>
+                  </div>
+                  <Input
+                    type="time"
+                    value={data.horario?.horaFin}
+                    onChange={e => setData({...data, horario: {...data.horario!, horaFin: e.target.value}})}
+                    className="bg-[var(--bg-input)] border-[var(--border-light)]"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 mb-1">
-                <Sun className="w-4 h-4 text-[var(--accent)]" />
-                <Label className="text-sm font-bold text-[var(--text-primary-light)]">Hora de Apertura</Label>
-              </div>
-              <Input 
-                type="time" 
-                value={data.horario?.horaInicio}
-                onChange={e => setData({...data, horario: {...data.horario!, horaInicio: e.target.value}})}
-                className="bg-[var(--bg-input)] border-[var(--border-light)]"
-              />
+          {/* Fin de semana */}
+          <div className="space-y-4 pt-4 border-t border-[var(--border-light)]">
+            <Label className="text-sm font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">Fin de semana</Label>
+
+            {/* Sábado */}
+            <div className="space-y-3">
+              <button
+                onClick={() => toggleDia('sab')}
+                className={cn(
+                  "px-4 py-2 rounded-xl text-sm font-bold border transition-all",
+                  data.horario?.diasActivos.includes('sab')
+                    ? "bg-[var(--accent)] border-[var(--accent)] text-[var(--accent-text)] shadow-md"
+                    : "bg-[var(--bg-input)] border-[var(--border-light)] text-[var(--text-tertiary-light)] hover:border-[var(--border-light-strong)]"
+                )}
+              >
+                Sábado
+              </button>
+
+              {data.horario?.diasActivos.includes('sab') && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 ml-2">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-bold text-[var(--text-primary-light)]">Apertura sábado</Label>
+                    <Input
+                      type="time"
+                      value={data.horario?.sabadoHoraInicio || ''}
+                      onChange={e => setData({...data, horario: {...data.horario!, sabadoHoraInicio: e.target.value}})}
+                      className="bg-[var(--bg-input)] border-[var(--border-light)]"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-bold text-[var(--text-primary-light)]">Cierre sábado</Label>
+                    <Input
+                      type="time"
+                      value={data.horario?.sabadoHoraFin || ''}
+                      onChange={e => setData({...data, horario: {...data.horario!, sabadoHoraFin: e.target.value}})}
+                      className="bg-[var(--bg-input)] border-[var(--border-light)]"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 mb-1">
-                <Moon className="w-4 h-4 text-[var(--accent)]" />
-                <Label className="text-sm font-bold text-[var(--text-primary-light)]">Hora de Cierre</Label>
-              </div>
-              <Input 
-                type="time" 
-                value={data.horario?.horaFin}
-                onChange={e => setData({...data, horario: {...data.horario!, horaFin: e.target.value}})}
-                className="bg-[var(--bg-input)] border-[var(--border-light)]"
-              />
+
+            {/* Domingo */}
+            <div className="space-y-3">
+              <button
+                onClick={() => toggleDia('dom')}
+                className={cn(
+                  "px-4 py-2 rounded-xl text-sm font-bold border transition-all",
+                  data.horario?.diasActivos.includes('dom')
+                    ? "bg-[var(--accent)] border-[var(--accent)] text-[var(--accent-text)] shadow-md"
+                    : "bg-[var(--bg-input)] border-[var(--border-light)] text-[var(--text-tertiary-light)] hover:border-[var(--border-light-strong)]"
+                )}
+              >
+                Domingo
+              </button>
+
+              {data.horario?.diasActivos.includes('dom') && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 ml-2">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-bold text-[var(--text-primary-light)]">Apertura domingo</Label>
+                    <Input
+                      type="time"
+                      value={data.horario?.domingoHoraInicio || ''}
+                      onChange={e => setData({...data, horario: {...data.horario!, domingoHoraInicio: e.target.value}})}
+                      className="bg-[var(--bg-input)] border-[var(--border-light)]"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-bold text-[var(--text-primary-light)]">Cierre domingo</Label>
+                    <Input
+                      type="time"
+                      value={data.horario?.domingoHoraFin || ''}
+                      onChange={e => setData({...data, horario: {...data.horario!, domingoHoraFin: e.target.value}})}
+                      className="bg-[var(--bg-input)] border-[var(--border-light)]"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
           <div className="space-y-3 pt-4 border-t border-[var(--border-light)]">
             <Label className="text-sm font-bold text-[var(--text-primary-light)]">Mensaje fuera de horario</Label>
-            <Textarea 
+            <Textarea
               value={data.horario?.mensajeFueraHorario}
               onChange={e => setData({...data, horario: {...data.horario!, mensajeFueraHorario: e.target.value}})}
               className="bg-[var(--bg-input)] border-[var(--border-light)] resize-none h-24 rounded-2xl p-4 text-sm"

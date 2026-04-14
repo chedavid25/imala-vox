@@ -1,11 +1,14 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, Loader2, RefreshCw, AlertCircle, MessageCircle } from "lucide-react";
+import { Send, Bot, User, Loader2, RefreshCw, AlertCircle, FileText, Image as ImageIcon, FileVideo, FileAudio, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { chatPlaygroundAction } from "@/app/actions/ai";
+import { db } from "@/lib/firebase";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { COLLECTIONS, RecursoConocimiento } from "@/lib/types/firestore";
 
 interface Message {
   role: "user" | "assistant";
@@ -17,13 +20,110 @@ interface TestChatProps {
   agentId: string;
 }
 
+// Detecta patrones [nombre.ext] en el texto y los separa en partes
+function parseMessageContent(content: string, recursos: (RecursoConocimiento & { id: string })[]) {
+  const parts: { type: "text" | "resource"; text: string; recurso?: RecursoConocimiento & { id: string } }[] = [];
+  const regex = /\[([^\]]+\.\w+)\]/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(content)) !== null) {
+    // Texto antes del match
+    if (match.index > lastIndex) {
+      parts.push({ type: "text", text: content.slice(lastIndex, match.index) });
+    }
+
+    // Buscar el recurso por nombre de archivo
+    const fileName = match[1];
+    const recurso = recursos.find(r =>
+      r.archivoNombre?.toLowerCase() === fileName.toLowerCase() ||
+      r.titulo?.toLowerCase() === fileName.toLowerCase()
+    );
+
+    parts.push({ type: "resource", text: fileName, recurso });
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Texto restante
+  if (lastIndex < content.length) {
+    parts.push({ type: "text", text: content.slice(lastIndex) });
+  }
+
+  return parts;
+}
+
+function getIconByName(fileName: string) {
+  const ext = fileName?.split('.').pop()?.toLowerCase();
+  if (['jpg','jpeg','png','gif','webp'].includes(ext || '')) return ImageIcon;
+  if (['mp4','mov','avi','webm'].includes(ext || '')) return FileVideo;
+  if (['mp3','wav','ogg','m4a'].includes(ext || '')) return FileAudio;
+  return FileText;
+}
+
+function ResourceChip({ fileName, recurso }: { fileName: string; recurso?: RecursoConocimiento & { id: string } }) {
+  const Icon = getIconByName(fileName);
+  const ext = fileName.split('.').pop()?.toUpperCase() || 'FILE';
+  const hasUrl = !!recurso?.archivoUrl;
+
+  if (!hasUrl) {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[var(--bg-input)] border border-[var(--border-light)] text-[11px] font-bold text-[var(--text-secondary-light)] mx-0.5">
+        <Icon className="w-3 h-3" />
+        {fileName}
+      </span>
+    );
+  }
+
+  return (
+    <a
+      href={recurso!.archivoUrl!}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[var(--bg-sidebar)] border border-[var(--accent)]/30 text-[11px] font-bold text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[var(--accent-text)] transition-all mx-0.5 shadow-sm cursor-pointer"
+      title={`Abrir ${fileName}`}
+    >
+      <Icon className="w-3 h-3" />
+      {fileName}
+      <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+      <span className="text-[9px] font-black uppercase tracking-widest opacity-60">{ext}</span>
+    </a>
+  );
+}
+
+function MessageContent({ content, recursos }: { content: string; recursos: (RecursoConocimiento & { id: string })[] }) {
+  const parts = parseMessageContent(content, recursos);
+
+  return (
+    <span>
+      {parts.map((part, i) => {
+        if (part.type === "text") return <span key={i}>{part.text}</span>;
+        return <ResourceChip key={i} fileName={part.text} recurso={part.recurso} />;
+      })}
+    </span>
+  );
+}
+
 export function TestChat({ wsId, agentId }: TestChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+  const [recursos, setRecursos] = useState<(RecursoConocimiento & { id: string })[]>([]);
+
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Cargar recursos multimedia del workspace para parsear links en el chat
+  useEffect(() => {
+    if (!wsId) return;
+    const q = query(
+      collection(db, COLLECTIONS.ESPACIOS, wsId, COLLECTIONS.CONOCIMIENTO),
+      where("tipo", "==", "recurso")
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setRecursos(snap.docs.map(d => ({ ...d.data(), id: d.id })) as any);
+    });
+    return () => unsub();
+  }, [wsId]);
 
   // Auto-scroll al final cuando hay mensajes nuevos
   useEffect(() => {
@@ -43,12 +143,11 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
     setIsTyping(true);
 
     try {
-      // Llamada a la Server Action
       const result = await chatPlaygroundAction(
         wsId,
         agentId,
         userMessage,
-        messages.slice(-10) // Enviamos solo los últimos 10 para contexto (ahorro de tokens)
+        messages.slice(-10)
       );
 
       if (result.success && result.reply) {
@@ -78,7 +177,7 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
           </div>
           <div>
             <h3 className="text-xs font-bold text-[var(--text-primary-light)]">Chat de Prueba</h3>
-            <p className="text-[10px] text-[var(--text-tertiary-light)] font-medium">Modo Simulación (Sin persistencia)</p>
+            <p className="text-[10px] text-[var(--text-tertiary-light)] font-medium">Modo Simulación · Los recursos aparecen como links clicables</p>
           </div>
         </div>
         <Button 
@@ -92,7 +191,7 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
         </Button>
       </div>
 
-      {/* área de Mensajes */}
+      {/* Área de Mensajes */}
       <div 
         ref={scrollRef}
         className="flex-1 overflow-y-auto p-6 space-y-6 scroll-smooth"
@@ -129,7 +228,10 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
                   ? "bg-[var(--bg-input)] text-[var(--text-primary-light)] rounded-tr-none" 
                   : "bg-white border border-[var(--border-light)] text-[var(--text-primary-light)] rounded-tl-none font-medium"
               )}>
-                {m.content}
+                {m.role === "assistant"
+                  ? <MessageContent content={m.content} recursos={recursos} />
+                  : m.content
+                }
               </div>
             </div>
           ))
