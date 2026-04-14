@@ -48,8 +48,8 @@ export const PLAN_LIMITS: Record<'starter' | 'pro' | 'agencia', PlanLimits> = {
     visualWorkflows: 0,
     scraper: false,
     apiAccess: false,
-    priceMonthly: 29,
-    priceYearly: 24,
+    priceMonthly: 39,
+    priceYearly: 32,
   },
   pro: {
     seats: 5,

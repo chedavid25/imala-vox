@@ -13,7 +13,7 @@ interface WorkspaceState {
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set) => ({
-  currentWorkspaceId: 'default-workspace',
+  currentWorkspaceId: null,
   workspace: null,
   selectedContactId: null,
   currentAgentName: null,

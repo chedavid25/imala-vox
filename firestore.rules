@@ -1,0 +1,23 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Plataforma: solo admins (via backend)
+    match /plataforma/{doc=**} {
+      allow read, write: if false;
+    }
+    
+    // Workspaces: solo el propietario
+    match /espaciosDeTrabajo/{wsId} {
+      allow read, write: if request.auth != null 
+        && request.auth.uid == resource.data.propietarioUid;
+      
+      // Subcolecciones del workspace
+      match /{subCollection}/{docId=**} {
+        allow read, write: if request.auth != null 
+          && request.auth.uid == get(/databases/$(database)/documents/espaciosDeTrabajo/$(wsId)).data.propietarioUid;
+      }
+    }
+  }
+}

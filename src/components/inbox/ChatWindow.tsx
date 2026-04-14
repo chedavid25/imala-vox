@@ -18,6 +18,11 @@ import {
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { db } from "@/lib/firebase";
+import { doc, updateDoc } from "firebase/firestore";
+import { COLLECTIONS } from "@/lib/types/firestore";
+import { useWorkspaceStore } from "@/store/useWorkspaceStore";
+import { toast } from "sonner";
 
 interface ChatWindowProps {
   conversacion: any;
@@ -39,10 +44,22 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage, onLoadMore }
     setSugerenciaIa(null);
   };
 
+  const { currentWorkspaceId } = useWorkspaceStore();
+
   const handleToggleIA = async (active: boolean) => {
-    // Lógica para actualizar Firestore...
-    console.log("Toggle IA:", active);
-    // Simular actualización vía prop o método
+    if (!currentWorkspaceId || !conversacion?.id) return;
+    
+    try {
+      const convRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES, conversacion.id);
+      await updateDoc(convRef, { 
+        aiActive: active,
+        actualizadoEl: new Date()
+      });
+      toast.success(active ? "Agente IA activado" : "Agente IA desactivado");
+    } catch (error) {
+      console.error("Error al cambiar estado IA:", error);
+      toast.error("No se pudo cambiar el estado de la IA");
+    }
   };
 
   const aceptarSugerencia = () => {

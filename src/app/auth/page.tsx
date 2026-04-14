@@ -47,7 +47,7 @@ export default function AuthPage() {
     try {
       await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
       toast.success("¡Bienvenido de nuevo!");
-      router.push("/dashboard/operacion/inbox");
+      router.push("/onboarding");
     } catch (error: any) {
       console.error("Error login:", error);
       toast.error(error.message || "Error al iniciar sesión");
@@ -82,9 +82,9 @@ export default function AuthPage() {
     const provider = new GoogleAuthProvider();
     try {
       const result = await signInWithPopup(auth, provider);
-      // Tras el login de Google, AppLayout decidirá si va a Onboarding o Dashboard
+      // Tras el login de Google, forzamos paso por onboarding para asegurar que tenga un equipo
       toast.success(`¡Hola, ${result.user.displayName}!`);
-      router.push("/dashboard/operacion/inbox");
+      router.push("/onboarding");
     } catch (error: any) {
       console.error("Error Google login:", error);
       toast.error("Error al iniciar sesión con Google");

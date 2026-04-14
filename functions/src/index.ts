@@ -1,4 +1,4 @@
-import * as functions from "firebase-functions";
+import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 
 admin.initializeApp();
@@ -8,7 +8,7 @@ admin.initializeApp();
  * Disparador: Antes de cada acción del agente (Llamada interna)
  * Responsabilidad: Lee uso actual vs plataforma/config.planes — bloquea si supera límite
  */
-export const checkLimitesPlantilla = functions.https.onCall(async (data, context) => {
+export const checkLimitesPlantilla = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
   if (!context.auth) {
     throw new functions.https.HttpsError("unauthenticated", "El usuario debe estar autenticado.");
   }
@@ -46,15 +46,17 @@ export const checkLimitesPlantilla = functions.https.onCall(async (data, context
  * Disparador: HTTP (Webhook de Facebook/Meta)
  * Responsabilidad: Valida el webhook (GET) y procesa mensajes entrantes (POST).
  */
-export const recibirMensajeWhatsApp = functions.https.onRequest(async (req, res) => {
+export const recibirMensajeWhatsApp = functions.https.onRequest(async (req: functions.https.Request, res: functions.Response) => {
   // 1. Verificación del Webhook (GET)
   if (req.method === "GET") {
     const mode = req.query["hub.mode"];
     const token = req.query["hub.verify_token"];
     const challenge = req.query["hub.challenge"];
 
-    // Se recomienda guardar el VERIFY_TOKEN en las variables de entorno de functions
-    if (mode === "subscribe" && token === "imala_vox_verify_token") {
+    // WA_VERIFY_TOKEN debe estar configurado en las variables de entorno de functions
+    const VERIFY_TOKEN = process.env.WA_VERIFY_TOKEN || 'imala_vox_verify_token';
+
+    if (mode === "subscribe" && token === VERIFY_TOKEN) {
       res.status(200).send(challenge);
       return;
     } else {
@@ -64,39 +66,47 @@ export const recibirMensajeWhatsApp = functions.https.onRequest(async (req, res)
   }
 
   // 2. Recepción del Mensaje (POST)
-  if (req.method === "POST") {
+  if (req.method === 'POST') {
     const body = req.body;
-
-    if (body.object === "whatsapp_business_account") {
+    if (body.object === 'whatsapp_business_account') {
       try {
-        // Estructura simplificada de Meta:
         const entry = body.entry?.[0];
         const changes = entry?.changes?.[0];
         const value = changes?.value;
         const message = value?.messages?.[0];
+        // Obtener el phoneNumberId del metadata del webhook
+        const phoneNumberId = value?.metadata?.phone_number_id;
 
-        if (message) {
-          const from = message.from; // Teléfono del cliente
+        if (message && phoneNumberId) {
+          const from = message.from;
           const text = message.text?.body;
-          const workspaceId = "default_workspace"; // Lógica para determinar el workspace vía WABA ID
+          
+          // Buscar workspace por phoneNumberId en la subcolección 'canales'
+          const canalSnap = await admin.firestore()
+            .collectionGroup('canales')
+            .where('phoneNumberId', '==', phoneNumberId)
+            .where('tipo', '==', 'whatsapp')
+            .limit(1).get();
 
-          console.log(`Mensaje recibido de ${from}: ${text}`);
+          if (canalSnap.empty) {
+            console.warn(`phoneNumberId ${phoneNumberId} no mapeado a ningún workspace`);
+            res.sendStatus(200); return;
+          }
 
-          // Aquí se dispararía la lógica de:
-          // 1. Buscar/Crear contacto
-          // 2. Crear/Actualizar conversación
-          // 3. Guardar mensaje en Firestore
-          // 4. Disparar procesarRespuestaIA
+          // Obtener workspaceId del path: espaciosDeTrabajo/{wsId}/canales/{canalId}
+          const canalRef = canalSnap.docs[0].ref;
+          const workspaceId = canalRef.path.split('/')[1];
+
+          console.log(`Msg de ${from}: ${text} → ws: ${workspaceId}`);
+          
+          // TODO Fase 2: disparar procesarRespuestaIA aquí
         }
-
         res.sendStatus(200);
       } catch (error) {
-        console.error("Error procesando webhook:", error);
+        console.error('Error procesando webhook:', error);
         res.sendStatus(500);
       }
-    } else {
-      res.sendStatus(404);
-    }
+    } else { res.sendStatus(404); }
   }
 });
 
@@ -105,7 +115,7 @@ export const recibirMensajeWhatsApp = functions.https.onRequest(async (req, res)
  * Disparador: Manual (Llamada interna tras recibir un mensaje)
  * Responsabilidad: Esqueleto para procesar el mensaje con Claude y generar respuesta.
  */
-export const procesarRespuestaIA = functions.https.onCall(async (data, context) => {
+export const procesarRespuestaIA = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
   const { workspaceId, conversationId, userMessage } = data;
 
   console.log(`Procesando respuesta IA para workspace ${workspaceId}, conv ${conversationId}`);
@@ -130,7 +140,7 @@ export const procesarRespuestaIA = functions.https.onCall(async (data, context) 
  */
 export const autoActualizarWebs = functions.pubsub.schedule('0 3 * * *')
   .timeZone('America/Argentina/Buenos_Aires')
-  .onRun(async (context) => {
+  .onRun(async (context: functions.EventContext): Promise<void> => {
     console.log("Iniciando tarea programada de actualización de webs...");
     
     const workspaces = await admin.firestore().collection("espaciosDeTrabajo").get();
@@ -162,3 +172,45 @@ export const autoActualizarWebs = functions.pubsub.schedule('0 3 * * *')
     
     return null;
 });
+
+/**
+ * ejecutarScrapingWeb
+ * Disparador: HTTPS (onCall)
+ * Responsabilidad: Ejecuta el scraper profundo en un entorno con recursos suficientes (1GB RAM).
+ */
+export const ejecutarScrapingWeb = functions
+  .runWith({ timeoutSeconds: 300, memory: '1GB' })
+  .https.onCall(async (data: any, context: functions.https.CallableContext) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', 'Usuario no autenticado.');
+    }
+
+    const { wsId, recursoId, url } = data;
+    if (!wsId || !recursoId || !url) {
+      throw new functions.https.HttpsError('invalid-argument', 'Faltan parámetros (wsId, recursoId, url).');
+    }
+
+    try {
+      // Importar dinámicamente el scraper
+      const { ejecutarScrapingProfundo } = require('./scraper');
+      const result = await ejecutarScrapingProfundo(url);
+
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+
+      // Actualizar el documento en Firestore
+      await admin.firestore()
+        .doc(`espaciosDeTrabajo/${wsId}/baseConocimiento/${recursoId}`)
+        .update({
+          contenidoTexto: result.mainText,
+          estado: 'activo',
+          ultimoScrapeo: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+      return { success: true, propertyCount: result.propertyCount };
+    } catch (error: any) {
+      console.error('Error en ejecutarScrapingWeb:', error);
+      throw new functions.https.HttpsError('internal', error.message || 'Error desconocido en el scraper.');
+    }
+  });

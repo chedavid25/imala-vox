@@ -2,8 +2,8 @@
 
 import { db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
+import { getFunctions, httpsCallable } from "firebase/functions";
 import { COLLECTIONS } from "@/lib/types/firestore";
-import { ejecutarScrapingProfundo } from "@/lib/scraper";
 
 // Polyfill para evitar error "DOMMatrix is not defined" en pdf-parse
 if (typeof global.DOMMatrix === "undefined") {
@@ -92,26 +92,21 @@ export async function scrapearWebAction(
       errorMensaje: null 
     });
 
-    console.log(`Iniciando scraping profundo para: ${url}`);
+    console.log(`Iniciando scraping profundo vía Cloud Function para: ${url}`);
     
-    // 2. Ejecutar el scraper (Nivel 1: Lista, Nivel 2: Detalles)
-    const result = await ejecutarScrapingProfundo(url);
+    // 2. Ejecutar la función en la nube
+    const functions = getFunctions();
+    const scrapeFunc = httpsCallable(functions, 'ejecutarScrapingWeb');
+    
+    const result: any = await scrapeFunc({ wsId, recursoId, url });
 
-    if (!result.success) {
-      throw new Error(result.error || "Error desconocido durante el scraping.");
+    if (!result.data?.success) {
+      throw new Error(result.data?.error || "Error desconocido en la Cloud Function.");
     }
-
-    // 3. Finalizar y guardar
-    await updateDoc(docRef, {
-      contenidoTexto: result.mainText,
-      estado: 'activo',
-      ultimoScrapeo: serverTimestamp(),
-      actualizadoEl: serverTimestamp()
-    });
 
     return {
       success: true,
-      message: `Scraping completado. Se indexaron ${result.propertyCount} propiedades.`
+      message: `Scraping completado. Se indexaron ${result.data.propertyCount} propiedades.`
     };
 
   } catch (error: any) {

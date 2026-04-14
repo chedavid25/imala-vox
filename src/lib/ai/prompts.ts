@@ -7,7 +7,8 @@ import {
   query, 
   where, 
   orderBy, 
-  limit 
+  limit,
+  documentId 
 } from "firebase/firestore";
 import { COLLECTIONS, Agente, RecursoConocimiento } from "@/lib/types/firestore";
 
@@ -33,17 +34,27 @@ export async function construirSystemPrompt(wsId: string, agenteId: string): Pro
     )
   );
 
-  // 3. Cargar el contenido real de esos recursos desde la baseConocimiento global del workspace
-  const recursosDetallados = await Promise.all(
-    activosSnap.docs.map(async (docActivo) => {
-      const data = docActivo.data();
-      const idReal = data.recursoId || docActivo.id;
-      const recursoSnap = await getDoc(doc(db, COLLECTIONS.ESPACIOS, wsId, COLLECTIONS.CONOCIMIENTO, idReal));
-      return recursoSnap.exists() ? { ...recursoSnap.data(), id: recursoSnap.id } as RecursoConocimiento : null;
-    })
-  );
+  // 3. Cargar el contenido real de esos recursos de forma masiva (Evita N+1)
+  const idsRecursos = activosSnap.docs.map(d => d.data().recursoId || d.id);
+  
+  let recursosValidos: RecursoConocimiento[] = [];
+  
+  if (idsRecursos.length > 0) {
+    // Firestore permite hasta 30 IDs en un 'in' query
+    const chunks = [];
+    for (let i = 0; i < idsRecursos.length; i += 30) {
+      chunks.push(idsRecursos.slice(i, i + 30));
+    }
 
-  const recursosValidos = recursosDetallados.filter(r => r !== null) as RecursoConocimiento[];
+    const snaps = await Promise.all(chunks.map(chunk => 
+      getDocs(query(
+        collection(db, COLLECTIONS.ESPACIOS, wsId, COLLECTIONS.CONOCIMIENTO),
+        where(documentId(), "in", chunk)
+      ))
+    ));
+
+    recursosValidos = snaps.flatMap(s => s.docs.map(d => ({ ...d.data(), id: d.id } as RecursoConocimiento)));
+  }
 
   // Separar recursos de entrenamiento vs recursos para enviar (multimedia)
   const conocimiento = recursosValidos.filter(r => r.tipo !== 'recurso');
