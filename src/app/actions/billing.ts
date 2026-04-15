@@ -71,8 +71,8 @@ export async function crearSuscripcionMP(wsId: string, plan: 'starter' | 'pro' |
       body: JSON.stringify({
         reason: `Imalá Vox — Plan ${plan.charAt(0).toUpperCase() + plan.slice(1)} (${ciclo})`,
         auto_recurring: {
-          frequency: 1,
-          frequency_type: 'months', // Siempre mensual en MP, manejamos ciclo anual con el monto
+          frequency: ciclo === 'anual' ? 12 : 1,
+          frequency_type: 'months', 
           transaction_amount: ciclo === 'anual' ? Math.round(precioARS * 12) : precioARS,
           currency_id: 'ARS',
         },

@@ -14,7 +14,8 @@ import {
   History,
   Info,
   ExternalLink,
-  ChevronDown
+  ChevronDown,
+  HelpCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -88,6 +89,17 @@ export default function FacturacionPage() {
   }, [currentWorkspaceId]);
 
   if (!workspace) return null;
+
+  // Componente local para Tooltips informativos
+  const InfoTooltip = ({ text }: { text: string }) => (
+    <div className="group relative inline-block ml-1 align-middle">
+      <HelpCircle className="size-3 text-[var(--text-tertiary-light)] cursor-help hover:text-[var(--accent)] transition-colors" />
+      <div className="absolute bottom-full right-0 mb-2 w-64 p-3 bg-[#1F1F1E] text-white text-[11px] rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 border border-white/10 leading-relaxed font-semibold">
+        {text}
+        <div className="absolute top-full right-4 border-8 border-transparent border-t-[#1F1F1E]" />
+      </div>
+    </div>
+  );
 
   const currentPlan = workspace.plan;
   const statusLabels = {
@@ -227,7 +239,7 @@ export default function FacturacionPage() {
             <div className="flex items-start gap-3 p-4 bg-blue-500/5 rounded-2xl border border-blue-500/10">
               <Info className="size-4 text-[var(--text-primary-light)] shrink-0 mt-0.5" />
               <p className="text-[10px] text-[var(--text-primary-light)] leading-relaxed font-bold">
-                Los precios en ARS se ajustan trimestralmente basándose en el Dólar Blue para mantener la paridad operativa. Próximo ajuste: <strong className="font-black underline cursor-help decoration-[var(--accent)] decoration-2">{workspace.facturacion?.proximaActualizacion?.toDate().toLocaleDateString()}</strong>.
+                Los precios en ARS se ajustan trimestralmente basándose en el Dólar Blue para mantener la paridad operativa. La conversión incluye un spread operativo y gastos administrativos. Próximo ajuste: <strong className="font-black underline cursor-help decoration-[var(--accent)] decoration-2">{workspace.facturacion?.proximaActualizacion?.toDate().toLocaleDateString()}</strong>.
               </p>
             </div>
           </CardContent>
@@ -333,7 +345,7 @@ export default function FacturacionPage() {
                   className={cn("px-4 py-1.5 text-[10px] font-bold uppercase rounded-lg transition-all flex items-center gap-2", isAnual ? "bg-[var(--accent)] text-[var(--accent-text)] shadow-lg" : "text-[var(--text-tertiary-light)]")}
                >
                  Anual 
-                 <Badge className="bg-[#22C55E]/15 text-[#22C55E] border-none h-5 px-2 py-0.5 text-[9px] font-black rounded-full">-15%</Badge>
+                 <Badge className="bg-[#22C55E]/15 text-[#22C55E] border-none h-5 px-2 py-0.5 text-[9px] font-black rounded-full">-20% — 2 meses gratis</Badge>
                </button>
             </div>
           </div>
@@ -346,7 +358,7 @@ export default function FacturacionPage() {
 
               return (
                 <Card key={p} className={cn(
-                  "relative flex flex-col bg-[var(--bg-card)] border-[var(--border-light)] transition-all overflow-hidden",
+                  "relative flex flex-col bg-[var(--bg-card)] border-[var(--border-light)] transition-all",
                   isCurrent ? "ring-2 ring-[var(--accent)] border-transparent scale-[1.02] shadow-2xl z-10" : "hover:border-[var(--accent)]/30"
                 )}>
                   {isCurrent && (
@@ -356,7 +368,18 @@ export default function FacturacionPage() {
                   )}
                   <CardHeader className="text-center p-6 space-y-1">
                     <CardTitle className="text-lg font-black uppercase tracking-widest text-[var(--text-primary-light)]">{p}</CardTitle>
-                    <div className="flex flex-col items-center">
+                    <p className="text-[10px] text-[var(--text-tertiary-light)] font-bold italic">
+                      {p === 'starter' && "Ideal para el agente que empieza con IA"}
+                      {p === 'pro' && "Para equipos activos con volumen"}
+                      {p === 'agencia' && "Para equipos grandes y redes de oficinas"}
+                    </p>
+                    <div className="flex flex-col items-center pt-2">
+                       {p === 'pro' && !isCurrent && (
+                        <div className="flex flex-col items-center animate-bounce-subtle">
+                           <Badge className="mb-1 bg-[#22C55E] text-white border-none text-[8px] font-black uppercase px-3 shadow-lg shadow-emerald-500/20">Más Popular</Badge>
+                           <div className="text-[9px] font-black text-emerald-500 uppercase tracking-tighter mb-1">Recomendado</div>
+                        </div>
+                      )}
                       <div className="text-3xl font-black text-[var(--text-primary-light)]">${priceMonthly}</div>
                       <span className="text-[10px] font-bold text-[var(--text-tertiary-light)] uppercase tracking-widest">USD / MES</span>
                     </div>
@@ -366,25 +389,24 @@ export default function FacturacionPage() {
                       <div className="flex items-center gap-2 text-[11px] font-bold text-[var(--text-secondary-light)]">
                         <Check className="size-3.5 text-emerald-500" />
                         {limits.agentsIA} Agente Inteligente
+                        <InfoTooltip text="Un experto virtual entrenado con tu información que atiende, vende y agenda citas por vos las 24/7." />
                       </div>
                       <div className="flex items-center gap-2 text-[11px] font-bold text-[var(--text-secondary-light)]">
                         <Check className="size-3.5 text-emerald-500" />
                         {limits.convCountIA.toLocaleString()} Conversaciones
+                        <InfoTooltip text="Sesiones de chat con clientes. La IA puede intercambiar mensajes ilimitados en una misma sesión." />
                       </div>
                       <div className="flex items-center gap-2 text-[11px] font-bold text-[var(--text-secondary-light)]">
                          <Check className="size-3.5 text-emerald-500" />
                          CRM p/ {limits.crmContacts === 'unlimited' ? 'Contactos Ilimitados' : limits.crmContacts.toString() + ' contactos'}
+                         <InfoTooltip text="Capacidad máxima de clientes únicos guardados en tu base para seguimiento y re-marketing." />
                       </div>
                        <div className="flex items-center gap-2 text-[11px] font-bold text-[var(--text-secondary-light)]">
                          <Check className="size-3.5 text-emerald-500" />
                          Base de Conocimiento
+                         <InfoTooltip text="Documentación y archivos (PDF, Webs) que le das a tu IA para que aprenda sobre tu negocio." />
                       </div>
-                      {p === 'agencia' && (
-                         <div className="flex items-center gap-2 text-[11px] font-bold text-[var(--text-secondary-light)]">
-                            <Check className="size-3.5 text-emerald-500" />
-                            Acceso API Full
-                        </div>
-                      )}
+                      {/* Item API eliminado por solicitud */}
                     </div>
                   </CardContent>
                   <CardFooter className="p-6">
