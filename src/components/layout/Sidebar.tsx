@@ -25,7 +25,8 @@ import {
   Zap,
   LogOut,
   User as UserIcon,
-  ChevronsUpDown
+  ChevronsUpDown,
+  Target
 } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { signOut, onAuthStateChanged, User } from "firebase/auth";
@@ -179,6 +180,12 @@ export function Sidebar() {
             href="/dashboard/operacion/inbox" 
             icon={Inbox} 
             active={pathname.startsWith("/dashboard/operacion/inbox")} 
+          />
+          <NavItem 
+            label="Leads" 
+            href="/dashboard/operacion/leads" 
+            icon={Target} 
+            active={pathname.startsWith("/dashboard/operacion/leads")} 
           />
           <NavItem 
             label="Contactos" 

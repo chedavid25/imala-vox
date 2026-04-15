@@ -47,7 +47,7 @@ const getIconByType = (fileName: string) => {
 };
 
 export default function AgenteRecursosPage() {
-  const { currentWorkspaceId } = useWorkspaceStore();
+  const { currentWorkspaceId, workspace } = useWorkspaceStore();
   const { id: agentId } = useParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -56,6 +56,9 @@ export default function AgenteRecursosPage() {
   const [activosMap, setActivosMap] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+
+  const limits = PLAN_LIMITS[workspace?.plan ?? 'starter'];
+  const currentActiveCount = Object.values(activosMap).filter(v => v).length;
 
   useEffect(() => {
     if (!currentWorkspaceId || !agentId) return;
@@ -107,6 +110,12 @@ export default function AgenteRecursosPage() {
 
   const uploadRecurso = async (file: File) => {
     if (!currentWorkspaceId || !agentId) return;
+
+    if (currentActiveCount >= limits.recursosMultimediaPorAgente) {
+      toast.error(`Has alcanzado el límite de ${limits.recursosMultimediaPorAgente} recursos activos.`);
+      return;
+    }
+
     setUploading(true);
     try {
       // 1. Subir archivo a Firebase Storage
@@ -183,6 +192,11 @@ export default function AgenteRecursosPage() {
         // Desactivar: eliminar de conocimientoActivo
         await deleteDoc(activeRef);
       } else {
+        // Validar límite antes de activar
+        if (currentActiveCount >= limits.recursosMultimediaPorAgente) {
+          toast.error(`Has alcanzado el límite de ${limits.recursosMultimediaPorAgente} recursos activos.`);
+          return;
+        }
         // Activar: crear en conocimientoActivo
         await setDoc(activeRef, {
           activo: true,
@@ -232,11 +246,18 @@ export default function AgenteRecursosPage() {
           <h1 className="text-2xl font-bold text-[var(--text-primary-light)]">Recursos Multimedia</h1>
           <p className="text-sm text-[var(--text-tertiary-light)]">Archivos que el agente enviará proactivamente a los clientes.</p>
         </div>
-        <Button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-          className="bg-[var(--accent)] text-[var(--accent-text)]"
-        >
+        <div className="flex flex-col items-end gap-3">
+          <div className="flex items-center gap-2.5 bg-[var(--bg-sidebar)] px-3 py-1.5 rounded-full border border-[var(--accent)]/30 shadow-sm">
+            <Zap className="w-3.5 h-3.5 text-[var(--accent)]" />
+            <span className="text-[11px] font-bold text-[var(--accent)] uppercase tracking-tight">
+              {currentActiveCount} / {limits.recursosMultimediaPorAgente} Activos
+            </span>
+          </div>
+          <Button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="bg-[var(--accent)] text-[var(--accent-text)]"
+          >
           {uploading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />

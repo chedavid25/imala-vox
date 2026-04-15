@@ -57,6 +57,8 @@ export const COLLECTIONS = {
   CONOCIMIENTO_ACTIVO: 'conocimientoActivo',
   ETIQUETAS_AGENTE: 'etiquetasAgente',
   NOTIFICACIONES: 'notificaciones',
+  LEADS: 'leads',
+  ETAPAS_EMBUDO: 'etapasEmbudo',
 };
 
 export interface Contacto {
@@ -181,6 +183,61 @@ export interface Mensaje {
     suggestedByIA?: boolean;       // Si es un borrador generado en modo copiloto
     recursoId?: string;            // Si adjuntó un archivo multimedia
   };
+}
+
+export interface Canal {
+  id?: string;
+  tipo: 'whatsapp' | 'instagram' | 'facebook';
+  nombre: string;
+  cuenta: string;        // número de teléfono o @usuario
+  status: 'connected' | 'disconnected' | 'error' | 'pending';
+  metaPageId?: string;
+  metaPhoneNumberId?: string; // solo WhatsApp
+  metaInstagramId?: string;   // solo Instagram
+  webhookVerified: boolean;
+  creadoEl: Timestamp;
+  actualizadoEl: Timestamp;
+}
+
+// Estructura para canales/{id}/secrets/config
+// Solo accesible desde Admin SDK (Backend)
+export interface CanalSecret {
+  metaAccessToken: string;
+  metaAppSecret?: string;      // por si cada cliente tiene su propia app de Meta
+  actualizadoEl: Timestamp;
+}
+
+// MÓDULO DE LEADS
+export type TemperaturaLead = 'frio' | 'tibio' | 'caliente';
+export type OrigenLead = 'meta_ads' | 'organico' | 'manual';
+
+export interface Lead {
+  id?: string;
+  origen: OrigenLead;
+  etapaId: string;             // ID de la etapa del embudo
+  temperatura: TemperaturaLead;
+  nombre: string;
+  email: string | null;
+  telefono: string | null;
+  camposFormulario: Record<string, string>; // respuestas del formulario Meta
+  metaLeadId?: string;
+  metaFormId?: string;
+  metaPageId?: string;
+  campana?: string;            // nombre de la campaña
+  formulario?: string;         // nombre del formulario
+  notas: string;
+  convertidoAContacto: boolean;
+  contactoId: string | null;   // referencia al contacto CRM si fue convertido
+  creadoEl: Timestamp;
+  actualizadoEl: Timestamp;
+}
+
+export interface EtapaEmbudo {
+  id?: string;
+  nombre: string;
+  orden: number;               // posición en el embudo
+  color: string;               // hex para identificación visual
+  esDefault: boolean;          // las etapas default no se pueden eliminar
 }
 
 // NOTIFICACIONES DE SISTEMA

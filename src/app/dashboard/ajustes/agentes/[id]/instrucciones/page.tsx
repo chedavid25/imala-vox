@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { useParams } from "next/navigation";
 import { mejorarInstruccionesAction } from "@/app/actions/ai";
+import { MODELOS } from "@/lib/ai/anthropic";
 
 const SNIPPETS = [
   { label: "Seguir pasos", icon: ListOrdered, text: "Seguí estos pasos en orden:\n1. \n2. \n3. " },
@@ -222,12 +223,15 @@ export default function InstruccionesAgente() {
             </ul>
           </div>
 
+import { MODELOS } from "@/lib/ai/anthropic";
+
+// ... dentro del componente ...
           <div className="p-5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-2xl space-y-3">
             <h4 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">Metadata del Modelo</h4>
             <div className="space-y-2">
               <div className="flex justify-between text-xs">
                 <span className="text-[var(--text-tertiary-light)]">Motor</span>
-                <span className="font-bold text-[var(--text-secondary-light)]">Claude 3.5 Sonnet</span>
+                <span className="font-bold text-[var(--text-secondary-light)]">Claude Sonnet 4.6</span>
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-[var(--text-tertiary-light)]">Cache Status</span>

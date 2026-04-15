@@ -44,8 +44,7 @@ export default function AgenteArchivosPage() {
   const [loading, setLoading] = useState(true);
 
   // Límites del plan según el workspace real
-  const planKey = (workspace?.plan || 'starter') as keyof typeof PLAN_LIMITS;
-  const limits = PLAN_LIMITS[planKey];
+  const limits = PLAN_LIMITS[workspace?.plan ?? 'starter'];
   const currentActiveCount = Object.values(activosMap).filter(v => v).length;
 
   useEffect(() => {

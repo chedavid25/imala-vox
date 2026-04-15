@@ -43,8 +43,7 @@ export default function AgenteWebsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const planKey = (workspace?.plan || 'starter') as keyof typeof PLAN_LIMITS;
-  const limits = PLAN_LIMITS[planKey];
+  const limits = PLAN_LIMITS[workspace?.plan ?? 'starter'];
   const currentActiveCount = Object.values(activosMap).filter(v => v).length;
 
   useEffect(() => {

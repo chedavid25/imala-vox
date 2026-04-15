@@ -90,7 +90,7 @@ export default function OnboardingPage() {
       const mesSiguiente = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 1);
 
       // Crear el Espacio de Trabajo
-      await addDoc(collection(db, COLLECTIONS.ESPACIOS), {
+      const docRef = await addDoc(collection(db, COLLECTIONS.ESPACIOS), {
         nombre: empresaNombre,
         propietarioEmail: user.email,
         propietarioUid: user.uid,
@@ -108,6 +108,23 @@ export default function OnboardingPage() {
         creadoEl: serverTimestamp(),
         actualizadoEl: serverTimestamp()
       });
+
+      // 3.2 Etapas default del embudo
+      const etapasRef = collection(db, COLLECTIONS.ESPACIOS, docRef.id, COLLECTIONS.ETAPAS_EMBUDO);
+      const ETAPAS_DEFAULT = [  
+        { nombre: 'Nuevos', orden: 0, color: '#3B82F6', esDefault: true },  
+        { nombre: 'Contactados', orden: 1, color: '#F59E0B', esDefault: true },  
+        { nombre: 'En seguimiento', orden: 2, color: '#8B5CF6', esDefault: true },  
+        { nombre: 'Calificados', orden: 3, color: '#22C55E', esDefault: true },  
+        { nombre: 'Cerrados', orden: 4, color: '#6B7280', esDefault: true },  
+      ];
+
+      for (const etapa of ETAPAS_DEFAULT) {
+        await addDoc(etapasRef, {
+          ...etapa,
+          creadoEl: serverTimestamp()
+        });
+      }
 
       toast.success("¡Espacio configurado! Bienvenido.");
       router.push("/dashboard/operacion/inbox");

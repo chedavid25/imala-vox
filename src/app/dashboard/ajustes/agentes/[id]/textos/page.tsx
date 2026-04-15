@@ -61,8 +61,7 @@ export default function AgenteTextosPage() {
   const [creating, setCreating] = useState(false);
 
   // Usar plan real del workspace
-  const planKey = (workspace?.plan || 'starter') as keyof typeof PLAN_LIMITS;
-  const limits = PLAN_LIMITS[planKey];
+  const limits = PLAN_LIMITS[workspace?.plan ?? 'starter'];
   const currentActiveCount = Object.values(activosMap).filter(v => v).length;
 
   useEffect(() => {
