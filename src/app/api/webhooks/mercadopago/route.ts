@@ -73,19 +73,37 @@ export async function POST(request: NextRequest) {
         periodoHasta.setMonth(periodoHasta.getMonth() + 1);
       }
 
-      await wsDoc.ref.update({
+      const updates: any = {
         estado: nuevoEstado,
         periodoVigenteHasta: Timestamp.fromDate(periodoHasta),
         actualizadoEl: Timestamp.now(),
-      });
+      };
+
+      // Si el pago es exitoso, activamos el plan que estaba pendiente y fijamos el precio
+      if (nuevoEstado === 'activo' && wsData.facturacion?.planPendiente) {
+        const transAmount = suscripcion.auto_recurring?.transaction_amount || 0;
+        
+        updates.plan = wsData.facturacion.planPendiente;
+        updates['facturacion.planPendiente'] = null; // Limpiamos el pendiente
+        
+        // Actualizamos los precios oficiales del workspace basados en este pago
+        updates['facturacion.precioARS'] = transAmount;
+        // El monto real en USD depende del ciclo (anual/mensual) y del plan
+        const planPend = wsData.facturacion.planPendiente as 'starter' | 'pro' | 'agencia';
+        const pUSD = (wsData.facturacion.ciclo === 'anual') ? PLAN_LIMITS[planPend].priceYearly : PLAN_LIMITS[planPend].priceMonthly;
+        updates['facturacion.precioUSD'] = pUSD;
+        updates['facturacion.precioFijadoEl'] = Timestamp.now();
+      }
+
+      await wsDoc.ref.update(updates);
 
       // Registrar evento
       await wsDoc.ref.collection(COLLECTIONS.EVENTOS_FACT).add({
         tipo: nuevoEstado === 'activo' ? 'pago_exitoso' : 'pago_fallido',
         monto: suscripcion.auto_recurring?.transaction_amount || 0,
-        montoUSD: 0,
+        montoUSD: updates['facturacion.precioUSD'] || 0,
         mpPagoId: dataId,
-        descripcion: `Webhook MP: suscripción ${suscripcion.status}`,
+        descripcion: `Webhook MP: suscripción ${suscripcion.status} - Activación de Plan ${updates.plan || wsData.plan}`,
         creadoEl: Timestamp.now(),
       });
 

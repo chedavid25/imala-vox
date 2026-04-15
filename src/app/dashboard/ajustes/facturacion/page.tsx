@@ -217,7 +217,7 @@ export default function FacturacionPage() {
               <div className="flex justify-between items-center py-2 border-b border-[var(--border-light)]">
                 <span className="text-xs font-bold text-[var(--text-tertiary-light)]">Precio ARS</span>
                 <span className="text-sm font-black text-[var(--text-primary-light)]">
-                  {cotizacion && (workspace.facturacion?.precioUSD || PLAN_LIMITS[workspace.plan as keyof typeof PLAN_LIMITS]?.priceMonthly)
+                  {cotizacion 
                     ? `$${Math.round((workspace.facturacion?.precioUSD || PLAN_LIMITS[workspace.plan as keyof typeof PLAN_LIMITS].priceMonthly) * cotizacion * 1.10).toLocaleString('es-AR')} / mes` 
                     : 'Calculando...'}
                 </span>

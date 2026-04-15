@@ -8,9 +8,10 @@ import { revalidatePath } from 'next/cache';
 
 // --- OBTENER TOKEN DE ACCOSO (SANDBOX VS PROD) ---
 const getMPAccessToken = () => {
-  return process.env.NODE_ENV === 'development' 
+  const token = process.env.NODE_ENV === 'development' 
     ? process.env.MP_ACCESS_TOKEN_TEST 
     : process.env.MP_ACCESS_TOKEN;
+  return token?.trim();
 };
 
 // ─── OBTENER COTIZACIÓN DÓLAR BLUE ───────────────────────────────────────────
@@ -61,56 +62,81 @@ export async function crearSuscripcionMP(wsId: string, plan: 'starter' | 'pro' |
 
     if (!accessToken) throw new Error("MercadoPago Access Token not configured");
 
+    const wsSnap = await adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}`).get();
+    if (!wsSnap.exists) throw new Error("Workspace not found");
+    const ws = wsSnap.data() as any;
+
+    // MercadoPago requiere HTTPS para el back_url en suscripciones, incluso en sandbox.
+    // Usamos una URL de dominio válido como fallback para desarrollo.
+    const backUrl = process.env.NODE_ENV === 'development'
+      ? 'https://imala-vox.vercel.app/dashboard/ajustes/facturacion'
+      : `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/ajustes/facturacion`;
+
+    // MercadoPago requiere obligatoriamente un payer_email para suscripciones.
+    // Usamos el de prueba en desarrollo (asegurando formato mail) y el del propietario en producción.
+    let devPayerEmail = process.env.MP_TEST_USER_EMAIL || 'test_user_imala_checkout@testuser.com';
+    if (process.env.NODE_ENV === 'development' && !devPayerEmail.includes('@')) {
+      devPayerEmail = `${devPayerEmail}@testuser.com`;
+    }
+
+    const payerEmail = process.env.NODE_ENV === 'development' 
+      ? devPayerEmail
+      : ws.propietarioEmail;
+
     // Crear suscripción en MercadoPago
     const mpRes = await fetch('https://api.mercadopago.com/preapproval', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
+        'Authorization': `Bearer ${accessToken.trim()}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        reason: `Imalá Vox — Plan ${plan.charAt(0).toUpperCase() + plan.slice(1)} (${ciclo})`,
+        // Reason simplificado para evitar errores 500 de encoding
+        reason: `Imala Vox - Plan ${plan} ${ciclo}`,
+        payer_email: payerEmail,
         auto_recurring: {
           frequency: ciclo === 'anual' ? 12 : 1,
           frequency_type: 'months', 
           transaction_amount: ciclo === 'anual' ? Math.round(precioARS * 12) : precioARS,
           currency_id: 'ARS',
         },
-        back_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/ajustes/facturacion`,
+        back_url: backUrl,
         status: 'pending',
       }),
     });
 
     if (!mpRes.ok) {
       const err = await mpRes.text();
+      console.error("--- MERCADO PAGO API ERROR ---");
+      console.error(err);
+      console.error("------------------------------");
       throw new Error(`MP Error: ${err}`);
     }
 
     const mpData = await mpRes.json();
 
-    // Actualizar workspace con datos de facturación
+    // Actualizar workspace con datos de facturación PERO NO CAMBIAR EL PLAN AÚN
+    // El plan solo se cambiará cuando el webhook de MP confirme el pago.
+    // Actualizar workspace con la "intención" de suscripción.
+    // IMPORTANTE: NO actualizamos facturacion.precioUSD ni precioARS acá.
+    // Esos campos se actualizarán en el Webhook solo cuando el pago esté confirmado.
     await adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}`).update({
       'facturacion.metodo': 'mercadopago',
       'facturacion.moneda': 'ARS',
-      'facturacion.precioUSD': precioUSD,
-      'facturacion.precioARS': precioARS,
-      'facturacion.cotizacionUsada': cotizacion,
-      'facturacion.precioFijadoEl': Timestamp.now(),
       'facturacion.mpSuscripcionId': mpData.id,
       'facturacion.ciclo': ciclo,
-      'facturacion.proximaActualizacion': calcularProximoTrimestre(),
-      plan,
+      'facturacion.planPendiente': plan,
       actualizadoEl: Timestamp.now(),
     });
 
-    // Registrar evento de facturación
+    // Registrar evento de intención
     await registrarEventoFact(wsId, {
       tipo: 'suscripcion_creada',
       monto: precioARS,
       montoUSD: precioUSD,
       cotizacionUsada: cotizacion,
       mpSuscripcionId: mpData.id,
-      descripcion: `Suscripción Plan ${plan} ${ciclo} creada`,
+      descripcion: `Intención de suscripción Plan ${plan} ${ciclo} creada (Pendiente de pago)`,
     });
 
     return { success: true, initPoint: mpData.init_point, suscripcionId: mpData.id };
