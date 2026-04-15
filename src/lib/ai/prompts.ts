@@ -86,10 +86,14 @@ ${conocimiento.length > 0
   ? conocimiento.map(r => `### ${r.titulo}${r.descripcion ? `\nGuía de uso: ${r.descripcion}` : ""}\nContenido:\n${r.contenidoTexto}`).join("\n\n---\n\n")
   : "No hay documentos de conocimiento cargados aún."}
 
-## RECURSOS MULTIMEDIA (Archivos que puedes sugerir enviar)
+## RECURSOS MULTIMEDIA (Archivos que puedes enviar al cliente)
+Si el cliente solicita un archivo, catálogo o certificado que esté en esta lista, debes incluir su nombre exacto entre corchetes en tu respuesta para que el sistema genere un enlace de descarga. 
+Formato requerido: [NombreArchivo.ext]
+
+Recursos disponibles:
 ${multimedia.length > 0
-  ? multimedia.map(r => `- "${r.titulo}": ${r.descripcion}`).join("\n")
-  : "No hay recursos multimedia disponibles para este agente."}
+  ? multimedia.map(r => `- "${r.titulo}": Usa el código [${r.archivoNombre}] | Descripción: ${r.descripcion}`).join("\n")
+  : "No hay recursos multimedia disponibles para enviar."}
 
 ## CATÁLOGO DE OBJETOS/PROPIEDADES DISPONIBLES
 ${objetosSnap.docs.length > 0
