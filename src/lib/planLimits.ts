@@ -16,6 +16,7 @@ export interface PlanLimits {
   sitiosWorkspace: number;
   etiquetasPorAgente: number;
   recursosMB: number;
+  recursosMultimediaPorAgente: number;
 
   knowledgeBase: boolean;
   massBroadcast: number | 'unlimited';
@@ -43,6 +44,7 @@ export const PLAN_LIMITS: Record<'starter' | 'pro' | 'agencia', PlanLimits> = {
     sitiosWorkspace: 5,
     etiquetasPorAgente: 10,
     recursosMB: 50,
+    recursosMultimediaPorAgente: 5,
     knowledgeBase: true,
     massBroadcast: 0,
     visualWorkflows: 0,
@@ -67,6 +69,7 @@ export const PLAN_LIMITS: Record<'starter' | 'pro' | 'agencia', PlanLimits> = {
     sitiosWorkspace: 20,
     etiquetasPorAgente: 30,
     recursosMB: 200,
+    recursosMultimediaPorAgente: 20,
     knowledgeBase: true,
     massBroadcast: 1000,
     visualWorkflows: 5,
@@ -91,6 +94,7 @@ export const PLAN_LIMITS: Record<'starter' | 'pro' | 'agencia', PlanLimits> = {
     sitiosWorkspace: 100,
     etiquetasPorAgente: 100,
     recursosMB: 1000,
+    recursosMultimediaPorAgente: 100,
     knowledgeBase: true,
     massBroadcast: 'unlimited',
     visualWorkflows: 'unlimited',

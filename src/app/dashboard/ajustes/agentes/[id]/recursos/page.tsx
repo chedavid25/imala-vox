@@ -18,6 +18,7 @@ import {
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { getAuth } from "firebase/auth";
 import { COLLECTIONS, RecursoConocimiento } from "@/lib/types/firestore";
+import { PLAN_LIMITS } from "@/lib/planLimits";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import {
   FilePlus,
@@ -271,6 +272,7 @@ export default function AgenteRecursosPage() {
           )}
         </Button>
       </div>
+    </div>
 
       <div className="bg-[var(--bg-input)] border border-[var(--border-light)] p-6 rounded-3xl flex gap-4">
         <div className="shrink-0"><HelpCircle className="w-5 h-5 text-[var(--accent)]" /></div>

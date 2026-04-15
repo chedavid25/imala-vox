@@ -65,7 +65,7 @@ export default function ContactosPage() {
     console.log(`Iniciando importación de ${newContacts.length} contactos con detección de duplicados...`);
 
     try {
-      const contactsRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS);
+      const contactsRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId!, COLLECTIONS.CONTACTOS);
       const CHUNK_SIZE = 50; 
       
       for (let i = 0; i < newContacts.length; i += CHUNK_SIZE) {
@@ -139,7 +139,7 @@ export default function ContactosPage() {
     
     setIsAdding(true);
     try {
-      const contactsRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS);
+      const contactsRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId!, COLLECTIONS.CONTACTOS);
       
       const conditions = [where("telefono", "==", newContact.telefono)];
       if (newContact.email) conditions.push(where("email", "==", newContact.email));

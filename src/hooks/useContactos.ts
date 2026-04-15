@@ -17,7 +17,7 @@ export function useContactos() {
       return;
     }
 
-    const contactsRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS);
+    const contactsRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId!, COLLECTIONS.CONTACTOS);
     const q = query(contactsRef);
 
     const unsubscribe = onSnapshot(

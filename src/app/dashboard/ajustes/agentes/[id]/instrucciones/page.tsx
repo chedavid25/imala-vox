@@ -223,9 +223,6 @@ export default function InstruccionesAgente() {
             </ul>
           </div>
 
-import { MODELOS } from "@/lib/ai/anthropic";
-
-// ... dentro del componente ...
           <div className="p-5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-2xl space-y-3">
             <h4 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">Metadata del Modelo</h4>
             <div className="space-y-2">

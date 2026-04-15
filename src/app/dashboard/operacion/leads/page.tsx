@@ -15,7 +15,6 @@ import {
   Clock,
   MoreVertical,
   MessageCircle,
-  Convert,
   Loader2,
   Lock,
   ExternalLink
@@ -130,7 +129,7 @@ export default function LeadsPage() {
     email: "",
     telefono: "",
     etapaId: "",
-    temperatura: "frio" as const,
+    temperatura: "frio" as "frio" | "tibio" | "caliente",
     notas: "",
   });
   const [isSavingLead, setIsSavingLead] = useState(false);
@@ -200,6 +199,26 @@ export default function LeadsPage() {
              creado.getFullYear() === esteAno;
     }).length;
 
+    // Calcular mes anterior
+    const mesAnterior = esteMes === 0 ? 11 : esteMes - 1;
+    const anoAnterior = esteMes === 0 ? esteAno - 1 : esteAno;
+
+    const enMesAnterior = leads.filter(l => {
+      const creado = l.creadoEl?.toDate();
+      return creado && 
+             creado.getMonth() === mesAnterior &&
+             creado.getFullYear() === anoAnterior;
+    }).length;
+
+    // Calcular Tendencia
+    let tendenciaLeads = "0%";
+    if (enMesAnterior === 0) {
+      if (enEsteMes > 0) tendenciaLeads = "+100%";
+    } else {
+      const diff = ((enEsteMes - enMesAnterior) / enMesAnterior) * 100;
+      tendenciaLeads = `${diff >= 0 ? '+' : ''}${Math.round(diff)}%`;
+    }
+
     // Se considera convertido si está en la etapa 'Cerrados' o marcado como convertido
     const convertidos = leads.filter(l => {
       const etapa = etapas.find(e => e.id === l.etapaId);
@@ -208,7 +227,7 @@ export default function LeadsPage() {
 
     const tasaCierre = leads.length > 0 ? Math.round((convertidos / leads.length) * 100) : 0;
 
-    return { nuevosHoy, enEsteMes, convertidos, tasaCierre };
+    return { nuevosHoy, enEsteMes, enMesAnterior, tendenciaLeads, convertidos, tasaCierre };
   }, [leads, etapas]);
 
   // Sensores para DnD
@@ -291,7 +310,7 @@ export default function LeadsPage() {
       );
 
       // 2. Marcar lead como convertido
-      const leadRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.LEADS, lead.id);
+      const leadRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId!, COLLECTIONS.LEADS, lead.id);
       await updateDoc(leadRef, {
         convertidoAContacto: true,
         contactoId: contactoRef.id,
@@ -348,7 +367,7 @@ export default function LeadsPage() {
 
     setIsSavingStage(true);
     try {
-      const stageRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.ETAPAS_EMBUDO, editingStage.id);
+      const stageRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId!, COLLECTIONS.ETAPAS_EMBUDO, editingStage.id);
       await updateDoc(stageRef, {
         nombre: newStageName,
         color: newStageColor,
@@ -382,7 +401,7 @@ export default function LeadsPage() {
     if (!confirm("¿Estás seguro de que quieres eliminar esta etapa?")) return;
 
     try {
-      await deleteDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.ETAPAS_EMBUDO, stageId));
+      await deleteDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId!, COLLECTIONS.ETAPAS_EMBUDO, stageId));
       toast.success("Etapa eliminada");
     } catch (err) {
       toast.error("Error al eliminar la etapa");
@@ -417,7 +436,7 @@ export default function LeadsPage() {
   const handleUpdateLeadField = async (leadId: string, field: string, value: any) => {
     if (!currentWorkspaceId) return;
     try {
-      const leadRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.LEADS, leadId);
+      const leadRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId!, COLLECTIONS.LEADS, leadId);
       await updateDoc(leadRef, {
         [field]: value,
         actualizadoEl: serverTimestamp()
@@ -490,7 +509,7 @@ export default function LeadsPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <MetricCard title="Leads este mes" value={metrics.enEsteMes} icon={Users} trend="+12%" color="blue" />
+          <MetricCard title="Leads este mes" value={metrics.enEsteMes} icon={Users} trend={metrics.tendenciaLeads} color="blue" />
           <MetricCard title="Nuevos hoy" value={metrics.nuevosHoy} icon={Clock} trend="Nuevo" color="orange" />
           <MetricCard title="Convertidos" value={metrics.convertidos} icon={CheckCircle2} color="green" />
           <MetricCard title="Tasa de Cierre" value={`${metrics.tasaCierre}%`} icon={TrendingUp} color="purple" />
