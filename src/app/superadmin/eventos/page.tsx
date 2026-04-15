@@ -22,8 +22,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { db } from "@/lib/firebase";
-import { collectionGroup, query, orderBy, onSnapshot, limit } from "firebase/firestore";
+import { obtenerEventosGlobales } from "@/app/actions/superadmin";
 import { EventoFacturacion } from "@/lib/types/firestore";
 
 export default function EventosGlobalesPage() {
@@ -32,23 +31,18 @@ export default function EventosGlobalesPage() {
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    // Escuchar eventos de facturación como proxy de eventos importantes del sistema
-    const q = query(
-      collectionGroup(db, "eventosFact"), // Usamos el string literal por simplicidad en collectionGroup
-      orderBy("creadoEl", "desc"),
-      limit(200)
-    );
-
-    const unsubscribe = onSnapshot(q, (snap) => {
-      setEvents(snap.docs.map(doc => ({
-        id: doc.id,
-        wsId: doc.ref.parent.parent?.id,
-        ...doc.data() as EventoFacturacion
-      })));
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
+    async function load() {
+      setLoading(true);
+      try {
+        const data = await obtenerEventosGlobales();
+        setEvents(data as any);
+      } catch (err) {
+        console.error("Error cargando eventos:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
   }, []);
 
   const filtered = events.filter(e => 

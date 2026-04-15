@@ -181,7 +181,10 @@ export default function EspaciosAdminPage() {
                         </Button>
                       } />
                       <DropdownMenuContent align="end" className="w-56 bg-zinc-900 border-white/5 text-white rounded-2xl p-2 shadow-2xl">
-                         <DropdownMenuItem className="gap-3 px-4 py-3 rounded-xl hover:bg-white/10 cursor-pointer">
+                         <DropdownMenuItem 
+                            className="gap-3 px-4 py-3 rounded-xl hover:bg-white/10 cursor-pointer"
+                            onClick={() => toast.info(`Detalles de ${ws.nombre}: ID ${ws.id}`)}
+                         >
                             <Eye className="size-4 text-blue-400" />
                             <span className="text-sm font-bold">Ver Detalles</span>
                          </DropdownMenuItem>

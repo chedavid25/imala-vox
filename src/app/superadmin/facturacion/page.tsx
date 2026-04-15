@@ -23,9 +23,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { db } from "@/lib/firebase";
-import { collectionGroup, query, orderBy, onSnapshot, limit } from "firebase/firestore";
-import { EventoFacturacion, COLLECTIONS } from "@/lib/types/firestore";
+import { obtenerEventosFacturacionGlobales } from "@/app/actions/superadmin";
+import { EventoFacturacion } from "@/lib/types/firestore";
 import { cn } from "@/lib/utils";
 
 export default function FacturacionAdminPage() {
@@ -34,23 +33,18 @@ export default function FacturacionAdminPage() {
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    // Usamos collectionGroup para traer eventos de todos los workspaces
-    const q = query(
-      collectionGroup(db, COLLECTIONS.EVENTOS_FACT),
-      orderBy("creadoEl", "desc"),
-      limit(100)
-    );
-
-    const unsubscribe = onSnapshot(q, (snap) => {
-      setEvents(snap.docs.map(doc => ({
-        id: doc.id,
-        wsId: doc.ref.parent.parent?.id,
-        ...doc.data() as EventoFacturacion
-      })) as (EventoFacturacion & { wsId?: string })[]);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
+    async function load() {
+      setLoading(true);
+      try {
+        const data = await obtenerEventosFacturacionGlobales();
+        setEvents(data as any);
+      } catch (err) {
+        console.error("Error cargando facturacion:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
   }, []);
 
   const totalARS = events

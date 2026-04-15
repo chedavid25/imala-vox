@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // 1. Redirigir la raíz / hacia /auth
@@ -18,16 +18,26 @@ export async function middleware(request: NextRequest) {
   if (pathname.startsWith('/superadmin')) {
     const adminCookie = request.cookies.get('imala-admin-session')?.value;
     
+    console.log("--- PROXY DEBUG ---");
+    console.log("Ruta detectada:", pathname);
+    console.log("¿Hay cookie de admin?:", !!adminCookie);
+
     if (!adminCookie) {
+      console.log("Redirigiendo a /auth por falta de cookie.");
       return NextResponse.redirect(new URL('/auth', request.url));
     }
 
     try {
       const { jwtVerify } = await import('jose');
-      const secret = new TextEncoder().encode(process.env.ADMIN_JWT_SECRET || 'fallback-secret-imala-vox-2026');
+      const secretKey = process.env.ADMIN_JWT_SECRET || 'fallback-secret-imala-vox-2026';
+      const secret = new TextEncoder().encode(secretKey);
+      
+      console.log("Usando Secret Key para validar:", secretKey === 'fallback-secret-imala-vox-2026' ? "FALLBACK" : "ENV_VAR");
+      
       await jwtVerify(adminCookie, secret);
-    } catch (error) {
-      console.error("SuperAdmin Auth Error:", error);
+      console.log("JWT Validado con éxito en el Proxy.");
+    } catch (error: any) {
+      console.error("SuperAdmin Auth Error en Proxy:", error.message);
       return NextResponse.redirect(new URL('/auth', request.url));
     }
   }

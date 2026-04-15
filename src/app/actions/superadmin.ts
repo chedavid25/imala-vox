@@ -6,32 +6,66 @@ import { COLLECTIONS, PlataformaConfig } from '@/lib/types/firestore';
 import { cookies } from 'next/headers';
 import { Timestamp } from 'firebase-admin/firestore';
 
-const ADMIN_JWT_SECRET = new TextEncoder().encode(process.env.ADMIN_JWT_SECRET || 'fallback-secret-imala-vox-2026');
+const secretKey = process.env.ADMIN_JWT_SECRET || 'fallback-secret-imala-vox-2026';
+const ADMIN_JWT_SECRET = new TextEncoder().encode(secretKey);
+
+// --- HELPERS ---
+
+/**
+ * Función para serializar recursivamente los Timestamps de Firestore
+ * y otros tipos complejos para que Next.js los acepte en Client Components.
+ */
+const serializeFirestoreData = (obj: any): any => {
+  if (obj === null || typeof obj !== 'object') return obj;
+  
+  // Si es un Timestamp de Firestore
+  if (obj.toDate && typeof obj.toDate === 'function') {
+    return obj.toDate().toISOString();
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(serializeFirestoreData);
+  }
+  
+  const res: any = {};
+  Object.keys(obj).forEach(key => {
+    res[key] = serializeFirestoreData(obj[key]);
+  });
+  return res;
+};
+
+// --- AUTH ACTIONS ---
 
 export async function verificarYSetearAdmin(uid: string): Promise<boolean> {
   try {
     const configSnap = await adminDb.doc(COLLECTIONS.PLATAFORMA_CONFIG).get();
     const config = configSnap.data() as PlataformaConfig | undefined;
-    const esAdmin = config?.superAdminUids?.includes(uid) || false;
+    const uidsPermitidos = config?.superAdminUids || [];
+    const esAdmin = uidsPermitidos.includes(uid);
+
+    console.log("--- DEBUG ADMIN AUTH ---");
+    console.log("UID Recibido:", uid);
+    console.log("UIDs Permitidos en Firestore:", uidsPermitidos);
+    console.log("¿Es Admin?:", esAdmin);
 
     if (esAdmin) {
-      // Crear JWT firmado
       const token = await new SignJWT({ uid })
         .setProtectedHeader({ alg: 'HS256' })
         .setExpirationTime('8h')
         .sign(ADMIN_JWT_SECRET);
 
-      // Setear cookie de sesión admin (httpOnly, 8 horas)
       const cookieStore = await cookies();
       cookieStore.set('imala-admin-session', token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: 60 * 60 * 8,
+        secure: false, // Localhost fix
+        maxAge: 60 * 60 * 8, 
         path: '/',
+        sameSite: 'lax',
       });
+      
+      return true;
     }
-
-    return esAdmin;
+    return false;
   } catch (error) {
     console.error("Error verificando admin:", error);
     return false;
@@ -43,11 +77,15 @@ export async function removerSesionAdmin() {
   cookieStore.delete('imala-admin-session');
 }
 
+// --- DATA ACTIONS ---
+
 export async function obtenerMetricasSuperAdmin() {
   try {
-    // Obtener todos los workspaces
     const wsSnap = await adminDb.collection(COLLECTIONS.ESPACIOS).get();
-    const workspaces = wsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+    const workspaces = wsSnap.docs.map(d => ({
+      ...serializeFirestoreData(d.data()),
+      id: d.id
+    }));
 
     const hoy = new Date();
     const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
@@ -56,10 +94,9 @@ export async function obtenerMetricasSuperAdmin() {
     const enPrueba = workspaces.filter(w => w.estado === 'prueba');
     const cancelados = workspaces.filter(w => w.estado === 'cancelado');
     const nuevosEsteMes = workspaces.filter(w => 
-      w.creadoEl?.toDate() >= inicioMes
+      w.creadoEl ? new Date(w.creadoEl) >= inicioMes : false
     );
 
-    // Calcular MRR
     const mrr = activos.reduce((acc: number, w: any) => {
       return acc + (w.facturacion?.precioUSD || 0);
     }, 0);
@@ -75,7 +112,7 @@ export async function obtenerMetricasSuperAdmin() {
         workspacesCancelados: cancelados.length,
         nuevosEsteMes: nuevosEsteMes.length,
         churnEsteMes: cancelados.filter((w: any) => 
-          w.actualizadoEl?.toDate() >= inicioMes
+          w.actualizadoEl ? new Date(w.actualizadoEl) >= inicioMes : false
         ).length,
       }
     };
@@ -85,7 +122,44 @@ export async function obtenerMetricasSuperAdmin() {
   }
 }
 
-// ACCIONES MANUALES
+export async function obtenerEventosFacturacionGlobales() {
+  try {
+    const snap = await adminDb.collectionGroup(COLLECTIONS.EVENTOS_FACT)
+      .orderBy("creadoEl", "desc")
+      .limit(100)
+      .get();
+    
+    return snap.docs.map(doc => ({
+      id: doc.id,
+      wsId: doc.ref.parent.parent?.id,
+      ...serializeFirestoreData(doc.data())
+    }));
+  } catch (error) {
+    console.error("Error eventos facturacion:", error);
+    return [];
+  }
+}
+
+export async function obtenerEventosGlobales() {
+  try {
+    const snap = await adminDb.collectionGroup("eventosFact") 
+      .orderBy("creadoEl", "desc")
+      .limit(200)
+      .get();
+
+    return snap.docs.map(doc => ({
+      id: doc.id,
+      wsId: doc.ref.parent.parent?.id,
+      ...serializeFirestoreData(doc.data())
+    }));
+  } catch (error) {
+    console.error("Error eventos globales:", error);
+    return [];
+  }
+}
+
+// --- MANAGEMENT ACTIONS ---
+
 export async function cambiarPlanManual(wsId: string, plan: string) {
   await adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}`).update({
     plan,
@@ -104,7 +178,6 @@ export async function extenderPrueba(wsId: string, diasExtra: number) {
   
   await wsDoc.update({
     pruebaTerminaEl: Timestamp.fromDate(newEnd),
-    estado: 'prueba',
     actualizadoEl: Timestamp.now()
   });
   return { success: true };

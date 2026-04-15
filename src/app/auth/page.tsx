@@ -59,10 +59,15 @@ export default function AuthPage() {
       const snap = await getDocs(q);
       
       // Verificar si es SuperAdmin y setear cookie
-      await verificarYSetearAdmin(result.user.uid);
+      const esAdmin = await verificarYSetearAdmin(result.user.uid);
 
       toast.success("¡Bienvenido de nuevo!");
-      router.push(snap.empty ? "/onboarding" : "/dashboard/operacion/inbox");
+      
+      if (esAdmin) {
+        window.location.href = "/superadmin";
+      } else {
+        router.push(snap.empty ? "/onboarding" : "/dashboard/operacion/inbox");
+      }
     } catch (error: any) {
       console.error("Error login:", error);
       toast.error(error.message || "Error al iniciar sesión");
@@ -99,6 +104,7 @@ export default function AuthPage() {
   const handleGoogleLogin = async () => {
     setLoading(true);
     const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
     try {
       const result = await signInWithPopup(auth, provider);
       // Verificar si ya tiene workspace
@@ -113,10 +119,15 @@ export default function AuthPage() {
       const snap = await getDocs(q);
       
       // Verificar si es SuperAdmin y setear cookie
-      await verificarYSetearAdmin(result.user.uid);
+      const esAdmin = await verificarYSetearAdmin(result.user.uid);
 
       toast.success(`¡Hola, ${result.user.displayName}!`);
-      router.push(snap.empty ? '/onboarding' : '/dashboard/operacion/inbox');
+      
+      if (esAdmin) {
+        window.location.href = "/superadmin";
+      } else {
+        router.push(snap.empty ? '/onboarding' : '/dashboard/operacion/inbox');
+      }
     } catch (error: any) {
       console.error("Error Google login:", error);
       toast.error("Error al iniciar sesión con Google");
