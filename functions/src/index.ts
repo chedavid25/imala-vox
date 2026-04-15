@@ -304,21 +304,34 @@ export const recibirMensajeWhatsApp = functions.https.onRequest(async (req: func
  * Responsabilidad: Esqueleto para procesar el mensaje con Claude y generar respuesta.
  */
 export const procesarRespuestaIA = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
-  const { workspaceId, conversationId, userMessage } = data;
+  const { workspaceId, conversationId, userMessage, historial } = data;
 
   console.log(`Procesando respuesta IA para workspace ${workspaceId}, conv ${conversationId}`);
 
-  // TODO: Fase 2
-  // 1. Consultar base de conocimiento/recursos
-  // 2. Llamada a Anthropic SDK (Claude) con el contexto
-  // 3. Validar límites de tokens
-  // 4. Enviar mensaje respuesta vía WhatsApp Cloud API
-  
+  try {
+    // Obtener agente activo
+    const agentesSnap = await admin.firestore()
+      .collection(`espaciosDeTrabajo/${workspaceId}/agentes`)
+      .where('activo', '==', true)
+      .limit(1)
+      .get();
 
-  return { 
-    status: 'success', 
-    message: 'Esqueleto procesado — esperando implementación de Fase 2 (Cognitive).' 
-  };
+    if (agentesSnap.empty) throw new Error("No hay agentes activos");
+    const agenteId = agentesSnap.docs[0].id;
+
+    const respuestaIA = await procesarConIA({
+      wsId: workspaceId,
+      agenteId,
+      conversacionId: conversationId,
+      textoUsuario: userMessage,
+      historialUltimos: historial || []
+    });
+
+    return { status: 'success', respuesta: respuestaIA };
+  } catch (error: any) {
+    console.error("Error en procesarRespuestaIA:", error);
+    throw new functions.https.HttpsError("internal", error.message);
+  }
 });
 
 /**
@@ -494,12 +507,31 @@ export const cronReseteoMensual = functions.pubsub.schedule('0 0 1 * *')
     const workspaces = await db.collection("espaciosDeTrabajo").get();
     const batch = db.batch();
 
-    workspaces.docs.forEach(ws => {
+    for (const ws of workspaces.docs) {
+      const data = ws.data();
+      const plan = data.plan || 'starter';
+      const usage = data.uso?.convCount || 0;
+      
+      // Cálculo de excesos para plan Agencia (Límite 10,000)
+      if (plan === 'agencia' && usage > 10000) {
+        const exceso = usage - 10000;
+        const bloques = Math.ceil(exceso / 100);
+        const montoExceso = bloques * 1.80; // $1.80 cada 100 mensajes
+
+        await ws.ref.collection("eventosFacturacion").add({
+          tipo: 'exceso_conversaciones',
+          monto: montoExceso,
+          montoUSD: montoExceso,
+          descripcion: `Cargo por exceso de conversiones: ${exceso} msgs adicionales (${bloques} bloques de 100).`,
+          creadoEl: admin.firestore.Timestamp.now(),
+        });
+      }
+
       batch.update(ws.ref, { "uso.convCount": 0 });
-    });
+    }
 
     await batch.commit();
-    console.log(`Consumo reseteado para ${workspaces.size} workspaces.`);
+    console.log(`Consumo reseteado y cargos por exceso procesados para ${workspaces.size} workspaces.`);
   });
 
 /**
@@ -508,47 +540,69 @@ export const cronReseteoMensual = functions.pubsub.schedule('0 0 1 * *')
  * Responsabilidad: Obtiene cotización Dólar Blue y actualiza precios en ARS 
  * para workspaces en Argentina.
  */
-export const cronAjusteARS = functions.pubsub.schedule('0 6 * * *')
+export const cronAjusteARS = functions.pubsub.schedule('0 9 1 1,4,7,10 *')
   .timeZone('America/Argentina/Buenos_Aires')
   .onRun(async () => {
     const db = admin.firestore();
     try {
-      // 1. Obtener cotización Blue (API Pública)
+      // 1. Obtener cotización Blue + 10% SPREAD
       const resp = await fetch('https://dolarapi.com/v1/dolares/blue');
       const data = await resp.json();
-      const bluePrice = data.venta;
-
-      if (!bluePrice) throw new Error("No se obtuvo precio del dólar");
+      const blueBase = data.venta;
+      if (!blueBase) throw new Error("No se obtuvo precio del dólar");
+      
+      const blueConSpread = Math.round(blueBase * 1.10); // +10% de margen
 
       // 2. Obtener planes de la config global
       const configSnap = await db.collection("plataforma").doc("config").get();
       const planes = configSnap.data()?.planes;
-
       if(!planes) return;
 
-      // 3. Actualizar workspaces
-      const workspaces = await db.collection("espaciosDeTrabajo").get();
-      const batch = db.batch();
+      // 3. Procesar workspaces activos
+      const workspaces = await db.collection("espaciosDeTrabajo").where('estado', '==', 'activo').get();
+      
+      const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN; // Requiere configuración en Functions
 
-      workspaces.docs.forEach(ws => {
+      for (const ws of workspaces.docs) {
         const wsData = ws.data();
         const planKey = wsData.plan || 'starter';
         const planConfig = planes[planKey];
+        const ciclo = wsData.facturacion?.ciclo || 'mensual';
         
         if (planConfig) {
-          const precioUSD = planConfig.priceMonthly;
-          const nuevoPrecioARS = Math.round(precioUSD * bluePrice);
+          const precioUSD = (ciclo === 'anual') ? planConfig.priceYearly : planConfig.priceMonthly;
+          const nuevoPrecioARS = Math.round(precioUSD * blueConSpread);
 
-          batch.update(ws.ref, {
+          // Actualizar Firestore
+          await ws.ref.update({
             "facturacion.precioARS": nuevoPrecioARS,
-            "facturacion.cotizacionUsada": bluePrice,
+            "facturacion.cotizacionUsada": blueConSpread,
             "facturacion.ultimaActualizacion": admin.firestore.FieldValue.serverTimestamp()
           });
-        }
-      });
 
-      await batch.commit();
-      console.log(`Precios ARS actualizados con Blue a $${bluePrice}`);
+          // Si tiene suscripción MP, recrearla para aplicar nuevo precio
+          const mpSubId = wsData.facturacion?.mpSuscripcionId;
+          if (mpSubId && MP_ACCESS_TOKEN) {
+             console.log(`Recreando suscripción ${mpSubId} para WS ${ws.id} con nuevo precio: ${nuevoPrecioARS}`);
+             try {
+               // A. Cancelar actual
+               await fetch(`https://api.mercadopago.com/preapproval/${mpSubId}`, {
+                 method: 'PUT',
+                 headers: { 'Authorization': `Bearer ${MP_ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
+                 body: JSON.stringify({ status: 'cancelled' })
+               });
+
+               // B. El usuario deberá re-suscribirse manualmente cuando expire su periodo vigente
+               // o podríamos intentar crear una nueva, pero MP requiere intervención del usuario para autorizar debito
+               console.log(`Suscripción ${mpSubId} cancelada. El usuario deberá activarla nuevamente con el nuevo precio.`);
+             } catch (e) {
+               console.error(`Error manejando suscripción MP ${mpSubId}:`, e);
+             }
+          }
+        }
+      }
+
+      console.log(`Ajuste trimestral completado. Dólar Blue con Spread: $${blueConSpread}`);
     } catch (err) {
       console.error("Error en cronAjusteARS:", err);
     }

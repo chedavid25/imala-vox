@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { Timestamp } from 'firebase-admin/firestore';
 import { COLLECTIONS } from '@/lib/types/firestore';
+import { PLAN_LIMITS } from '@/lib/planLimits';
+import crypto from 'crypto';
 
 // --- OBTENER TOKEN DE ACCESO (SANDBOX VS PROD) ---
 const getMPAccessToken = () => {
@@ -12,6 +14,34 @@ const getMPAccessToken = () => {
 
 export async function POST(request: NextRequest) {
   try {
+    // --- VERIFICACIÓN DE FIRMA HMAC ---
+    const xSignature = request.headers.get('x-signature');
+    const xRequestId = request.headers.get('x-request-id');
+    const webhookSecret = process.env.MP_WEBHOOK_SECRET;
+
+    if (xSignature && webhookSecret && webhookSecret !== 'xxxx') {
+      try {
+        const parts = xSignature.split(',');
+        const tsPart = parts.find(p => p.startsWith('ts='));
+        const v1Part = parts.find(p => p.startsWith('v1='));
+        
+        const ts = tsPart?.split('=')[1];
+        const v1 = v1Part?.split('=')[1];
+        
+        if (ts && v1) {
+          const manifest = `id:${xRequestId};request-date:${ts};`;
+          const expected = crypto.createHmac('sha256', webhookSecret).update(manifest).digest('hex');
+          
+          if (v1 !== expected) {
+            console.error("MP Webhook: Invalid HMAC Signature");
+            return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+          }
+        }
+      } catch (err) {
+        console.error("MP Webhook: Error parsing signature", err);
+      }
+    }
+
     const body = await request.json();
     const tipo = body.type;
     const dataId = body.data?.id;

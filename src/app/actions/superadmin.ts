@@ -1,9 +1,12 @@
 'use server'
 
+import { SignJWT } from 'jose';
 import { adminDb } from '@/lib/firebase-admin';
 import { COLLECTIONS, PlataformaConfig } from '@/lib/types/firestore';
 import { cookies } from 'next/headers';
 import { Timestamp } from 'firebase-admin/firestore';
+
+const ADMIN_JWT_SECRET = new TextEncoder().encode(process.env.ADMIN_JWT_SECRET || 'fallback-secret-imala-vox-2026');
 
 export async function verificarYSetearAdmin(uid: string): Promise<boolean> {
   try {
@@ -12,9 +15,15 @@ export async function verificarYSetearAdmin(uid: string): Promise<boolean> {
     const esAdmin = config?.superAdminUids?.includes(uid) || false;
 
     if (esAdmin) {
+      // Crear JWT firmado
+      const token = await new SignJWT({ uid })
+        .setProtectedHeader({ alg: 'HS256' })
+        .setExpirationTime('8h')
+        .sign(ADMIN_JWT_SECRET);
+
       // Setear cookie de sesión admin (httpOnly, 8 horas)
       const cookieStore = await cookies();
-      cookieStore.set('imala-admin-session', uid, {
+      cookieStore.set('imala-admin-session', token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         maxAge: 60 * 60 * 8,

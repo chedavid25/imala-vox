@@ -5,6 +5,7 @@ import { Timestamp } from 'firebase-admin/firestore';
 import { COLLECTIONS, EventoFacturacion } from '@/lib/types/firestore';
 import { PLAN_LIMITS } from '@/lib/planLimits';
 import { revalidatePath } from 'next/cache';
+import crypto from 'crypto';
 
 // --- OBTENER TOKEN DE ACCOSO (SANDBOX VS PROD) ---
 const getMPAccessToken = () => {
@@ -212,8 +213,12 @@ export async function cambiarPlan(wsId: string, planNuevo: 'starter' | 'pro' | '
 
     if (!resultado.success) throw new Error(resultado.error);
 
+    // Comparación robusta de Upgrade/Downgrade usando índices de jerarquía
+    const ORDEN_PLANES = { starter: 0, pro: 1, agencia: 2 };
+    const esUpgrade = ORDEN_PLANES[planNuevo] > ORDEN_PLANES[planAnterior as keyof typeof ORDEN_PLANES];
+
     await registrarEventoFact(wsId, {
-      tipo: (planNuevo === 'agencia' || (planNuevo === 'pro' && planAnterior === 'starter')) ? 'upgrade' : 'downgrade',
+      tipo: esUpgrade ? 'upgrade' : 'downgrade',
       monto: 0,
       montoUSD: PLAN_LIMITS[planNuevo].priceMonthly,
       planAnterior,
