@@ -34,7 +34,7 @@ import { cn } from "@/lib/utils";
 import { PLAN_LIMITS } from "@/lib/planLimits";
 
 export default function AgenteWebsPage() {
-  const { currentWorkspaceId } = useWorkspaceStore();
+  const { currentWorkspaceId, workspace } = useWorkspaceStore();
   const { id: agentId } = useParams();
   const router = useRouter();
 
@@ -43,7 +43,8 @@ export default function AgenteWebsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const limits = PLAN_LIMITS['agencia']; 
+  const planKey = (workspace?.plan || 'starter') as keyof typeof PLAN_LIMITS;
+  const limits = PLAN_LIMITS[planKey];
   const currentActiveCount = Object.values(activosMap).filter(v => v).length;
 
   useEffect(() => {

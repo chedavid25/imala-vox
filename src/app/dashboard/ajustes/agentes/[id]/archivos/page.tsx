@@ -35,7 +35,7 @@ import { cn } from "@/lib/utils";
 import { PLAN_LIMITS } from "@/lib/planLimits";
 
 export default function AgenteArchivosPage() {
-  const { currentWorkspaceId } = useWorkspaceStore();
+  const { currentWorkspaceId, workspace } = useWorkspaceStore();
   const { id: agentId } = useParams();
   const router = useRouter();
 
@@ -43,8 +43,9 @@ export default function AgenteArchivosPage() {
   const [activosMap, setActivosMap] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
 
-  // Límites del plan (hardcoded a 'agencia' por ahora o detectado del workspace)
-  const limits = PLAN_LIMITS['agencia']; 
+  // Límites del plan según el workspace real
+  const planKey = (workspace?.plan || 'starter') as keyof typeof PLAN_LIMITS;
+  const limits = PLAN_LIMITS[planKey];
   const currentActiveCount = Object.values(activosMap).filter(v => v).length;
 
   useEffect(() => {

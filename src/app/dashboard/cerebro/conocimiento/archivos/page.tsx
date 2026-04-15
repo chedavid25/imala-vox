@@ -48,9 +48,18 @@ export default function ArchivosGlobalPage() {
       where("tipo", "==", "archivo")
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
       const docs = snapshot.docs.map(d => ({ ...d.data(), id: d.id })) as (RecursoConocimiento & { id: string })[];
-      setArchivos(docs.map(d => ({ ...d, usageCount: 0 })));
+      
+      // Calcular uso en tiempo real por cada archivo
+      const updatedDocs = await Promise.all(docs.map(async (docData) => {
+        const usageSnap = await getDocs(
+          query(collectionGroup(db, COLLECTIONS.CONOCIMIENTO_ACTIVO), where("recursoId", "==", docData.id), where("activo", "==", true))
+        );
+        return { ...docData, usageCount: usageSnap.size };
+      }));
+
+      setArchivos(updatedDocs);
       setLoading(false);
     }, (error) => {
       console.error("Error en snapshot de archivos:", error);

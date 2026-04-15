@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { Sidebar } from "./Sidebar";
 import { ContextPanel } from "./ContextPanel";
+import { NotificationBanner } from "./NotificationBanner";
 import { usePathname, useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
@@ -140,6 +141,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
     <div className="flex h-screen w-full overflow-hidden bg-[var(--bg-main)]">
       <Sidebar />
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <NotificationBanner />
         <header className="h-[var(--header-height)] border-b border-[var(--border-light)] bg-[var(--bg-card)] flex items-center justify-between px-6 shrink-0 z-10 shadow-sm">
           <div className="flex items-center gap-2 text-[13px]">
             {breadcrumbs.map((crumb, index) => (

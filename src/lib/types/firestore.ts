@@ -56,6 +56,7 @@ export const COLLECTIONS = {
   AGENTES: 'agentes',
   CONOCIMIENTO_ACTIVO: 'conocimientoActivo',
   ETIQUETAS_AGENTE: 'etiquetasAgente',
+  NOTIFICACIONES: 'notificaciones',
 };
 
 export interface Contacto {
@@ -180,4 +181,15 @@ export interface Mensaje {
     suggestedByIA?: boolean;       // Si es un borrador generado en modo copiloto
     recursoId?: string;            // Si adjuntó un archivo multimedia
   };
+}
+
+// NOTIFICACIONES DE SISTEMA
+export interface NotificacionSistema {
+  id?: string;
+  tipo: 'alerta' | 'info' | 'error';
+  titulo: string;
+  mensaje: string;
+  visto: boolean;
+  creadoEl: Timestamp;
+  metadata?: Record<string, any>;
 }

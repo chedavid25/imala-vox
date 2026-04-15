@@ -9,6 +9,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/auth', request.url))
   }
 
+  // 2. Redirigir /dashboard/operacion a /dashboard/operacion/inbox
+  if (pathname === '/dashboard/operacion' || pathname === '/dashboard/operacion/') {
+    return NextResponse.redirect(new URL('/dashboard/operacion/inbox', request.url))
+  }
+
   // Las rutas del dashboard requieren autenticación.
   // Nota: Firebase Auth se verifica en el cliente via AppLayout,
   // pero este middleware asegura que la entrada principal siempre sea controlada.
