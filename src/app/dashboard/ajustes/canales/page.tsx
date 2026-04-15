@@ -151,7 +151,7 @@ export default function CanalesPage() {
                   onClick={handleConnect}
                   variant="ghost" 
                   size="sm" 
-                  className="border border-[var(--accent)]/30 bg-[var(--accent)]/5 text-[var(--accent)] hover:bg-[var(--accent)] hover:text-white transition-all font-bold rounded-[var(--radius-md)] h-9 px-5 text-[12px]"
+                  className="border border-[var(--accent)]/30 bg-[var(--accent)]/5 text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[var(--accent-text)] transition-all font-bold rounded-[var(--radius-md)] h-9 px-5 text-[12px]"
                 >
                   Conectar
                 </Button>

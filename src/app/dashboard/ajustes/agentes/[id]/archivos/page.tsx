@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
+import { getAuth } from "firebase/auth";
 import { 
   collection, 
   onSnapshot, 
@@ -50,6 +51,10 @@ export default function AgenteArchivosPage() {
   useEffect(() => {
     if (!currentWorkspaceId || !agentId) return;
 
+    console.log("DEBUG - Auth UID:", getAuth().currentUser?.uid);
+    console.log("DEBUG - Workspace Id:", currentWorkspaceId);
+    console.log("DEBUG - Agent Id:", agentId);
+
     // 1. Escuchar archivos totales del workspace
     const qGlobal = query(
       collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONOCIMIENTO),
@@ -58,6 +63,8 @@ export default function AgenteArchivosPage() {
 
     const unsubscribeGlobal = onSnapshot(qGlobal, (snapshot) => {
       setArchivosGlobales(snapshot.docs.map(d => ({ ...d.data(), id: d.id })) as any);
+    }, (err) => {
+      console.error("ERROR - Global files query:", err);
     });
 
     // 2. Escuchar activas este agente

@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { verificarYSetearAdmin } from "@/app/actions/superadmin";
 
 export default function AuthPage() {
   const [loading, setLoading] = useState(false);
@@ -56,6 +57,10 @@ export default function AuthPage() {
         limit(1)
       );
       const snap = await getDocs(q);
+      
+      // Verificar si es SuperAdmin y setear cookie
+      await verificarYSetearAdmin(result.user.uid);
+
       toast.success("¡Bienvenido de nuevo!");
       router.push(snap.empty ? "/onboarding" : "/dashboard/operacion/inbox");
     } catch (error: any) {
@@ -106,6 +111,10 @@ export default function AuthPage() {
         limit(1)
       );
       const snap = await getDocs(q);
+      
+      // Verificar si es SuperAdmin y setear cookie
+      await verificarYSetearAdmin(result.user.uid);
+
       toast.success(`¡Hola, ${result.user.displayName}!`);
       router.push(snap.empty ? '/onboarding' : '/dashboard/operacion/inbox');
     } catch (error: any) {

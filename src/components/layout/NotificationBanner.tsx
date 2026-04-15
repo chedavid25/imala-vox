@@ -14,13 +14,20 @@ import {
 } from "firebase/firestore";
 import { COLLECTIONS, NotificacionSistema } from "@/lib/types/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
-import { AlertCircle, X, ExternalLink, TriangleAlert } from "lucide-react";
+import { AlertCircle, X, ExternalLink, TriangleAlert, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 
 export function NotificationBanner() {
-  const { currentWorkspaceId } = useWorkspaceStore();
+  const { workspace, currentWorkspaceId } = useWorkspaceStore();
   const [notificaciones, setNotificaciones] = useState<(NotificacionSistema & { id: string })[]>([]);
+
+  // Lógica de período de prueba
+  const trialEnds = workspace?.pruebaTerminaEl?.toDate();
+  const isTrial = workspace?.estado === 'prueba';
+  const diasRestantes = trialEnds ? Math.ceil((trialEnds.getTime() - Date.now()) / 86400000) : 0;
+  const showTrialBanner = isTrial && diasRestantes >= 0 && diasRestantes <= 7;
 
   useEffect(() => {
     if (!currentWorkspaceId) return;
@@ -55,7 +62,41 @@ export function NotificationBanner() {
   if (notificaciones.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-0 border-b border-[var(--error)]/20 animate-in slide-in-from-top duration-300">
+    <div className="flex flex-col gap-0 border-b border-[var(--border-light)] animate-in slide-in-from-top duration-300">
+      {/* Banner de Período de Prueba */}
+      {showTrialBanner && (
+        <div 
+          className={cn(
+            "flex items-center justify-between px-6 py-2.5 text-xs font-bold transition-colors",
+            diasRestantes <= 3 
+              ? "bg-rose-500 text-white" 
+              : "bg-amber-400 text-black shadow-inner shadow-black/5"
+          )}
+        >
+          <div className="flex items-center gap-3">
+            <Clock className="w-4 h-4 animate-pulse" />
+            <div className="flex items-center gap-2">
+              <span className="uppercase tracking-widest">Aviso de Prueba</span>
+              <span className="font-medium opacity-90 truncate max-w-[200px] sm:max-w-none">
+                Tu período de prueba vence en {diasRestantes === 0 ? "unas horas" : `${diasRestantes} ${diasRestantes === 1 ? 'día' : 'días'}`}. Suscribite para no perder el acceso.
+              </span>
+            </div>
+          </div>
+          <Link 
+            href="/dashboard/ajustes/facturacion"
+            className={cn(
+              "px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all",
+              diasRestantes <= 3 
+                ? "bg-white text-rose-500 hover:bg-rose-50 shadow-lg" 
+                : "bg-black text-white hover:bg-black/80 shadow-md"
+            )}
+          >
+            Ver Planes
+          </Link>
+        </div>
+      )}
+
+      {/* Notificaciones de Sistema */}
       {notificaciones.map((n) => (
         <div 
           key={n.id}

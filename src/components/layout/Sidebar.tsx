@@ -26,7 +26,8 @@ import {
   LogOut,
   User as UserIcon,
   ChevronsUpDown,
-  Target
+  Target,
+  CreditCard
 } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { signOut, onAuthStateChanged, User } from "firebase/auth";
@@ -260,6 +261,12 @@ export function Sidebar() {
             href="/dashboard/ajustes/etiquetas" 
             icon={Tag} 
             active={pathname.startsWith("/dashboard/ajustes/etiquetas")} 
+          />
+          <NavItem 
+            label="Facturación" 
+            href="/dashboard/ajustes/facturacion" 
+            icon={CreditCard} 
+            active={pathname.startsWith("/dashboard/ajustes/facturacion")} 
           />
         </div>
       </nav>

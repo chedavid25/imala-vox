@@ -481,3 +481,112 @@ export const onActivacionCambiada = functions.firestore
       console.error('Error en onActivacionCambiada:', error);
     }
   });
+
+/**
+ * cronReseteoMensual
+ * Disparador: Programado (Día 1 de cada mes)
+ * Responsabilidad: Reinicia el contador de uso.convCount de todos los workspaces.
+ */
+export const cronReseteoMensual = functions.pubsub.schedule('0 0 1 * *')
+  .timeZone('America/Argentina/Buenos_Aires')
+  .onRun(async () => {
+    const db = admin.firestore();
+    const workspaces = await db.collection("espaciosDeTrabajo").get();
+    const batch = db.batch();
+
+    workspaces.docs.forEach(ws => {
+      batch.update(ws.ref, { "uso.convCount": 0 });
+    });
+
+    await batch.commit();
+    console.log(`Consumo reseteado para ${workspaces.size} workspaces.`);
+  });
+
+/**
+ * cronAjusteARS
+ * Disparador: Programado (Diario 06:00 AM)
+ * Responsabilidad: Obtiene cotización Dólar Blue y actualiza precios en ARS 
+ * para workspaces en Argentina.
+ */
+export const cronAjusteARS = functions.pubsub.schedule('0 6 * * *')
+  .timeZone('America/Argentina/Buenos_Aires')
+  .onRun(async () => {
+    const db = admin.firestore();
+    try {
+      // 1. Obtener cotización Blue (API Pública)
+      const resp = await fetch('https://dolarapi.com/v1/dolares/blue');
+      const data = await resp.json();
+      const bluePrice = data.venta;
+
+      if (!bluePrice) throw new Error("No se obtuvo precio del dólar");
+
+      // 2. Obtener planes de la config global
+      const configSnap = await db.collection("plataforma").doc("config").get();
+      const planes = configSnap.data()?.planes;
+
+      if(!planes) return;
+
+      // 3. Actualizar workspaces
+      const workspaces = await db.collection("espaciosDeTrabajo").get();
+      const batch = db.batch();
+
+      workspaces.docs.forEach(ws => {
+        const wsData = ws.data();
+        const planKey = wsData.plan || 'starter';
+        const planConfig = planes[planKey];
+        
+        if (planConfig) {
+          const precioUSD = planConfig.priceMonthly;
+          const nuevoPrecioARS = Math.round(precioUSD * bluePrice);
+
+          batch.update(ws.ref, {
+            "facturacion.precioARS": nuevoPrecioARS,
+            "facturacion.cotizacionUsada": bluePrice,
+            "facturacion.ultimaActualizacion": admin.firestore.FieldValue.serverTimestamp()
+          });
+        }
+      });
+
+      await batch.commit();
+      console.log(`Precios ARS actualizados con Blue a $${bluePrice}`);
+    } catch (err) {
+      console.error("Error en cronAjusteARS:", err);
+    }
+  });
+
+/**
+ * cronVerificarPruebasYSuscripciones
+ * Disparador: Programado (Diario 00:00 AM)
+ * Responsabilidad: Bloquea workspaces con prueba vencida o pago pendiente.
+ */
+export const cronVerificarPruebasYSuscripciones = functions.pubsub.schedule('0 0 * * *')
+  .timeZone('America/Argentina/Buenos_Aires')
+  .onRun(async () => {
+    const db = admin.firestore();
+    const hoy = new Date();
+    
+    // 1. Verificar Pruebas Vencidas
+    const pruebasVencidas = await db.collection("espaciosDeTrabajo")
+      .where("estado", "==", "prueba")
+      .where("pruebaTerminaEl", "<", admin.firestore.Timestamp.fromDate(hoy))
+      .get();
+
+    const batch = db.batch();
+    pruebasVencidas.docs.forEach(ws => {
+      batch.update(ws.ref, { estado: 'cancelado', "metadata.razonBloqueo": 'prueba_vencida' });
+    });
+
+    // 2. Verificar Suscripciones con Pago Vencido (Vigencia cumplida)
+    const suscVencidas = await db.collection("espaciosDeTrabajo")
+      .where("estado", "==", "activo")
+      .where("periodoVigenteHasta", "<", admin.firestore.Timestamp.fromDate(hoy))
+      .get();
+
+    suscVencidas.docs.forEach(ws => {
+      // Pasamos a pago_vencido para dar gracia de 24hs o bloquear directo
+      batch.update(ws.ref, { estado: 'pago_vencido', "metadata.razonBloqueo": 'periodo_cumplido' });
+    });
+
+    await batch.commit();
+    console.log(`Limpieza diaria: ${pruebasVencidas.size} pruebas vencidas, ${suscVencidas.size} pagos vencidos.`);
+  });

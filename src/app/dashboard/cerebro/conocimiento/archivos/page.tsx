@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
+import { getAuth } from "firebase/auth";
 import { 
   collection, 
   onSnapshot, 
@@ -41,6 +42,9 @@ export default function ArchivosGlobalPage() {
 
   useEffect(() => {
     if (!currentWorkspaceId) return;
+
+    console.log("DEBUG [Cerebro] - Auth UID:", getAuth().currentUser?.uid);
+    console.log("DEBUG [Cerebro] - Workspace Id:", currentWorkspaceId);
 
     // 1. Escuchar la colección de conocimiento global
     const q = query(

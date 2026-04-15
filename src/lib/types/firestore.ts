@@ -258,3 +258,42 @@ export interface NotificacionSistema {
   creadoEl: Timestamp;
   metadata?: Record<string, any>;
 }
+// FACTURACIÓN Y SUPERADMIN
+export interface EventoFacturacion {
+  id?: string;
+  tipo: 'pago_exitoso' | 'pago_fallido' | 'suscripcion_creada' |
+        'suscripcion_cancelada' | 'upgrade' | 'downgrade' |
+        'trial_iniciado' | 'trial_vencido' | 'ajuste_ars' | 'exceso_conversaciones';
+  monto: number;             // en ARS
+  montoUSD: number;          // equivalente en USD
+  cotizacionUsada?: number;  // solo para pagos ARS
+  mpSuscripcionId?: string;
+  mpPagoId?: string;
+  planAnterior?: string;
+  planNuevo?: string;
+  descripcion: string;
+  creadoEl: Timestamp;
+}
+
+export interface PlataformaConfig {
+  planes: {
+    starter: { precioUSD: number; precioARS: number; cotizacionUsada: number; fijadoEl: Timestamp };
+    pro:     { precioUSD: number; precioARS: number; cotizacionUsada: number; fijadoEl: Timestamp };
+    agencia: { precioUSD: number; precioARS: number; cotizacionUsada: number; fijadoEl: Timestamp };
+  };
+  proximoAjusteARS: Timestamp;
+  superAdminUids: string[];
+  overageRate: number;        // 0.018 — costo por conversación extra en plan Agencia
+  trialDias: number;          // 7
+}
+
+export interface SuperAdminMetrics {
+  mrr: number;
+  arr: number;
+  totalWorkspaces: number;
+  workspacesActivos: number;
+  workspacesEnPrueba: number;
+  workspacesCancelados: number;
+  churnEsteMes: number;
+  nuevosEsteMes: number;
+}
