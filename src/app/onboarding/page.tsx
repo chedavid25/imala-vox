@@ -113,10 +113,8 @@ export default function OnboardingPage() {
       const etapasRef = collection(db, COLLECTIONS.ESPACIOS, docRef.id, COLLECTIONS.ETAPAS_EMBUDO);
       const ETAPAS_DEFAULT = [  
         { nombre: 'Nuevos', orden: 0, color: '#3B82F6', esDefault: true },  
-        { nombre: 'Contactados', orden: 1, color: '#F59E0B', esDefault: true },  
-        { nombre: 'En seguimiento', orden: 2, color: '#8B5CF6', esDefault: true },  
-        { nombre: 'Calificados', orden: 3, color: '#22C55E', esDefault: true },  
-        { nombre: 'Cerrados', orden: 4, color: '#6B7280', esDefault: true },  
+        { nombre: 'Calificados', orden: 1, color: '#F59E0B', esDefault: true },  
+        { nombre: 'Cerrados', orden: 2, color: '#22C55E', esDefault: true },  
       ];
 
       for (const etapa of ETAPAS_DEFAULT) {
