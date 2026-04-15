@@ -17,8 +17,10 @@ import {
   MessageCircle,
   Convert,
   Loader2,
-  Lock
+  Lock,
+  ExternalLink
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -94,14 +96,22 @@ import { useDroppable } from "@dnd-kit/core";
  * Gestión de prospectos con vista Kanban y Lista.
  */
 export default function LeadsPage() {
+  const router = useRouter();
   const { currentWorkspaceId } = useWorkspaceStore();
   const [view, setView] = useState<'kanban' | 'list'>('kanban');
   const [loading, setLoading] = useState(true);
   const [leads, setLeads] = useState<(Lead & { id: string })[]>([]);
   const [etapas, setEtapas] = useState<(EtapaEmbudo & { id: string })[]>([]);
   const [search, setSearch] = useState("");
+  const [filtroOrigen, setFiltroOrigen] = useState<'todos' | 'meta_ads' | 'organico' | 'manual'>('todos');
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [selectedLead, setSelectedLead] = useState<(Lead & { id: string }) | null>(null);
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  
+  // Lead seleccionado derivado (para reactividad total)
+  const selectedLead = useMemo(() => 
+    leads.find(l => l.id === selectedLeadId) || null,
+  [leads, selectedLeadId]);
+
   const [converting, setConverting] = useState(false);
   
   // Estados Nueva Etapa
@@ -121,6 +131,7 @@ export default function LeadsPage() {
     telefono: "",
     etapaId: "",
     temperatura: "frio" as const,
+    notas: "",
   });
   const [isSavingLead, setIsSavingLead] = useState(false);
 
@@ -159,12 +170,14 @@ export default function LeadsPage() {
 
   // Filtrado de Leads
   const filteredLeads = useMemo(() => {
-    return leads.filter(l => 
-      l.nombre.toLowerCase().includes(search.toLowerCase()) ||
-      l.email?.toLowerCase().includes(search.toLowerCase()) ||
-      l.telefono?.includes(search)
-    );
-  }, [leads, search]);
+    return leads.filter(l => {
+      const matchSearch = l.nombre.toLowerCase().includes(search.toLowerCase()) ||
+        l.email?.toLowerCase().includes(search.toLowerCase()) ||
+        l.telefono?.includes(search);
+      const matchOrigen = filtroOrigen === 'todos' || l.origen === filtroOrigen;
+      return matchSearch && matchOrigen;
+    });
+  }, [leads, search, filtroOrigen]);
 
   // Cálculos de Métricas Reales
   const metrics = useMemo(() => {
@@ -263,9 +276,12 @@ export default function LeadsPage() {
         nombre: lead.nombre,
         email: lead.email,
         telefono: lead.telefono,
-        relacionTag: 'Lead' as const,
-        aiBlocked: false,
         etiquetas: lead.origen === 'meta_ads' ? ['lead-meta-ads'] : ['lead-organico'],
+        leadOrigenId: lead.id,
+        origenCampana: lead.campana || null,
+        origenFormulario: lead.formulario || null,
+        camposFormulario: lead.camposFormulario || {},
+        notas: lead.notas || '',
         creadoEl: serverTimestamp(),
       };
 
@@ -282,8 +298,15 @@ export default function LeadsPage() {
         actualizadoEl: serverTimestamp()
       });
 
-      toast.success("Lead convertido exitosamente", { id: toastId });
-      setSelectedLead(null);
+      toast.success("Lead convertido a contacto CRM", { 
+        id: toastId,
+        action: {
+          label: "Ver contacto →",
+          onClick: () => router.push(`/dashboard/operacion/contactos`)
+        },
+        duration: 6000,
+      });
+      setSelectedLeadId(null);
     } catch (err) {
       console.error("Error al convertir lead:", err);
       toast.error("Error al convertir el lead", { id: toastId });
@@ -343,8 +366,12 @@ export default function LeadsPage() {
   };
 
   const handleDeleteStage = async (stageId: string) => {
-    if (!currentWorkspaceId) return;
-    
+    // Verificar si es la última etapa
+    if (etapas.length === 1) {
+      toast.error("No puedes eliminar la última etapa del embudo.");
+      return;
+    }
+
     // Verificar si hay leads en esta etapa
     const leadsInStage = leads.filter(l => l.etapaId === stageId);
     if (leadsInStage.length > 0) {
@@ -470,22 +497,46 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      {/* FILTROS Y ACCIONES */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[300px]">
+      <div className="flex flex-col md:flex-row gap-4 mb-2">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-tertiary-light)]" />
           <Input 
             placeholder="Buscar por nombre, email o teléfono..." 
-            className="pl-10 h-11 bg-white border-[var(--border-light)] rounded-xl focus:ring-1 focus:ring-[var(--accent)]"
+            className="pl-10 h-11 bg-white border-[var(--border-light)] rounded-2xl shadow-sm focus:ring-1 focus:ring-[var(--accent)]"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" className="h-11 rounded-xl border-[var(--border-light)] font-bold text-xs gap-2">
-            <Filter className="w-4 h-4" /> Filtros
-          </Button>
-          
+        
+        <div className="flex gap-1.5 p-1 bg-[var(--bg-input)] rounded-2xl border border-[var(--border-light)]/50">
+          {[
+            { id: 'todos', label: 'Todos' },
+            { id: 'meta_ads', label: 'Meta Ads' },
+            { id: 'organico', label: 'Orgánico' },
+            { id: 'manual', label: 'Manual' }
+          ].map(pill => (
+            <button
+              key={pill.id}
+              onClick={() => setFiltroOrigen(pill.id as any)}
+              className={cn(
+                "px-4 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2",
+                filtroOrigen === pill.id 
+                  ? "bg-white text-[var(--accent)] shadow-sm" 
+                  : "text-[var(--text-tertiary-light)] hover:text-[var(--text-secondary-light)]"
+              )}
+            >
+              {pill.label}
+              <span className={cn(
+                "px-1.5 py-0.5 rounded-full text-[10px] transition-colors",
+                filtroOrigen === pill.id ? "bg-[var(--accent)]/10 text-[var(--accent)]" : "bg-black/5 text-[var(--text-tertiary-light)]"
+              )}>
+                {pill.id === 'todos' ? leads.length : leads.filter(l => l.origen === pill.id).length}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className="flex gap-2">
           <Button 
             onClick={() => {
               setNewLeadData({
@@ -493,11 +544,12 @@ export default function LeadsPage() {
                 email: "",
                 telefono: "",
                 etapaId: etapas[0]?.id || "",
-                temperatura: "frio"
+                temperatura: "frio",
+                notas: ""
               });
               setIsNewLeadModalOpen(true);
             }}
-            className="h-11 rounded-xl bg-[var(--text-primary-light)] text-white hover:bg-[var(--text-primary-light)]/90 font-bold text-xs gap-2 px-6"
+            className="h-11 rounded-2xl bg-[var(--text-primary-light)] text-white hover:opacity-90 font-bold text-xs gap-2 px-6"
           >
             <Plus className="w-4 h-4" /> Nuevo Lead
           </Button>
@@ -519,7 +571,7 @@ export default function LeadsPage() {
                   key={etapa.id} 
                   etapa={etapa} 
                   leads={filteredLeads.filter(l => l.etapaId === etapa.id)}
-                  onSelected={setSelectedLead}
+                  onSelected={(lead: any) => setSelectedLeadId(lead.id)}
                   onEdit={(e) => {
                     setEditingStage(e);
                     setNewStageName(e.nombre);
@@ -560,12 +612,12 @@ export default function LeadsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-light)]">
-                {filteredLeads.map(lead => (
-                  <tr 
-                    key={lead.id} 
-                    className="hover:bg-[var(--bg-main)]/50 transition-colors group cursor-pointer"
-                    onClick={() => setSelectedLead(lead)}
-                  >
+                  {filteredLeads.map(lead => (
+                    <tr 
+                      key={lead.id} 
+                      className="hover:bg-[var(--bg-main)]/50 transition-colors group cursor-pointer"
+                      onClick={() => setSelectedLeadId(lead.id)}
+                    >
                     <td className="p-4">
                       <div className="flex flex-col">
                         <span className="text-sm font-bold text-[var(--text-primary-light)]">{lead.nombre}</span>
@@ -574,10 +626,14 @@ export default function LeadsPage() {
                     </td>
                     <td className="p-4">
                       <Badge className={cn(
-                        "text-[9px] font-black uppercase",
-                        lead.origen === 'meta_ads' ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"
+                        "text-[9px] font-black uppercase px-2 py-0.5",
+                        lead.origen === 'meta_ads' 
+                          ? "bg-emerald-100 text-emerald-700" 
+                          : lead.origen === 'organico' 
+                            ? "bg-sky-100 text-sky-700" 
+                            : "bg-slate-100 text-slate-600"
                       )}>
-                        {lead.origen === 'meta_ads' ? 'Meta Ads' : 'Orgánico'}
+                        {lead.origen === 'meta_ads' ? 'Meta Ads' : lead.origen === 'organico' ? 'Orgánico' : 'Manual'}
                       </Badge>
                     </td>
                     <td className="p-4" onClick={(e) => e.stopPropagation()}>
@@ -624,23 +680,25 @@ export default function LeadsPage() {
         </div>
       )}
 
-      {/* PANEL DE DETALLE (Simulación de Sheet) */}
-      {selectedLead && (
+      {/* PANEL DE DETALLE */}
+      {selectedLeadId && (
         <div className="fixed inset-0 z-[100] flex justify-end">
           <div 
             className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300" 
-            onClick={() => setSelectedLead(null)}
+            onClick={() => setSelectedLeadId(null)}
           />
           <div className="relative w-full max-w-[480px] h-full bg-white shadow-2xl animate-in slide-in-from-right duration-500 overflow-y-auto custom-scrollbar">
-            <LeadDetailContent 
-              lead={selectedLead} 
-              etapas={etapas} 
-              onClose={() => setSelectedLead(null)}
-              onConvert={() => handleConvertLead(selectedLead)}
-              onWhatsApp={() => handleStartWhatsApp(selectedLead)}
-              onUpdateField={(field: string, val: any) => handleUpdateLeadField(selectedLead.id, field, val)}
-              converting={converting}
-            />
+            {selectedLead && (
+              <LeadDetailContent 
+                lead={selectedLead} 
+                etapas={etapas} 
+                onClose={() => setSelectedLeadId(null)}
+                onConvert={() => handleConvertLead(selectedLead)}
+                onWhatsApp={() => handleStartWhatsApp(selectedLead)}
+                onUpdateField={(field: string, val: any) => handleUpdateLeadField(selectedLead.id, field, val)}
+                converting={converting}
+              />
+            )}
           </div>
         </div>
       )}
@@ -817,6 +875,16 @@ export default function LeadsPage() {
               </div>
             </div>
 
+            <div className="space-y-2">
+              <Label>Notas internas</Label>
+              <textarea 
+                placeholder="Observaciones iniciales sobre el prospecto..." 
+                value={newLeadData.notas}
+                onChange={(e) => setNewLeadData(prev => ({ ...prev, notas: e.target.value }))}
+                className="w-full min-h-[100px] bg-white border border-[var(--border-light)] rounded-xl p-3 text-sm focus:ring-1 focus:ring-[var(--accent)] outline-none resize-none transition-all shadow-inner"
+              />
+            </div>
+
             <DialogFooter className="pt-4">
               <DialogClose render={<Button type="button" variant="ghost" className="rounded-xl" />}>
                 Cancelar
@@ -945,9 +1013,13 @@ function LeadCard({ lead, onClick }: { lead: Lead & { id: string }, onClick: () 
       <div className="flex justify-between items-start mb-2">
          <Badge className={cn(
             "text-[8px] font-black uppercase px-2 py-0.5 h-4",
-            lead.origen === 'meta_ads' ? "bg-emerald-100 text-emerald-700" : "bg-sky-100 text-sky-700"
+            lead.origen === 'meta_ads' 
+              ? "bg-emerald-100 text-emerald-700" 
+              : lead.origen === 'organico' 
+                ? "bg-sky-100 text-sky-700" 
+                : "bg-slate-100 text-slate-600"
           )}>
-            {lead.origen === 'meta_ads' ? 'Meta Ads' : 'Orgánico'}
+            {lead.origen === 'meta_ads' ? 'Meta Ads' : lead.origen === 'organico' ? 'Orgánico' : 'Manual'}
           </Badge>
           <TemperatureDot temperature={lead.temperatura} />
       </div>
@@ -979,6 +1051,20 @@ function LeadCard({ lead, onClick }: { lead: Lead & { id: string }, onClick: () 
 }
 
 function LeadDetailContent({ lead, etapas, onClose, onConvert, onWhatsApp, onUpdateField, converting }: any) {
+  const router = useRouter();
+
+  const handleStartWhatsApp = () => {
+    if (!lead.telefono) {
+      toast.error("Este lead no tiene número de teléfono");
+      return;
+    }
+    if (lead.contactoId) {
+      router.push(`/dashboard/operacion/inbox?contactoId=${lead.contactoId}`);
+    } else {
+      toast.info("Primero convertí el lead a contacto para iniciar una conversación.");
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-[var(--bg-main)]">
       {/* Header */}
@@ -989,13 +1075,35 @@ function LeadDetailContent({ lead, etapas, onClose, onConvert, onWhatsApp, onUpd
             <div className="flex items-center gap-2">
               <Badge className={cn(
                 "text-[9px] font-black uppercase px-2 py-0.5",
-                lead.origen === 'meta_ads' ? "bg-emerald-100 text-emerald-700" : "bg-sky-100 text-sky-700"
+                lead.origen === 'meta_ads' 
+                  ? "bg-emerald-100 text-emerald-700" 
+                  : lead.origen === 'organico' 
+                    ? "bg-sky-100 text-sky-700" 
+                    : "bg-slate-100 text-slate-600"
               )}>
-                {lead.origen.replace('_', ' ')}
+                {lead.origen === 'meta_ads' ? 'Meta Ads' : lead.origen === 'organico' ? 'Orgánico' : 'Manual'}
               </Badge>
-              <Badge className="bg-white text-[var(--text-secondary-light)] border-[var(--border-light)] text-[9px] font-bold uppercase">
-                {etapas.find((e: any) => e.id === lead.etapaId)?.nombre}
-              </Badge>
+              
+              <Select
+                value={lead.etapaId}
+                onValueChange={(val) => onUpdateField('etapaId', val)}
+              >
+                <SelectTrigger className="h-7 text-[10px] font-bold border-[var(--border-light)] rounded-full px-3 w-auto bg-transparent">
+                  <div className="w-2 h-2 rounded-full mr-1.5"
+                    style={{ backgroundColor: etapas.find((e: any) => e.id === lead.etapaId)?.color }} />
+                  <SelectValue placeholder="Etapa" />
+                </SelectTrigger>
+                <SelectContent>
+                  {etapas.map((e: any) => (
+                    <SelectItem key={e.id} value={e.id}>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: e.color }} />
+                        {e.nombre}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full">
@@ -1005,20 +1113,27 @@ function LeadDetailContent({ lead, etapas, onClose, onConvert, onWhatsApp, onUpd
 
         <div className="grid grid-cols-2 gap-3 mt-6">
           <Button 
-            onClick={onWhatsApp}
+            onClick={handleStartWhatsApp}
             className="bg-[var(--accent)] text-[var(--accent-text)] font-bold text-xs rounded-xl h-12 shadow-lg shadow-[var(--accent)]/10"
           >
             <MessageCircle className="w-4 h-4 mr-2" />
             Inbox WA
           </Button>
           <Button 
-            onClick={onConvert}
-            disabled={lead.convertidoAContacto || converting}
+            onClick={lead.convertidoAContacto 
+              ? () => router.push(`/dashboard/operacion/contactos`) 
+              : onConvert}
+            disabled={converting}
             variant="outline"
             className="border-[var(--border-light-strong)] font-bold text-xs rounded-xl h-12 hover:bg-white"
           >
-            {converting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <TrendingUp className="w-4 h-4 mr-2 text-blue-500" />}
-            {lead.convertidoAContacto ? 'Convertido' : 'Convertir'}
+            {converting 
+              ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> 
+              : lead.convertidoAContacto 
+                ? <ExternalLink className="w-4 h-4 mr-2 text-green-500" /> 
+                : <TrendingUp className="w-4 h-4 mr-2 text-blue-500" />
+            }
+            {lead.convertidoAContacto ? 'Ver en CRM' : 'Convertir'}
           </Button>
         </div>
       </div>

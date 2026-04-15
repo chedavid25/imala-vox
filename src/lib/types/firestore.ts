@@ -69,6 +69,14 @@ export interface Contacto {
   aiBlocked: boolean; // Automático si relacionTag === 'Personal'
   etiquetas: string[];
   fechaNacimiento?: string; // Formato YYYY-MM-DD
+  
+  // Trazabilidad desde Leads
+  leadOrigenId?: string;
+  origenCampana?: string;
+  origenFormulario?: string;
+  camposFormulario?: Record<string, string>;
+  notas?: string;
+
   creadoEl: Timestamp;
 }
 
