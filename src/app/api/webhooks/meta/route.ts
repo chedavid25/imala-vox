@@ -12,6 +12,25 @@ export async function GET(request: NextRequest) {
   const challenge = searchParams.get('hub.challenge');
 
   if (mode === 'subscribe' && token === process.env.META_WEBHOOK_VERIFY_TOKEN) {
+    // Intentar marcar los canales como verificados en background
+    // Buscamos canales que estén 'connected' pero con 'webhookVerified' en false
+    // Nota: lo hacemos asíncrono para no bloquear la respuesta de Meta
+    adminDb.collectionGroup(COLLECTIONS.CANALES)
+      .where('status', '==', 'connected')
+      .where('webhookVerified', '==', false)
+      .get()
+      .then(snap => {
+        const batch = adminDb.batch();
+        snap.forEach(doc => {
+          batch.update(doc.ref, { 
+            webhookVerified: true,
+            actualizadoEl: Timestamp.now() 
+          });
+        });
+        return batch.commit();
+      })
+      .catch(err => console.error("Error marcando webhooks verificados:", err));
+
     return new NextResponse(challenge, { status: 200 });
   }
   return new NextResponse('Forbidden', { status: 403 });
