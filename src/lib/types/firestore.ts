@@ -203,6 +203,8 @@ export interface Canal {
   metaPhoneNumberId?: string; // solo WhatsApp
   metaInstagramId?: string;   // solo Instagram
   webhookVerified: boolean;
+  aiEnabled: boolean;         // Nuevo: control maestro IA por canal
+  agenteId?: string | null;   // Nuevo: agente específico asignado a este canal
   creadoEl: Timestamp;
   actualizadoEl: Timestamp;
 }

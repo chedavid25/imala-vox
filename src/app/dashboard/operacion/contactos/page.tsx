@@ -50,8 +50,9 @@ export default function ContactosPage() {
   });
 
   const filteredContactos = contactos.filter(c => 
-    c.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.telefono.includes(searchTerm)
+    (c.esContactoCRM !== false) && // Solo mostrar si esContactoCRM es true o undefined (legacy)
+    ((c.nombre || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+     (c.telefono || "").includes(searchTerm))
   );
 
   const handleBulkImport = async (newContacts: Partial<Contacto>[]) => {
@@ -109,6 +110,7 @@ export default function ContactosPage() {
               relacionTag: data.relacionTag || "Lead",
               aiBlocked,
               etiquetas: data.etiquetas || [],
+              esContactoCRM: true, // Importados son contactos reales
               creadoEl: Timestamp.now()
             });
             importedCount++;
@@ -164,6 +166,7 @@ export default function ContactosPage() {
         ...newContact,
         aiBlocked,
         etiquetas: [],
+        esContactoCRM: true, // Manuales son contactos reales
         creadoEl: Timestamp.now()
       });
 

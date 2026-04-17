@@ -41,6 +41,8 @@ export async function POST(request: NextRequest) {
   const rawBody = await request.text();
   const body = JSON.parse(rawBody);
 
+  console.log("🔔 Webhook Meta Recibido:", JSON.stringify(body, null, 2));
+
   // 1. Verificar firma HMAC (X-Hub-Signature-256)
   const signature = request.headers.get('x-hub-signature-256');
   if (!signature) {
@@ -59,16 +61,22 @@ export async function POST(request: NextRequest) {
   }
 
   // 2. Procesar el objeto (mensajes o leads)
-  if (body.object === 'page') {
+  if (body.object === 'page' || body.object === 'instagram') {
     for (const entry of body.entry || []) {
-      const pageId = entry.id; // ID de la página de FB que disparó el evento
+      const pageId = entry.id;
 
+      // Soporte para Mensajes (Messenger / Instagram)
+      if (entry.messaging) {
+        for (const messagingItem of entry.messaging) {
+          await procesarMensajeMeta(messagingItem, pageId, body.object === 'instagram');
+        }
+      }
+
+      // Soporte para Leads (Formularios)
       for (const change of entry.changes || []) {
-        // Leads de formularios Meta Lead Ads
         if (change.field === 'leadgen') {
           await procesarLeadMeta(change.value, pageId);
         }
-        // TODO: Procesar mensajes (Field 'messages')
       }
     }
   }
@@ -169,5 +177,170 @@ async function procesarLeadMeta(leadData: any, pageId: string) {
     console.log(`Lead ${leadId} procesado exitosamente para workspace ${wsId}`);
   } catch (err) {
     console.error('Error procesando lead de Meta:', err);
+  }
+}
+
+/**
+ * Obtiene el perfil público del usuario desde la Graph API de Meta
+ */
+async function fetchMetaProfile(senderId: string, accessToken: string, isInstagram: boolean) {
+  try {
+    const fields = isInstagram ? 'username,profile_pic' : 'first_name,last_name,profile_pic';
+    const res = await fetch(`https://graph.facebook.com/v19.0/${senderId}?fields=${fields}&access_token=${accessToken}`);
+    
+    if (!res.ok) {
+      console.warn("No se pudo obtener el perfil de Meta. Usando fallback.");
+      return null;
+    }
+    
+    const data = await res.json();
+    return {
+      nombre: isInstagram ? data.username : `${data.first_name || ''} ${data.last_name || ''}`.trim(),
+      foto: data.profile_pic || null
+    };
+  } catch (error) {
+    console.error("Error en fetchMetaProfile:", error);
+    return null;
+  }
+}
+
+/**
+ * Procesa mensajes entrantes de Messenger o Instagram Direct.
+ */
+async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagram: boolean) {
+  try {
+    const senderId = messagingItem.sender.id;
+    const text = messagingItem.message?.text;
+
+    if (!text) return; // Ignorar si no es texto por ahora
+
+    // 1. Identificar Workspace y Canal
+    const canalType = isInstagram ? 'instagram' : 'facebook';
+    const wsQuery = await adminDb
+      .collectionGroup(COLLECTIONS.CANALES)
+      .where(isInstagram ? 'metaInstagramId' : 'metaPageId', '==', pageId)
+      .where('tipo', '==', canalType)
+      .where('status', '==', 'connected')
+      .limit(1)
+      .get();
+
+    if (wsQuery.empty) {
+      console.warn(`❌ Mensaje de ${senderId} ignorado: Canal ${canalType} para pageId ${pageId} no encontrado en Firestore.`);
+      return;
+    }
+
+    const canalDoc = wsQuery.docs[0];
+    const canalData = canalDoc.data() as any;
+    const wsId = canalDoc.ref.parent.parent!.id;
+    const canalId = canalDoc.id;
+
+    // 1.5 Obtener Token de Acceso para consultar perfil
+    const secretSnap = await adminDb
+      .doc(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CANALES}/${canalId}/secrets/config`)
+      .get();
+    const metaAccessToken = secretSnap.data()?.metaAccessToken;
+
+    // 2. Obtener o crear contacto
+    const contactosRef = adminDb.collection(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CONTACTOS}`);
+    let contactoId = "";
+    let contactoNombre = `Usuario ${canalType}`;
+    let avatarUrl = null;
+
+    const contactSnap = await contactosRef.where('metaId', '==', senderId).limit(1).get();
+
+    if (contactSnap.empty) {
+      // Intentar obtener perfil real de Meta
+      if (metaAccessToken) {
+        const profile = await fetchMetaProfile(senderId, metaAccessToken, isInstagram);
+        if (profile) {
+          contactoNombre = profile.nombre || contactoNombre;
+          avatarUrl = profile.foto || null;
+        }
+      }
+
+      const res = await contactosRef.add({
+        nombre: contactoNombre,
+        avatarUrl,
+        metaId: senderId,
+        canalOrigen: canalType,
+        aiBlocked: false,
+        esContactoCRM: false, // Inician como prospectos de chat, no en el CRM real
+        creadoEl: Timestamp.now()
+      });
+      contactoId = res.id;
+    } else {
+      const cDoc = contactSnap.docs[0];
+      contactoId = cDoc.id;
+      const cData = cDoc.data();
+      
+      // Si el nombre sigue siendo el genérico, intentamos actualizarlo
+      if (cData.nombre?.startsWith('Usuario ') && metaAccessToken) {
+        const profile = await fetchMetaProfile(senderId, metaAccessToken, isInstagram);
+        if (profile) {
+          contactoNombre = profile.nombre || contactoNombre;
+          avatarUrl = profile.foto || null;
+          await cDoc.ref.update({ nombre: contactoNombre, avatarUrl });
+        } else {
+          contactoNombre = cData.nombre;
+        }
+      } else {
+        contactoNombre = cData.nombre;
+      }
+    }
+
+    // 3. Obtener o crear conversación
+    const convRef = adminDb.collection(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CONVERSACIONES}`);
+    let convId = "";
+    const convSnap = await convRef
+      .where('contactoId', '==', contactoId)
+      .where('canalId', '==', canalId)
+      .limit(1)
+      .get();
+
+    if (convSnap.empty) {
+      const res = await convRef.add({
+        contactoId,
+        contactoNombre, // Denormalización para el Inbox
+        canal: canalType, // Denormalización para el Inbox
+        canalId,
+        agenteId: canalData.agenteId || null,
+        ultimoMensaje: text,
+        ultimaActividad: Timestamp.now(),
+        unreadCount: 1,
+        modoIA: 'auto',
+        creadoEl: Timestamp.now()
+      });
+      convId = res.id;
+      console.log(`🆕 Conversación creada: ${convId}`);
+    } else {
+      convId = convSnap.docs[0].id;
+      console.log(`💬 Conversación existente: ${convId}`);
+      await convRef.doc(convId).update({
+        ultimoMensaje: text,
+        contactoNombre,
+        canal: canalType,
+        ultimaActividad: Timestamp.now(),
+        unreadCount: (convSnap.docs[0].data().unreadCount || 0) + 1
+      });
+    }
+
+    // 4. Guardar mensaje
+    await convRef.doc(convId).collection(COLLECTIONS.MENSAJES).add({
+      text,
+      from: 'user',
+      creadoEl: Timestamp.now(),
+      visto: false
+    });
+
+    // 5. Trigger IA si está habilitado
+    if (canalData.aiEnabled && canalData.agenteId) {
+      // Por ahora registramos que debería responder. 
+      // La respuesta se puede manejar vía un trigger de Firestore o llamando a una acción interna.
+      console.log(`IA activada para ${canalType}. Agente: ${canalData.agenteId}`);
+      // TODO: Invocar lógica de respuesta IA (Claude)
+    }
+
+  } catch (err) {
+    console.error('Error procesando mensaje de Meta:', err);
   }
 }

@@ -160,20 +160,31 @@ export const recibirMensajeWhatsApp = functions.https.onRequest(async (req: func
             res.sendStatus(200); return;
           }
 
-          // ── 3. Obtener agente activo del workspace ──
-          const agentesSnap = await admin.firestore()
-            .collection(`espaciosDeTrabajo/${workspaceId}/agentes`)
-            .where('activo', '==', true)
-            .limit(1)
-            .get();
-
-          if (agentesSnap.empty) {
-            console.warn(`No hay agentes activos en workspace ${workspaceId}`);
-            res.sendStatus(200); return;
+          // ── 2. Verificar configuración de IA del canal ──
+          if (!canalData.aiEnabled) {
+            console.log(`IA desactivada para el canal ${canalId}. Solo guardando mensaje.`);
+            // Procedemos solo a guardar el mensaje abajo
           }
 
-          const agenteId = agentesSnap.docs[0].id;
-          const agenteData = agentesSnap.docs[0].data();
+          // ── 3. Obtener agente asignado o activo ──
+          let agenteId = canalData.agenteId;
+          
+          if (!agenteId) {
+            // Fallback a agente activo si no hay uno fijo asignado
+            const agentesSnap = await admin.firestore()
+              .collection(`espaciosDeTrabajo/${workspaceId}/agentes`)
+              .where('activo', '==', true)
+              .limit(1)
+              .get();
+            
+            if (!agentesSnap.empty) {
+              agenteId = agentesSnap.docs[0].id;
+            }
+          }
+
+          if (!agenteId) {
+            console.warn(`No hay agentes disponibles para responder en ws ${workspaceId}`);
+          }
 
           // ── 4. Obtener o crear conversación ──
           const convDoc = await obtenerOCrearConversacion(
