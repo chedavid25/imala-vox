@@ -270,10 +270,11 @@ export default function TareasPage() {
     }
   };
 
-  const handleQuickUpdate = async (task: TareaCRM, updates: Partial<TareaCRM>) => {
-    if (!currentWorkspaceId || !task.id) return;
+  const handleQuickUpdate = async (taskOrRef: TareaCRM | { id: string }, updates: Partial<TareaCRM>) => {
+    const taskId = taskOrRef.id;
+    if (!currentWorkspaceId || !taskId) return;
     try {
-      const taskRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, "tareasCRM", task.id);
+      const taskRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, "tareasCRM", taskId);
       if (updates.estado === 'completada') updates.completada = true;
       else if (updates.estado) updates.completada = false;
       
@@ -282,6 +283,7 @@ export default function TareasPage() {
         actualizadoEl: Timestamp.now()
       });
     } catch (e) {
+      console.error("Error al actualizar tarea:", e);
       toast.error("Error al actualizar");
     }
   };
@@ -460,6 +462,7 @@ export default function TareasPage() {
                                     className="h-10 rounded-xl bg-slate-50 border-none"
                                     value={searchContactTerm}
                                     onChange={e => setSearchContactTerm(e.target.value)}
+                                    onKeyDown={e => e.stopPropagation()}
                                   />
                                 </div>
                                 <div className="max-h-[250px] overflow-y-auto no-scrollbar">
@@ -611,7 +614,11 @@ export default function TareasPage() {
               tareas={filteredTareas}
               contactos={contactos}
               grouping={canvasGrouping}
-              onTaskUpdate={(t) => handleQuickUpdate(t, { estado: t.estado, prioridad: t.prioridad })}
+              onTaskUpdate={(taskId, updates) => {
+                // TaskCanvasView pasa (taskId: string, updates: Partial<TareaCRM>)
+                // Necesitamos construir un objeto task fake con el id para handleQuickUpdate
+                handleQuickUpdate({ id: taskId } as TareaCRM, updates);
+              }}
               onEdit={(t) => { setEditingTask(t); setTaskForm(t as any); setIsAddingTask(true); }}
               onDelete={handleDelete}
             />

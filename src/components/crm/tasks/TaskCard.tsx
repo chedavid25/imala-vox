@@ -68,7 +68,8 @@ export function TaskCard({
          <div 
            {...dragHandleProps.attributes} 
            {...dragHandleProps.listeners}
-           className="cursor-grab active:cursor-grabbing p-1 -ml-2 text-slate-200 hover:text-slate-400 transition-colors"
+           className="cursor-grab active:cursor-grabbing p-1 -ml-2 transition-colors"
+           style={{ color: '#1F1F1E' }}
          >
            <GripVertical className="size-4" />
          </div>
