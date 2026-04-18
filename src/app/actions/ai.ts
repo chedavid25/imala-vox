@@ -2,6 +2,10 @@
 
 import { anthropic, MODELOS } from "@/lib/ai/anthropic";
 import { construirSystemPrompt } from "@/lib/ai/prompts";
+import { adminDb } from "@/lib/firebase-admin";
+import { Timestamp } from "firebase-admin/firestore";
+import { COLLECTIONS } from "@/lib/types/firestore";
+import { procesarMensajeConIA } from "@/lib/ai/engine";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -109,5 +113,63 @@ export async function mejorarInstruccionesAction(instruccionesActuales: string) 
       success: false,
       error: error.message || "Error al conectar con la IA"
     };
+  }
+}
+
+/**
+ * Server Action para solicitar una sugerencia de la IA manualmente desde el CRM.
+ */
+export async function pedirSugerenciaIAAction(wsId: string, conversacionId: string) {
+  try {
+    if (!wsId || !conversacionId) throw new Error("Parámetros insuficientes.");
+
+    // 1. Obtener datos de la conversación
+    const convRef = adminDb
+      .collection(COLLECTIONS.ESPACIOS).doc(wsId)
+      .collection(COLLECTIONS.CONVERSACIONES).doc(conversacionId);
+    
+    const convSnap = await convRef.get();
+    if (!convSnap.exists) throw new Error("Conversación no encontrada.");
+    
+    const convData = convSnap.data()!;
+
+    // 2. Obtener historial reciente para contexto
+    const historialSnap = await convRef
+      .collection(COLLECTIONS.MENSAJES)
+      .orderBy("creadoEl", "desc")
+      .limit(30)
+      .get();
+    
+    const messages = historialSnap.docs.reverse();
+    if (messages.length === 0) throw new Error("No hay mensajes previos para analizar.");
+
+    // Identificar el último mensaje del usuario como el disparador
+    const lastUserMsg = messages.filter(m => m.data().from === 'user').pop();
+    const textoUsuario = lastUserMsg?.data().text || messages[messages.length - 1].data().text;
+
+    // Preparar historial excluyendo el mensaje disparador si es posible
+    const historial = messages
+      .filter(m => m.id !== lastUserMsg?.id)
+      .map(d => ({
+        from: d.data().from,
+        text: d.data().text
+      }));
+
+    // 3. Disparar el motor de IA en modo copiloto (esto actualizará 'sugerenciaIA' en Firestore)
+    await procesarMensajeConIA({
+      wsId,
+      agenteId: convData.agenteId,
+      conversacionId,
+      textoUsuario,
+      historial,
+      isCopiloto: true,
+      contactoNombre: convData.contactoNombre || "Cliente"
+    });
+
+    return { success: true };
+
+  } catch (error: any) {
+    console.error("Error al pedir sugerencia IA:", error);
+    return { success: false, error: error.message || "Error al generar sugerencia" };
   }
 }

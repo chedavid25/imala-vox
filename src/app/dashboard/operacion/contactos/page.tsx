@@ -33,7 +33,8 @@ import {
   DropdownMenuTrigger,
   DropdownMenuCheckboxItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator
+  DropdownMenuSeparator,
+  DropdownMenuGroup
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -244,7 +245,7 @@ export default function ContactosPage() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-[300px] bg-white max-h-[300px] overflow-y-auto no-scrollbar border-slate-100 shadow-xl p-2 rounded-2xl">
                       {categories.map(cat => (
-                        <div key={cat.id} className="mb-2">
+                        <DropdownMenuGroup key={cat.id} className="mb-2">
                           <div className="px-2 py-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-50/50 rounded-lg">{cat.nombre}</div>
                           {tags.filter(t => t.categoriaId === cat.id).map(tag => (
                             <DropdownMenuCheckboxItem
@@ -266,7 +267,7 @@ export default function ContactosPage() {
                               </div>
                             </DropdownMenuCheckboxItem>
                           ))}
-                        </div>
+                        </DropdownMenuGroup>
                       ))}
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -328,7 +329,7 @@ export default function ContactosPage() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-[300px] p-2 bg-white rounded-2xl shadow-2xl border-slate-100 max-h-[400px] overflow-y-auto no-scrollbar">
               {categories.map(cat => (
-                <div key={cat.id} className="mb-2">
+                <DropdownMenuGroup key={cat.id} className="mb-2">
                   <DropdownMenuLabel className="text-[10px] font-black uppercase text-slate-400 bg-slate-50 px-2 py-1.5 rounded-lg mb-1">{cat.nombre}</DropdownMenuLabel>
                   {tags.filter(t => t.categoriaId === cat.id).map(tag => (
                     <DropdownMenuCheckboxItem
@@ -350,7 +351,7 @@ export default function ContactosPage() {
                     </DropdownMenuCheckboxItem>
                   ))}
                   <DropdownMenuSeparator className="bg-slate-50 mx-2" />
-                </div>
+                </DropdownMenuGroup>
               ))}
               {selectedTagIds.length > 0 && (
                 <div className="pt-2">

@@ -30,7 +30,9 @@ import {
   LayoutList,
   Layers,
   CheckCircle2,
-  Circle
+  Circle,
+  HelpCircle,
+  ArrowRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,6 +80,7 @@ export default function CRMTagsPage() {
   const [editingCategory, setEditingCategory] = useState<CategoriaCRM | null>(null);
   const [isAddingTag, setIsAddingTag] = useState(false);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   // Form states
   const [tagForm, setTagForm] = useState<Partial<EtiquetaCRM>>({
@@ -156,19 +159,30 @@ export default function CRMTagsPage() {
   // TAGS CRUD
   const handleSaveTag = async () => {
     if (!currentWorkspaceId || !tagForm.nombre || !tagForm.categoriaId) {
-      toast.error("Falta nombre o categoría");
+      toast.error("Completa el nombre de la etiqueta");
       return;
     }
     try {
+      // Limpiar undefined — Firestore no los acepta
+      const cleanData: Record<string, any> = {};
+      for (const [key, value] of Object.entries(tagForm)) {
+        if (value !== undefined && value !== "") cleanData[key] = value;
+      }
+      // Asegurar campos obligatorios
+      cleanData.nombre = tagForm.nombre;
+      cleanData.categoriaId = tagForm.categoriaId;
+      cleanData.colorBg = tagForm.colorBg || PRESET_COLORS[0].bg;
+      cleanData.colorText = tagForm.colorText || PRESET_COLORS[0].text;
+
       if (editingTag?.id) {
         await updateDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.ETIQUETAS_CRM, editingTag.id), {
-          ...tagForm,
+          ...cleanData,
           actualizadoEl: serverTimestamp()
         });
         toast.success("Etiqueta actualizada");
       } else {
         await addDoc(collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.ETIQUETAS_CRM), {
-          ...tagForm,
+          ...cleanData,
           creadoEl: serverTimestamp()
         });
         toast.success("Etiqueta creada");
@@ -177,11 +191,12 @@ export default function CRMTagsPage() {
       setEditingTag(null);
       setTagForm({ 
         nombre: "", 
-        categoriaId: tagForm.categoriaId, // Mantenemos la categoría para creación rápida
+        categoriaId: tagForm.categoriaId,
         colorBg: PRESET_COLORS[0].bg, 
         colorText: PRESET_COLORS[0].text 
       });
     } catch (err) {
+      console.error("Error guardando etiqueta:", err);
       toast.error("Error al guardar etiqueta");
     }
   };
@@ -203,167 +218,114 @@ export default function CRMTagsPage() {
       
       <div className="flex justify-between items-end">
         <div className="space-y-1">
-          <h1 className="text-2xl font-black text-[var(--text-primary-light)] flex items-center gap-2 tracking-tight">
+          <h1 className="text-2xl font-semibold text-[var(--text-primary-light)] flex items-center gap-2 tracking-tight">
             <Layers className="w-6 h-6 text-[var(--accent)]" /> 
             Etiquetas y Salud Relacional
           </h1>
-          <p className="text-sm text-[var(--text-tertiary-light)] font-medium">Define categorías, semáforos de estado e instrucciones para la IA.</p>
+          <p className="text-sm text-[var(--text-tertiary-light)] font-medium">Organiza tus contactos con grupos de etiquetas y controla la salud relacional.</p>
         </div>
         
         <div className="flex gap-2">
+           <Button 
+             variant="ghost" 
+             size="icon" 
+             onClick={() => setIsHelpOpen(true)}
+             className="size-11 rounded-full border border-slate-100 text-slate-400 hover:text-[var(--accent)] hover:border-[var(--accent)]/30 transition-all"
+           >
+             <HelpCircle className="size-5" />
+           </Button>
            <Dialog open={isAddingCategory} onOpenChange={(o) => { if(!o) setEditingCategory(null); setIsAddingCategory(o); }}>
             <DialogTrigger render={
-              <Button variant="outline" className="border-[var(--border-light)] text-[var(--text-primary-light)]">
-                <LayoutList className="w-4 h-4 mr-2" />
-                Nueva Categoría
+              <Button className="bg-[var(--accent)] text-[var(--accent-text)] rounded-full h-11 px-6 font-semibold shadow-lg shadow-[var(--accent)]/20 hover:scale-105 transition-all">
+                <Plus className="w-4 h-4 mr-2" />
+                Nuevo Grupo
               </Button>
             } />
-            <DialogContent className="bg-[var(--bg-card)] border-[var(--border-light)] max-w-md">
-              <DialogHeader>
-                <DialogTitle>{editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}</DialogTitle>
+            <DialogContent className="max-w-[520px] bg-white border-none shadow-2xl rounded-[32px] overflow-hidden p-0">
+              <DialogHeader className="bg-slate-50/50 p-8 pb-4">
+                <DialogTitle className="text-2xl font-semibold tracking-tight flex items-center gap-3">
+                  <div className="size-10 rounded-2xl bg-[var(--accent)] flex items-center justify-center text-[var(--accent-text)]">
+                    {editingCategory ? <Edit2 className="size-5" /> : <LayoutList className="size-5" />}
+                  </div>
+                  {editingCategory ? 'Editar Grupo' : 'Nuevo Grupo de Etiquetas'}
+                </DialogTitle>
               </DialogHeader>
-              <div className="space-y-6 py-4">
+
+              <div className="p-8 space-y-6">
                 <div className="space-y-2">
-                  <Label>Nombre de la categoría</Label>
+                  <Label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 ml-1">Nombre del grupo</Label>
                   <Input 
                     value={categoryForm.nombre}
                     onChange={e => setCategoryForm({...categoryForm, nombre: e.target.value})}
-                    placeholder="Ej: Interés, Prioridad, Temperatura..."
+                    placeholder="Ej: Tipo de Cliente, Estado del Negocio..."
+                    className="h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-[15px] font-medium focus:bg-white transition-all shadow-sm"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Comportamiento de selección</Label>
-                  <Select 
-                    value={categoryForm.tipo} 
-                    onValueChange={(v:any) => setCategoryForm({...categoryForm, tipo: v})}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-white border-[var(--border-light)]">
-                      <SelectItem value="multiple">Multiselección (Varias etiquetas a la vez)</SelectItem>
-                      <SelectItem value="exclusiva">Exclusiva (Semáforo: Solo una a la vez)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-[11px] text-[var(--text-tertiary-light)] px-1">
-                    Las exclusivas son ideales para estados o niveles de urgencia.
+
+                <div className="space-y-3">
+                  <Label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 ml-1">¿Cómo se asigna?</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => setCategoryForm({...categoryForm, tipo: 'multiple'})}
+                      className={cn(
+                        "flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all text-center",
+                        categoryForm.tipo === 'multiple'
+                          ? "border-blue-400 bg-blue-50/50 shadow-sm"
+                          : "border-slate-100 bg-white hover:border-slate-200"
+                      )}
+                    >
+                      <LayoutGrid className={cn("size-6", categoryForm.tipo === 'multiple' ? "text-blue-500" : "text-slate-300")} />
+                      <div>
+                        <p className={cn("text-[12px] font-semibold", categoryForm.tipo === 'multiple' ? "text-blue-700" : "text-slate-600")}>Múltiple</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Permite varias etiquetas a la vez</p>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => setCategoryForm({...categoryForm, tipo: 'exclusiva'})}
+                      className={cn(
+                        "flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all text-center",
+                        categoryForm.tipo === 'exclusiva'
+                          ? "border-emerald-400 bg-emerald-50/50 shadow-sm"
+                          : "border-slate-100 bg-white hover:border-slate-200"
+                      )}
+                    >
+                      <CheckCircle2 className={cn("size-6", categoryForm.tipo === 'exclusiva' ? "text-emerald-500" : "text-slate-300")} />
+                      <div>
+                        <p className={cn("text-[12px] font-semibold", categoryForm.tipo === 'exclusiva' ? "text-emerald-700" : "text-slate-600")}>Exclusiva</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Solo una etiqueta activa (semáforo)</p>
+                      </div>
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-400 px-1 leading-relaxed">
+                    <strong>Múltiple:</strong> Un contacto puede tener varias etiquetas de esta categoría. Ideal para intereses o características. <br/>
+                    <strong>Exclusiva:</strong> Solo una etiqueta activa por contacto. Perfecta para estados o niveles de urgencia (funciona como semáforo).
                   </p>
                 </div>
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <Clock className="w-3.5 h-3.5" />
+
+                <div className="space-y-2 p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
+                  <Label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+                    <Clock className="size-3.5" />
                     Días para Alerta (Salud Relacional)
                   </Label>
                   <Input 
                     type="number"
                     value={categoryForm.alertaDiasDefault}
                     onChange={e => setCategoryForm({...categoryForm, alertaDiasDefault: parseInt(e.target.value)})}
+                    className="h-12 rounded-2xl bg-white border-slate-100 text-[15px] font-medium focus:bg-white transition-all shadow-sm"
                   />
-                  <p className="text-[11px] text-[var(--text-tertiary-light)] px-1">
-                    Si pasan estos días sin contacto, el semáforo se pondrá en Rojo.
+                  <p className="text-[10px] text-slate-400 px-1 leading-relaxed">
+                    Si pasan estos días sin contacto con el cliente, el semáforo cambiará a Rojo para que tomes acción.
                   </p>
                 </div>
               </div>
-              <DialogFooter>
-                <Button onClick={handleSaveCategory} className="bg-[var(--accent)] text-[var(--accent-text)] w-full">
-                  {editingCategory ? 'Guardar Cambios' : 'Crear Categoría'}
+
+              <DialogFooter className="p-8 pt-0">
+                <Button 
+                  onClick={handleSaveCategory} 
+                  className="w-full h-12 rounded-2xl font-semibold bg-[var(--accent)] text-[var(--accent-text)] shadow-xl shadow-[var(--accent)]/30 hover:scale-[1.02] active:scale-95 transition-all"
+                >
+                  {editingCategory ? 'Guardar Cambios' : 'Crear Grupo'}
                 </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
-          <Dialog open={isAddingTag} onOpenChange={(o) => { if(!o) setEditingTag(null); setIsAddingTag(o); }}>
-            <DialogTrigger render={
-              <Button className="bg-[var(--accent)] text-[var(--accent-text)]">
-                <Plus className="w-4 h-4 mr-2" />
-                Nueva Etiqueta
-              </Button>
-            } />
-            <DialogContent className="bg-[var(--bg-card)] border-[var(--border-light)] max-w-lg max-h-[90vh] overflow-y-auto no-scrollbar">
-              <DialogHeader>
-                <DialogTitle>{editingTag ? 'Editar Etiqueta' : 'Crear Nueva Etiqueta'}</DialogTitle>
-              </DialogHeader>
-              <div className="grid gap-6 py-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Nombre</Label>
-                    <Input 
-                      value={tagForm.nombre}
-                      onChange={e => setTagForm({...tagForm, nombre: e.target.value})}
-                      placeholder="Ej: Inversor" 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Categoría</Label>
-                    <Select 
-                      value={tagForm.categoriaId} 
-                      onValueChange={v => setTagForm({...tagForm, categoriaId: v})}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar..." />
-                      </SelectTrigger>
-                      <SelectContent className="bg-white border-[var(--border-light)]">
-                        {categories.map(c => (
-                          <SelectItem key={c.id} value={c.id!}>{c.nombre}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <Label>Estilo visual</Label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {PRESET_COLORS.map((c, idx) => (
-                      <button 
-                        key={idx}
-                        onClick={() => setTagForm({...tagForm, colorBg: c.bg, colorText: c.text})}
-                        className={cn(
-                          "p-2 rounded-xl border-2 transition-all flex flex-col items-center gap-1",
-                          tagForm.colorBg === c.bg ? "border-[var(--accent)] bg-[var(--accent)]/5" : "border-transparent opacity-60 hover:opacity-100"
-                        )}
-                      >
-                         <div 
-                          className="px-2 py-0.5 rounded text-[10px] font-bold"
-                          style={{ backgroundColor: c.bg, color: c.text }}
-                         >
-                          ABC
-                         </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-2 p-4 bg-[var(--bg-input)] rounded-2xl border border-[var(--border-light)]">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Bot className="w-4 h-4 text-[var(--accent)]" />
-                    <Label className="text-[12px] font-bold">Automatización IA (Opcional)</Label>
-                  </div>
-                  <Textarea 
-                    placeholder="Describe cuándo la IA debe aplicar esta etiqueta..."
-                    className="min-h-[80px] text-[13px] bg-white border-none focus-visible:ring-1"
-                    value={tagForm.instruccionIA}
-                    onChange={e => setTagForm({...tagForm, instruccionIA: e.target.value})}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="flex items-center justify-between">
-                    Días de Alerta Específicos
-                    <span className="text-[10px] text-[var(--text-tertiary-light)] font-normal">Opcional</span>
-                  </Label>
-                  <Input 
-                    type="number" 
-                    placeholder="Ej: 7"
-                    value={tagForm.alertaDias || ""}
-                    onChange={e => setTagForm({...tagForm, alertaDias: parseInt(e.target.value) || undefined})}
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                 <Button onClick={handleSaveTag} className="bg-[var(--accent)] text-[var(--accent-text)] w-full py-6 rounded-2xl font-bold">
-                    {editingTag ? 'Guardar Cambios' : 'Confirmar'}
-                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -374,7 +336,8 @@ export default function CRMTagsPage() {
         {categories.length === 0 ? (
           <div className="p-20 text-center border-2 border-dashed border-[var(--border-light)] rounded-[32px] bg-[var(--bg-card)]/30">
             <LayoutList className="w-12 h-12 text-[var(--text-tertiary-light)] mx-auto mb-4 opacity-20" />
-            <p className="text-[15px] font-bold text-[var(--text-secondary-light)]">Aún no tienes categorías.</p>
+            <p className="text-[15px] font-semibold text-[var(--text-secondary-light)]">Creá tu primer grupo de etiquetas para organizar contactos.</p>
+            <p className="text-[12px] text-[var(--text-tertiary-light)] mt-1">Ej: "Tipo de Cliente" con etiquetas Inversor, Comprador, Vendedor.</p>
           </div>
         ) : (
           categories.map(cat => (
@@ -385,12 +348,12 @@ export default function CRMTagsPage() {
                       {cat.tipo === 'exclusiva' ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <LayoutGrid className="w-5 h-5 text-blue-500" />}
                     </div>
                     <div>
-                      <h3 className="text-[17px] font-black tracking-tight flex items-center gap-2">
+                      <h3 className="text-[17px] font-semibold tracking-tight flex items-center gap-2">
                         {cat.nombre}
-                        {cat.tipo === 'exclusiva' && <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full text-[9px] font-bold">SEMÁFORO</span>}
+                        {cat.tipo === 'exclusiva' && <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full text-[9px] font-semibold">SEMÁFORO</span>}
                       </h3>
                       <p className="text-[11px] text-[var(--text-tertiary-light)] font-medium">
-                        {cat.alertaDiasDefault} días • {cat.tipo === 'exclusiva' ? 'Única' : 'Múltiple'}
+                        Alerta: {cat.alertaDiasDefault} días • {cat.tipo === 'exclusiva' ? 'Solo una activa' : 'Varias a la vez'}
                       </p>
                     </div>
                   </div>
@@ -418,9 +381,9 @@ export default function CRMTagsPage() {
                       </div>
                     </div>
                   ))}
-                  <button onClick={() => { setTagForm({ ...tagForm, categoriaId: cat.id! }); setIsAddingTag(true); }} className="border-2 border-dashed border-[var(--border-light)] rounded-[24px] p-5 flex items-center justify-center gap-2 text-[var(--text-tertiary-light)] hover:border-[var(--accent)] hover:text-[var(--accent)] bg-[var(--bg-main)]/50 group">
-                    <Plus className="w-4 h-4 group-hover:scale-110" />
-                    <span className="text-[12px] font-bold">Añadir</span>
+                  <button onClick={() => { setTagForm({ ...tagForm, categoriaId: cat.id! }); setIsAddingTag(true); }} className="border-2 border-dashed border-[var(--border-light)] rounded-[24px] p-5 flex items-center justify-center gap-2 text-[var(--text-tertiary-light)] hover:border-[var(--accent)] hover:text-[var(--accent)] bg-[var(--bg-main)]/50 group transition-all hover:shadow-sm">
+                    <Plus className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                    <span className="text-[12px] font-semibold">Añadir etiqueta</span>
                   </button>
                </div>
             </section>
@@ -428,23 +391,206 @@ export default function CRMTagsPage() {
         )}
       </div>
 
-      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 p-4 bg-white/80 backdrop-blur-md rounded-2xl border border-[var(--border-light)] shadow-2xl z-50 flex gap-6 max-w-2xl w-full hidden md:flex">
-        <div className="flex gap-3">
-           <LayoutGrid className="size-8 text-blue-500" />
-           <div className="space-y-0.5">
-              <h4 className="text-[11px] font-black uppercase tracking-widest">Normal</h4>
-              <p className="text-[10px] text-[var(--text-tertiary-light)]">Multiselección de etiquetas.</p>
-           </div>
-        </div>
-        <div className="w-[1px] h-10 bg-[var(--border-light)] shrink-0" />
-        <div className="flex gap-3">
-           <Circle className="size-8 text-emerald-500" />
-           <div className="space-y-0.5">
-              <h4 className="text-[11px] font-black uppercase tracking-widest">Semáforo</h4>
-              <p className="text-[10px] text-[var(--text-tertiary-light)]">Solo una por categoría.</p>
-           </div>
-        </div>
-      </div>
+      {/* Modal de Ayuda */}
+      <Dialog open={isHelpOpen} onOpenChange={setIsHelpOpen}>
+        <DialogContent className="max-w-[620px] bg-white border-none shadow-2xl rounded-[32px] overflow-hidden p-0">
+          <DialogHeader className="bg-slate-50/50 p-8 pb-4">
+            <DialogTitle className="text-2xl font-semibold tracking-tight flex items-center gap-3">
+              <div className="size-10 rounded-2xl bg-indigo-500 flex items-center justify-center text-white">
+                <HelpCircle className="size-5" />
+              </div>
+              ¿Cómo funciona?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="p-8 space-y-6 max-h-[70vh] overflow-y-auto no-scrollbar">
+            
+            {/* Paso 1 */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="size-6 rounded-full bg-[var(--accent)] text-[var(--accent-text)] flex items-center justify-center text-[11px] font-bold">1</div>
+                <h3 className="text-[14px] font-semibold text-slate-800">Creá un grupo de etiquetas</h3>
+              </div>
+              <p className="text-[13px] text-slate-500 pl-8 leading-relaxed">
+                Un grupo es como una "carpeta" para organizar etiquetas del mismo tipo. Por ejemplo: <strong>"Tipo de Cliente"</strong> o <strong>"Nivel de Interés"</strong>.
+              </p>
+            </div>
+
+            {/* Paso 2 */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="size-6 rounded-full bg-[var(--accent)] text-[var(--accent-text)] flex items-center justify-center text-[11px] font-bold">2</div>
+                <h3 className="text-[14px] font-semibold text-slate-800">Agregá etiquetas al grupo</h3>
+              </div>
+              <p className="text-[13px] text-slate-500 pl-8 leading-relaxed">
+                Dentro de cada grupo, creá las opciones. Hacé clic en <strong>"Añadir etiqueta"</strong> dentro del grupo.
+              </p>
+            </div>
+
+            {/* Paso 3 */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="size-6 rounded-full bg-[var(--accent)] text-[var(--accent-text)] flex items-center justify-center text-[11px] font-bold">3</div>
+                <h3 className="text-[14px] font-semibold text-slate-800">Asigná etiquetas a tus contactos</h3>
+              </div>
+              <p className="text-[13px] text-slate-500 pl-8 leading-relaxed">
+                Desde la ficha de cada contacto en el CRM, podés asignarle las etiquetas que necesites.
+              </p>
+            </div>
+
+            {/* Separador */}
+            <div className="h-px bg-slate-100" />
+
+            {/* Ejemplos */}
+            <div className="space-y-4">
+              <h3 className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Ejemplos prácticos</h3>
+              
+              {/* Ejemplo 1: Múltiple */}
+              <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 space-y-3">
+                <div className="flex items-center gap-2">
+                  <LayoutGrid className="size-4 text-blue-500" />
+                  <span className="text-[12px] font-semibold text-blue-700">Grupo Múltiple: "Tipo de Cliente"</span>
+                </div>
+                <div className="flex flex-wrap gap-2 pl-6">
+                  <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">Inversor</span>
+                  <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-green-100 text-green-800">Comprador</span>
+                  <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">Vendedor</span>
+                  <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800">Desarrollador</span>
+                </div>
+                <p className="text-[11px] text-blue-600/70 pl-6">
+                  ✓ Un contacto puede ser "Inversor" y "Comprador" al mismo tiempo.
+                </p>
+              </div>
+
+              {/* Ejemplo 2: Exclusiva */}
+              <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 space-y-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="size-4 text-emerald-500" />
+                  <span className="text-[12px] font-semibold text-emerald-700">Grupo Exclusivo: "Nivel de Interés"</span>
+                </div>
+                <div className="flex items-center gap-2 pl-6">
+                  <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-800">Caliente 🔥</span>
+                  <ArrowRight className="size-3 text-slate-300" />
+                  <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">Tibio ⚡</span>
+                  <ArrowRight className="size-3 text-slate-300" />
+                  <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">Frío 💤</span>
+                </div>
+                <p className="text-[11px] text-emerald-600/70 pl-6">
+                  ✓ Solo una puede estar activa. Si marcás "Caliente", se desactiva "Frío".
+                </p>
+              </div>
+            </div>
+
+            {/* Separador */}
+            <div className="h-px bg-slate-100" />
+
+            {/* Salud Relacional */}
+            <div className="p-4 bg-amber-50/50 rounded-2xl border border-amber-100 space-y-2">
+              <div className="flex items-center gap-2">
+                <Clock className="size-4 text-amber-500" />
+                <span className="text-[12px] font-semibold text-amber-700">Salud Relacional: ¿qué son los días de alerta?</span>
+              </div>
+              <p className="text-[11px] text-amber-700/70 pl-6 leading-relaxed">
+                Cada grupo tiene un número de "días de alerta". Si pasan esos días sin que tengas contacto con un cliente, 
+                el sistema te avisa automáticamente para que retomes la relación. Es como un recordatorio inteligente para no perder clientes.
+              </p>
+            </div>
+          </div>
+          <DialogFooter className="p-8 pt-0">
+            <Button 
+              onClick={() => setIsHelpOpen(false)} 
+              className="w-full h-12 rounded-2xl font-semibold bg-[var(--accent)] text-[var(--accent-text)] shadow-xl shadow-[var(--accent)]/30 hover:scale-[1.02] active:scale-95 transition-all"
+            >
+              ¡Entendido!
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Etiqueta — se abre desde el "+" de cada grupo */}
+      <Dialog open={isAddingTag} onOpenChange={(o) => { if(!o) setEditingTag(null); setIsAddingTag(o); }}>
+        <DialogContent className="max-w-[580px] bg-white border-none shadow-2xl rounded-[32px] overflow-hidden p-0">
+          <DialogHeader className="bg-slate-50/50 p-8 pb-4">
+            <DialogTitle className="text-2xl font-semibold tracking-tight flex items-center gap-3">
+              <div className="size-10 rounded-2xl bg-[var(--accent)] flex items-center justify-center text-[var(--accent-text)]">
+                {editingTag ? <Edit2 className="size-5" /> : <Tags className="size-5" />}
+              </div>
+              {editingTag ? 'Editar Etiqueta' : 'Nueva Etiqueta'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="p-8 space-y-6 max-h-[70vh] overflow-y-auto no-scrollbar">
+            <div className="space-y-2">
+              <Label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 ml-1">Nombre de la etiqueta</Label>
+              <Input 
+                value={tagForm.nombre}
+                onChange={e => setTagForm({...tagForm, nombre: e.target.value})}
+                placeholder="Ej: Inversor, Comprador, Frío..." 
+                className="h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-[15px] font-medium focus:bg-white transition-all shadow-sm"
+              />
+            </div>
+
+            <div className="space-y-3">
+              <Label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 ml-1">Color</Label>
+              <div className="grid grid-cols-4 gap-2">
+                {PRESET_COLORS.map((c, idx) => (
+                  <button 
+                    key={idx}
+                    onClick={() => setTagForm({...tagForm, colorBg: c.bg, colorText: c.text})}
+                    className={cn(
+                      "p-3 rounded-2xl border-2 transition-all flex flex-col items-center gap-1.5",
+                      tagForm.colorBg === c.bg ? "border-[var(--accent)] bg-[var(--accent)]/5 shadow-sm" : "border-slate-100 opacity-60 hover:opacity-100"
+                    )}
+                  >
+                     <div 
+                      className="px-3 py-1 rounded-full text-[10px] font-bold"
+                      style={{ backgroundColor: c.bg, color: c.text }}
+                     >
+                      {c.label}
+                     </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2 p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
+              <div className="flex items-center gap-2 mb-2">
+                <Bot className="size-4 text-[var(--accent)]" />
+                <Label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Automatización IA (Opcional)</Label>
+              </div>
+              <Textarea 
+                placeholder="Describe cuándo la IA debe aplicar esta etiqueta automáticamente..."
+                className="min-h-[80px] text-[13px] bg-white border-slate-100 rounded-xl focus-visible:ring-1 font-medium"
+                value={tagForm.instruccionIA}
+                onChange={e => setTagForm({...tagForm, instruccionIA: e.target.value})}
+              />
+              <p className="text-[10px] text-slate-400 px-1 leading-relaxed">
+                Ej: "Aplica cuando el contacto mencione inversiones o bienes raíces".
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-widest text-slate-400 ml-1">
+                Días de Alerta
+                <span className="text-[9px] text-slate-300 font-medium normal-case">Opcional — sobreescribe el del grupo</span>
+              </Label>
+              <Input 
+                type="number" 
+                placeholder="Ej: 7"
+                value={tagForm.alertaDias || ""}
+                onChange={e => setTagForm({...tagForm, alertaDias: parseInt(e.target.value) || undefined})}
+                className="h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-[15px] font-medium focus:bg-white transition-all shadow-sm"
+              />
+            </div>
+          </div>
+          <DialogFooter className="p-8 pt-0">
+             <Button 
+               onClick={handleSaveTag} 
+               className="w-full h-12 rounded-2xl font-semibold bg-[var(--accent)] text-[var(--accent-text)] shadow-xl shadow-[var(--accent)]/30 hover:scale-[1.02] active:scale-95 transition-all"
+             >
+                {editingTag ? 'Guardar Cambios' : 'Crear Etiqueta'}
+             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

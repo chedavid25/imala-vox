@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { useContactos } from "@/hooks/useContactos";
 import { cn } from "@/lib/utils";
@@ -38,7 +38,8 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-  DropdownMenuLabel
+  DropdownMenuLabel,
+  DropdownMenuGroup
 } from "@/components/ui/dropdown-menu";
 import {
   Dialog,
@@ -53,7 +54,7 @@ import { toast } from "sonner";
 import { deleteDoc } from "firebase/firestore";
 
 export function ContextPanel() {
-  const { selectedContactId, currentWorkspaceId } = useWorkspaceStore();
+  const { selectedContactId, currentWorkspaceId, selectedChatId } = useWorkspaceStore();
   const { contactos } = useContactos();
   
   const [activeTab, setActiveTab] = useState("perfil");
@@ -111,6 +112,16 @@ export function ContextPanel() {
     );
     return onSnapshot(q, snap => setInteracciones(snap.docs.map(d => ({...d.data(), id: d.id} as InteraccionCRM))));
   }, [currentWorkspaceId, selectedContact?.id]);
+  
+  const groupedInteracciones = useMemo(() => {
+    const groups: { [key: string]: InteraccionCRM[] } = {};
+    interacciones.forEach(log => {
+      const date = format(log.creadoEl.toDate(), "yyyy-MM-dd");
+      if (!groups[date]) groups[date] = [];
+      groups[date].push(log);
+    });
+    return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [interacciones]);
 
   const handleUpdateField = async (field: string, value: any) => {
     const targetId = selectedContact?.id || selectedContactId;
@@ -161,18 +172,36 @@ export function ContextPanel() {
       const contactRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS, selectedContact.id);
       
       if (!resetingOnly) {
+        // 1. Guardar en interacciones del contacto
         await addDoc(collection(contactRef, "interacciones"), {
           tipo: interactionType,
           contenido: newInteraction.trim(),
           creadoEl: Timestamp.now(),
           creadoPor: "Operador"
         });
+
+        // 2. Si hay un chat activo y es una nota, inyectar en el chat
+        if (selectedChatId && interactionType === 'nota') {
+          const messagesRef = collection(
+            db, 
+            COLLECTIONS.ESPACIOS, currentWorkspaceId, 
+            COLLECTIONS.CONVERSACIONES, selectedChatId, 
+            COLLECTIONS.MENSAJES
+          );
+          
+          await addDoc(messagesRef, {
+            text: newInteraction.trim(),
+            from: 'system',
+            creadoEl: Timestamp.now(),
+            metadata: { isInternalNote: true, source: 'crm_panel' }
+          });
+        }
       }
 
       await updateDoc(contactRef, { ultimaInteraccion: Timestamp.now() });
       
       setNewInteraction("");
-      toast.success(resetingOnly ? "Contador reiniciado" : "Interacción registrada");
+      toast.success(resetingOnly ? "Contador reiniciado" : "Interacción registrada y sincronizada");
       if (resetingOnly) setActiveTab("perfil");
     } catch (e) { toast.error("Error al registrar"); }
     finally { setIsSavingInteraction(false); }
@@ -232,7 +261,7 @@ export function ContextPanel() {
               {selectedContact?.nombre || "Prospecto"}
             </h4>
             <div className="flex items-center justify-center gap-2 mt-1">
-              <Badge className="text-[9px] font-black bg-[var(--accent)]/10 text-[var(--accent)] border-none px-2 h-4">
+              <Badge className="text-[10px] font-black bg-[var(--bg-sidebar)] text-[var(--accent)] border-none px-2.5 h-5 rounded-full shadow-sm">
                 {selectedContact?.relacionTag || "LEAD"}
               </Badge>
               <div className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -313,14 +342,16 @@ export function ContextPanel() {
                     <DropdownMenuContent align="end" className="w-[240px] bg-white border-[var(--border-light)] max-h-[400px] overflow-y-auto no-scrollbar">
                        {categories.map(cat => (
                          <div key={cat.id}>
-                            <DropdownMenuLabel className="text-[9px] font-black uppercase tracking-tighter text-[var(--text-tertiary-light)] bg-slate-50 py-1">{cat.nombre}</DropdownMenuLabel>
-                            {masterTags.filter(t => t.categoriaId === cat.id).map(tag => (
-                              <DropdownMenuItem key={tag.id} onClick={() => handleAddTag(tag)} className="text-[12px] font-bold gap-2 py-2">
-                                <div className="size-2 rounded-full" style={{ backgroundColor: tag.colorBg }} />
-                                {tag.nombre}
-                                {(selectedContact?.etiquetas || []).includes(tag.id!) && <Check className="size-3 ml-auto text-emerald-500" />}
-                              </DropdownMenuItem>
-                            ))}
+                            <DropdownMenuGroup>
+                              <DropdownMenuLabel className="text-[9px] font-black uppercase tracking-tighter text-[var(--text-tertiary-light)] bg-slate-50 py-1">{cat.nombre}</DropdownMenuLabel>
+                              {masterTags.filter(t => t.categoriaId === cat.id).map(tag => (
+                                <DropdownMenuItem key={tag.id} onClick={() => handleAddTag(tag)} className="text-[12px] font-bold gap-2 py-2">
+                                  <div className="size-2 rounded-full" style={{ backgroundColor: tag.colorBg }} />
+                                  {tag.nombre}
+                                  {(selectedContact?.etiquetas || []).includes(tag.id!) && <Check className="size-3 ml-auto text-emerald-500" />}
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuGroup>
                             <DropdownMenuSeparator className="bg-[var(--border-light)]" />
                          </div>
                        ))}
@@ -407,54 +438,64 @@ export function ContextPanel() {
                   </Badge>
                 </div>
                 
-                <div className="space-y-3 relative before:absolute before:left-[17px] before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-50">
-                   {interacciones.map(log => (
-                     <div key={log.id} className="relative pl-9 space-y-1 group">
-                        <div className={cn(
-                          "absolute left-0 top-1 size-9 rounded-xl border border-white shadow-sm z-10 flex items-center justify-center transition-all group-hover:scale-110",
-                          log.tipo === 'nota' ? "bg-blue-50 text-blue-500" :
-                          log.tipo === 'llamada' ? "bg-emerald-50 text-emerald-500" :
-                          "bg-violet-50 text-violet-500"
-                        )}>
-                           {log.tipo === 'nota' ? <FileText className="size-4" /> :
-                            log.tipo === 'llamada' ? <PhoneCall className="size-4" /> :
-                            <MessageSquare className="size-4" />}
-                        </div>
-                        <div className="bg-white border border-slate-50 p-4 rounded-[22px] shadow-sm group-hover:border-[var(--accent)]/20 transition-all group-hover:shadow-md">
-                           <div className="flex items-center justify-between mb-2">
-                              <span className={cn(
-                                "text-[10px] font-black uppercase tracking-tighter",
-                                log.tipo === 'nota' ? "text-blue-600" :
-                                log.tipo === 'llamada' ? "text-emerald-600" :
-                                "text-violet-600"
-                              )}>{log.tipo}</span>
-                              <div className="flex items-center gap-2">
-                                <span className="text-[9px] font-bold text-slate-300 tabular-nums">
-                                  {format(log.creadoEl.toDate(), "d MMM, HH:mm", { locale: es })}
-                                </span>
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger render={
-                                    <button className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-slate-100 rounded transition-all">
-                                      <MoreVertical className="size-3 text-slate-400" />
-                                    </button>
-                                  } />
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => setEditingInteraction(log)} className="text-xs font-bold gap-2">
-                                      <Pencil className="size-3" /> Editar
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={() => handleDeleteInteraction(log.id!)} className="text-xs font-bold gap-2 text-rose-500">
-                                      <Trash2 className="size-3" /> Borrar
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
+                <div className="space-y-6 relative before:absolute before:left-[17px] before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-50">
+                    {groupedInteracciones.map(([date, logs]) => (
+                      <div key={date} className="space-y-3">
+                         <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-sm py-1">
+                            <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
+                              {format(new Date(date + "T12:00:00"), "EEEE d 'de' MMMM", { locale: es })}
+                            </span>
+                         </div>
+                         
+                         {logs.map(log => (
+                           <div key={log.id} className="relative pl-9 space-y-1 group">
+                              <div className={cn(
+                                "absolute left-0 top-1 size-9 rounded-xl border border-white shadow-sm z-10 flex items-center justify-center transition-all group-hover:scale-110",
+                                log.tipo === 'nota' ? "bg-blue-50 text-blue-500" :
+                                log.tipo === 'llamada' ? "bg-emerald-50 text-emerald-500" :
+                                "bg-violet-50 text-violet-500"
+                              )}>
+                                 {log.tipo === 'nota' ? <FileText className="size-4" /> :
+                                  log.tipo === 'llamada' ? <PhoneCall className="size-4" /> :
+                                  <MessageSquare className="size-4" />}
+                              </div>
+                              <div className="bg-white border border-slate-50 p-4 rounded-[22px] shadow-sm group-hover:border-[var(--accent)]/20 transition-all group-hover:shadow-md">
+                                 <div className="flex items-center justify-between mb-2">
+                                    <span className={cn(
+                                      "text-[10px] font-black uppercase tracking-tighter",
+                                      log.tipo === 'nota' ? "text-blue-600" :
+                                      log.tipo === 'llamada' ? "text-emerald-600" :
+                                      "text-violet-600"
+                                    )}>{log.tipo}</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[10px] font-black text-slate-300 tabular-nums">
+                                        {format(log.creadoEl.toDate(), "HH:mm", { locale: es })}
+                                      </span>
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger render={
+                                          <button className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-slate-100 rounded transition-all">
+                                            <MoreVertical className="size-3 text-slate-400" />
+                                          </button>
+                                        } />
+                                        <DropdownMenuContent align="end">
+                                          <DropdownMenuItem onClick={() => setEditingInteraction(log)} className="text-xs font-bold gap-2">
+                                            <Pencil className="size-3" /> Editar
+                                          </DropdownMenuItem>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuItem onClick={() => handleDeleteInteraction(log.id!)} className="text-xs font-bold gap-2 text-rose-500">
+                                            <Trash2 className="size-3" /> Borrar
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    </div>
+                                 </div>
+                                 <p className="text-[12.5px] text-slate-600 font-medium leading-relaxed">{log.contenido}</p>
                               </div>
                            </div>
-                           <p className="text-[12.5px] text-slate-600 font-medium leading-relaxed">{log.contenido}</p>
-                        </div>
-                     </div>
-                   ))}
-                   {interacciones.length === 0 && (
+                         ))}
+                      </div>
+                    ))}
+                    {interacciones.length === 0 && (
                      <div className="py-12 flex flex-col items-center justify-center opacity-30 text-center gap-3">
                         <History className="size-10" />
                         <p className="text-[11px] font-bold uppercase tracking-widest italic">Sin historial previo</p>

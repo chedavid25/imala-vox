@@ -16,8 +16,7 @@ import { toast } from "sonner";
 
 export default function InboxPage() {
   const { conversaciones, loading: loadingConvs } = useConversaciones();
-  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
-  const { currentWorkspaceId, setSelectedContactId } = useWorkspaceStore();
+  const { currentWorkspaceId, setSelectedContactId, selectedChatId, setSelectedChatId } = useWorkspaceStore();
   const { mensajes, loading: loadingMsgs } = useMensajes(selectedChatId);
 
   // Sincronizar el contacto seleccionado en el store global cuando cambia el chat
@@ -70,7 +69,7 @@ export default function InboxPage() {
 
     try {
       if (isInternal) {
-        // 1. Guardar nota interna en la conversación (timeline)
+        // 1. Guardar nota interna en la conversación (timeline del chat)
         await addDoc(messagesRef, {
           text,
           from: 'system',
@@ -78,7 +77,24 @@ export default function InboxPage() {
           metadata: { isInternalNote: true }
         });
 
-        // 2. Guardar nota en el perfil del contacto (historial CRM centralizado)
+        // 2. Sincronizar con el historial de SALUD (interacciones)
+        const interactionsRef = collection(
+          db, 
+          COLLECTIONS.ESPACIOS, currentWorkspaceId, 
+          COLLECTIONS.CONTACTOS, selectedChat.contactoId, 
+          "interacciones"
+        );
+        
+        await addDoc(interactionsRef, {
+          tipo: 'nota',
+          contenido: text,
+          fuente: 'chat',
+          conversacionId: selectedChatId,
+          creadoPor: "Operador",
+          creadoEl: Timestamp.now()
+        });
+
+        // 3. Mantener compatibilidad con notas_internas si es necesario
         const contactNotesRef = collection(
           db, 
           COLLECTIONS.ESPACIOS, currentWorkspaceId, 
@@ -93,7 +109,7 @@ export default function InboxPage() {
           creadoEl: Timestamp.now()
         });
 
-        toast.info("Nota guardada en el perfil del contacto");
+        toast.info("Nota sincronizada en el perfil y salud del contacto");
         return;
       }
 

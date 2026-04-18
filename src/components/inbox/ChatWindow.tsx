@@ -23,6 +23,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Trash2, BellOff, CheckCircle as CheckIcon } from "lucide-react";
 import { deleteDoc } from "firebase/firestore";
+import { pedirSugerenciaIAAction } from "@/app/actions/ai";
+import { Loader2 } from "lucide-react";
 
 interface ChatWindowProps {
   conversacion: any;
@@ -37,6 +39,7 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
   const [miembros, setMiembros] = useState<any[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { currentWorkspaceId } = useWorkspaceStore();
+  const [isRequestingSuggestion, setIsRequestingSuggestion] = useState(false);
 
   const selectedContact = contactos.find(c => c.id === conversacion?.contactoId);
   const contactName = selectedContact?.nombre || conversacion?.contactoNombre || "Desconocido";
@@ -142,6 +145,24 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
       toast.success("Marcada como no leída");
     } catch (error) {
       toast.error("Error al actualizar");
+    }
+  };
+
+  const handleRequestSuggestion = async () => {
+    if (!currentWorkspaceId || !conversacion?.id) return;
+    
+    setIsRequestingSuggestion(true);
+    try {
+      const res = await pedirSugerenciaIAAction(currentWorkspaceId, conversacion.id);
+      if (res.success) {
+        toast.success("Sugerencia solicitada a la IA");
+      } else {
+        toast.error(res.error || "No se pudo generar la sugerencia");
+      }
+    } catch (error) {
+      toast.error("Error al conectar con la IA");
+    } finally {
+      setIsRequestingSuggestion(false);
     }
   };
 
@@ -373,9 +394,15 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 gap-1.5 font-extrabold text-[11px] text-[var(--accent)] hover:bg-[var(--accent)]/10 px-3 rounded-lg border border-[var(--accent)]/20 shadow-sm"
+                onClick={handleRequestSuggestion}
+                disabled={isRequestingSuggestion}
+                className="h-8 gap-1.5 font-black text-[10px] text-[var(--accent)] bg-[var(--bg-sidebar)] hover:bg-[var(--bg-sidebar-hover)] hover:text-white px-4 rounded-full border border-[var(--accent)]/20 shadow-lg shadow-black/10 transition-all hover:scale-[1.02] active:scale-[0.98]"
               >
-                <Sparkles className="w-3.5 h-3.5 fill-[var(--accent)]/20" />
+                {isRequestingSuggestion ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5 fill-[var(--accent)]/20" />
+                )}
                 ASISTENTE IA
               </Button>
             </div>

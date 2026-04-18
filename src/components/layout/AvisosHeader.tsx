@@ -19,6 +19,7 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger,
   DropdownMenuLabel,
+  DropdownMenuGroup,
   DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
@@ -82,7 +83,8 @@ export function AvisosHeader() {
         </Button>
       } />
       <DropdownMenuContent align="end" className="w-[320px] p-2 bg-white border-slate-100 shadow-2xl rounded-2xl animate-in zoom-in-95 duration-200">
-        <DropdownMenuLabel className="px-3 py-2 text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center justify-between">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="px-3 py-2 text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center justify-between">
            Tareas Pendientes
            <Badge variant="outline" className="text-rose-500 border-rose-100 bg-rose-50 font-black text-[9px] px-1.5 py-0 h-4">Urgente</Badge>
         </DropdownMenuLabel>
@@ -115,8 +117,8 @@ export function AvisosHeader() {
             </DropdownMenuItem>
           ))}
         </div>
-        
-        <DropdownMenuSeparator className="bg-slate-50 mx-2" />
+      </DropdownMenuGroup>
+      <DropdownMenuSeparator className="bg-slate-50 mx-2" />
         <div className="p-1">
           <Button 
             variant="ghost" 
