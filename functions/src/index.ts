@@ -182,7 +182,15 @@ export const recibirMensajeWhatsApp = functions.https.onRequest(async (req: func
             }
           }
 
-          if (!agenteId) {
+          let modoAgenteDefault = 'auto';
+          if (agenteId) {
+            const agenteDoc = await admin.firestore()
+              .doc(`espaciosDeTrabajo/${workspaceId}/agentes/${agenteId}`)
+              .get();
+            if (agenteDoc.exists) {
+              modoAgenteDefault = agenteDoc.data()?.modoDefault || 'auto';
+            }
+          } else {
             console.warn(`No hay agentes disponibles para responder en ws ${workspaceId}`);
           }
 
@@ -242,7 +250,7 @@ export const recibirMensajeWhatsApp = functions.https.onRequest(async (req: func
           }
 
           // ── 10. Modo copiloto: guardar sugerencia sin enviar ──
-          if (convData.modoIA === 'copiloto' || agenteData.modoDefault === 'copiloto') {
+          if (convData.modoIA === 'copiloto' || modoAgenteDefault === 'copiloto') {
             await admin.firestore()
               .doc(`espaciosDeTrabajo/${workspaceId}/conversaciones/${convId}`)
               .update({ sugerenciaIA: textoLimpio });

@@ -214,6 +214,11 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
 
     if (!text) return; // Ignorar si no es texto por ahora
 
+    // Bloquear los "echoes" (mensajes que el propio sistema/bot acaba de enviar)
+    if (messagingItem.message?.is_echo) {
+      return;
+    }
+
     // 1. Identificar Workspace y Canal
     const canalType = isInstagram ? 'instagram' : 'facebook';
     const wsQuery = await adminDb
@@ -334,10 +339,70 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
 
     // 5. Trigger IA si está habilitado
     if (canalData.aiEnabled && canalData.agenteId) {
-      // Por ahora registramos que debería responder. 
-      // La respuesta se puede manejar vía un trigger de Firestore o llamando a una acción interna.
       console.log(`IA activada para ${canalType}. Agente: ${canalData.agenteId}`);
-      // TODO: Invocar lógica de respuesta IA (Claude)
+      
+      const cDocSnap = await contactosRef.doc(contactoId).get();
+      if (cDocSnap.exists && cDocSnap.data()?.aiBlocked) {
+         console.log(`Contacto ${senderId} bloqueado para IA. Sin respuesta automática.`);
+         return;
+      }
+      
+      const convDocSnap = await convRef.doc(convId).get();
+      const convData = convDocSnap.data();
+      if (convData?.modoIA === 'pausado') {
+         console.log(`Conversación ${convId} pausada, sin respuesta IA.`);
+         return;
+      }
+      
+      let modoAgenteDefault = 'auto';
+      const agenteDoc = await adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.AGENTES}/${canalData.agenteId}`).get();
+      if (agenteDoc.exists) {
+         modoAgenteDefault = agenteDoc.data()?.modoDefault || 'auto';
+      }
+      
+      const isCopiloto = convData?.modoIA === 'copiloto' || modoAgenteDefault === 'copiloto';
+
+      const historialSnap = await convRef.doc(convId)
+          .collection(COLLECTIONS.MENSAJES)
+          .orderBy('creadoEl', 'desc')
+          .limit(30)
+          .get();
+          
+      const historial = historialSnap.docs.reverse().map(d => ({
+         from: d.data().from,
+         text: d.data().text
+      }));
+      // Remover último msg (es el actual) para no duplicarlo en el context
+      if (historial.length > 0) historial.pop(); 
+      
+      const { procesarMensajeConIA } = await import('@/lib/ai/engine');
+      const { enviarMensajeAccion } = await import('@/app/actions/channels');
+
+      try {
+        const respuestaIA = await procesarMensajeConIA({
+           wsId,
+           agenteId: canalData.agenteId,
+           conversacionId: convId,
+           textoUsuario: text,
+           historial,
+           isCopiloto,
+           contactoNombre
+        });
+
+        if (!isCopiloto && respuestaIA) {
+           await enviarMensajeAccion(wsId, canalId, senderId, respuestaIA);
+           
+           // Incrementar mensajes IA en el workspace
+           const FieldValue = require('firebase-admin').firestore.FieldValue;
+           await adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}`).update({
+             "uso.convCount": FieldValue.increment(1)
+           });
+           
+           console.log(`✅ Respuesta IA completada para Meta (${canalType}) - sender: ${senderId}`);
+        }
+      } catch (error) {
+         console.error('Error durante procesamiento de IA en webhook:', error);
+      }
     }
 
   } catch (err) {

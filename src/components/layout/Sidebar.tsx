@@ -189,6 +189,12 @@ export function Sidebar() {
             active={pathname.startsWith("/dashboard/operacion/leads")} 
           />
           <NavItem 
+            label="Tareas" 
+            href="/dashboard/operacion/tareas" 
+            icon={Clock} 
+            active={pathname.startsWith("/dashboard/operacion/tareas")} 
+          />
+          <NavItem 
             label="Contactos" 
             href="/dashboard/operacion/contactos" 
             icon={Users} 

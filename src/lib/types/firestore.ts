@@ -59,18 +59,67 @@ export const COLLECTIONS = {
   NOTIFICACIONES: 'notificaciones',
   LEADS: 'leads',
   ETAPAS_EMBUDO: 'etapasEmbudo',
+  CATEGORIAS_CRM: 'categoriasCRM',
+  ETIQUETAS_CRM: 'etiquetasCRM',
 };
 
+export interface CategoriaCRM {
+  id?: string;
+  nombre: string;
+  tipo: 'multiple' | 'exclusiva'; // 'exclusiva' es el semáforo
+  alertaDiasDefault?: number;     // Días para que se ponga en rojo
+  orden: number;
+  creadoEl: Timestamp;
+}
+
+export interface EtiquetaCRM {
+  id?: string;
+  nombre: string;
+  categoriaId: string;
+  colorBg: string;
+  colorText: string;
+  instruccionIA?: string;         // Instrucción para lo que la IA debe detectar
+  alertaDias?: number;            // Sobrescribe alertaDiasDefault de la categoría
+  creadoEl: Timestamp;
+}
+
+export interface TareaCRM {
+  id?: string;
+  titulo: string;
+  descripcion?: string;
+  fecha: string;                   // Formato YYYY-MM-DD
+  hora?: string;                   // Formato HH:mm
+  prioridad: 'baja' | 'media' | 'alta';
+  completada: boolean;
+  estado?: 'pendiente' | 'proceso' | 'completada'; // Nuevo sistema de estados
+  contactoId?: string | null;      // Opcional
+  recurrencia?: {
+    tipo: 'diaria' | 'semanal' | 'intervalo' | 'ninguna';
+    config?: {
+      diasSemana?: number[];       // 0-6 (Dom-Sab)
+      intervaloDias?: number;      // Cada X días
+    }
+  };
+  creadoEl: Timestamp;
+  venceEl: Timestamp;
+}
+
 export interface Contacto {
+  id?: string;
   nombre: string;
   email?: string;
   telefono: string;
+  avatarUrl?: string;
+  esContactoCRM?: boolean;
   relacionTag: 'Personal' | 'Laboral' | 'Lead';
-  aiBlocked: boolean; // Automático si relacionTag === 'Personal'
+  aiBlocked: boolean;
   etiquetas: string[];
-  fechaNacimiento?: string; // Formato YYYY-MM-DD
+  ultimaInteraccion: Timestamp;
+  fechaNacimiento?: string;        // Formato YYYY-MM-DD
+  proximoAviso?: Timestamp | null;
+  notaAviso?: string | null;
   
-  // Trazabilidad desde Leads
+  // Trazabilidad
   leadOrigenId?: string;
   origenCampana?: string;
   origenFormulario?: string;
@@ -177,6 +226,7 @@ export interface Conversacion {
   aiActive: boolean;               // Toggle manual del operador
   modoIA: 'auto' | 'copiloto';     // Puede heredar del agente o ser forzado aquí
   statusIA: 'thinking' | 'idle' | 'warning';
+  necesitaHumano?: boolean;        // Si la IA delegó la conversación
 }
 
 export interface Mensaje {

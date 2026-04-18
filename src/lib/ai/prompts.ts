@@ -55,13 +55,15 @@ export async function construirSystemPrompt(wsId: string, agenteId: string): Pro
   const conocimiento = recursosValidos.filter(r => r.tipo !== 'recurso');
   const multimedia = recursosValidos.filter(r => r.tipo === 'recurso');
 
-  // 4. Cargar etiquetas del agente
+  // 4. Cargar etiquetas centralizadas del CRM que tengan instrucciones para la IA
   const etiquetasSnap = await adminDb
     .collection(COLLECTIONS.ESPACIOS).doc(wsId)
-    .collection(COLLECTIONS.AGENTES).doc(agenteId)
-    .collection(COLLECTIONS.ETIQUETAS_AGENTE)
-    .where("activa", "==", true)
+    .collection(COLLECTIONS.ETIQUETAS_CRM)
     .get();
+  
+  const etiquetasIA = etiquetasSnap.docs
+    .map(doc => doc.data())
+    .filter(data => data.instruccionIA && data.instruccionIA.trim() !== "");
 
   // 5. Cargar objetos/propiedades activos (limitado para no saturar contexto)
   const objetosSnap = await adminDb
@@ -105,8 +107,8 @@ ${objetosSnap.docs.length > 0
 
 ## ETIQUETAS QUE PUEDES AUTO-APLICAR
 Si detectas alguna de estas situaciones, indica al final de tu respuesta una línea con el formato [ETIQUETA: Nombre]:
-${etiquetasSnap.docs.length > 0
-  ? etiquetasSnap.docs.map(e => `- "${e.data().nombre}": ${e.data().instruccionIA}`).join("\n")
+${etiquetasIA.length > 0
+  ? etiquetasIA.map(e => `- "${e.nombre}": ${e.instruccionIA}`).join("\n")
   : "No hay etiquetas configuradas."}
 
 ## REGLAS GLOBALES DE CONDUCTA
@@ -117,7 +119,7 @@ ${etiquetasSnap.docs.length > 0
 ${agente.strictMode
   ? "- MODO ESTRICTO: Solo estás autorizado a usar la información de la 'BASE DE CONOCIMIENTO'. Si la respuesta no está allí, dile al cliente que lo consultarás con un asesor humano."
   : "- Si la información no está en el conocimiento, usa el sentido común pero aclara que es una respuesta general."}
-- Si el cliente pide hablar con un humano o manifiesta frustración más de una vez, escala la conversación amablemente.
+- Si el cliente pide hablar con un humano, manifiesta frustración, o si necesitas derivar la gestión para su atención, incluye al final de tu respuesta la instrucción exacta: [ACCION: ESCALAR]. **IMPORTANTE: Cuando decidas escalar, despídete amablemente y NO le hagas más preguntas al cliente, simplemente avísale que un humano lo contactará a la brevedad.**
 ${agente.horarioActivo && agente.horario
   ? (() => {
       const h = agente.horario!;

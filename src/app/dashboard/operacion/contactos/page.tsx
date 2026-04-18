@@ -1,25 +1,23 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { ContactTable } from "@/components/crm/ContactTable";
 import { CSVImporter } from "@/components/crm/CSVImporter";
 import { useContactos } from "@/hooks/useContactos";
-import { Plus, Search, Loader2, AlertCircle } from "lucide-react";
+import { Plus, Search, Loader2, Filter, X, ChevronDown, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { db } from "@/lib/firebase";
-import { collection, doc, writeBatch, Timestamp, addDoc, query, where, getDocs, or, and } from "firebase/firestore";
-import { COLLECTIONS, Contacto } from "@/lib/types/firestore";
+import { collection, Timestamp, addDoc, query, orderBy, onSnapshot, writeBatch, doc } from "firebase/firestore";
+import { COLLECTIONS, Contacto, EtiquetaCRM, CategoriaCRM } from "@/lib/types/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogClose,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import {
@@ -29,16 +27,29 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuTrigger,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
 export default function ContactosPage() {
-  const { contactos, loading, error: fetchError } = useContactos();
+  const { contactos, loading: loadingContacts } = useContactos();
   const { currentWorkspaceId } = useWorkspaceStore();
+  
+  const [categories, setCategories] = useState<CategoriaCRM[]>([]);
+  const [tags, setTags] = useState<EtiquetaCRM[]>([]);
+  const [loadingConfig, setLoadingConfig] = useState(true);
+
   const [searchTerm, setSearchTerm] = useState("");
-  const [isImporting, setIsImporting] = useState(false);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  
   const [isAdding, setIsAdding] = useState(false);
-  const [importError, setImportError] = useState<string | null>(null);
 
   // Estado del formulario de nuevo contacto
   const [newContact, setNewContact] = useState({
@@ -47,290 +58,313 @@ export default function ContactosPage() {
     email: "",
     fechaNacimiento: "",
     relacionTag: "Lead" as "Personal" | "Laboral" | "Lead",
+    etiquetas: [] as string[],
   });
 
-  const filteredContactos = contactos.filter(c => 
-    (c.esContactoCRM !== false) && // Solo mostrar si esContactoCRM es true o undefined (legacy)
-    ((c.nombre || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-     (c.telefono || "").includes(searchTerm))
-  );
+  // Cargar Configuración de CRM (Categorías y Etiquetas)
+  useEffect(() => {
+    if (!currentWorkspaceId) return;
 
-  const handleBulkImport = async (newContacts: Partial<Contacto>[]) => {
-    if (!currentWorkspaceId || newContacts.length === 0) return;
-    
-    setIsImporting(true);
-    setImportError(null);
-    let importedCount = 0;
-    let skippedCount = 0;
+    const qCats = query(collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CATEGORIAS_CRM), orderBy("orden", "asc"));
+    const qTags = query(collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.ETIQUETAS_CRM));
 
-    console.log(`Iniciando importación de ${newContacts.length} contactos con detección de duplicados...`);
+    const unsubCats = onSnapshot(qCats, (snap) => {
+      setCategories(snap.docs.map(d => ({ ...d.data(), id: d.id } as CategoriaCRM)));
+    });
+
+    const unsubTags = onSnapshot(qTags, (snap) => {
+      setTags(snap.docs.map(d => ({ ...d.data(), id: d.id } as EtiquetaCRM)));
+      setLoadingConfig(false);
+    });
+
+    return () => {
+      unsubCats();
+      unsubTags();
+    };
+  }, [currentWorkspaceId]);
+
+  const handleBulkImport = async (data: Partial<Contacto>[]) => {
+    if (!currentWorkspaceId) return;
+    const batch = writeBatch(db);
+    const contactsRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS);
+
+    data.forEach(contact => {
+      const newDocRef = doc(contactsRef);
+      batch.set(newDocRef, {
+        ...contact,
+        esContactoCRM: true,
+        etiquetas: contact.etiquetas || [],
+        ultimaInteraccion: Timestamp.now(),
+        creadoEl: Timestamp.now()
+      });
+    });
 
     try {
-      const contactsRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId!, COLLECTIONS.CONTACTOS);
-      const CHUNK_SIZE = 50; 
-      
-      for (let i = 0; i < newContacts.length; i += CHUNK_SIZE) {
-        const chunk = newContacts.slice(i, i + CHUNK_SIZE);
-        const batch = writeBatch(db);
-        
-        console.log(`Verificando lote ${Math.floor(i / CHUNK_SIZE) + 1}...`);
-        
-        const validationPromises = chunk.map(async (contactData) => {
-          const nombre = contactData.nombre || "Sin nombre";
-          const telefono = contactData.telefono || "";
-          const email = contactData.email || "";
-
-          const conditions = [];
-          if (telefono) conditions.push(where("telefono", "==", telefono));
-          if (email) conditions.push(where("email", "==", email));
-
-          if (conditions.length === 0) return { shouldAdd: true, data: contactData };
-
-          const q = query(
-            contactsRef, 
-            or(...conditions)
-          );
-          
-          const snap = await getDocs(q);
-          return { shouldAdd: snap.empty, data: contactData };
-        });
-
-        const results = await Promise.all(validationPromises);
-        
-        results.forEach(({ shouldAdd, data }) => {
-          if (shouldAdd) {
-            const newDocRef = doc(contactsRef);
-            const aiBlocked = data.relacionTag === 'Personal';
-            
-            batch.set(newDocRef, {
-              nombre: data.nombre || "Sin nombre",
-              telefono: data.telefono || "Sin teléfono",
-              email: data.email || "",
-              fechaNacimiento: data.fechaNacimiento || "",
-              relacionTag: data.relacionTag || "Lead",
-              aiBlocked,
-              etiquetas: data.etiquetas || [],
-              esContactoCRM: true, // Importados son contactos reales
-              creadoEl: Timestamp.now()
-            });
-            importedCount++;
-          } else {
-            skippedCount++;
-          }
-        });
-
-        await batch.commit();
-      }
-      
-      if (skippedCount > 0) {
-        toast.success(`Importación terminada: ${importedCount} agregados. Se omitieron ${skippedCount} duplicados (mismo teléfono o email).`);
-      } else {
-        toast.success(`¡Éxito! Se importaron ${importedCount} contactos correctamente.`);
-      }
-    } catch (error: any) {
-      console.error("CRITICAL ERROR en importación masiva:", error);
-      setImportError(error.message || "Error desconocido durante la importación.");
-      toast.error("Hubo un error al importar.");
-    } finally {
-      setIsImporting(false);
+      await batch.commit();
+      toast.success(`${data.length} contactos importados correctamente`);
+    } catch (e) {
+      toast.error("Error al importar");
     }
   };
 
-  const handleManualAdd = async () => {
-    if (!currentWorkspaceId || !newContact.nombre || !newContact.telefono) return;
-    
+  const handleAddContact = async () => {
+    if (!currentWorkspaceId || !newContact.nombre || !newContact.telefono) {
+      toast.error("Nombre y teléfono son obligatorios");
+      return;
+    }
     setIsAdding(true);
     try {
-      const contactsRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId!, COLLECTIONS.CONTACTOS);
-      
-      const conditions = [where("telefono", "==", newContact.telefono)];
-      if (newContact.email) conditions.push(where("email", "==", newContact.email));
-
-      // Consultamos si el teléfono o el email ya existen (sin importar el nombre)
-      const q = query(
-        contactsRef,
-        or(...conditions)
-      );
-
-      const snap = await getDocs(q);
-      
-      if (!snap.empty) {
-        toast.error("Este contacto ya existe (mismo teléfono o email).");
-        setIsAdding(false);
-        return;
-      }
-
-      const aiBlocked = newContact.relacionTag === 'Personal';
-
+      const contactsRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS);
       await addDoc(contactsRef, {
         ...newContact,
-        aiBlocked,
-        etiquetas: [],
-        esContactoCRM: true, // Manuales son contactos reales
+        esContactoCRM: true,
+        ultimaInteraccion: Timestamp.now(),
         creadoEl: Timestamp.now()
       });
-
-      toast.success("Contacto agregado correctamente");
-      setNewContact({ nombre: "", telefono: "", email: "", fechaNacimiento: "", relacionTag: "Lead" });
+      toast.success("Contacto registrado con éxito");
+      setNewContact({ nombre: "", telefono: "", email: "", fechaNacimiento: "", relacionTag: "Lead", etiquetas: [] });
+      setIsAdding(false);
     } catch (error) {
-      console.error("Error agregando contacto manual:", error);
-      toast.error("No se pudo agregar el contacto");
-    } finally {
+      toast.error("Error al registrar contacto");
       setIsAdding(false);
     }
   };
+
+  const filteredContactos = useMemo(() => {
+    if (!contactos) return [];
+    return contactos.filter(c => {
+      const matchesSearch = (c.nombre || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
+                            (c.telefono || "").includes(searchTerm);
+      const matchesTags = selectedTagIds.length === 0 || 
+                          selectedTagIds.every(tId => (c.etiquetas || []).includes(tId));
+      return matchesSearch && matchesTags;
+    });
+  }, [contactos, searchTerm, selectedTagIds]);
+
+  if (loadingContacts || loadingConfig) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center space-y-4">
+        <Loader2 className="size-10 text-[var(--accent)] animate-spin" />
+        <p className="text-xs font-black uppercase text-slate-400 tracking-widest">Cargando CRM...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-1">
-          <h1 className="text-3xl font-bold text-[var(--text-primary-light)] tracking-tight">Contactos</h1>
-          <p className="text-[13px] text-[var(--text-secondary-light)]">Gestión de CRM y segmentación inteligente de audiencia.</p>
+          <h1 className="text-3xl font-black text-slate-800 tracking-tight">Contactos CRM</h1>
+          <p className="text-[13px] text-slate-500 font-medium">Gestiona tu red de contactos y salud relacional.</p>
         </div>
         <div className="flex items-center gap-3">
           <CSVImporter onImport={handleBulkImport} />
           
-          <Dialog>
-            <DialogTrigger render={
-              <Button className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-10 px-5 shadow-lg shadow-[var(--accent)]/20">
-                <Plus className="w-4 h-4 mr-2" />
-                Nuevo Contacto
-              </Button>
-            } />
-            <DialogContent className="sm:max-w-[425px] bg-[var(--bg-card)] border-[var(--border-light)] max-h-[90vh] overflow-y-auto">
+          <Dialog open={isAdding} onOpenChange={setIsAdding}>
+            <DialogTrigger render={<Button className="bg-[var(--accent)] text-[var(--accent-text)] h-11 px-6 shadow-lg shadow-[var(--accent)]/20 font-black rounded-full transition-all hover:scale-105 active:scale-95" />}>
+              <Plus className="w-4 h-4 mr-2" /> Nuevo Contacto
+            </DialogTrigger>
+            <DialogContent className="max-w-md bg-white rounded-3xl border-none shadow-2xl overflow-y-auto max-h-[90vh] no-scrollbar">
               <DialogHeader>
-                <DialogTitle className="text-[var(--text-primary-light)]">Agregar Contacto</DialogTitle>
-                <DialogDescription className="text-[var(--text-secondary-light)]">
-                  Ingresa los datos del nuevo contacto. Se aplicará bloqueo de IA si es personal.
-                </DialogDescription>
+                <DialogTitle className="text-xl font-black tracking-tight flex items-center gap-2">
+                   <div className="size-8 rounded-lg bg-[var(--accent)]/10 flex items-center justify-center text-[var(--accent)]">
+                      <Plus className="size-5" />
+                   </div>
+                   Nueva Ficha de Contacto
+                </DialogTitle>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="name" className="text-right text-[13px] text-[var(--text-secondary-light)]">Nombre</Label>
-                  <Input 
-                    id="name" 
-                    value={newContact.nombre}
-                    onChange={(e) => setNewContact({...newContact, nombre: e.target.value})}
-                    placeholder="Ej: Juan Pérez"
-                    className="col-span-3 h-9 bg-[var(--bg-input)] border-[var(--border-light)]" 
-                  />
+
+              <div className="space-y-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-black uppercase text-slate-400 ml-1">Nombre Completo</Label>
+                    <Input 
+                      placeholder="Ej: Juan Pérez" 
+                      className="h-11 rounded-2xl bg-slate-50 border-none px-4"
+                      value={newContact.nombre}
+                      onChange={e => setNewContact({...newContact, nombre: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-black uppercase text-slate-400 ml-1">WhatsApp / Tel</Label>
+                    <Input 
+                      placeholder="+54 9..." 
+                      className="h-11 rounded-2xl bg-slate-50 border-none px-4"
+                      value={newContact.telefono}
+                      onChange={e => setNewContact({...newContact, telefono: e.target.value})}
+                    />
+                  </div>
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="phone" className="text-right text-[13px] text-[var(--text-secondary-light)]">Teléfono</Label>
-                  <Input 
-                    id="phone" 
-                    value={newContact.telefono}
-                    onChange={(e) => setNewContact({...newContact, telefono: e.target.value})}
-                    placeholder="Ej: +54 9 11..."
-                    className="col-span-3 h-9 bg-[var(--bg-input)] border-[var(--border-light)]" 
-                  />
+
+                <div className="grid grid-cols-2 gap-4">
+                   <div className="space-y-1.5">
+                      <Label className="text-[10px] font-black uppercase text-slate-400 ml-1">Email (Opcional)</Label>
+                      <Input 
+                        placeholder="email@ejemplo.com" 
+                        type="email"
+                        className="h-11 rounded-2xl bg-slate-50 border-none px-4"
+                        value={newContact.email}
+                        onChange={e => setNewContact({...newContact, email: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] font-black uppercase text-slate-400 ml-1">Cumpleaños</Label>
+                      <Input 
+                        type="date"
+                        className="h-11 rounded-2xl bg-slate-50 border-none px-4"
+                        value={newContact.fechaNacimiento}
+                        onChange={e => setNewContact({...newContact, fechaNacimiento: e.target.value})}
+                      />
+                    </div>
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="email" className="text-right text-[13px] text-[var(--text-secondary-light)]">Email</Label>
-                  <Input 
-                    id="email" 
-                    type="email"
-                    value={newContact.email}
-                    onChange={(e) => setNewContact({...newContact, email: e.target.value})}
-                    placeholder="ejemplo@mail.com"
-                    className="col-span-3 h-9 bg-[var(--bg-input)] border-[var(--border-light)]" 
-                  />
+
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase text-slate-400 ml-1">Perfil de Relación</Label>
+                  <Select 
+                    value={newContact.relacionTag} 
+                    onValueChange={(v:any) => setNewContact({...newContact, relacionTag: v})}
+                  >
+                    <SelectTrigger className="h-11 rounded-2xl bg-slate-50 border-none px-4">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl border-slate-100 shadow-xl bg-white">
+                      <SelectItem value="Lead">Lead 🔥</SelectItem>
+                      <SelectItem value="Laboral">Laboral 👔</SelectItem>
+                      <SelectItem value="Personal">Personal ⭐</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="birthday" className="text-right text-[13px] text-[var(--text-secondary-light)]">Cumpleaños</Label>
-                  <Input 
-                    id="birthday" 
-                    type="date"
-                    value={newContact.fechaNacimiento}
-                    onChange={(e) => setNewContact({...newContact, fechaNacimiento: e.target.value})}
-                    className="col-span-3 h-9 bg-[var(--bg-input)] border-[var(--border-light)]" 
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="tag" className="text-right text-[13px] text-[var(--text-secondary-light)]">Relación</Label>
-                  <div className="col-span-3">
-                    <Select 
-                      value={newContact.relacionTag}
-                      onValueChange={(v: any) => setNewContact({...newContact, relacionTag: v})}
-                    >
-                      <SelectTrigger className="h-9 bg-[var(--bg-input)] border-[var(--border-light)]">
-                        <SelectValue placeholder="Selecciona el tipo" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[var(--bg-card)] border-[var(--border-light)]">
-                        <SelectItem value="Lead">Lead (Cliente)</SelectItem>
-                        <SelectItem value="Laboral">Laboral (Colega)</SelectItem>
-                        <SelectItem value="Personal">Personal (Privado)</SelectItem>
-                      </SelectContent>
-                    </Select>
+
+                <div className="space-y-3">
+                  <Label className="text-[10px] font-black uppercase text-slate-400 ml-1">Segmentación (Etiquetas)</Label>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger render={<Button variant="outline" className="w-full justify-between h-11 rounded-2xl border-dashed border-2 bg-slate-50/50 hover:bg-slate-50" />}>
+                      <span className="text-xs font-bold text-slate-400">Seleccionar etiquetas...</span>
+                      <Plus className="size-4 opacity-50" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-[300px] bg-white max-h-[300px] overflow-y-auto no-scrollbar border-slate-100 shadow-xl p-2 rounded-2xl">
+                      {categories.map(cat => (
+                        <div key={cat.id} className="mb-2">
+                          <div className="px-2 py-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-50/50 rounded-lg">{cat.nombre}</div>
+                          {tags.filter(t => t.categoriaId === cat.id).map(tag => (
+                            <DropdownMenuCheckboxItem
+                              key={tag.id}
+                              checked={newContact.etiquetas.includes(tag.id!)}
+                              onCheckedChange={() => {
+                                setNewContact(prev => ({
+                                  ...prev,
+                                  etiquetas: prev.etiquetas.includes(tag.id!)
+                                    ? prev.etiquetas.filter(id => id !== tag.id)
+                                    : [...prev.etiquetas, tag.id!]
+                                }));
+                              }}
+                              className="text-[12px] font-bold py-2.5 rounded-xl transition-all"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="size-2 rounded-full" style={{ backgroundColor: tag.colorBg }} />
+                                {tag.nombre}
+                              </div>
+                            </DropdownMenuCheckboxItem>
+                          ))}
+                        </div>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-2xl min-h-[60px]">
+                    {newContact.etiquetas.length > 0 ? (
+                      newContact.etiquetas.map(tId => {
+                        const tag = tags.find(t => t.id === tId);
+                        if (!tag) return null;
+                        return (
+                          <Badge key={tId} className="bg-white border-slate-100 text-slate-600 text-[10px] font-bold px-3 py-1 rounded-full gap-2 shadow-sm">
+                            <div className="size-1.5 rounded-full" style={{ backgroundColor: tag.colorBg }} />
+                            {tag.nombre}
+                            <X className="size-3 text-slate-300 hover:text-rose-500 cursor-pointer" onClick={() => setNewContact(p => ({...p, etiquetas: p.etiquetas.filter(id => id !== tId)}))} />
+                          </Badge>
+                        );
+                      })
+                    ) : (
+                      <p className="text-[11px] text-slate-400 italic w-full text-center py-2">Sin etiquetas seleccionadas</p>
+                    )}
                   </div>
                 </div>
               </div>
+
               <DialogFooter>
-                <DialogClose render={
-                  <Button 
-                    onClick={handleManualAdd} 
-                    disabled={isAdding || !newContact.nombre || !newContact.telefono}
-                    className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] w-full sm:w-auto"
-                  >
-                    {isAdding ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                    Guardar Contacto
-                  </Button>
-                } />
+                <Button variant="ghost" onClick={() => setIsAdding(false)} className="rounded-xl h-12 font-bold text-slate-500">Cancelar</Button>
+                <Button onClick={handleAddContact} disabled={isAdding} className="bg-[var(--accent)] text-[var(--accent-text)] rounded-2xl px-8 h-12 font-black shadow-xl shadow-[var(--accent)]/30">
+                  {isAdding ? <Loader2 className="size-4 animate-spin" /> : "Guardar Registro"}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
       </div>
 
-      <div className="flex items-center gap-3 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl px-4 py-3 shadow-sm">
-        <Search className="w-4 h-4 text-[var(--text-tertiary-light)]" />
-        <Input 
-          placeholder="Buscar por nombre o teléfono..." 
-          className="border-none bg-transparent h-6 focus-visible:ring-0 text-sm p-0 shadow-none"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm transition-all focus-within:shadow-md">
+        <div className="relative flex-1 w-full">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-slate-300" />
+          <Input 
+            placeholder="Buscar por nombre o teléfono..." 
+            className="pl-11 h-12 border-none bg-slate-50/30 rounded-xl text-[13px] font-medium"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+          />
+        </div>
+        
+        <div className="flex items-center gap-2">
+          {selectedTagIds.length > 0 && (
+            <Badge variant="secondary" className="bg-rose-50 text-rose-500 rounded-lg px-3 py-1.5 flex items-center gap-2 font-black text-[10px]">
+              {selectedTagIds.length} FILTROS ACTIVOS
+              <X className="size-3 cursor-pointer" onClick={() => setSelectedTagIds([])} />
+            </Badge>
+          )}
+
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" className="h-12 rounded-xl border-slate-100 px-5 gap-2 font-black text-slate-600 text-[11px] uppercase tracking-wider shadow-sm hover:bg-slate-50" />}>
+              <Filter className="size-3.5" /> Filtrar Segmentos
+              <ChevronDown className="size-3.5 opacity-40 ml-1" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[300px] p-2 bg-white rounded-2xl shadow-2xl border-slate-100 max-h-[400px] overflow-y-auto no-scrollbar">
+              {categories.map(cat => (
+                <div key={cat.id} className="mb-2">
+                  <DropdownMenuLabel className="text-[10px] font-black uppercase text-slate-400 bg-slate-50 px-2 py-1.5 rounded-lg mb-1">{cat.nombre}</DropdownMenuLabel>
+                  {tags.filter(t => t.categoriaId === cat.id).map(tag => (
+                    <DropdownMenuCheckboxItem
+                      key={tag.id}
+                      checked={selectedTagIds.includes(tag.id!)}
+                      onCheckedChange={() => {
+                        if (selectedTagIds.includes(tag.id!)) {
+                          setSelectedTagIds(selectedTagIds.filter(id => id !== tag.id));
+                        } else {
+                          setSelectedTagIds([...selectedTagIds, tag.id!]);
+                        }
+                      }}
+                      className="rounded-xl py-2.5 font-bold text-xs"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="size-2 rounded-full" style={{ backgroundColor: tag.colorBg }} />
+                        {tag.nombre}
+                      </div>
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                  <DropdownMenuSeparator className="bg-slate-50 mx-2" />
+                </div>
+              ))}
+              {selectedTagIds.length > 0 && (
+                <div className="pt-2">
+                  <Button variant="ghost" className="w-full text-rose-500 font-black uppercase text-[10px] h-10 rounded-xl" onClick={() => setSelectedTagIds([])}>
+                    Limpiar Filtros
+                  </Button>
+                </div>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
-      {fetchError && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 h-4" />
-          <AlertTitle>Error de Conexión</AlertTitle>
-          <AlertDescription>
-            No se pudieron cargar los contactos: {fetchError.message}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {importError && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 h-4" />
-          <AlertTitle>Error de Importación</AlertTitle>
-          <AlertDescription>
-            {importError}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {loading || isImporting ? (
-        <div className="h-64 flex flex-col items-center justify-center text-[var(--text-tertiary-light)] gap-4 bg-[var(--bg-card)]/50 rounded-2xl border border-dashed border-[var(--border-light)]">
-          <Loader2 className="w-10 h-10 animate-spin text-[var(--accent)]" />
-          <div className="text-center">
-            <p className="text-sm font-semibold text-[var(--text-primary-light)]">{isImporting ? "Procesando importación masiva..." : "Cargando contactos..."}</p>
-            {isImporting && <p className="text-xs text-[var(--text-secondary-light)] mt-1">Esto puede tardar unos segundos dependiendo del tamaño del archivo.</p>}
-          </div>
-        </div>
-      ) : (
-        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-light)] shadow-sm overflow-hidden">
-          <ContactTable contactos={filteredContactos} />
-          {filteredContactos.length === 0 && (
-            <div className="p-20 text-center space-y-2">
-              <p className="text-[var(--text-primary-light)] font-medium">No se encontraron contactos</p>
-              <p className="text-sm text-[var(--text-tertiary-light)]">Intenta con otro término de búsqueda o importa un archivo CSV.</p>
-            </div>
-          )}
-        </div>
-      )}
+      <ContactTable contactos={filteredContactos} tags={tags} categories={categories} />
     </div>
   );
 }

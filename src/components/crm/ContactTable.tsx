@@ -35,8 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { EtiquetaRelacion } from "@/components/ui/EtiquetaRelacion";
-import { Contacto } from "@/lib/types/firestore";
+import { Contacto, EtiquetaCRM, CategoriaCRM } from "@/lib/types/firestore";
 import { 
   Shield, 
   ShieldOff, 
@@ -48,7 +47,11 @@ import {
   Loader2,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  History,
+  AlertCircle,
+  CheckCircle2,
+  Clock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
@@ -57,369 +60,165 @@ import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { COLLECTIONS } from "@/lib/types/firestore";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { formatDistanceToNow, differenceInDays } from "date-fns";
+import { es } from "date-fns/locale";
 
 interface ContactTableProps {
   contactos: (Contacto & { id: string })[];
+  tags: EtiquetaCRM[];
+  categories: CategoriaCRM[];
 }
 
-type SortConfig = {
-  key: keyof Contacto | "id";
-  direction: "asc" | "desc";
-} | null;
-
-export function ContactTable({ contactos }: ContactTableProps) {
+export function ContactTable({ contactos, tags, categories }: ContactTableProps) {
   const { currentWorkspaceId, selectedContactId, setSelectedContactId } = useWorkspaceStore();
-  
-  // Estado para ordenamiento
-  const [sortConfig, setSortConfig] = useState<SortConfig>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
 
-  // Estado para edición
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [editingContact, setEditingContact] = useState<(Contacto & { id: string }) | null>(null);
+  // Health calculation helper
+  const getContactHealth = (contacto: Contacto) => {
+    if (!contacto.ultimaInteraccion) return { status: 'none', days: 0 };
+    
+    const lastDate = contacto.ultimaInteraccion.toDate();
+    const daysSince = differenceInDays(new Date(), lastDate);
+    
+    // Encontrar el umbral más bajo (más restrictivo) entre sus etiquetas
+    let minThreshold = 30; // Default
+    let hasExplicitLimit = false;
 
-  // Lógica de ordenamiento
+    (contacto.etiquetas || []).forEach(tId => {
+      const tag = tags.find(t => t.id === tId);
+      if (tag) {
+        if (tag.alertaDias) {
+          minThreshold = Math.min(minThreshold, tag.alertaDias);
+          hasExplicitLimit = true;
+        } else {
+          const cat = categories.find(c => c.id === tag.categoriaId);
+          if (cat?.alertaDiasDefault) {
+            minThreshold = Math.min(minThreshold, cat.alertaDiasDefault);
+            hasExplicitLimit = true;
+          }
+        }
+      }
+    });
+
+    if (daysSince >= minThreshold) return { status: 'rojo', days: daysSince, limit: minThreshold };
+    if (daysSince >= (minThreshold - 3)) return { status: 'amarillo', days: daysSince, limit: minThreshold };
+    return { status: 'verde', days: daysSince, limit: minThreshold };
+  };
+
   const sortedContactos = useMemo(() => {
-    let sortableItems = [...contactos];
-    if (sortConfig !== null) {
+    let sortableItems = [...(contactos || [])];
+    if (sortConfig) {
       sortableItems.sort((a, b) => {
-        const aValue = a[sortConfig.key] || "";
-        const bValue = b[sortConfig.key] || "";
-        
-        if (aValue < bValue) {
-          return sortConfig.direction === "asc" ? -1 : 1;
-        }
-        if (aValue > bValue) {
-          return sortConfig.direction === "asc" ? 1 : -1;
-        }
+        const aVal = (a as any)[sortConfig.key] || "";
+        const bVal = (b as any)[sortConfig.key] || "";
+        if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1;
+        if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
         return 0;
       });
     }
     return sortableItems;
   }, [contactos, sortConfig]);
 
-  const requestSort = (key: keyof Contacto | "id") => {
+  const requestSort = (key: string) => {
     let direction: "asc" | "desc" = "asc";
-    if (sortConfig && sortConfig.key === key && sortConfig.direction === "asc") {
-      direction = "desc";
-    }
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === "asc") direction = "desc";
     setSortConfig({ key, direction });
   };
 
-  const handleDelete = async (event: React.MouseEvent, id: string) => {
-    event.stopPropagation();
-    if (!currentWorkspaceId) return;
-    
-    if (!confirm("¿Estás seguro de que deseas eliminar este contacto?")) return;
-    
-    const promise = deleteDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS, id));
-
-    toast.promise(promise, {
-      loading: 'Eliminando contacto...',
-      success: 'Contacto eliminado correctamente',
-      error: 'No se pudo eliminar el contacto',
-    });
-
-    try {
-      await promise;
-      if (selectedContactId === id) setSelectedContactId(null);
-    } catch (error) {
-      console.error("Error eliminando contacto:", error);
-    }
-  };
-
-  const handleEditClick = (event: React.MouseEvent, contacto: Contacto & { id: string }) => {
-    event.stopPropagation();
-    setEditingContact({ ...contacto });
-    setIsEditDialogOpen(true);
-  };
-
-  const handleUpdate = async () => {
-    if (!currentWorkspaceId || !editingContact) return;
-    
-    setIsSaving(true);
-    const contactRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS, editingContact.id);
-    
-    try {
-      const aiBlocked = editingContact.relacionTag === 'Personal';
-      
-      const updatePromise = updateDoc(contactRef, {
-        nombre: editingContact.nombre,
-        telefono: editingContact.telefono,
-        email: editingContact.email || "",
-        fechaNacimiento: editingContact.fechaNacimiento || "",
-        relacionTag: editingContact.relacionTag,
-        aiBlocked
-      });
-
-      toast.promise(updatePromise, {
-        loading: 'Guardando cambios...',
-        success: 'Contacto actualizado correctamente',
-        error: 'Error al actualizar contacto',
-      });
-
-      await updatePromise;
-      setIsEditDialogOpen(false);
-    } catch (error) {
-      console.error("Error actualizando contacto:", error);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const SortIndicator = ({ columnKey }: { columnKey: keyof Contacto | "id" }) => {
-    if (sortConfig?.key !== columnKey) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-30" />;
-    return sortConfig.direction === "asc" 
-      ? <ArrowUp className="w-3 h-3 ml-1 text-[var(--accent)]" /> 
-      : <ArrowDown className="w-3 h-3 ml-1 text-[var(--accent)]" />;
-  };
-
   return (
-    <>
-      <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-card)] overflow-hidden shadow-sm">
-        <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent border-[var(--border-light)] bg-[var(--bg-main)]/30">
-              <TableHead 
-                className="text-[var(--text-secondary-light)] font-semibold text-[11px] uppercase h-10 cursor-pointer hover:text-[var(--text-primary-light)] transition-colors group"
-                onClick={() => requestSort("nombre")}
-              >
-                <div className="flex items-center">
-                  Nombre
-                  <SortIndicator columnKey="nombre" />
+    <Table className="table-fixed w-full">
+      <TableHeader>
+        <TableRow className="hover:bg-transparent bg-[var(--bg-main)]/30 border-b border-[var(--border-light)]">
+          <TableHead className="w-[200px] text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)] cursor-pointer" onClick={() => requestSort("nombre")}>Nombre</TableHead>
+          <TableHead className="w-[120px] text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">Salud Relacional</TableHead>
+          <TableHead className="w-[250px] text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">Categorías y Etiquetas</TableHead>
+          <TableHead className="w-[120px] text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">IA</TableHead>
+          <TableHead className="w-[80px] text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)] text-right">Acciones</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {sortedContactos.map((contacto) => {
+          const health = getContactHealth(contacto);
+          return (
+            <TableRow 
+              key={contacto.id} 
+              className={cn(
+                "group cursor-pointer border-b border-[var(--border-light)] transition-all",
+                selectedContactId === contacto.id ? "bg-[var(--accent)]/5" : "hover:bg-[var(--bg-main)]/30"
+              )}
+              onClick={() => setSelectedContactId(contacto.id)}
+            >
+              <TableCell className="py-4">
+                <div className="flex flex-col">
+                  <span className="text-[13px] font-bold text-[var(--text-primary-light)]">{contacto.nombre}</span>
+                  <span className="text-[11px] text-[var(--text-tertiary-light)] font-medium">{contacto.telefono}</span>
                 </div>
-              </TableHead>
-              <TableHead 
-                className="text-[var(--text-secondary-light)] font-semibold text-[11px] uppercase h-10 cursor-pointer hover:text-[var(--text-primary-light)] transition-colors group"
-                onClick={() => requestSort("telefono")}
-              >
-                <div className="flex items-center">
-                  Teléfono
-                  <SortIndicator columnKey="telefono" />
+              </TableCell>
+              
+              <TableCell>
+                <div className="flex items-center gap-2">
+                  <div className={cn(
+                    "size-2.5 rounded-full",
+                    health.status === 'verde' ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" :
+                    health.status === 'amarillo' ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)] animate-pulse" :
+                    "bg-rose-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]"
+                  )} />
+                  <div className="flex flex-col">
+                    <span className="text-[12px] font-black tabular-nums">{health.days} días</span>
+                    <span className="text-[9px] text-[var(--text-tertiary-light)] font-bold uppercase">Sin contacto</span>
+                  </div>
                 </div>
-              </TableHead>
-              <TableHead 
-                className="text-[var(--text-secondary-light)] font-semibold text-[11px] uppercase h-10 cursor-pointer hover:text-[var(--text-primary-light)] transition-colors group"
-                onClick={() => requestSort("email")}
-              >
-                <div className="flex items-center">
-                  Email
-                  <SortIndicator columnKey="email" />
-                </div>
-              </TableHead>
-              <TableHead 
-                className="text-[var(--text-secondary-light)] font-semibold text-[11px] uppercase h-10 cursor-pointer hover:text-[var(--text-primary-light)] transition-colors group"
-                onClick={() => requestSort("fechaNacimiento")}
-              >
-                <div className="flex items-center">
-                  Cumpleaños
-                  <SortIndicator columnKey="fechaNacimiento" />
-                </div>
-              </TableHead>
-              <TableHead 
-                className="text-[var(--text-secondary-light)] font-semibold text-[11px] uppercase h-10 cursor-pointer hover:text-[var(--text-primary-light)] transition-colors group"
-                onClick={() => requestSort("relacionTag")}
-              >
-                <div className="flex items-center">
-                  Relación
-                  <SortIndicator columnKey="relacionTag" />
-                </div>
-              </TableHead>
-              <TableHead 
-                className="text-[var(--text-secondary-light)] font-semibold text-[11px] uppercase h-10 cursor-pointer hover:text-[var(--text-primary-light)] transition-colors group"
-                onClick={() => requestSort("aiBlocked")}
-              >
-                <div className="flex items-center">
-                  IA
-                  <SortIndicator columnKey="aiBlocked" />
-                </div>
-              </TableHead>
-              <TableHead className="text-[var(--text-secondary-light)] font-semibold text-[11px] uppercase h-10 text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sortedContactos.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="h-32 text-center text-[var(--text-tertiary-light)] text-[13px]">
-                  No se encontraron contactos.
-                </TableCell>
-              </TableRow>
-            ) : (
-              sortedContactos.map((contacto) => (
-                <TableRow 
-                  key={contacto.id} 
-                  className={cn(
-                    "border-[var(--border-light)] transition-colors group cursor-pointer",
-                    selectedContactId === contacto.id 
-                      ? "bg-[var(--accent)]/10 hover:bg-[var(--accent)]/15" 
-                      : "hover:bg-[var(--bg-main)]/50"
+              </TableCell>
+
+              <TableCell>
+                <div className="flex flex-wrap gap-1.5 max-w-[240px]">
+                  {(contacto.etiquetas || []).slice(0, 3).map(tId => {
+                    const tag = tags.find(t => t.id === tId);
+                    if (!tag) return null;
+                    return (
+                      <span 
+                        key={tId} 
+                        className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-tighter"
+                        style={{ backgroundColor: tag.colorBg, color: tag.colorText }}
+                      >
+                        {tag.nombre}
+                      </span>
+                    );
+                  })}
+                  {contacto.etiquetas?.length > 3 && (
+                    <span className="text-[9px] font-bold text-[var(--text-tertiary-light)] bg-[var(--bg-input)] px-1.5 py-0.5 rounded-full">
+                      +{contacto.etiquetas.length - 3}
+                    </span>
                   )}
-                  onClick={() => setSelectedContactId(contacto.id)}
-                >
-                  <TableCell className="font-semibold text-[var(--text-primary-light)] text-[13px]">
-                    {contacto.nombre}
-                  </TableCell>
-                  <TableCell className="text-[var(--text-secondary-light)] text-[13px] font-medium">
-                    {contacto.telefono}
-                  </TableCell>
-                  <TableCell className="text-[var(--text-tertiary-light)] text-[13px]">
-                    {contacto.email ? (
-                      <div className="flex items-center gap-1.5">
-                        <Mail className="size-3" />
-                        {contacto.email}
-                      </div>
-                    ) : "-"}
-                  </TableCell>
-                  <TableCell className="text-[var(--text-tertiary-light)] text-[13px]">
-                     {contacto.fechaNacimiento ? (
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="size-3" />
-                        {contacto.fechaNacimiento}
-                      </div>
-                    ) : "-"}
-                  </TableCell>
-                  <TableCell>
-                    <EtiquetaRelacion tipo={contacto.relacionTag} />
-                  </TableCell>
-                  <TableCell>
-                    {contacto.aiBlocked ? (
-                      <div className="flex items-center gap-1.5 text-[var(--error)] text-[11px] font-bold">
-                        <ShieldOff className="size-3.5" />
-                        BLOQUEADA
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1.5 text-[var(--success)] text-[11px] font-bold">
-                        <Shield className="size-3.5" />
-                        ACTIVA
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger render={
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-[var(--text-tertiary-light)] hover:text-[var(--text-primary-light)]">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      } />
-                      <DropdownMenuContent align="end" className="bg-[var(--bg-card)] border-[var(--border-light)]">
-                        <DropdownMenuGroup>
-                          <DropdownMenuLabel className="text-[11px] font-bold uppercase text-[var(--text-tertiary-light)]">Opciones</DropdownMenuLabel>
-                          <DropdownMenuSeparator className="bg-[var(--border-light)]" />
-                          <DropdownMenuItem 
-                            onClick={(e) => handleEditClick(e, contacto)}
-                            className="text-[13px] text-[var(--text-primary-light)] focus:bg-[var(--bg-main)] cursor-pointer"
-                          >
-                            <Pencil className="w-4 h-4 mr-2" />
-                            Editar contacto
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={(e) => handleDelete(e, contacto.id)}
-                            className="text-[13px] text-[var(--error)] focus:bg-[var(--error)]/10 cursor-pointer"
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Eliminar
-                          </DropdownMenuItem>
-                        </DropdownMenuGroup>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Diálogo de Edición */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[425px] bg-[var(--bg-card)] border-[var(--border-light)] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-[var(--text-primary-light)]">Editar Contacto</DialogTitle>
-            <DialogDescription className="text-[var(--text-secondary-light)]">
-              Modifica los datos del contacto. La IA se ajustará según la relación.
-            </DialogDescription>
-          </DialogHeader>
-          
-          {editingContact && (
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-name" className="text-right text-[13px] text-[var(--text-secondary-light)]">Nombre</Label>
-                <Input 
-                  id="edit-name" 
-                  value={editingContact.nombre}
-                  onChange={(e) => setEditingContact({...editingContact, nombre: e.target.value})}
-                  className="col-span-3 h-9 bg-[var(--bg-input)] border-[var(--border-light)]" 
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-phone" className="text-right text-[13px] text-[var(--text-secondary-light)]">Teléfono</Label>
-                <Input 
-                  id="edit-phone" 
-                  value={editingContact.telefono}
-                  onChange={(e) => setEditingContact({...editingContact, telefono: e.target.value})}
-                  className="col-span-3 h-9 bg-[var(--bg-input)] border-[var(--border-light)]" 
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-email" className="text-right text-[13px] text-[var(--text-secondary-light)]">Email</Label>
-                <Input 
-                  id="edit-email" 
-                  type="email"
-                  value={editingContact.email || ""}
-                  onChange={(e) => setEditingContact({...editingContact, email: e.target.value})}
-                  className="col-span-3 h-9 bg-[var(--bg-input)] border-[var(--border-light)]" 
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-birthday" className="text-right text-[13px] text-[var(--text-secondary-light)]">Cumpleaños</Label>
-                <Input 
-                  id="edit-birthday" 
-                  type="date"
-                  value={editingContact.fechaNacimiento || ""}
-                  onChange={(e) => setEditingContact({...editingContact, fechaNacimiento: e.target.value})}
-                  className="col-span-3 h-9 bg-[var(--bg-input)] border-[var(--border-light)]" 
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-tag" className="text-right text-[13px] text-[var(--text-secondary-light)]">Relación</Label>
-                <div className="col-span-3">
-                  <Select 
-                    value={editingContact.relacionTag}
-                    onValueChange={(v: any) => setEditingContact({...editingContact, relacionTag: v})}
-                  >
-                    <SelectTrigger className="h-9 bg-[var(--bg-input)] border-[var(--border-light)]">
-                      <SelectValue placeholder="Selecciona el tipo" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-[var(--bg-card)] border-[var(--border-light)]">
-                      <SelectItem value="Lead">Lead (Cliente)</SelectItem>
-                      <SelectItem value="Laboral">Laboral (Colega)</SelectItem>
-                      <SelectItem value="Personal">Personal (Privado)</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  {(!contacto.etiquetas || contacto.etiquetas.length === 0) && (
+                    <span className="text-[10px] italic text-[var(--text-tertiary-light)]">Sin etiquetas</span>
+                  )}
                 </div>
-              </div>
-            </div>
-          )}
+              </TableCell>
 
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setIsEditDialogOpen(false)}
-              className="border-[var(--border-light)] text-[var(--text-secondary-light)]"
-            >
-              Cancelar
-            </Button>
-            <Button 
-              onClick={handleUpdate} 
-              disabled={isSaving || !editingContact?.nombre || !editingContact?.telefono}
-              className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)]"
-            >
-              {isSaving ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
-              Guardar Cambios
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+              <TableCell>
+                 {contacto.aiBlocked ? (
+                    <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-rose-50 border border-rose-100 text-[9px] font-black text-rose-500">
+                      <ShieldOff className="size-3" />
+                      SILENCIADA
+                    </div>
+                 ) : (
+                    <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-100 text-[9px] font-black text-emerald-600">
+                      <Shield className="size-3" />
+                      PILOTO
+                    </div>
+                 )}
+              </TableCell>
+
+              <TableCell className="text-right">
+                <Button variant="ghost" size="icon" className="size-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                  <MoreHorizontal className="size-4" />
+                </Button>
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
   );
 }

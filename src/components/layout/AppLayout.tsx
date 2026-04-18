@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { Sidebar } from "./Sidebar";
 import { ContextPanel } from "./ContextPanel";
 import { NotificationBanner } from "./NotificationBanner";
+import { AvisosHeader } from "./AvisosHeader";
 import { usePathname, useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
@@ -158,6 +159,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 )}
               </React.Fragment>
             ))}
+          </div>
+
+          <div className="flex items-center gap-4">
+             <AvisosHeader />
           </div>
         </header>
         <div className="flex-1 overflow-y-auto bg-[var(--bg-main)] custom-scrollbar">

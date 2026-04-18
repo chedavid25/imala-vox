@@ -185,7 +185,7 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
                 En línea
               </span>
               <span className="text-[11px] text-[var(--text-tertiary-light)]">•</span>
-              <IndicadorIA status={conversacion.aiActive ? 'activo' : 'idle'} className="scale-75 origin-left" />
+              <IndicadorIA status={conversacion.aiActive ? 'activo' : 'pausado'} className="scale-75 origin-left" />
             </div>
           </div>
         </div>
@@ -297,7 +297,30 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
       </div>
 
       {/* Composer Area */}
-      <div className="px-6 py-4 border-t border-[var(--border-light)] bg-[var(--bg-card)] space-y-3 shadow-[0_-4px_15px_-5px_rgba(0,0,0,0.1)]">
+      <div className="px-6 py-4 border-t border-[var(--border-light)] bg-[var(--bg-card)] space-y-3 shadow-[0_-4px_15px_-5px_rgba(0,0,0,0.1)] flex-shrink-0">
+        
+        {/* Sugerencia Copiloto */}
+        {conversacion.sugerenciaIA && (
+          <div className="bg-gradient-to-r from-purple-50 to-purple-100/30 border border-purple-200/80 p-3 rounded-[12px] flex flex-col gap-2 relative shadow-sm animate-in slide-in-from-bottom-2 fade-in">
+            <div className="flex items-center gap-2 mb-1">
+              <Sparkles className="w-3.5 h-3.5 text-purple-500 fill-purple-500/20" />
+              <span className="text-[10px] font-bold text-purple-600 tracking-wider">BORRADOR DEL COPILOTO</span>
+            </div>
+            <p className="text-[13px] text-purple-900/90 leading-relaxed pl-5 whitespace-pre-wrap">{conversacion.sugerenciaIA}</p>
+            <div className="flex gap-2 justify-end mt-1">
+              <Button variant="ghost" size="sm" className="h-7 text-purple-700/70 hover:text-purple-900 hover:bg-purple-200/50 text-xs transition-colors" onClick={async () => {
+                if (!currentWorkspaceId || !conversacion?.id) return;
+                await updateDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES, conversacion.id), { sugerenciaIA: null });
+              }}>Descartar</Button>
+              <Button size="sm" className="h-7 bg-purple-600 text-white hover:bg-purple-700 text-xs shadow-sm transition-all shadow-purple-500/20" onClick={async () => {
+                setInputText(conversacion.sugerenciaIA);
+                setMode('public');
+                if (!currentWorkspaceId || !conversacion?.id) return;
+                await updateDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES, conversacion.id), { sugerenciaIA: null });
+              }}>Usar Texto</Button>
+            </div>
+          </div>
+        )}
         {/* Composer Tabs */}
         <div className="flex items-center gap-1 bg-[var(--bg-input)] p-0.5 rounded-lg w-fit border border-[var(--border-light)]">
           <button 

@@ -17,7 +17,7 @@ interface ChatListProps {
 
 export function ChatList({ conversaciones, selectedId, onSelect }: ChatListProps) {
   const { contactos } = useContactos();
-  const [filter, setFilter] = useState<'all' | 'mine' | 'unread'>('all');
+  const [filter, setFilter] = useState<'all' | 'mine' | 'unread' | 'escalated'>('all');
   const [search, setSearch] = useState("");
 
   const getContactInfo = (contactoId: string, defaultNombre: string) => {
@@ -37,7 +37,9 @@ export function ChatList({ conversaciones, selectedId, onSelect }: ChatListProps
     // Si hay búsqueda, mostramos todo lo que coincida
     if (search.trim() !== "") return matchesSearch;
 
-    // Si no hay búsqueda, aplicamos filtros de estado
+    if (filter === 'escalated') return matchesSearch && conv.necesitaHumano === true;
+    
+    // Si no hay búsqueda ni es un filtro de escalada, aplicamos reglas normales
     if (isResolved) return false; // Ocultar resueltas en vista normal
 
     if (filter === 'unread') return matchesSearch && conv.unreadCount > 0;
@@ -67,9 +69,10 @@ export function ChatList({ conversaciones, selectedId, onSelect }: ChatListProps
       </div>
 
       {/* Filtros Rápidos */}
-      <div className="flex items-center gap-1 px-3 py-2 border-b border-[var(--border-light)] bg-[var(--bg-main)] overflow-x-auto no-scrollbar">
+      <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 border-b border-[var(--border-light)] bg-[var(--bg-main)]">
         {[
           { id: 'all', label: 'Todos', icon: MessageSquare },
+          { id: 'escalated', label: 'Por Atender', icon: Filter },
           { id: 'mine', label: 'Míos', icon: User2 },
           { id: 'unread', label: 'Sin leer', icon: Mail },
         ].map((btn) => (
