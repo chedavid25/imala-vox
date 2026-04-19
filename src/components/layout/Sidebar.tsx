@@ -333,13 +333,19 @@ function SidebarFooter() {
               Mi Cuenta
             </DropdownMenuLabel>
             <DropdownMenuSeparator className="bg-[var(--border-dark)] mx-1 my-1" />
-            <DropdownMenuItem className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[var(--bg-sidebar-hover)] focus:bg-[var(--bg-sidebar-hover)] cursor-pointer outline-none transition-all">
-              <UserIcon className="w-4 h-4 text-[var(--text-secondary-dark)]" />
-              <span className="text-sm font-medium">Perfil</span>
+            <DropdownMenuItem 
+              render={<Link href="/dashboard/perfil" />}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[var(--bg-sidebar-hover)] focus:bg-[var(--bg-sidebar-hover)] cursor-pointer outline-none transition-all"
+            >
+                <UserIcon className="w-4 h-4 text-[var(--text-secondary-dark)]" />
+                <span className="text-sm font-medium">Perfil</span>
             </DropdownMenuItem>
-            <DropdownMenuItem className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[var(--bg-sidebar-hover)] focus:bg-[var(--bg-sidebar-hover)] cursor-pointer outline-none transition-all">
-              <Settings2 className="w-4 h-4 text-[var(--text-secondary-dark)]" />
-              <span className="text-sm font-medium">Ajustes</span>
+            <DropdownMenuItem 
+              render={<Link href="/dashboard/ajustes" />}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[var(--bg-sidebar-hover)] focus:bg-[var(--bg-sidebar-hover)] cursor-pointer outline-none transition-all"
+            >
+                <Settings2 className="w-4 h-4 text-[var(--text-secondary-dark)]" />
+                <span className="text-sm font-medium">Ajustes</span>
             </DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator className="bg-[var(--border-dark)] mx-1 my-1" />

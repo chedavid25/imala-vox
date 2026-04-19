@@ -16,18 +16,33 @@ function initAdminApp(): App {
     return getApps()[0];
   }
 
-  const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if (!serviceAccountKey) {
+  const serviceAccountKeyB64 = process.env.FIREBASE_SERVICE_ACCOUNT_KEY_B64;
+  if (!serviceAccountKeyB64) {
     throw new Error(
-      "Firebase Admin: Variable de entorno FIREBASE_SERVICE_ACCOUNT_KEY no encontrada. " +
-      "Agregá el contenido JSON de la service account a .env.local"
+      "Firebase Admin: Variable de entorno FIREBASE_SERVICE_ACCOUNT_KEY_B64 no encontrada. " +
+      "Agregala a .env.local"
     );
   }
 
-  const serviceAccount = JSON.parse(serviceAccountKey);
-  return initializeApp({
-    credential: cert(serviceAccount),
-  });
+  try {
+    // Decodificar Base64 a string
+    const decodedKey = Buffer.from(serviceAccountKeyB64, 'base64').toString('utf-8');
+    const serviceAccount = JSON.parse(decodedKey);
+    
+    // IMPORTANTE: Asegurarse de que los saltos de línea literales se conviertan a saltos de línea reales (\n)
+    if (serviceAccount.private_key) {
+      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+    }
+    
+    console.log("🔥 Firebase Admin: Inicializado con éxito para el proyecto", serviceAccount.project_id);
+
+    return initializeApp({
+      credential: cert(serviceAccount),
+    });
+  } catch (error: any) {
+    console.error("❌ Error CRÍTICO al inicializar Firebase Admin:", error.message);
+    throw error;
+  }
 }
 
 const adminApp = initAdminApp();

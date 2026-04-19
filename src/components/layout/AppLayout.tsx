@@ -62,24 +62,49 @@ export default function AppLayout({ children }: AppLayoutProps) {
 // ... existing session logic ...
       if (user) {
         try {
-          const { collection, query, where, getDocs, limit } = await import("firebase/firestore");
-          const q = query(
+          const { collection, query, where, getDocs, limit, collectionGroup, getDoc, doc } = await import("firebase/firestore");
+          
+          // 1. Intentar cargar el espacio donde es dueño
+          const qOwner = query(
             collection(db, COLLECTIONS.ESPACIOS),
             where("propietarioUid", "==", user.uid),
             limit(1)
           );
-          const snapshot = await getDocs(q);
+          const ownerSnap = await getDocs(qOwner);
 
-          if (snapshot.empty) {
-// ... onboarding logic ...
+          let wsDocData = null;
+
+          if (!ownerSnap.empty) {
+            const doc = ownerSnap.docs[0];
+            wsDocData = { ...doc.data(), id: doc.id } as Workspace;
+          } else {
+            // 2. Intentar cargar donde es miembro
+            const qMember = query(
+              collectionGroup(db, COLLECTIONS.MIEMBROS),
+              where("__name__", "==", user.uid),
+              limit(1)
+            );
+            const memberSnap = await getDocs(qMember);
+            
+            if (!memberSnap.empty) {
+              const memberDoc = memberSnap.docs[0];
+              const wsRef = memberDoc.ref.parent.parent;
+              if (wsRef) {
+                const wsSnap = await getDoc(wsRef);
+                if (wsSnap.exists()) {
+                   wsDocData = { ...wsSnap.data(), id: wsSnap.id } as Workspace;
+                }
+              }
+            }
+          }
+
+          if (!wsDocData) {
             if (pathname !== "/onboarding") {
               router.push("/onboarding");
             }
           } else {
-            const wsDoc = snapshot.docs[0];
-            const wsData = { ...wsDoc.data(), id: wsDoc.id } as Workspace;
-            setWorkspaceId(wsDoc.id);
-            setWorkspace(wsData);
+            setWorkspaceId(wsDocData.id);
+            setWorkspace(wsDocData);
 
             if (isPublicRoute) {
               router.push("/dashboard/operacion/inbox");

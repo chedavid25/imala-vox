@@ -54,7 +54,7 @@ export const PLAN_LIMITS: Record<'starter' | 'pro' | 'agencia', PlanLimits> = {
     priceYearly: 29,
   },
   pro: {
-    seats: 5,
+    seats: 3,
     whatsappNumbers: 2,
     channelsIGFB: true,
     convCountIA: 3000,
@@ -79,7 +79,7 @@ export const PLAN_LIMITS: Record<'starter' | 'pro' | 'agencia', PlanLimits> = {
     priceYearly: 66,
   },
   agencia: {
-    seats: 15,
+    seats: 6,
     whatsappNumbers: 5,
     channelsIGFB: true,
     convCountIA: 10000,
