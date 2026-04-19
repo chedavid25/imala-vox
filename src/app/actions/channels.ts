@@ -111,22 +111,26 @@ export async function conectarCanalManual(wsId: string, datos: {
   }
 }
 
-export async function desconectarCanal(wsId: string, canalId: string) {
+/**
+ * Elimina físicamente un canal y sus secretos de la base de datos.
+ * Esto permite limpiar el dashboard de conexiones fallidas o antiguas.
+ */
+export async function eliminarCanal(wsId: string, canalId: string) {
   try {
     if (!wsId || !canalId) throw new Error("IDs insuficientes");
 
-    await adminDb
-      .collection(COLLECTIONS.ESPACIOS).doc(wsId)
-      .collection(COLLECTIONS.CANALES).doc(canalId)
-      .update({
-        status: 'disconnected',
-        actualizadoEl: Timestamp.now(),
-      });
+    const canalPath = `${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CANALES}/${canalId}`;
+    
+    // 1. Borrar secretos (subcolección)
+    await adminDb.doc(`${canalPath}/secrets/config`).delete().catch(() => {});
+    
+    // 2. Borrar documento principal
+    await adminDb.doc(canalPath).delete();
 
     revalidatePath('/dashboard/ajustes/canales');
     return { success: true };
   } catch (error: any) {
-    console.error("Error desconectando canal:", error);
+    console.error("Error eliminando canal:", error);
     return { success: false, error: error.message };
   }
 }

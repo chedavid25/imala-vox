@@ -44,9 +44,9 @@ export async function GET(req: NextRequest) {
 
     const longLivedUserToken = longTokenData.access_token;
 
-    // 3. Obtener lista de Páginas de Facebook del usuario
+    // 3. Obtener lista de Páginas de Facebook del usuario con sus cuentas de Instagram vinculadas
     const accountsRes = await fetch(
-      `https://graph.facebook.com/v19.0/me/accounts?access_token=${longLivedUserToken}`
+      `https://graph.facebook.com/v19.0/me/accounts?fields=name,access_token,instagram_business_account&access_token=${longLivedUserToken}`
     );
     const accountsData = await accountsRes.json();
 
@@ -98,10 +98,49 @@ export async function GET(req: NextRequest) {
       // Guardar el Page Access Token (que no expira) en secretos
       await guardarTokenCanal(wsId, canalId, pageAccessToken);
       
-      // Sincronizar automáticamente los webhooks de esta página
+      // Sincronizar automáticamente los webhooks de esta página (incluye leadgen)
       await sincronizarWebhooks(wsId, canalId);
       
       newPageIds.push(metaPageId);
+
+      // --- DETECTION DE INSTAGRAM VINCULADO ---
+      if (page.instagram_business_account) {
+        const igId = page.instagram_business_account.id;
+        
+        // Buscar si ya existe canal de Instagram
+        const igSnap = await workspaceRef
+          .collection(COLLECTIONS.CANALES)
+          .where('tipo', '==', 'instagram')
+          .where('metaInstagramId', '==', igId)
+          .limit(1)
+          .get();
+
+        const igData = {
+          tipo: 'instagram',
+          nombre: `Instagram - ${pageName}`,
+          cuenta: pageName,
+          metaPageId: metaPageId,
+          metaInstagramId: igId,
+          status: 'connected' as const,
+          webhookVerified: true, // Se asocia al webhook de la página
+          actualizadoEl: Timestamp.now(),
+        };
+
+        let igCanalId: string;
+        if (!igSnap.empty) {
+          igCanalId = igSnap.docs[0].id;
+          await workspaceRef.collection(COLLECTIONS.CANALES).doc(igCanalId).update(igData);
+        } else {
+          const igRef = await workspaceRef.collection(COLLECTIONS.CANALES).add({
+            ...igData,
+            creadoEl: Timestamp.now(),
+          });
+          igCanalId = igRef.id;
+        }
+        
+        // Compartir el mismo token de la página para Instagram
+        await guardarTokenCanal(wsId, igCanalId, pageAccessToken);
+      }
     }
 
     // 5. Actualizar canalesPageIds en el workspace
@@ -112,12 +151,17 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Redirigir al dashboard con éxito
-    return NextResponse.redirect(new URL('/dashboard/ajustes/canales?success=true', req.url));
+    // 6. Redirigir al dashboard con éxito
+    // Usamos una URL relativa para evitar problemas de protocolo (http vs https) al saltar entre ngrok y localhost
+    const successUrl = new URL('/dashboard/ajustes/canales', req.url);
+    successUrl.searchParams.set('success', 'true');
+    return NextResponse.redirect(successUrl);
 
   } catch (error: any) {
     console.error('Meta Auth Callback Error:', error);
     const errorMsg = encodeURIComponent(error.message || 'Error desconocido');
-    return NextResponse.redirect(new URL(`/dashboard/ajustes/canales?error=${errorMsg}`, req.url));
+    const errorUrl = new URL('/dashboard/ajustes/canales', req.url);
+    errorUrl.searchParams.set('error', errorMsg);
+    return NextResponse.redirect(errorUrl);
   }
 }

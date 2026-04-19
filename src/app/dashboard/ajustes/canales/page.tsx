@@ -13,7 +13,8 @@ import {
   AlertCircle,
   Copy,
   Zap,
-  UserCheck
+  UserCheck,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -45,7 +46,7 @@ import { collection, onSnapshot } from "firebase/firestore";
 import { COLLECTIONS, Canal } from "@/lib/types/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { toast } from "sonner";
-import { desconectarCanal, sincronizarWebhooks, configurarCanalIA } from "@/app/actions/channels";
+import { eliminarCanal, sincronizarWebhooks, configurarCanalIA } from "@/app/actions/channels";
 
 const CANALES_CONFIG = [
   {
@@ -131,6 +132,8 @@ export default function CanalesPage() {
       'instagram_manage_messages',
       'leads_retrieval',
       'pages_read_engagement',
+      'pages_manage_metadata',
+      'ads_management',
       'ads_read',
       'business_management'
     ].join(',');
@@ -139,15 +142,19 @@ export default function CanalesPage() {
     window.location.href = authUrl;
   };
 
-  const handleDisconnect = async (canalId: string) => {
+  const handleDelete = async (canalId: string) => {
     if (!currentWorkspaceId) return;
-    if (!confirm("¿Estás seguro de desconectar este canal? Se eliminarán los tokens de acceso.")) return;
+    if (!confirm("¿Deseas eliminar permanentemente esta conexión y todos sus datos?")) return;
 
     try {
-      await desconectarCanal(currentWorkspaceId, canalId);
-      toast.success("Canal desconectado");
+      const res = await eliminarCanal(currentWorkspaceId, canalId);
+      if (res.success) {
+        toast.success("Canal eliminado permanentemente");
+      } else {
+        toast.error(res.error || "No se pudo eliminar el canal");
+      }
     } catch (error) {
-      toast.error("Error al desconectar canal");
+      toast.error("Error al eliminar canal");
     }
   };
 
@@ -252,7 +259,7 @@ export default function CanalesPage() {
                         </Badge>
                       ) : (
                         <Badge variant="outline" className="text-[var(--text-tertiary-light)] border-[var(--border-light)] px-3 py-1 text-[10px] uppercase font-bold">
-                          {canal.status}
+                          {canal.status === 'disconnected' ? 'Desconectado' : canal.status}
                         </Badge>
                       )}
                     </div>
@@ -293,12 +300,13 @@ export default function CanalesPage() {
                         <DropdownMenuTrigger className="h-9 w-9 rounded-xl hover:bg-[var(--bg-input)] flex items-center justify-center transition-colors">
                           <MoreVertical className="w-4 h-4 text-[var(--text-tertiary-light)]" />
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="rounded-xl">
+                        <DropdownMenuContent align="end" className="rounded-xl min-w-[200px]">
                           <DropdownMenuItem 
-                            onClick={() => handleDisconnect(canal.id)}
+                            onClick={() => handleDelete(canal.id)}
                             className="text-red-600 font-bold"
                           >
-                            Eliminar conexión
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Eliminar definitivamente
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
