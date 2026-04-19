@@ -202,7 +202,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 function AppLoadingSkeleton() {
   return (
     <div className="flex h-screen w-full overflow-hidden bg-[var(--bg-main)]">
-      <div className="w-[var(--sidebar-width)] h-full bg-[var(--bg-sidebar)] border-r border-[var(--border-dark)] p-4 space-y-8">
+      <div className="w-[240px] h-full bg-[var(--bg-sidebar)] border-r border-[var(--border-dark)] p-4 space-y-8">
         <div className="h-6 w-32 bg-white/10 rounded-md animate-pulse mb-12" />
         <div className="space-y-4">
           {[1, 2, 3, 4, 5, 6].map((i) => (

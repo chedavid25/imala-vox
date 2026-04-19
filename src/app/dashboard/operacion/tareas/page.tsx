@@ -349,17 +349,17 @@ export default function TareasPage() {
               <p className="text-[13px] text-[var(--text-secondary-light)] font-medium">Gestiona tus recordatorios y compromisos comerciales.</p>
             </div>
             
-            <div className="flex items-center gap-3 bg-[var(--bg-card)] p-1.5 rounded-2xl border border-[var(--border-light)] shadow-sm">
-               <Button variant={viewMode === 'lista' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('lista')} className={cn("rounded-xl h-9", viewMode === 'lista' ? "bg-[var(--accent)] text-white" : "text-slate-500")}>
-                 <List className="size-4 mr-2" /> Lista
-               </Button>
-               <Button variant={viewMode === 'canvas' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('canvas')} className={cn("rounded-xl h-9", viewMode === 'canvas' ? "bg-[var(--accent)] text-white" : "text-slate-500")}>
-                 <LayoutGrid className="size-4 mr-2" /> Canvas
-               </Button>
-               <Button variant={viewMode === 'calendario' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('calendario')} className={cn("rounded-xl h-9", viewMode === 'calendario' ? "bg-[var(--accent)] text-white" : "text-slate-500")}>
-                 <CalendarIcon className="size-4 mr-2" /> Calendario
-               </Button>
-            </div>
+             <div className="flex items-center gap-3 bg-[var(--bg-card)] p-1.5 rounded-2xl border border-[var(--border-light)] shadow-sm">
+                <Button variant={viewMode === 'lista' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('lista')} className={cn("rounded-xl h-9", viewMode === 'lista' ? "bg-[var(--accent)] text-black" : "text-slate-500")}>
+                  <List className="size-4 mr-2" /> Lista
+                </Button>
+                <Button variant={viewMode === 'canvas' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('canvas')} className={cn("rounded-xl h-9", viewMode === 'canvas' ? "bg-[var(--accent)] text-black" : "text-slate-500")}>
+                  <LayoutGrid className="size-4 mr-2" /> Canvas
+                </Button>
+                <Button variant={viewMode === 'calendario' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('calendario')} className={cn("rounded-xl h-9", viewMode === 'calendario' ? "bg-[var(--accent)] text-black" : "text-slate-500")}>
+                  <CalendarIcon className="size-4 mr-2" /> Calendario
+                </Button>
+             </div>
 
             <div className="flex items-center gap-3">
               {viewMode === 'canvas' && (
