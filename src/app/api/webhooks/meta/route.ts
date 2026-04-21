@@ -44,45 +44,38 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 2. Procesar el objeto (mensajes o leads) de forma asíncrona (sin await para responder rápido)
-    // Nota: Usamos Promise.resolve().then() para no bloquear la respuesta HTTP
-    Promise.resolve().then(async () => {
-      try {
-        if (body.object === 'page' || body.object === 'instagram' || body.object === 'whatsapp_business_account') {
-          for (const entry of body.entry || []) {
-            const pageId = entry.id;
+    // 2. Procesar el objeto (mensajes o leads) de forma síncrona para asegurar la persistencia en Serverless
+    if (body.object === 'page' || body.object === 'instagram' || body.object === 'whatsapp_business_account') {
+      for (const entry of body.entry || []) {
+        const pageId = entry.id;
 
-            // Soporte para WhatsApp Cloud API
-            if (body.object === 'whatsapp_business_account') {
-              for (const change of entry.changes || []) {
-                if (change.field === 'messages') {
-                  console.log("🟢 Procesando mensaje de WhatsApp...");
-                  await procesarMensajeWhatsapp(change.value, pageId);
-                }
-              }
-            }
-
-            // Soporte para Mensajes (Messenger / Instagram)
-            if (entry.messaging) {
-              for (const messagingItem of entry.messaging) {
-                console.log(`📩 Procesando mensaje de ${messagingItem.sender.id}`);
-                await procesarMensajeMeta(messagingItem, pageId, body.object === 'instagram');
-              }
-            }
-
-            // Soporte para Leads (Formularios)
-            for (const change of entry.changes || []) {
-              if (change.field === 'leadgen') {
-                console.log(`🎯 Lead Detectado para pageId: ${pageId}. Lead ID: ${change.value.leadgen_id}`);
-                await procesarLeadMeta(change.value, pageId);
-              }
+        // Soporte para WhatsApp Cloud API
+        if (body.object === 'whatsapp_business_account') {
+          for (const change of entry.changes || []) {
+            if (change.field === 'messages') {
+              console.log("🟢 Procesando mensaje de WhatsApp...");
+              await procesarMensajeWhatsapp(change.value, pageId);
             }
           }
         }
-      } catch (err) {
-        console.error("❌ Error en procesamiento asíncrono de webhook:", err);
+
+        // Soporte para Mensajes (Messenger / Instagram)
+        if (entry.messaging) {
+          for (const messagingItem of entry.messaging) {
+            console.log(`📩 Procesando mensaje de ${messagingItem.sender.id}`);
+            await procesarMensajeMeta(messagingItem, pageId, body.object === 'instagram');
+          }
+        }
+
+        // Soporte para Leads (Formularios)
+        for (const change of entry.changes || []) {
+          if (change.field === 'leadgen') {
+            console.log(`🎯 Lead Detectado para pageId: ${pageId}. Lead ID: ${change.value.leadgen_id}`);
+            await procesarLeadMeta(change.value, pageId);
+          }
+        }
       }
-    });
+    }
 
     // SIEMPRE responder 200 OK inmediatamente para evitar retries de Meta
     return NextResponse.json({ status: 'ok' });
@@ -104,7 +97,7 @@ async function procesarLeadMeta(leadData: any, pageId: string) {
     const wsQuery = await adminDb
       .collectionGroup(COLLECTIONS.CANALES)
       .where('metaPageId', '==', pageId)
-      .where('tipo', '==', 'facebook') 
+      // Flexibilizamos el tipo para encontrar el workspace independientemente de si se conectó como facebook o instagram
       .where('status', '==', 'connected')
       .limit(1)
       .get();
