@@ -155,14 +155,28 @@ export async function pedirSugerenciaIAAction(wsId: string, conversacionId: stri
         text: d.data().text
       }));
 
-    if (!convData.agenteId) {
-      throw new Error("Esta conversación no tiene un agente asignado. Por favor, asigna uno en los ajustes del canal o del contacto.");
+    let agenteId = convData.agenteId;
+
+    // Si la conversación no tiene agente, buscamos el del canal
+    if (!agenteId && convData.canalId) {
+      const canalSnap = await adminDb
+        .collection(COLLECTIONS.ESPACIOS).doc(wsId)
+        .collection(COLLECTIONS.CANALES).doc(convData.canalId)
+        .get();
+      
+      if (canalSnap.exists) {
+        agenteId = canalSnap.data()?.agenteId;
+      }
+    }
+
+    if (!agenteId) {
+      throw new Error("Este chat no tiene un agente asignado. Por favor, configura un agente en los ajustes del canal.");
     }
 
     // 3. Disparar el motor de IA en modo copiloto (esto actualizará 'sugerenciaIA' en Firestore)
     await procesarMensajeConIA({
       wsId,
-      agenteId: convData.agenteId,
+      agenteId,
       conversacionId,
       textoUsuario,
       historial,
