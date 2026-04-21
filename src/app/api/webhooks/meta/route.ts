@@ -139,18 +139,38 @@ async function procesarLeadMeta(leadData: any, pageId: string) {
       campos[field.name] = field.values?.[0] || '';
     }
 
-    // 5. Guardar en Firestore del Workspace
+    // 5. Resolver Etapa del Embudo (Dinámica para evitar IDs fantasmas)
+    const etapasSnap = await adminDb
+      .collection(COLLECTIONS.ESPACIOS)
+      .doc(wsId)
+      .collection(COLLECTIONS.ETAPAS_EMBUDO)
+      .orderBy('orden', 'asc')
+      .limit(1)
+      .get();
+    
+    let defaultStageId = 'nuevo';
+    if (!etapasSnap.empty) {
+      defaultStageId = etapasSnap.docs[0].id;
+    }
+
+    // 6. Mapeo de nombre robusto (Meta usa varios nombres de campos)
+    const first_name = campos.first_name || '';
+    const last_name = campos.last_name || '';
+    const full_name = campos.full_name || campos.nombre || campos.name || '';
+    const nombreFinal = (first_name || last_name) ? `${first_name} ${last_name}`.trim() : (full_name || 'Nuevo Cliente Potencial');
+
+    // 7. Guardar en Firestore del Workspace
     await adminDb
       .collection(COLLECTIONS.ESPACIOS)
       .doc(wsId)
       .collection(COLLECTIONS.LEADS)
       .add({
         origen: 'meta_ads',
-        etapaId: 'nuevo', // Etapa default
+        etapaId: defaultStageId, 
         temperatura: 'frio',
-        nombre: `${campos.first_name || ''} ${campos.last_name || ''}`.trim() || 'Sin nombre',
-        email: campos.email || null,
-        telefono: campos.phone_number || null,
+        nombre: nombreFinal,
+        email: campos.email || campos.email_address || null,
+        telefono: campos.phone_number || campos.telefono || campos.phone || null,
         camposFormulario: campos,
         metaLeadId: leadId,
         metaFormId: formId,
