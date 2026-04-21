@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 
   const appId = process.env.NEXT_PUBLIC_META_APP_ID;
   const appSecret = process.env.META_APP_SECRET;
-  const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/meta/callback`;
+  const redirectUri = `${new URL(req.url).origin}/api/auth/meta/callback`;
 
   try {
     // 1. Intercambiar code por Short-Lived User Token
