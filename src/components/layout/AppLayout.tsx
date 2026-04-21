@@ -23,7 +23,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const { setWorkspace, setWorkspaceId, currentWorkspaceId, currentAgentName, setCurrentAgentName } = useWorkspaceStore();
   const [isSessionLoading, setIsSessionLoading] = useState(true);
   
-  const isPublicRoute = pathname === "/auth" || pathname === "/onboarding" || pathname === "/privacy" || pathname === "/terms";
+  const isPublicRoute = 
+    pathname.toLowerCase().startsWith("/auth") || 
+    pathname.toLowerCase().startsWith("/onboarding") || 
+    pathname.toLowerCase().startsWith("/privacy") || 
+    pathname.toLowerCase().startsWith("/terms");
 
   // Efecto para recuperar el nombre del agente si estamos en una subruta de agentes
   useEffect(() => {

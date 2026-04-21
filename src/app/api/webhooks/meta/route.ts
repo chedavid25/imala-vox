@@ -135,6 +135,7 @@ async function procesarLeadMeta(leadData: any, pageId: string) {
     }
 
     const metaLead = await metaRes.json();
+    const campaignName = metaLead.ad_name || metaLead.campaign_name || 'Campaña de Meta Ads';
 
     // 4. Mapear campos del formulario
     const campos: Record<string, string> = {};
