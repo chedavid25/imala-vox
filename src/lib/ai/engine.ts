@@ -116,9 +116,9 @@ export async function procesarMensajeConIA({
     if (etiquetasAplicadas.length > 0) {
       try {
         const convSnap = await adminDb.collection(COLLECTIONS.ESPACIOS).doc(wsId).collection(COLLECTIONS.CONVERSACIONES).doc(conversacionId).get();
-        const contactId = convSnap.data()?.contactId;
+        const contactId = convSnap.data()?.contactoId; // Corregido: era contactoId, no contactId
 
-        if (contactId) {
+        if (contactId && typeof contactId === 'string') {
           const contactRef = adminDb.collection(COLLECTIONS.ESPACIOS).doc(wsId).collection(COLLECTIONS.CONTACTOS).doc(contactId);
           const contactSnap = await contactRef.get();
           const contactData = contactSnap.data();

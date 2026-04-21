@@ -38,8 +38,8 @@ export async function construirSystemPrompt(wsId: string, agenteId: string): Pro
   let recursosValidos: RecursoConocimiento[] = [];
 
   if (idsRecursos.length > 0) {
-    // Admin SDK permite getAll() que es más eficiente que queries 'in'
-    const docRefs = idsRecursos.map(id =>
+    const validIds = idsRecursos.filter(id => id && typeof id === 'string');
+    const docRefs = validIds.map(id =>
       adminDb
         .collection(COLLECTIONS.ESPACIOS).doc(wsId)
         .collection(COLLECTIONS.CONOCIMIENTO).doc(id)
