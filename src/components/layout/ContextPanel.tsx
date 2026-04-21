@@ -30,6 +30,7 @@ import {
   MoreVertical, Clock, MessageSquare, PhoneCall, Users, ChevronDown, ChevronRight,
   TimerReset, Loader2, Pencil, Trash2
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { 
@@ -54,6 +55,7 @@ import { toast } from "sonner";
 import { deleteDoc } from "firebase/firestore";
 
 export function ContextPanel() {
+  const router = useRouter();
   const { selectedContactId, currentWorkspaceId, selectedChatId } = useWorkspaceStore();
   const { contactos } = useContactos();
   
