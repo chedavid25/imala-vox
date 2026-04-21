@@ -332,9 +332,12 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
       console.log(`IA activada para ${canalType}. Agente: ${canalData.agenteId}`);
       
       const cDocSnap = await contactosRef.doc(contactoId).get();
-      if (cDocSnap.exists && cDocSnap.data()?.aiBlocked) {
-         console.log(`Contacto ${senderId} bloqueado para IA. Sin respuesta automática.`);
-         return;
+      if (cDocSnap.exists) {
+        const isBlocked = await isAIBlockedForContact(wsId, cDocSnap.data());
+        if (isBlocked) {
+           console.log(`Contacto ${senderId} bloqueado para IA (por contacto, etiqueta o categoría). Sin respuesta automática.`);
+           return;
+        }
       }
       
       const convDocSnap = await convRef.doc(convId).get();
@@ -373,16 +376,10 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
       try {
         // ACTIVAR INDICADOR DE ESCRITURA
         if (!isCopiloto) {
-          if (canalType === 'whatsapp') {
-            // En WhatsApp enviamos un 'visto'
-            const msgId = messagingItem.message?.mid || messagingItem.id;
-            await enviarMensajeAccion(wsId, canalId, senderId, msgId, undefined, 'mark_read');
-          } else {
-            // En Messenger/Instagram enviamos 'typing_on'
-            await enviarMensajeAccion(wsId, canalId, senderId, undefined, undefined, 'typing_on');
-            // Pequeña espera para que el cliente note el "Escribiendo"
-            await new Promise(resolve => setTimeout(resolve, 1500));
-          }
+          // En Messenger/Instagram siempre enviamos 'typing_on'
+          await enviarMensajeAccion(wsId, canalId, senderId, undefined, undefined, 'typing_on');
+          // Pequeña espera para que el cliente note el "Escribiendo"
+          await new Promise(resolve => setTimeout(resolve, 1500));
         }
 
         const respuestaIA = await procesarMensajeConIA({
@@ -511,6 +508,12 @@ async function procesarMensajeWhatsapp(value: any, wabaId: string) {
       const convDoc = await convRef.doc(convId).get();
       if (convDoc.data()?.modoIA !== 'auto') return;
 
+      const cDocSnap = await contactosRef.doc(contactoId).get();
+      if (cDocSnap.exists) {
+        const isBlocked = await isAIBlockedForContact(wsId, cDocSnap.data());
+        if (isBlocked) return;
+      }
+
       const { procesarMensajeConIA } = await import('@/lib/ai/engine');
       const { enviarMensajeAccion } = await import('@/app/actions/channels');
 
@@ -537,5 +540,53 @@ async function procesarMensajeWhatsapp(value: any, wabaId: string) {
     }
   } catch (err) {
     console.error('Error procesando WA:', err);
+  }
+}
+
+/**
+ * Helper para verificar si la IA está bloqueada para un contacto 
+ * por el contacto mismo, sus etiquetas o sus categorías.
+ */
+async function isAIBlockedForContact(wsId: string, contactoData: any) {
+  // 1. Bloqueo manual directo
+  if (contactoData.aiBlocked) return true;
+
+  const tagIds = contactoData.etiquetas || [];
+  if (tagIds.length === 0) return false;
+
+  try {
+    // 2. Obtener etiquetas del contacto
+    const tagsRef = adminDb.collection(COLLECTIONS.ESPACIOS).doc(wsId).collection(COLLECTIONS.ETIQUETAS_CRM);
+    const tagsSnap = await tagsRef.get();
+    const allTags = tagsSnap.docs.map(d => ({ id: d.id, ...d.data() as any }));
+    
+    const contactTags = allTags.filter(t => tagIds.includes(t.id));
+    
+    // Si alguna etiqueta bloquea la IA
+    if (contactTags.some(t => t.aiBlocked)) {
+      console.log(`[CASCADE-BLOCK] Bloqueado por etiqueta: ${contactTags.find(t => t.aiBlocked)?.nombre}`);
+      return true;
+    }
+
+    // 3. Obtener categorías de esas etiquetas
+    const categoryIds = Array.from(new Set(contactTags.map(t => t.categoriaId)));
+    if (categoryIds.length === 0) return false;
+
+    const catsRef = adminDb.collection(COLLECTIONS.ESPACIOS).doc(wsId).collection(COLLECTIONS.CATEGORIAS_CRM);
+    const catsSnap = await catsRef.get();
+    const allCats = catsSnap.docs.map(d => ({ id: d.id, ...d.data() as any }));
+
+    const contactCats = allCats.filter(c => categoryIds.includes(c.id));
+
+    // Si alguna categoría bloquea la IA
+    if (contactCats.some(c => c.aiBlocked)) {
+      console.log(`[CASCADE-BLOCK] Bloqueado por categoría: ${contactCats.find(c => c.aiBlocked)?.nombre}`);
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error("Error verificando bloqueo en cascada:", error);
+    return false; // Ante la duda, permitimos (o podrías bloquear por seguridad)
   }
 }

@@ -68,6 +68,7 @@ export interface CategoriaCRM {
   nombre: string;
   tipo: 'multiple' | 'exclusiva'; // 'exclusiva' es el semáforo
   alertaDiasDefault?: number;     // Días para que se ponga en rojo
+  aiBlocked?: boolean;            // Nuevo: Bloqueo de IA para el grupo
   orden: number;
   creadoEl: Timestamp;
 }
@@ -79,6 +80,7 @@ export interface EtiquetaCRM {
   colorBg: string;
   colorText: string;
   instruccionIA?: string;         // Instrucción para lo que la IA debe detectar
+  aiBlocked?: boolean;            // Nuevo: Bloqueo de IA para esta etiqueta
   alertaDias?: number;            // Sobrescribe alertaDiasDefault de la categoría
   creadoEl: Timestamp;
 }

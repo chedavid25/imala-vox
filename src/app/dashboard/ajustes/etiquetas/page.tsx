@@ -89,6 +89,7 @@ export default function CRMTagsPage() {
     colorBg: PRESET_COLORS[0].bg,
     colorText: PRESET_COLORS[0].text,
     instruccionIA: "",
+    aiBlocked: false,
     alertaDias: undefined
   });
 
@@ -96,6 +97,7 @@ export default function CRMTagsPage() {
     nombre: "",
     tipo: "multiple",
     alertaDiasDefault: 15,
+    aiBlocked: false,
     orden: 0
   });
 
@@ -140,7 +142,7 @@ export default function CRMTagsPage() {
       }
       setIsAddingCategory(false);
       setEditingCategory(null);
-      setCategoryForm({ nombre: "", tipo: "multiple", alertaDiasDefault: 15 });
+      setCategoryForm({ nombre: "", tipo: "multiple", alertaDiasDefault: 15, aiBlocked: false });
     } catch (err) {
       toast.error("Error al guardar categoría");
     }
@@ -193,7 +195,8 @@ export default function CRMTagsPage() {
         nombre: "", 
         categoriaId: tagForm.categoriaId,
         colorBg: PRESET_COLORS[0].bg, 
-        colorText: PRESET_COLORS[0].text 
+        colorText: PRESET_COLORS[0].text,
+        aiBlocked: false
       });
     } catch (err) {
       console.error("Error guardando etiqueta:", err);
@@ -317,6 +320,20 @@ export default function CRMTagsPage() {
                     Si pasan estos días sin contacto con el cliente, el semáforo cambiará a Rojo para que tomes acción.
                   </p>
                 </div>
+
+                <div className="flex items-center justify-between p-4 bg-rose-50/50 rounded-2xl border border-rose-100">
+                  <div className="space-y-0.5">
+                    <Label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-rose-700">
+                      <Bot className="size-3.5" />
+                      Bloquear IA para este grupo
+                    </Label>
+                    <p className="text-[10px] text-rose-600/70">Silencia la IA para TODOS los clientes con etiquetas de este grupo.</p>
+                  </div>
+                  <Switch 
+                    checked={categoryForm.aiBlocked}
+                    onCheckedChange={(v) => setCategoryForm({...categoryForm, aiBlocked: v})}
+                  />
+                </div>
               </div>
 
               <DialogFooter className="p-8 pt-0">
@@ -354,6 +371,7 @@ export default function CRMTagsPage() {
                       </h3>
                       <p className="text-[11px] text-[var(--text-tertiary-light)] font-medium">
                         Alerta: {cat.alertaDiasDefault} días • {cat.tipo === 'exclusiva' ? 'Solo una activa' : 'Varias a la vez'}
+                        {cat.aiBlocked && <span className="ml-2 text-rose-500 font-bold">● IA BLOQUEADA</span>}
                       </p>
                     </div>
                   </div>
@@ -376,8 +394,11 @@ export default function CRMTagsPage() {
                         </div>
                       </div>
                       <div className="space-y-2">
-                        {tag.instruccionIA && <div className="text-[10px] text-purple-600 font-bold bg-purple-50 px-2 py-1 rounded-lg border border-purple-100 flex items-center gap-1.5"><Bot className="w-3 h-3" /> IA ON</div>}
-                        {tag.alertaDias && <div className="text-[10px] text-orange-600 font-bold bg-orange-50 px-2 py-1 rounded-lg border border-orange-100 flex items-center gap-1.5"><Clock className="w-3 h-3" /> {tag.alertaDias} d</div>}
+                        <div className="flex flex-wrap gap-1.5">
+                          {tag.instruccionIA && <div className="text-[10px] text-purple-600 font-bold bg-purple-50 px-2 py-1 rounded-lg border border-purple-100 flex items-center gap-1.5"><Bot className="w-3 h-3" /> IA ON</div>}
+                          {tag.aiBlocked && <div className="text-[10px] text-rose-600 font-bold bg-rose-50 px-2 py-1 rounded-lg border border-rose-100 flex items-center gap-1.5 line-through decoration-rose-300"><Bot className="w-3 h-3" /> IA OFF</div>}
+                          {tag.alertaDias && <div className="text-[10px] text-orange-600 font-bold bg-orange-50 px-2 py-1 rounded-lg border border-orange-100 flex items-center gap-1.5"><Clock className="w-3 h-3" /> {tag.alertaDias} d</div>}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -578,6 +599,20 @@ export default function CRMTagsPage() {
                 value={tagForm.alertaDias || ""}
                 onChange={e => setTagForm({...tagForm, alertaDias: parseInt(e.target.value) || undefined})}
                 className="h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-[15px] font-medium focus:bg-white transition-all shadow-sm"
+              />
+            </div>
+
+            <div className="flex items-center justify-between p-4 bg-rose-50/50 rounded-2xl border border-rose-100">
+              <div className="space-y-0.5">
+                <Label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-rose-700">
+                  <Bot className="size-3.5" />
+                  Bloquear IA para esta etiqueta
+                </Label>
+                <p className="text-[10px] text-rose-600/70">Silencia la IA solo cuando el contacto tenga esta etiqueta.</p>
+              </div>
+              <Switch 
+                checked={tagForm.aiBlocked}
+                onCheckedChange={(v) => setTagForm({...tagForm, aiBlocked: v})}
               />
             </div>
           </div>
