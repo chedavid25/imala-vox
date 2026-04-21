@@ -330,8 +330,10 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
       
       const convDocSnap = await convRef.doc(convId).get();
       const convData = convDocSnap.data();
-      if (convData?.modoIA === 'pausado') {
-         console.log(`Conversación ${convId} pausada, sin respuesta IA.`);
+      
+      // BLOQUEO CRÍTICO: Solo responder automáticamente si el modo es 'auto'
+      if (convData?.modoIA !== 'auto') {
+         console.log(`IA en modo ${convData?.modoIA || 'desconocido'}. No se enviará respuesta automática.`);
          return;
       }
       

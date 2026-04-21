@@ -232,7 +232,7 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
         </div>
 
         <div className="flex items-center gap-2">
-          {conversacion.modoIA === 'pausado' && (
+          {(conversacion.modoIA !== 'auto' && conversacion.modoIA !== 'copiloto') && (
             <Button
               size="sm"
               onClick={handleResumeIA}
