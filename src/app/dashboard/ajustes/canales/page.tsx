@@ -124,7 +124,7 @@ export default function CanalesPage() {
 
   const handleOAuthConnect = () => {
     const appId = process.env.NEXT_PUBLIC_META_APP_ID;
-    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/meta/callback`;
+    const redirectUri = `${window.location.origin}/api/auth/meta/callback`;
     const scope = [
       'pages_show_list',
       'pages_messaging',
