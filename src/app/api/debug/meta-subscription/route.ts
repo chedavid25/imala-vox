@@ -4,6 +4,11 @@ import { COLLECTIONS } from '@/lib/types/firestore';
 
 // GET /api/debug/meta-subscription?metaPageId=YYY
 export async function GET(req: NextRequest) {
+  const adminSecret = req.headers.get('x-admin-secret');
+  if (!adminSecret || adminSecret !== process.env.ADMIN_SECRET) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  }
+
   const metaPageIdParam = req.nextUrl.searchParams.get('metaPageId');
 
   if (!metaPageIdParam) {

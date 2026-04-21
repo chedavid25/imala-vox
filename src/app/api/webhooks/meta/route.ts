@@ -40,7 +40,12 @@ export async function POST(request: NextRequest) {
         .digest('hex');
 
       if (signature !== `sha256=${expectedSignature}`) {
-        console.warn('⚠️ Firma de webhook no coincide, pero se procesará igual por compatibilidad de pruebas');
+        console.warn('⚠️ Firma de webhook no coincide');
+        
+        // En producción, rechazamos con 403 si la firma no es válida
+        if (process.env.NODE_ENV === 'production') {
+          return new NextResponse('Invalid signature', { status: 403 });
+        }
       }
     }
 
