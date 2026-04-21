@@ -166,6 +166,20 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
     }
   };
 
+  const handleResumeIA = async () => {
+    if (!currentWorkspaceId || !conversacion?.id) return;
+    try {
+      const convRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES, conversacion.id);
+      await updateDoc(convRef, { 
+        modoIA: 'auto',
+        actualizadoEl: Timestamp.now()
+      });
+      toast.success("IA reanudada (Modo Automático)");
+    } catch (error) {
+      toast.error("Error al reanudar la IA");
+    }
+  };
+
   if (!conversacion) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-12 text-center bg-[var(--bg-main)]">
@@ -206,12 +220,29 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
                 En línea
               </span>
               <span className="text-[11px] text-[var(--text-tertiary-light)]">•</span>
-              <IndicadorIA status={conversacion.aiActive ? 'activo' : 'pausado'} className="scale-75 origin-left" />
+              <IndicadorIA 
+                status={
+                  conversacion.modoIA === 'pausado' ? 'pausado' : 
+                  (conversacion.modoIA === 'auto' || conversacion.modoIA === 'copiloto') ? 'activo' : 'pausado'
+                } 
+                className="scale-75 origin-left" 
+              />
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
+          {conversacion.modoIA === 'pausado' && (
+            <Button
+              size="sm"
+              onClick={handleResumeIA}
+              className="h-8 gap-1.5 font-black text-[10px] bg-purple-600/10 text-purple-600 border border-purple-200 hover:bg-purple-600 hover:text-white transition-all animate-in fade-in zoom-in duration-300"
+            >
+              <Sparkles className="w-3 h-3" />
+              REANUDAR IA
+            </Button>
+          )}
+          
           <DropdownMenu>
             <DropdownMenuTrigger className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md font-bold text-xs bg-[var(--bg-input)] border border-[var(--border-light)] hover:bg-[var(--bg-main)] text-[var(--text-primary-light)] transition-all shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50">
               <UserPlus className="w-3.5 h-3.5" />

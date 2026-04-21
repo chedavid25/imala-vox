@@ -137,7 +137,8 @@ export default function InboxPage() {
 
       await updateDoc(convRef, {
         ultimoMensaje: text,
-        ultimaActividad: Timestamp.now()
+        ultimaActividad: Timestamp.now(),
+        modoIA: 'pausado' // Pausar IA al intervenir humano
       });
 
     } catch (error: any) {
