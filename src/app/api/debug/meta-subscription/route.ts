@@ -2,75 +2,73 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { COLLECTIONS } from '@/lib/types/firestore';
 
-// GET /api/debug/meta-subscription?wsId=XXX&metaPageId=YYY
-// También acepta canalId=ZZZ si se prefiere.
+// GET /api/debug/meta-subscription?metaPageId=YYY
+// Ahora busca globalmente en todos los workspaces.
 export async function GET(req: NextRequest) {
-  const wsId = req.nextUrl.searchParams.get('wsId');
-  const canalId = req.nextUrl.searchParams.get('canalId');
   const metaPageIdParam = req.nextUrl.searchParams.get('metaPageId');
 
-  if (!wsId || (!canalId && !metaPageIdParam)) {
-    return NextResponse.json({ error: 'wsId y (canalId o metaPageId) son requeridos' }, { status: 400 });
+  if (!metaPageIdParam) {
+    return NextResponse.json({ error: 'metaPageId es requerido' }, { status: 400 });
   }
 
   try {
-    let canalData: any;
-    let finalCanalId = canalId;
-
-    if (canalId) {
-      const canalSnap = await adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CANALES}/${canalId}`).get();
-      if (canalSnap.exists) {
-        canalData = canalSnap.data();
-      }
+    // 1. Buscar el canal globalmente usando collectionGroup
+    const q = await adminDb
+      .collectionGroup(COLLECTIONS.CANALES)
+      .where('metaPageId', '==', metaPageIdParam)
+      .limit(1)
+      .get();
+    
+    if (q.empty) {
+      return NextResponse.json({ error: `No se encontró ningún canal con metaPageId: ${metaPageIdParam}` }, { status: 404 });
     }
 
-    if (!canalData && metaPageIdParam) {
-      const q = await adminDb
-        .collection(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CANALES}`)
-        .where('metaPageId', '==', metaPageIdParam)
-        .limit(1)
-        .get();
-      
-      if (!q.empty) {
-        canalData = q.docs[0].data();
-        finalCanalId = q.docs[0].id;
-      }
+    const canalDoc = q.docs[0];
+    const canalData = canalDoc.data();
+    const canalId = canalDoc.id;
+    
+    // Obtener el wsId desde la referencia del documento
+    const wsId = canalDoc.ref.parent.parent?.id;
+
+    if (!wsId) {
+      return NextResponse.json({ error: 'No se pudo determinar el Workspace ID para este canal' }, { status: 500 });
     }
 
-    if (!canalData) {
-      return NextResponse.json({ error: 'No se encontró el canal con los parámetros proporcionados' }, { status: 404 });
-    }
-
-    const metaPageId = canalData.metaPageId;
-    const secretSnap = await adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CANALES}/${finalCanalId}/secrets/config`).get();
+    const secretPath = `${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CANALES}/${canalId}/secrets/config`;
+    const secretSnap = await adminDb.doc(secretPath).get();
     
     if (!secretSnap.exists) {
-      return NextResponse.json({ error: 'No se encontraron secretos para este canal' }, { status: 404 });
+      return NextResponse.json({ 
+        error: 'Canal encontrado pero no tiene secretos configurados',
+        wsId,
+        canalId 
+      }, { status: 404 });
     }
 
     const { metaAccessToken } = secretSnap.data() as any;
 
-    // 1. ¿Qué apps están suscritas a esta página y con qué campos?
+    // 1. Consultar suscripciones en Meta
     const subsRes = await fetch(
-      `https://graph.facebook.com/v19.0/${metaPageId}/subscribed_apps?access_token=${encodeURIComponent(metaAccessToken)}`
+      `https://graph.facebook.com/v19.0/${metaPageIdParam}/subscribed_apps?access_token=${encodeURIComponent(metaAccessToken)}`
     );
     const subsData = await subsRes.json();
 
-    // 2. ¿Qué permisos tiene el Page Access Token?
+    // 2. Consultar permisos
     const permsRes = await fetch(
       `https://graph.facebook.com/v19.0/me/permissions?access_token=${encodeURIComponent(metaAccessToken)}`
     );
     const permsData = await permsRes.json();
 
-    // 3. Info del token (tipo, expiración)
+    // 3. Info del token
     const debugRes = await fetch(
       `https://graph.facebook.com/v19.0/debug_token?input_token=${encodeURIComponent(metaAccessToken)}&access_token=${encodeURIComponent(metaAccessToken)}`
     );
     const debugData = await debugRes.json();
 
     return NextResponse.json({
-      canalId: finalCanalId,
-      metaPageId,
+      wsId,
+      canalId,
+      metaPageId: metaPageIdParam,
       subscribedApps: subsData,
       tokenPermissions: permsData,
       tokenDebug: debugData,
