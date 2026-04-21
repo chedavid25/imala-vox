@@ -42,35 +42,40 @@ export async function POST(request: NextRequest) {
   }
 
   // 2. Procesar el objeto (mensajes o leads)
-  if (body.object === 'page' || body.object === 'instagram' || body.object === 'whatsapp_business_account') {
-    for (const entry of body.entry || []) {
-      const pageId = entry.id;
+  try {
+    if (body.object === 'page' || body.object === 'instagram' || body.object === 'whatsapp_business_account') {
+      for (const entry of body.entry || []) {
+        const pageId = entry.id;
 
-      // Soporte para WhatsApp Cloud API
-      if (body.object === 'whatsapp_business_account') {
+        // Soporte para WhatsApp Cloud API
+        if (body.object === 'whatsapp_business_account') {
+          for (const change of entry.changes || []) {
+            if (change.field === 'messages') {
+              procesarMensajeWhatsapp(change.value, pageId).catch(console.error);
+            }
+          }
+        }
+
+        // Soporte para Mensajes (Messenger / Instagram)
+        if (entry.messaging) {
+          for (const messagingItem of entry.messaging) {
+            procesarMensajeMeta(messagingItem, pageId, body.object === 'instagram').catch(console.error);
+          }
+        }
+
+        // Soporte para Leads (Formularios)
         for (const change of entry.changes || []) {
-          if (change.field === 'messages') {
-            await procesarMensajeWhatsapp(change.value, pageId);
+          if (change.field === 'leadgen') {
+            procesarLeadMeta(change.value, pageId).catch(console.error);
           }
         }
       }
-
-      // Soporte para Mensajes (Messenger / Instagram)
-      if (entry.messaging) {
-        for (const messagingItem of entry.messaging) {
-          await procesarMensajeMeta(messagingItem, pageId, body.object === 'instagram');
-        }
-      }
-
-      // Soporte para Leads (Formularios)
-      for (const change of entry.changes || []) {
-        if (change.field === 'leadgen') {
-          await procesarLeadMeta(change.value, pageId);
-        }
-      }
     }
+  } catch (error) {
+    console.error("Error crítico en el procesamiento del webhook:", error);
   }
 
+  // SIEMPRE responder 200 OK inmediatamente para evitar retries de Meta
   return NextResponse.json({ status: 'ok' });
 }
 
@@ -81,10 +86,10 @@ export async function POST(request: NextRequest) {
 async function procesarLeadMeta(leadData: any, pageId: string) {
   try {
     // 1. Buscar en Firestore qué workspace tiene esa página conectada
-    // Usamos collectionGroup para canales porque no sabemos el wsId aún
     const wsQuery = await adminDb
       .collectionGroup(COLLECTIONS.CANALES)
       .where('metaPageId', '==', pageId)
+      .where('tipo', '==', 'facebook') // Usar el índice de messenger para velocidad
       .where('status', '==', 'connected')
       .limit(1)
       .get();
