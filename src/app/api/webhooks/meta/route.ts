@@ -91,55 +91,83 @@ export async function POST(request: NextRequest) {
  * Utiliza búsqueda multi-tenant para encontrar el token del cliente.
  */
 async function procesarLeadMeta(leadData: any, pageId: string) {
+  const leadId = leadData.leadgen_id;
+  const formId = leadData.form_id;
+
   try {
     // 1. Buscar en Firestore qué workspace tiene esa página conectada
-    console.log(`🔍 Buscando canal para pageId: ${pageId}`);
-    const wsQuery = await adminDb
-      .collectionGroup(COLLECTIONS.CANALES)
-      .where('metaPageId', '==', pageId)
-      // Flexibilizamos el tipo para encontrar el workspace independientemente de si se conectó como facebook o instagram
-      .where('status', '==', 'connected')
-      .limit(1)
-      .get();
-    
-    
+    console.log(`🔍 [LEAD ${leadId}] Buscando canal para pageId: ${pageId}`);
+    let wsQuery;
+    try {
+      wsQuery = await adminDb
+        .collectionGroup(COLLECTIONS.CANALES)
+        .where('metaPageId', '==', pageId)
+        .where('status', '==', 'connected')
+        .limit(1)
+        .get();
+    } catch (indexErr: any) {
+      // Error típico cuando falta el índice compuesto en Firestore
+      console.error(
+        `❌ [LEAD ${leadId}] Fallo en collectionGroup query — probablemente falta índice en Firestore.`,
+        `Código: ${indexErr.code || 'sin código'}`,
+        `Mensaje: ${indexErr.message}`
+      );
+      return;
+    }
+
     if (wsQuery.empty) {
-      console.warn(`⚠️ No se encontró canal conectado para pageId: ${pageId}`);
+      console.warn(`⚠️ [LEAD ${leadId}] No se encontró ningún canal con metaPageId="${pageId}" y status="connected". Verificá que la página esté conectada en la app.`);
       return;
     }
 
     const canalDoc = wsQuery.docs[0];
     const canalId = canalDoc.id;
-    const wsId = canalDoc.ref.parent.parent!.id;
-    console.log(`✅ Canal encontrado: ${canalId} en workspace: ${wsId}`);
+    const wsId = canalDoc.ref.parent.parent?.id;
+
+    if (!wsId) {
+      console.error(`❌ [LEAD ${leadId}] No se pudo resolver el workspaceId desde la ruta del canal.`);
+      return;
+    }
+
+    console.log(`✅ [LEAD ${leadId}] Canal encontrado: ${canalId} en workspace: ${wsId}`);
 
     // 2. Obtener el token de acceso
     const configPath = `${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CANALES}/${canalId}/secrets/config`;
-    console.log(`🔑 Obteniendo token de: ${configPath}`);
+    console.log(`🔑 [LEAD ${leadId}] Obteniendo token de: ${configPath}`);
     const secretSnap = await adminDb.doc(configPath).get();
 
-    if (!secretSnap.exists || !secretSnap.data()?.metaAccessToken) {
-      console.error(`❌ Token de acceso no encontrado para el canal ${canalId}`);
+    if (!secretSnap.exists) {
+      console.error(`❌ [LEAD ${leadId}] El documento secrets/config no existe en la ruta: ${configPath}`);
       return;
     }
 
     const clienteToken = secretSnap.data()?.metaAccessToken;
-    const leadId = leadData.leadgen_id;
-    const formId = leadData.form_id;
+    if (!clienteToken) {
+      console.error(`❌ [LEAD ${leadId}] El campo metaAccessToken está vacío en secrets/config del canal ${canalId}`);
+      return;
+    }
 
     // 3. Obtener datos del lead desde Meta
-    console.log(`📡 Consultando datos del lead ${leadId} a Meta Graph API...`);
+    console.log(`📡 [LEAD ${leadId}] Consultando Meta Graph API...`);
     const metaRes = await fetch(
-      `https://graph.facebook.com/v19.0/${leadId}?access_token=${clienteToken}`
+      `https://graph.facebook.com/v19.0/${leadId}?fields=field_data,ad_name,campaign_name,form_id&access_token=${clienteToken}`
     );
-    
+
     if (!metaRes.ok) {
-      const errorText = await metaRes.text();
-      console.error(`Error de Meta Graph API (${metaRes.status}):`, errorText);
+      const errorBody = await metaRes.text();
+      console.error(`❌ [LEAD ${leadId}] Meta Graph API respondió ${metaRes.status}. Respuesta:`, errorBody);
       return;
     }
 
     const metaLead = await metaRes.json();
+
+    if (metaLead.error) {
+      console.error(`❌ [LEAD ${leadId}] Error en respuesta de Meta:`, JSON.stringify(metaLead.error));
+      return;
+    }
+
+    console.log(`📋 [LEAD ${leadId}] Datos recibidos de Meta:`, JSON.stringify(metaLead));
+
     const campaignName = metaLead.ad_name || metaLead.campaign_name || 'Campaña de Meta Ads';
 
     // 4. Mapear campos del formulario
@@ -148,7 +176,7 @@ async function procesarLeadMeta(leadData: any, pageId: string) {
       campos[field.name] = field.values?.[0] || '';
     }
 
-    // 5. Resolver Etapa del Embudo (Dinámica para evitar IDs fantasmas)
+    // 5. Resolver Etapa del Embudo (dinámica para evitar IDs fantasmas)
     const etapasSnap = await adminDb
       .collection(COLLECTIONS.ESPACIOS)
       .doc(wsId)
@@ -156,36 +184,43 @@ async function procesarLeadMeta(leadData: any, pageId: string) {
       .orderBy('orden', 'asc')
       .limit(1)
       .get();
-    
-    let defaultStageId = 'nuevo';
+
+    let defaultStageId: string;
     if (!etapasSnap.empty) {
       defaultStageId = etapasSnap.docs[0].id;
+      console.log(`🏷️ [LEAD ${leadId}] Etapa inicial: "${etapasSnap.docs[0].data().nombre}" (${defaultStageId})`);
+    } else {
+      defaultStageId = 'sin_etapa';
+      console.warn(`⚠️ [LEAD ${leadId}] No hay etapas de embudo en workspace ${wsId}. El lead se guardará con etapaId="sin_etapa". Creá al menos una etapa en la app.`);
     }
 
     // 6. Mapeo de nombre robusto (Meta usa varios nombres de campos)
     const first_name = campos.first_name || '';
     const last_name = campos.last_name || '';
     const full_name = campos.full_name || campos.nombre || campos.name || '';
-    const nombreFinal = (first_name || last_name) ? `${first_name} ${last_name}`.trim() : (full_name || 'Nuevo Cliente Potencial');
+    const nombreFinal = (first_name || last_name)
+      ? `${first_name} ${last_name}`.trim()
+      : (full_name || 'Nuevo Cliente Potencial');
 
     // 7. Guardar en Firestore del Workspace
-    await adminDb
+    console.log(`💾 [LEAD ${leadId}] Guardando lead en Firestore para workspace ${wsId}...`);
+    const docRef = await adminDb
       .collection(COLLECTIONS.ESPACIOS)
       .doc(wsId)
       .collection(COLLECTIONS.LEADS)
       .add({
         origen: 'meta_ads',
-        etapaId: defaultStageId, 
+        etapaId: defaultStageId,
         temperatura: 'frio',
         nombre: nombreFinal,
         email: campos.email || campos.email_address || null,
         telefono: campos.phone_number || campos.telefono || campos.phone || null,
         camposFormulario: campos,
         metaLeadId: leadId,
-        metaFormId: formId,
+        metaFormId: formId || metaLead.form_id || null,
         metaPageId: pageId,
         campana: campaignName,
-        formulario: leadData.form_name || 'Formulario sin nombre',
+        formulario: leadData.form_name || metaLead.form_name || 'Formulario sin nombre',
         notas: '',
         convertidoAContacto: false,
         contactoId: null,
@@ -193,9 +228,9 @@ async function procesarLeadMeta(leadData: any, pageId: string) {
         actualizadoEl: Timestamp.now(),
       });
 
-    console.log(`Lead ${leadId} procesado exitosamente para workspace ${wsId}`);
-  } catch (err) {
-    console.error('Error procesando lead de Meta:', err);
+    console.log(`✅ [LEAD ${leadId}] Guardado exitosamente. Doc ID: ${docRef.id} en workspace ${wsId}`);
+  } catch (err: any) {
+    console.error(`❌ [LEAD ${leadId}] Error no controlado en procesarLeadMeta:`, err.message, err.stack);
   }
 }
 

@@ -1,0 +1,40 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "canales",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "metaPageId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "canales",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "metaInstagramId", "order": "ASCENDING" },
+        { "fieldPath": "tipo", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "canales",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "metaPageId", "order": "ASCENDING" },
+        { "fieldPath": "tipo", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "canales",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "metaPhoneNumberId", "order": "ASCENDING" },
+        { "fieldPath": "tipo", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
