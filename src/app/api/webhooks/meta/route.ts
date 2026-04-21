@@ -42,9 +42,18 @@ export async function POST(request: NextRequest) {
   }
 
   // 2. Procesar el objeto (mensajes o leads)
-  if (body.object === 'page' || body.object === 'instagram') {
+  if (body.object === 'page' || body.object === 'instagram' || body.object === 'whatsapp_business_account') {
     for (const entry of body.entry || []) {
       const pageId = entry.id;
+
+      // Soporte para WhatsApp Cloud API
+      if (body.object === 'whatsapp_business_account') {
+        for (const change of entry.changes || []) {
+          if (change.field === 'messages') {
+            await procesarMensajeWhatsapp(change.value, pageId);
+          }
+        }
+      }
 
       // Soporte para Mensajes (Messenger / Instagram)
       if (entry.messaging) {
@@ -201,7 +210,7 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
     }
 
     // 1. Identificar Workspace y Canal
-    const canalType = isInstagram ? 'instagram' : 'facebook';
+    let canalType: 'whatsapp' | 'instagram' | 'facebook' = isInstagram ? 'instagram' : 'facebook';
     const wsQuery = await adminDb
       .collectionGroup(COLLECTIONS.CANALES)
       .where(isInstagram ? 'metaInstagramId' : 'metaPageId', '==', pageId)
@@ -366,11 +375,13 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
         if (!isCopiloto) {
           if (canalType === 'whatsapp') {
             // En WhatsApp enviamos un 'visto'
-            const msgId = messagingItem.message?.mid;
+            const msgId = messagingItem.message?.mid || messagingItem.id;
             await enviarMensajeAccion(wsId, canalId, senderId, msgId, undefined, 'mark_read');
           } else {
             // En Messenger/Instagram enviamos 'typing_on'
             await enviarMensajeAccion(wsId, canalId, senderId, undefined, undefined, 'typing_on');
+            // Pequeña espera para que el cliente note el "Escribiendo"
+            await new Promise(resolve => setTimeout(resolve, 1500));
           }
         }
 
@@ -402,5 +413,129 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
 
   } catch (err) {
     console.error('Error procesando mensaje de Meta:', err);
+  }
+}
+
+/**
+ * Procesa mensajes entrantes de WhatsApp Cloud API.
+ */
+async function procesarMensajeWhatsapp(value: any, wabaId: string) {
+  try {
+    const message = value.messages?.[0];
+    const contact = value.contacts?.[0];
+    
+    if (!message || message.type !== 'text') return;
+
+    const senderId = message.from; // Número de teléfono del cliente
+    const text = message.text.body;
+    const contactoNombre = contact?.profile?.name || senderId;
+
+    // 1. Identificar Workspace y Canal
+    const wsQuery = await adminDb
+      .collectionGroup(COLLECTIONS.CANALES)
+      .where('metaPhoneNumberId', '==', value.metadata.phone_number_id)
+      .where('tipo', '==', 'whatsapp')
+      .where('status', '==', 'connected')
+      .limit(1)
+      .get();
+
+    if (wsQuery.empty) {
+      console.warn(`❌ Mensaje de WA ${senderId} ignorado: Canal no encontrado.`);
+      return;
+    }
+
+    const canalDoc = wsQuery.docs[0];
+    const canalId = canalDoc.id;
+    const wsId = canalDoc.ref.parent.parent!.id;
+    const canalData = canalDoc.data() as any;
+
+    // 2. Obtener o crear contacto
+    const contactosRef = adminDb.collection(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CONTACTOS}`);
+    let contactoId = "";
+    const contactSnap = await contactosRef.where('telefono', '==', senderId).limit(1).get();
+
+    if (contactSnap.empty) {
+      const res = await contactosRef.add({
+        nombre: contactoNombre,
+        telefono: senderId,
+        canalOrigen: 'whatsapp',
+        creadoEl: Timestamp.now()
+      });
+      contactoId = res.id;
+    } else {
+      contactoId = contactSnap.docs[0].id;
+    }
+
+    // 3. Obtener o crear conversación
+    const convRef = adminDb.collection(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CONVERSACIONES}`);
+    let convId = "";
+    const convSnap = await convRef
+      .where('contactoId', '==', contactoId)
+      .where('canalId', '==', canalId)
+      .limit(1)
+      .get();
+
+    if (convSnap.empty) {
+      const res = await convRef.add({
+        contactoId,
+        contactoNombre,
+        canal: 'whatsapp',
+        canalId,
+        agenteId: canalData.agenteId || null,
+        ultimoMensaje: text,
+        ultimaActividad: Timestamp.now(),
+        unreadCount: 1,
+        modoIA: 'auto',
+        creadoEl: Timestamp.now()
+      });
+      convId = res.id;
+    } else {
+      convId = convSnap.docs[0].id;
+      await convRef.doc(convId).update({
+        ultimoMensaje: text,
+        ultimaActividad: Timestamp.now(),
+        unreadCount: (convSnap.docs[0].data().unreadCount || 0) + 1
+      });
+    }
+
+    // 4. Guardar mensaje
+    await convRef.doc(convId).collection(COLLECTIONS.MENSAJES).add({
+      text,
+      from: 'user',
+      creadoEl: Timestamp.now(),
+      visto: false
+    });
+
+    // 5. Trigger IA
+    if (canalData.aiEnabled && canalData.agenteId) {
+      const convDoc = await convRef.doc(convId).get();
+      if (convDoc.data()?.modoIA !== 'auto') return;
+
+      const { procesarMensajeConIA } = await import('@/lib/ai/engine');
+      const { enviarMensajeAccion } = await import('@/app/actions/channels');
+
+      try {
+        // En WhatsApp enviamos 'visto' como señal de respuesta
+        await enviarMensajeAccion(wsId, canalId, senderId, message.id, undefined, 'mark_read');
+
+        await procesarMensajeConIA({
+          wsId,
+          agenteId: canalData.agenteId,
+          conversacionId: convId,
+          textoUsuario: text,
+          historial: [], // Simplificado por ahora
+          isCopiloto: false,
+          contactoNombre
+        }).then(async (respuestaIA) => {
+          if (respuestaIA) {
+            await enviarMensajeAccion(wsId, canalId, senderId, respuestaIA);
+          }
+        });
+      } catch (e) {
+        console.error("Error IA WA:", e);
+      }
+    }
+  } catch (err) {
+    console.error('Error procesando WA:', err);
   }
 }
