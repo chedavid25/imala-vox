@@ -422,17 +422,17 @@ export default function CRMTagsPage() {
                       </div>
                       <div className="space-y-4">
                         <div className={cn(
-                          "flex items-center justify-between px-3 py-2 rounded-xl border transition-all",
-                          tag.aiBlocked ? "bg-rose-50/50 border-rose-100 text-rose-600" : "bg-purple-50/50 border-purple-100 text-purple-600"
+                          "flex items-center justify-between px-3 py-2 rounded-xl border transition-all shadow-sm",
+                          tag.aiBlocked ? "bg-rose-50 border-rose-100 text-rose-600" : "bg-purple-50 border-purple-100 text-purple-600"
                         )}>
                           <div className="flex items-center gap-2">
-                            <Bot className="size-3.5" />
-                            <span className="text-[10px] font-black uppercase tracking-wider">{tag.aiBlocked ? "IA OFF" : "IA ON"}</span>
+                             <Bot className="size-4" />
+                             <span className="text-[10px] font-black uppercase tracking-wider">{tag.aiBlocked ? "IA OFF" : "IA ON"}</span>
                           </div>
                           <Switch 
                             checked={!tag.aiBlocked}
                             onCheckedChange={() => handleToggleIA(tag, false)}
-                            className="ml-auto data-[state=checked]:bg-purple-600 data-[state=unchecked]:bg-rose-500 border-none shadow-sm"
+                            className="scale-90 data-[state=checked]:bg-purple-600 data-[state=unchecked]:bg-rose-500"
                           />
                         </div>
                         {tag.alertaDias && <div className="text-[9px] text-orange-600 font-bold px-1 flex items-center gap-1.5"><Clock className="w-3 h-3" /> Salud: {tag.alertaDias} días</div>}
