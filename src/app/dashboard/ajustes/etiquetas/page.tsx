@@ -398,12 +398,13 @@ export default function CRMTagsPage() {
                       <Switch 
                         checked={!cat.aiBlocked}
                         onCheckedChange={() => handleToggleIA(cat, true)}
-                        className="scale-75 data-[state=checked]:bg-emerald-500 data-[state=unchecked]:bg-rose-400"
+                        className="data-[state=checked]:bg-emerald-500 data-[state=unchecked]:bg-rose-500 border-none shadow-sm"
                       />
                     </div>
-                  <div className="flex gap-2">
-                    <Button variant="ghost" size="icon" onClick={() => { setEditingCategory(cat); setCategoryForm({...cat}); setIsAddingCategory(true); }} className="w-8 h-8"><Edit2 className="w-3.5 h-3.5" /></Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDeleteCategory(cat.id!)} className="w-8 h-8"><Trash2 className="w-3.5 h-3.5" /></Button>
+                    <div className="flex gap-2">
+                      <Button variant="ghost" size="icon" onClick={() => { setEditingCategory(cat); setCategoryForm({...cat}); setIsAddingCategory(true); }} className="w-8 h-8"><Edit2 className="w-3.5 h-3.5" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleDeleteCategory(cat.id!)} className="w-8 h-8"><Trash2 className="w-3.5 h-3.5" /></Button>
+                    </div>
                   </div>
                </div>
 
@@ -431,7 +432,7 @@ export default function CRMTagsPage() {
                           <Switch 
                             checked={!tag.aiBlocked}
                             onCheckedChange={() => handleToggleIA(tag, false)}
-                            className="scale-75 data-[state=checked]:bg-purple-500 data-[state=unchecked]:bg-rose-400"
+                            className="ml-auto data-[state=checked]:bg-purple-600 data-[state=unchecked]:bg-rose-500 border-none shadow-sm"
                           />
                         </div>
                         {tag.alertaDias && <div className="text-[9px] text-orange-600 font-bold px-1 flex items-center gap-1.5"><Clock className="w-3 h-3" /> Salud: {tag.alertaDias} días</div>}
