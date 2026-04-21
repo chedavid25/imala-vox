@@ -2,23 +2,52 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { COLLECTIONS } from '@/lib/types/firestore';
 
-// GET /api/debug/meta-subscription?wsId=XXX&canalId=YYY
-// Devuelve el estado real de la suscripción de la página en Meta.
+// GET /api/debug/meta-subscription?wsId=XXX&metaPageId=YYY
+// También acepta canalId=ZZZ si se prefiere.
 export async function GET(req: NextRequest) {
   const wsId = req.nextUrl.searchParams.get('wsId');
   const canalId = req.nextUrl.searchParams.get('canalId');
+  const metaPageIdParam = req.nextUrl.searchParams.get('metaPageId');
 
-  if (!wsId || !canalId) {
-    return NextResponse.json({ error: 'wsId y canalId son requeridos' }, { status: 400 });
+  if (!wsId || (!canalId && !metaPageIdParam)) {
+    return NextResponse.json({ error: 'wsId y (canalId o metaPageId) son requeridos' }, { status: 400 });
   }
 
   try {
-    const canalPath = `${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CANALES}/${canalId}`;
-    const canalSnap = await adminDb.doc(canalPath).get();
-    if (!canalSnap.exists) return NextResponse.json({ error: 'Canal no existe' }, { status: 404 });
+    let canalData: any;
+    let finalCanalId = canalId;
 
-    const { metaPageId } = canalSnap.data() as any;
-    const secretSnap = await adminDb.doc(`${canalPath}/secrets/config`).get();
+    if (canalId) {
+      const canalSnap = await adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CANALES}/${canalId}`).get();
+      if (canalSnap.exists) {
+        canalData = canalSnap.data();
+      }
+    }
+
+    if (!canalData && metaPageIdParam) {
+      const q = await adminDb
+        .collection(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CANALES}`)
+        .where('metaPageId', '==', metaPageIdParam)
+        .limit(1)
+        .get();
+      
+      if (!q.empty) {
+        canalData = q.docs[0].data();
+        finalCanalId = q.docs[0].id;
+      }
+    }
+
+    if (!canalData) {
+      return NextResponse.json({ error: 'No se encontró el canal con los parámetros proporcionados' }, { status: 404 });
+    }
+
+    const metaPageId = canalData.metaPageId;
+    const secretSnap = await adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CANALES}/${finalCanalId}/secrets/config`).get();
+    
+    if (!secretSnap.exists) {
+      return NextResponse.json({ error: 'No se encontraron secretos para este canal' }, { status: 404 });
+    }
+
     const { metaAccessToken } = secretSnap.data() as any;
 
     // 1. ¿Qué apps están suscritas a esta página y con qué campos?
@@ -40,6 +69,7 @@ export async function GET(req: NextRequest) {
     const debugData = await debugRes.json();
 
     return NextResponse.json({
+      canalId: finalCanalId,
       metaPageId,
       subscribedApps: subsData,
       tokenPermissions: permsData,
