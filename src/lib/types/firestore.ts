@@ -104,6 +104,15 @@ export interface TareaCRM {
   venceEl: Timestamp;
 }
 
+export interface InteraccionCRM {
+  id?: string;
+  tipo: 'nota' | 'llamada' | 'whatsapp';
+  contenido: string;
+  creadoPor: string;
+  creadoEl: Timestamp;
+  actualizadoEl?: Timestamp;
+}
+
 export interface Contacto {
   id?: string;
   nombre: string;
