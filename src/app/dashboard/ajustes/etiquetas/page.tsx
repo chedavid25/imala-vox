@@ -214,6 +214,20 @@ export default function CRMTagsPage() {
     }
   };
 
+  const handleToggleIA = async (item: CategoriaCRM | EtiquetaCRM, isCategory: boolean) => {
+    if (!currentWorkspaceId || !item.id) return;
+    try {
+      const coll = isCategory ? COLLECTIONS.CATEGORIAS_CRM : COLLECTIONS.ETIQUETAS_CRM;
+      await updateDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, coll, item.id), {
+        aiBlocked: !item.aiBlocked,
+        actualizadoEl: serverTimestamp()
+      });
+      toast.success(item.aiBlocked ? "IA Activada" : "IA Desactivada");
+    } catch (err) {
+      toast.error("Error al cambiar estado de IA");
+    }
+  };
+
   if (loading) return <div className="p-8 flex justify-center"><Loader2 className="animate-spin text-[var(--accent)]" /></div>;
 
   return (
@@ -262,6 +276,20 @@ export default function CRMTagsPage() {
                     onChange={e => setCategoryForm({...categoryForm, nombre: e.target.value})}
                     placeholder="Ej: Tipo de Cliente, Estado del Negocio..."
                     className="h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-[15px] font-medium focus:bg-white transition-all shadow-sm"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-rose-50/50 rounded-2xl border border-rose-100 ring-2 ring-rose-500/10">
+                  <div className="space-y-0.5">
+                    <Label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-rose-700">
+                      <Bot className="size-3.5" />
+                      Bloquear IA para este grupo
+                    </Label>
+                    <p className="text-[10px] text-rose-600/70">La IA no responderá a NADIE en este grupo.</p>
+                  </div>
+                  <Switch 
+                    checked={categoryForm.aiBlocked}
+                    onCheckedChange={(v) => setCategoryForm({...categoryForm, aiBlocked: v})}
                   />
                 </div>
 
@@ -320,20 +348,6 @@ export default function CRMTagsPage() {
                     Si pasan estos días sin contacto con el cliente, el semáforo cambiará a Rojo para que tomes acción.
                   </p>
                 </div>
-
-                <div className="flex items-center justify-between p-4 bg-rose-50/50 rounded-2xl border border-rose-100">
-                  <div className="space-y-0.5">
-                    <Label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-rose-700">
-                      <Bot className="size-3.5" />
-                      Bloquear IA para este grupo
-                    </Label>
-                    <p className="text-[10px] text-rose-600/70">Silencia la IA para TODOS los clientes con etiquetas de este grupo.</p>
-                  </div>
-                  <Switch 
-                    checked={categoryForm.aiBlocked}
-                    onCheckedChange={(v) => setCategoryForm({...categoryForm, aiBlocked: v})}
-                  />
-                </div>
               </div>
 
               <DialogFooter className="p-8 pt-0">
@@ -370,11 +384,23 @@ export default function CRMTagsPage() {
                         {cat.tipo === 'exclusiva' && <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full text-[9px] font-semibold">SEMÁFORO</span>}
                       </h3>
                       <p className="text-[11px] text-[var(--text-tertiary-light)] font-medium">
-                        Alerta: {cat.alertaDiasDefault} días • {cat.tipo === 'exclusiva' ? 'Solo una activa' : 'Varias a la vez'}
-                        {cat.aiBlocked && <span className="ml-2 text-rose-500 font-bold">● IA BLOQUEADA</span>}
+                        Alerta: {cat.alertaDiasDefault || '0'} días • {cat.tipo === 'exclusiva' ? 'Solo una activa' : 'Varias a la vez'}
                       </p>
                     </div>
                   </div>
+                  <div className="flex items-center gap-4">
+                    <div className={cn(
+                      "flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all",
+                      cat.aiBlocked ? "bg-rose-50 border-rose-100 text-rose-600" : "bg-emerald-50 border-emerald-100 text-emerald-600"
+                    )}>
+                      <Bot className="size-3.5" />
+                      <span className="text-[10px] font-black uppercase tracking-wider">{cat.aiBlocked ? "IA OFF" : "IA ON"}</span>
+                      <Switch 
+                        checked={!cat.aiBlocked}
+                        onCheckedChange={() => handleToggleIA(cat, true)}
+                        className="scale-75 data-[state=checked]:bg-emerald-500 data-[state=unchecked]:bg-rose-400"
+                      />
+                    </div>
                   <div className="flex gap-2">
                     <Button variant="ghost" size="icon" onClick={() => { setEditingCategory(cat); setCategoryForm({...cat}); setIsAddingCategory(true); }} className="w-8 h-8"><Edit2 className="w-3.5 h-3.5" /></Button>
                     <Button variant="ghost" size="icon" onClick={() => handleDeleteCategory(cat.id!)} className="w-8 h-8"><Trash2 className="w-3.5 h-3.5" /></Button>
@@ -393,12 +419,22 @@ export default function CRMTagsPage() {
                            <Button variant="ghost" size="icon" onClick={() => handleDeleteTag(tag.id!)} className="w-7 h-7"><Trash2 className="w-3 h-3" /></Button>
                         </div>
                       </div>
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap gap-1.5">
-                          {tag.instruccionIA && <div className="text-[10px] text-purple-600 font-bold bg-purple-50 px-2 py-1 rounded-lg border border-purple-100 flex items-center gap-1.5"><Bot className="w-3 h-3" /> IA ON</div>}
-                          {tag.aiBlocked && <div className="text-[10px] text-rose-600 font-bold bg-rose-50 px-2 py-1 rounded-lg border border-rose-100 flex items-center gap-1.5 line-through decoration-rose-300"><Bot className="w-3 h-3" /> IA OFF</div>}
-                          {tag.alertaDias && <div className="text-[10px] text-orange-600 font-bold bg-orange-50 px-2 py-1 rounded-lg border border-orange-100 flex items-center gap-1.5"><Clock className="w-3 h-3" /> {tag.alertaDias} d</div>}
+                      <div className="space-y-4">
+                        <div className={cn(
+                          "flex items-center justify-between px-3 py-2 rounded-xl border transition-all",
+                          tag.aiBlocked ? "bg-rose-50/50 border-rose-100 text-rose-600" : "bg-purple-50/50 border-purple-100 text-purple-600"
+                        )}>
+                          <div className="flex items-center gap-2">
+                            <Bot className="size-3.5" />
+                            <span className="text-[10px] font-black uppercase tracking-wider">{tag.aiBlocked ? "IA OFF" : "IA ON"}</span>
+                          </div>
+                          <Switch 
+                            checked={!tag.aiBlocked}
+                            onCheckedChange={() => handleToggleIA(tag, false)}
+                            className="scale-75 data-[state=checked]:bg-purple-500 data-[state=unchecked]:bg-rose-400"
+                          />
                         </div>
+                        {tag.alertaDias && <div className="text-[9px] text-orange-600 font-bold px-1 flex items-center gap-1.5"><Clock className="w-3 h-3" /> Salud: {tag.alertaDias} días</div>}
                       </div>
                     </div>
                   ))}
@@ -549,6 +585,20 @@ export default function CRMTagsPage() {
               />
             </div>
 
+            <div className="flex items-center justify-between p-4 bg-rose-50/50 rounded-2xl border border-rose-100 ring-2 ring-rose-500/10">
+              <div className="space-y-0.5">
+                <Label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-rose-700">
+                  <Bot className="size-3.5" />
+                  Bloquear IA para esta etiqueta
+                </Label>
+                <p className="text-[10px] text-rose-600/70">Silencia la IA solo para esta etiqueta específica.</p>
+              </div>
+              <Switch 
+                checked={tagForm.aiBlocked}
+                onCheckedChange={(v) => setTagForm({...tagForm, aiBlocked: v})}
+              />
+            </div>
+
             <div className="space-y-3">
               <Label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 ml-1">Color</Label>
               <div className="grid grid-cols-4 gap-2">
@@ -599,20 +649,6 @@ export default function CRMTagsPage() {
                 value={tagForm.alertaDias || ""}
                 onChange={e => setTagForm({...tagForm, alertaDias: parseInt(e.target.value) || undefined})}
                 className="h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-[15px] font-medium focus:bg-white transition-all shadow-sm"
-              />
-            </div>
-
-            <div className="flex items-center justify-between p-4 bg-rose-50/50 rounded-2xl border border-rose-100">
-              <div className="space-y-0.5">
-                <Label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-rose-700">
-                  <Bot className="size-3.5" />
-                  Bloquear IA para esta etiqueta
-                </Label>
-                <p className="text-[10px] text-rose-600/70">Silencia la IA solo cuando el contacto tenga esta etiqueta.</p>
-              </div>
-              <Switch 
-                checked={tagForm.aiBlocked}
-                onCheckedChange={(v) => setTagForm({...tagForm, aiBlocked: v})}
               />
             </div>
           </div>
