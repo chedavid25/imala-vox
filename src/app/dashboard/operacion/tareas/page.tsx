@@ -100,6 +100,8 @@ export default function TareasPage() {
     hora: "09:00",
     prioridad: 'media' as 'baja' | 'media' | 'alta',
     contactoId: "",
+    estado: 'pendiente' as 'pendiente' | 'proceso' | 'completada',
+    completada: false,
     recurrencia: {
       tipo: 'ninguna' as 'diaria' | 'semanal' | 'intervalo' | 'ninguna',
       config: {
@@ -247,6 +249,7 @@ export default function TareasPage() {
         prioridad: 'media',
         contactoId: "",
         estado: 'pendiente',
+        completada: false,
         recurrencia: { tipo: 'ninguna', config: { diasSemana: [], intervaloDias: 1 } }
       });
     } catch (error) {
