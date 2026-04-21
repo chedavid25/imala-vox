@@ -47,10 +47,16 @@ export async function GET(req: NextRequest) {
 
     const { metaAccessToken } = secretSnap.data() as any;
 
-    const [subsRes, permsRes, debugRes] = await Promise.all([
+    const appId = process.env.NEXT_PUBLIC_META_APP_ID;
+    const appSecret = process.env.META_APP_SECRET;
+    const appAccessToken = `${appId}|${appSecret}`;
+
+    const [subsRes, permsRes, debugRes, appInfoRes, appSubsRes] = await Promise.all([
       fetch(`https://graph.facebook.com/v19.0/${metaPageIdParam}/subscribed_apps?access_token=${encodeURIComponent(metaAccessToken)}`),
       fetch(`https://graph.facebook.com/v19.0/me/permissions?access_token=${encodeURIComponent(metaAccessToken)}`),
-      fetch(`https://graph.facebook.com/v19.0/debug_token?input_token=${encodeURIComponent(metaAccessToken)}&access_token=${encodeURIComponent(metaAccessToken)}`)
+      fetch(`https://graph.facebook.com/v19.0/debug_token?input_token=${encodeURIComponent(metaAccessToken)}&access_token=${encodeURIComponent(metaAccessToken)}`),
+      fetch(`https://graph.facebook.com/v19.0/${appId}?fields=id,name,app_domains,link,namespace,category,restrictions&access_token=${encodeURIComponent(appAccessToken)}`),
+      fetch(`https://graph.facebook.com/v19.0/${appId}/subscriptions?access_token=${encodeURIComponent(appAccessToken)}`),
     ]);
 
     return NextResponse.json({
@@ -60,6 +66,8 @@ export async function GET(req: NextRequest) {
       subscribedApps: await subsRes.json(),
       tokenPermissions: await permsRes.json(),
       tokenDebug: await debugRes.json(),
+      appInfo: await appInfoRes.json(),
+      appSubscriptions: await appSubsRes.json(),
     });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });

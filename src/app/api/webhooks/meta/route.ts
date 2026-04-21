@@ -19,6 +19,13 @@ export async function GET(request: NextRequest) {
 
 // POST — recibir eventos de Meta (mensajes + leads)
 export async function POST(request: NextRequest) {
+  console.log("[META-WEBHOOK-IN]", {
+    timestamp: new Date().toISOString(),
+    headers: Object.fromEntries(request.headers.entries()),
+    url: request.url,
+    method: request.method,
+  });
+
   try {
     const rawBody = await request.text();
     if (!rawBody) {
