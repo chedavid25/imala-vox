@@ -1,5 +1,5 @@
-import { adminDb } from './src/lib/firebase-admin.ts';
-import { COLLECTIONS } from './src/lib/types/firestore.ts';
+import { adminDb } from './src/lib/firebase-admin';
+import { COLLECTIONS } from './src/lib/types/firestore';
 
 async function cleanup() {
   const workspaces = await adminDb.collection(COLLECTIONS.ESPACIOS).get();
