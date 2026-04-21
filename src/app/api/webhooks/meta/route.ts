@@ -59,14 +59,16 @@ export async function POST(request: NextRequest) {
         // Soporte para Mensajes (Messenger / Instagram)
         if (entry.messaging) {
           for (const messagingItem of entry.messaging) {
-            procesarMensajeMeta(messagingItem, pageId, body.object === 'instagram').catch(console.error);
+            console.log(`📩 Procesando mensaje de ${messagingItem.sender.id}`);
+            await procesarMensajeMeta(messagingItem, pageId, body.object === 'instagram');
           }
         }
 
         // Soporte para Leads (Formularios)
         for (const change of entry.changes || []) {
           if (change.field === 'leadgen') {
-            procesarLeadMeta(change.value, pageId).catch(console.error);
+            console.log(`🎯 Lead Detectado para pageId: ${pageId}. Lead ID: ${change.value.leadgen_id}`);
+            await procesarLeadMeta(change.value, pageId);
           }
         }
       }
@@ -86,46 +88,42 @@ export async function POST(request: NextRequest) {
 async function procesarLeadMeta(leadData: any, pageId: string) {
   try {
     // 1. Buscar en Firestore qué workspace tiene esa página conectada
+    console.log(`🔍 Buscando canal para pageId: ${pageId}`);
     const wsQuery = await adminDb
       .collectionGroup(COLLECTIONS.CANALES)
       .where('metaPageId', '==', pageId)
-      .where('tipo', '==', 'facebook') // Usar el índice de messenger para velocidad
+      .where('tipo', '==', 'facebook') 
       .where('status', '==', 'connected')
       .limit(1)
       .get();
-
+    
+    
     if (wsQuery.empty) {
-      console.warn(`Webhook recibido para pageId ${pageId} no registrada o desconectada.`);
+      console.warn(`⚠️ No se encontró canal conectado para pageId: ${pageId}`);
       return;
     }
 
     const canalDoc = wsQuery.docs[0];
     const canalId = canalDoc.id;
-    // Navegamos al padre del canal para obtener el ID del espacio
-    // path: espaciosDeTrabajo/{wsId}/canales/{canalId}
     const wsId = canalDoc.ref.parent.parent!.id;
+    console.log(`✅ Canal encontrado: ${canalId} en workspace: ${wsId}`);
 
-    // 2. Obtener el token de ESE cliente específico desde el documento privado de secretos
-    const secretSnap = await adminDb
-      .doc(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CANALES}/${canalId}/secrets/config`)
-      .get();
+    // 2. Obtener el token de acceso
+    const configPath = `${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CANALES}/${canalId}/secrets/config`;
+    console.log(`🔑 Obteniendo token de: ${configPath}`);
+    const secretSnap = await adminDb.doc(configPath).get();
 
-    if (!secretSnap.exists) {
-      console.error(`Se encontró el canal ${canalId} pero no su documento de secretos.`);
+    if (!secretSnap.exists || !secretSnap.data()?.metaAccessToken) {
+      console.error(`❌ Token de acceso no encontrado para el canal ${canalId}`);
       return;
     }
 
     const clienteToken = secretSnap.data()?.metaAccessToken;
-    if (!clienteToken) {
-      console.error(`El documento de secretos para el canal ${canalId} no tiene metaAccessToken.`);
-      return;
-    }
-
-    // 3. Obtener datos completos del lead desde Meta Graph API
     const leadId = leadData.leadgen_id;
     const formId = leadData.form_id;
-    const campaignName = leadData.ad_name || 'Sin nombre';
 
+    // 3. Obtener datos del lead desde Meta
+    console.log(`📡 Consultando datos del lead ${leadId} a Meta Graph API...`);
     const metaRes = await fetch(
       `https://graph.facebook.com/v19.0/${leadId}?access_token=${clienteToken}`
     );
