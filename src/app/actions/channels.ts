@@ -141,18 +141,16 @@ export async function eliminarCanal(wsId: string, canalId: string) {
  */
 export async function sincronizarWebhooks(wsId: string, canalId: string) {
   try {
-    // 1. Obtener el ID de la página del documento del canal
     const canalPath = `${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CANALES}/${canalId}`;
     const canalSnap = await adminDb.doc(canalPath).get();
-    
+
     if (!canalSnap.exists) {
       throw new Error("No se encontró el canal configurado");
     }
-    
+
     const canalData = canalSnap.data() as any;
     const metaPageId = canalData.metaPageId;
 
-    // 2. Obtener el token de acceso de la página desde los secretos
     const secretPath = `${canalPath}/secrets/config`;
     const secretSnap = await adminDb.doc(secretPath).get();
 
@@ -166,38 +164,73 @@ export async function sincronizarWebhooks(wsId: string, canalId: string) {
       throw new Error("Faltan credenciales de Meta (Access Token o Page ID) para la sincronización");
     }
 
-    // 2. Llamar a Meta Graph API para suscribir la App a la Página
-    // Endpoint: POST /{page-id}/subscribed_apps
-    const res = await fetch(`https://graph.facebook.com/v19.0/${metaPageId}/subscribed_apps`, {
+    // 🔧 FIX: subscribed_fields debe ir como QUERY STRING separado por comas,
+    // NO como JSON body. Meta Graph API ignora silenciosamente los campos
+    // cuando se envían en el body JSON en este endpoint.
+    const subscribedFields = [
+      "messages",
+      "messaging_postbacks",
+      "messaging_optins",
+      "message_deliveries",
+      "message_reads",
+      "leadgen"
+    ].join(",");
+
+    const url = new URL(`https://graph.facebook.com/v19.0/${metaPageId}/subscribed_apps`);
+    url.searchParams.set("subscribed_fields", subscribedFields);
+    url.searchParams.set("access_token", metaAccessToken);
+
+    const res = await fetch(url.toString(), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        access_token: metaAccessToken,
-        subscribed_fields: [
-          "messages",
-          "messaging_postbacks",
-          "messaging_optins",
-          "message_deliveries",
-          "message_reads",
-          "leadgen"
-        ].join(",")
-      }),
+      // Sin body. Sin Content-Type. Todo va por query string.
     });
 
     const data = await res.json();
 
-    if (!data.success) {
-      console.error("Error al suscribir webhooks en Meta:", data);
-      return { success: false, error: data.error?.message || "Error desconocido en Meta" };
+    if (!res.ok || !data.success) {
+      console.error("Error al suscribir webhooks en Meta:", {
+        status: res.status,
+        data
+      });
+      return {
+        success: false,
+        error: data.error?.message || `HTTP ${res.status}: Error desconocido en Meta`
+      };
     }
 
-    // 3. Marcar el canal como verificado en Firestore
-    await adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CANALES}/${canalId}`).update({
+    // 🔧 FIX: Verificar DESPUÉS de suscribir que el campo leadgen quedó activo.
+    // Esto detecta casos donde Meta devuelve success:true parcial.
+    const verifyRes = await fetch(
+      `https://graph.facebook.com/v19.0/${metaPageId}/subscribed_apps?access_token=${encodeURIComponent(metaAccessToken)}`
+    );
+    const verifyData = await verifyRes.json();
+
+    const appSubscribed = verifyData.data?.[0];
+    const subscribedFieldsList: string[] = (appSubscribed?.subscribed_fields || [])
+      .map((f: any) => typeof f === "string" ? f : f.name);
+
+    const hasLeadgen = subscribedFieldsList.includes("leadgen");
+
+    console.log(`[sincronizarWebhooks] Verificación página ${metaPageId}:`, {
+      appSubscribed: !!appSubscribed,
+      subscribedFields: subscribedFieldsList,
+      hasLeadgen
+    });
+
+    if (!hasLeadgen) {
+      return {
+        success: false,
+        error: "La página quedó suscrita pero el campo 'leadgen' no se activó. Verificá que el Page Access Token tenga el permiso 'leads_retrieval' y que la app tenga el producto Webhooks → Page → 'leadgen' habilitado en el panel de Meta."
+      };
+    }
+
+    await adminDb.doc(canalPath).update({
       webhookVerified: true,
+      subscribedFields: subscribedFieldsList,
       actualizadoEl: Timestamp.now()
     });
 
-    return { success: true };
+    return { success: true, subscribedFields: subscribedFieldsList };
   } catch (error: any) {
     console.error("Error en sincronizarWebhooks:", error);
     return { success: false, error: error.message };

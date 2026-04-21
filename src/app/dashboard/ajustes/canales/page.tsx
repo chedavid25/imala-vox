@@ -127,15 +127,15 @@ export default function CanalesPage() {
     const redirectUri = `${window.location.origin}/api/auth/meta/callback`;
     const scope = [
       'pages_show_list',
-      'pages_messaging',
-      'instagram_basic',
-      'instagram_manage_messages',
-      'leads_retrieval',
       'pages_read_engagement',
       'pages_manage_metadata',
+      'pages_messaging',
+      'leads_retrieval',
       'ads_management',
-      'ads_read',
-      'business_management'
+      'business_management',
+      'instagram_basic',
+      'instagram_manage_messages',
+      'ads_read'
     ].join(',');
 
     const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&state=${currentWorkspaceId}`;
