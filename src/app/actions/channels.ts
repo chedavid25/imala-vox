@@ -235,11 +235,12 @@ export async function enviarMensajeAccion(
   wsId: string, 
   canalId: string, 
   destinatario: string, 
-  texto: string,
-  media?: { url: string; tipo: 'image' | 'video' | 'document' }
+  texto?: string,
+  media?: { url: string; tipo: 'image' | 'video' | 'document' },
+  senderAction?: 'typing_on' | 'typing_off' | 'mark_read'
 ) {
   try {
-    if (!wsId || !canalId || !destinatario || (!texto && !media)) throw new Error("Faltan parámetros de envío");
+    if (!wsId || !canalId || !destinatario || (!texto && !media && !senderAction)) throw new Error("Faltan parámetros de envío");
 
     const canalPath = `${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CANALES}/${canalId}`;
     const canalSnap = await adminDb.doc(canalPath).get();
@@ -259,7 +260,13 @@ export async function enviarMensajeAccion(
       if (!phoneNumberId) throw new Error("ID de teléfono no configurado para WhatsApp");
       url = `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`;
       
-      if (media) {
+      if (senderAction === 'mark_read') {
+        body = {
+          messaging_product: "whatsapp",
+          status: "read",
+          message_id: texto // Para WhatsApp 'read' requiere el messageId en el campo texto
+        };
+      } else if (media) {
         body = {
           messaging_product: "whatsapp",
           recipient_type: "individual",
@@ -280,7 +287,12 @@ export async function enviarMensajeAccion(
       // Instagram o Facebook use Messenger API
       url = `https://graph.facebook.com/v19.0/me/messages`; 
       
-      if (media) {
+      if (senderAction) {
+        body = {
+          recipient: { id: destinatario },
+          sender_action: senderAction
+        };
+      } else if (media) {
         body = {
           recipient: { id: destinatario },
           message: {

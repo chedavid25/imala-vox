@@ -362,6 +362,18 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
       const { enviarMensajeAccion } = await import('@/app/actions/channels');
 
       try {
+        // ACTIVAR INDICADOR DE ESCRITURA
+        if (!isCopiloto) {
+          if (canalType === 'whatsapp') {
+            // En WhatsApp enviamos un 'visto'
+            const msgId = messagingItem.message?.mid;
+            await enviarMensajeAccion(wsId, canalId, senderId, msgId, undefined, 'mark_read');
+          } else {
+            // En Messenger/Instagram enviamos 'typing_on'
+            await enviarMensajeAccion(wsId, canalId, senderId, undefined, undefined, 'typing_on');
+          }
+        }
+
         const respuestaIA = await procesarMensajeConIA({
            wsId,
            agenteId: canalData.agenteId,
