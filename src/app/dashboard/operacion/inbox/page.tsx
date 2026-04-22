@@ -13,10 +13,24 @@ import { COLLECTIONS, Contacto } from "@/lib/types/firestore";
 import { enviarMensajeAccion } from "@/app/actions/channels";
 import { getDoc } from "firebase/firestore";
 import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 
 import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
 export default function InboxPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-full items-center justify-center bg-[var(--bg-main)]">
+        <Loader2 className="w-8 h-8 animate-spin text-[var(--accent)]" />
+      </div>
+    }>
+      <InboxContent />
+    </Suspense>
+  );
+}
+
+function InboxContent() {
   const searchParams = useSearchParams();
   const targetContactoId = searchParams.get('contactoId');
   
@@ -184,7 +198,7 @@ export default function InboxPage() {
         />
       </div>
       
-      {/* Columna 2: Ventana de Chat - Se expande para ocupar el resto del espacio disponible antes del panel global */}
+      {/* Columna 2: Ventana de Chat */}
       <div className="flex-1 flex flex-col h-full min-w-0 bg-[var(--bg-card)]">
         <ChatWindow 
           conversacion={selectedChat}

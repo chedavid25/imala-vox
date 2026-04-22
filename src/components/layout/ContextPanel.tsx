@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { useContactos } from "@/hooks/useContactos";
+import { useMensajes } from "@/hooks/useMensajes";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -76,11 +77,35 @@ export function ContextPanel() {
   const [editedEmail, setEditedEmail] = useState("");
 
   const [editingInteraction, setEditingInteraction] = useState<InteraccionCRM | null>(null);
+  const { mensajes } = useMensajes(selectedChatId);
   const [isUpdating, setIsUpdating] = useState(false);
 
   const selectedContact = contactos.find(c => 
     c.id === selectedContactId || (c as any).metaId === selectedContactId
   );
+
+  const suggestedData = useMemo(() => {
+    if (!mensajes || mensajes.length === 0) return null;
+    
+    const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+    const phoneRegex = /\+?[0-9]{7,15}/g;
+
+    let foundEmail: string | null = null;
+    let foundPhone: string | null = null;
+
+    mensajes.slice(-20).forEach(m => {
+      if (m.from !== 'operator' && m.from !== 'system') {
+        const emailMatch = m.text?.match(emailRegex);
+        if (emailMatch && (!selectedContact?.email || selectedContact.email === '')) foundEmail = emailMatch[0];
+        
+        const phoneMatch = m.text?.match(phoneRegex);
+        if (phoneMatch && (!selectedContact?.telefono || selectedContact.telefono === '')) foundPhone = phoneMatch[0];
+      }
+    });
+
+    if (foundEmail || foundPhone) return { email: foundEmail, phone: foundPhone };
+    return null;
+  }, [mensajes, selectedContact]);
 
   useEffect(() => {
     if (selectedContact) {
@@ -258,17 +283,41 @@ export function ContextPanel() {
               <User className="w-8 h-8 text-[var(--text-tertiary-light)] opacity-30" />
             )}
           </div>
-          <div>
-            <h4 className="text-[16px] font-black text-[var(--text-primary-light)] tracking-tight">
-              {selectedContact?.nombre || "Prospecto"}
-            </h4>
-            <div className="flex items-center justify-center gap-2 mt-1">
-              <Badge className="text-[10px] font-black bg-[var(--bg-sidebar)] text-[var(--accent)] border-none px-2.5 h-5 rounded-full shadow-sm">
-                {selectedContact?.relacionTag || "LEAD"}
-              </Badge>
-              <div className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[10px] text-[var(--text-tertiary-light)] font-bold uppercase tracking-widest">Activo</span>
-            </div>
+          <div className="group relative flex items-center justify-center gap-2">
+            {isEditingName ? (
+              <div className="flex items-center gap-2 w-full max-w-[200px]">
+                <input 
+                  type="text" 
+                  value={editedName} 
+                  onChange={(e) => setEditedName(e.target.value)}
+                  className="bg-transparent border-b border-[var(--accent)] text-[16px] font-black text-[var(--text-primary-light)] text-center w-full focus:outline-none"
+                  autoFocus
+                  onKeyDown={(e) => e.key === 'Enter' && handleUpdateField("nombre", editedName).then(() => setIsEditingName(false))}
+                />
+                <button onClick={() => handleUpdateField("nombre", editedName).then(() => setIsEditingName(false))}>
+                  <Check className="size-4 text-emerald-500" />
+                </button>
+              </div>
+            ) : (
+              <>
+                <h4 className="text-[16px] font-black text-[var(--text-primary-light)] tracking-tight">
+                  {selectedContact?.nombre || "Prospecto"}
+                </h4>
+                <button 
+                  onClick={() => setIsEditingName(true)}
+                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-[var(--bg-input)] rounded-md transition-all"
+                >
+                  <Pencil className="size-3 text-[var(--accent)]" />
+                </button>
+              </>
+            )}
+          </div>
+          <div className="flex items-center justify-center gap-2 mt-1">
+            <Badge className="text-[10px] font-black bg-[var(--bg-sidebar)] text-[var(--accent)] border-none px-2.5 h-5 rounded-full shadow-sm">
+              {selectedContact?.relacionTag || "LEAD"}
+            </Badge>
+            <div className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-[10px] text-[var(--text-tertiary-light)] font-bold uppercase tracking-widest">Activo</span>
           </div>
         </div>
       </div>
@@ -287,15 +336,100 @@ export function ContextPanel() {
           <TabsContent value="perfil" className="p-6 m-0 space-y-8 animate-in fade-in">
             {/* Información Básica */}
             <div className="space-y-4">
-               <Label className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest px-1">Información Directa</Label>
+               <div className="flex items-center justify-between px-1">
+                  <Label className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest">Información Directa</Label>
+                  {suggestedData && (
+                    <Badge className="bg-emerald-500 text-white border-none animate-pulse text-[9px] font-black">Nuevos Datos</Badge>
+                  )}
+               </div>
+
+               {suggestedData && (
+                  <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-xl flex flex-col gap-2 animate-in slide-in-from-right-4 duration-500">
+                    <p className="text-[10px] font-black text-emerald-600 uppercase flex items-center gap-1">
+                      <Bot className="size-3" /> Sugerencia de la IA
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {suggestedData.phone && (
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="h-7 text-[10px] bg-white border-emerald-200 text-emerald-700 font-bold gap-1 rounded-lg hover:bg-emerald-100 transition-colors"
+                          onClick={() => handleUpdateField("telefono", suggestedData.phone)}
+                        >
+                          <Plus className="size-3" /> Tel: {suggestedData.phone}
+                        </Button>
+                      )}
+                      {suggestedData.email && (
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="h-7 text-[10px] bg-white border-emerald-200 text-emerald-700 font-bold gap-1 rounded-lg hover:bg-emerald-100 transition-colors"
+                          onClick={() => handleUpdateField("email", suggestedData.email)}
+                        >
+                          <Plus className="size-3" /> Email: {suggestedData.email}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+               )}
+
                <div className="grid gap-2">
                   <div className="bg-[var(--bg-input)]/50 p-3 rounded-xl border border-[var(--border-light)] group relative overflow-hidden">
-                    <p className="text-[9px] font-black text-[var(--text-tertiary-light)] uppercase mb-1">WhatsApp</p>
-                    <p className="text-[13px] font-bold">{selectedContact?.telefono || "No disponible"}</p>
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-[9px] font-black text-[var(--text-tertiary-light)] uppercase">WhatsApp</p>
+                      <button 
+                        onClick={() => setIsEditingPhone(!isEditingPhone)}
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white rounded transition-all"
+                      >
+                        {isEditingPhone ? <X className="size-3 text-rose-500" /> : <Pencil className="size-3 text-[var(--accent)]" />}
+                      </button>
+                    </div>
+                    {isEditingPhone ? (
+                      <div className="flex items-center gap-2">
+                        <input 
+                          type="text" 
+                          value={editedPhone} 
+                          onChange={(e) => setEditedPhone(e.target.value)}
+                          className="bg-transparent border-b border-[var(--accent)] text-[13px] font-bold w-full focus:outline-none"
+                          autoFocus
+                          onKeyDown={(e) => e.key === 'Enter' && handleUpdateField("telefono", editedPhone).then(() => setIsEditingPhone(false))}
+                        />
+                        <button onClick={() => handleUpdateField("telefono", editedPhone).then(() => setIsEditingPhone(false))}>
+                          <Check className="size-4 text-emerald-500" />
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="text-[13px] font-bold">{selectedContact?.telefono || "No disponible"}</p>
+                    )}
                   </div>
+
                   <div className="bg-[var(--bg-input)]/50 p-3 rounded-xl border border-[var(--border-light)] group relative overflow-hidden">
-                    <p className="text-[9px] font-black text-[var(--text-tertiary-light)] uppercase mb-1">Email</p>
-                    <p className="text-[13px] font-bold">{selectedContact?.email || "Sin correo"}</p>
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-[9px] font-black text-[var(--text-tertiary-light)] uppercase">Email</p>
+                      <button 
+                        onClick={() => setIsEditingEmail(!isEditingEmail)}
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white rounded transition-all"
+                      >
+                        {isEditingEmail ? <X className="size-3 text-rose-500" /> : <Pencil className="size-3 text-[var(--accent)]" />}
+                      </button>
+                    </div>
+                    {isEditingEmail ? (
+                      <div className="flex items-center gap-2">
+                        <input 
+                          type="email" 
+                          value={editedEmail} 
+                          onChange={(e) => setEditedEmail(e.target.value)}
+                          className="bg-transparent border-b border-[var(--accent)] text-[13px] font-bold w-full focus:outline-none"
+                          autoFocus
+                          onKeyDown={(e) => e.key === 'Enter' && handleUpdateField("email", editedEmail).then(() => setIsEditingEmail(false))}
+                        />
+                        <button onClick={() => handleUpdateField("email", editedEmail).then(() => setIsEditingEmail(false))}>
+                          <Check className="size-4 text-emerald-500" />
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="text-[13px] font-bold">{selectedContact?.email || "Sin correo"}</p>
+                    )}
                   </div>
                   <div className="bg-[var(--bg-input)]/50 p-3 rounded-xl border border-[var(--border-light)] group relative overflow-hidden">
                     <p className="text-[9px] font-black text-[var(--text-tertiary-light)] uppercase mb-1">Cumpleaños</p>

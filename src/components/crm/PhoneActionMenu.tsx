@@ -11,10 +11,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { 
   Phone, 
-  MessageCircle, 
   ExternalLink, 
   MessageSquare,
-  Smartphone
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -57,15 +55,17 @@ export function PhoneActionMenu({ phoneNumber, contactoId, nombre, className }: 
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button 
-          className={cn(
-            "text-[var(--text-primary-light)] font-bold hover:text-[var(--accent)] transition-colors text-left",
-            className
-          )}
-        >
-          {phoneNumber}
-        </button>
+      <DropdownMenuTrigger 
+        render={
+          <button 
+            className={cn(
+              "text-[var(--text-primary-light)] font-bold hover:text-[var(--accent)] transition-colors text-left",
+              className
+            )}
+          />
+        }
+      >
+        {phoneNumber}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56 rounded-2xl p-2 shadow-xl border-none bg-white">
         <DropdownMenuLabel className="text-[10px] font-black uppercase text-slate-400 px-3 py-2">
