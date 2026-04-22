@@ -12,6 +12,8 @@ import { collection, query, where, getDocs, limit } from "firebase/firestore";
 import { COLLECTIONS, Workspace } from "@/lib/types/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { cn } from "@/lib/utils";
+import { useMobileLayout } from "@/hooks/useMobileLayout";
+import { MobileLayout } from "./MobileLayout";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -22,6 +24,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const router = useRouter();
   const { setWorkspace, setWorkspaceId, currentWorkspaceId, currentAgentName, setCurrentAgentName } = useWorkspaceStore();
   const [isSessionLoading, setIsSessionLoading] = useState(true);
+  const isMobile = useMobileLayout();
   
   const isPublicRoute = 
     pathname.toLowerCase().startsWith("/auth") || 
@@ -136,6 +139,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   if (isSessionLoading) {
     return <AppLoadingSkeleton />;
+  }
+
+  // Fork Mobile
+  if (isMobile) {
+    return <MobileLayout>{children}</MobileLayout>;
   }
 
   const getBreadcrumbs = () => {

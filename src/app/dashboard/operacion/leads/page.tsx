@@ -95,6 +95,9 @@ import { useDroppable } from "@dnd-kit/core";
  * MÓDULO DE LEADS - FASE 3
  * Gestión de prospectos con vista Kanban y Lista.
  */
+import { useMobileLayout } from "@/hooks/useMobileLayout";
+import { MobileLeadList } from "@/components/mobile/crm/MobileLeadList";
+
 export default function LeadsPage() {
   const router = useRouter();
   const { currentWorkspaceId } = useWorkspaceStore();
@@ -106,6 +109,7 @@ export default function LeadsPage() {
   const [filtroOrigen, setFiltroOrigen] = useState<'todos' | 'meta_ads' | 'organico' | 'manual'>('todos');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const isMobile = useMobileLayout();
   
   // Lead seleccionado derivado (para reactividad total)
   const selectedLead = useMemo(() => 
@@ -472,242 +476,255 @@ export default function LeadsPage() {
   }
 
   return (
-    <div className="p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
-      {/* HEADER & METRICAS */}
-      <div className="flex flex-col gap-6">
-        <div className="flex justify-between items-end">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-[var(--accent)] mb-1">
-              <Target className="w-4 h-4" />
-              <span className="text-xs font-bold uppercase tracking-widest">Leads & Funnel</span>
-            </div>
-            <h1 className="text-2xl font-bold text-[var(--text-primary-light)]">Gestión de Prospectos</h1>
-            <p className="text-sm text-[var(--text-tertiary-light)]">Convierte leads de Meta Ads y orgánicos en clientes.</p>
-          </div>
-
-          <div className="flex items-center gap-2 bg-[var(--bg-input)] p-1 rounded-xl border border-[var(--border-light)]">
-            <button 
-              onClick={() => setView('kanban')}
-              className={cn(
-                "flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-lg transition-all",
-                view === 'kanban' ? "bg-white text-[var(--text-primary-light)] shadow-sm" : "text-[var(--text-tertiary-light)] hover:text-[var(--text-secondary-light)]"
-              )}
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              Kanban
-            </button>
-            <button 
-              onClick={() => setView('list')}
-              className={cn(
-                "flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-lg transition-all",
-                view === 'list' ? "bg-white text-[var(--text-primary-light)] shadow-sm" : "text-[var(--text-tertiary-light)] hover:text-[var(--text-secondary-light)]"
-              )}
-            >
-              <List className="w-3.5 h-3.5" />
-              Lista
-            </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <MetricCard title="Leads este mes" value={metrics.enEsteMes} icon={Users} trend={metrics.tendenciaLeads} color="blue" />
-          <MetricCard title="Nuevos hoy" value={metrics.nuevosHoy} icon={Clock} trend="Nuevo" color="orange" />
-          <MetricCard title="Convertidos" value={metrics.convertidos} icon={CheckCircle2} color="green" />
-          <MetricCard title="Tasa de Cierre" value={`${metrics.tasaCierre}%`} icon={TrendingUp} color="purple" />
-        </div>
-      </div>
-
-      <div className="flex flex-col md:flex-row gap-4 mb-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-tertiary-light)]" />
-          <Input 
-            placeholder="Buscar por nombre, email o teléfono..." 
-            className="pl-10 h-11 bg-white border-[var(--border-light)] rounded-2xl shadow-sm focus:ring-1 focus:ring-[var(--accent)]"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        
-        <div className="flex gap-1.5 p-1 bg-[var(--bg-input)] rounded-2xl border border-[var(--border-light)]/50">
-          {[
-            { id: 'todos', label: 'Todos' },
-            { id: 'meta_ads', label: 'Meta Ads' },
-            { id: 'organico', label: 'Orgánico' },
-            { id: 'manual', label: 'Manual' }
-          ].map(pill => (
-            <button
-              key={pill.id}
-              onClick={() => setFiltroOrigen(pill.id as any)}
-              className={cn(
-                "px-4 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2",
-                filtroOrigen === pill.id 
-                  ? "bg-white text-[var(--accent)] shadow-sm" 
-                  : "text-[var(--text-tertiary-light)] hover:text-[var(--text-secondary-light)]"
-              )}
-            >
-              {pill.label}
-              <span className={cn(
-                "px-1.5 py-0.5 rounded-full text-[10px] transition-colors",
-                filtroOrigen === pill.id ? "bg-[var(--accent)]/10 text-[var(--accent)]" : "bg-black/5 text-[var(--text-tertiary-light)]"
-              )}>
-                {pill.id === 'todos' ? leads.length : leads.filter(l => l.origen === pill.id).length}
-              </span>
-            </button>
-          ))}
-        </div>
-
-        <div className="flex gap-2">
-          <Button 
-            onClick={() => {
-              setNewLeadData({
-                nombre: "",
-                email: "",
-                telefono: "",
-                etapaId: etapas[0]?.id || "",
-                temperatura: "frio",
-                notas: ""
-              });
-              setIsNewLeadModalOpen(true);
-            }}
-            className="h-11 rounded-2xl bg-[var(--text-primary-light)] text-white hover:opacity-90 font-bold text-xs gap-2 px-6"
-          >
-            <Plus className="w-4 h-4" /> Nuevo Lead
-          </Button>
-        </div>
-      </div>
-
-      {/* VISTA CONTENIDO */}
-      {view === 'kanban' ? (
-        <div className="relative overflow-x-auto pb-4 custom-scrollbar">
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCorners}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
-            <div className="flex gap-4 min-w-max">
-              {etapas.map(etapa => (
-                <KanbanColumn 
-                  key={etapa.id} 
-                  etapa={etapa} 
-                  leads={filteredLeads.filter(l => l.etapaId === etapa.id)}
-                  onSelected={(lead: any) => setSelectedLeadId(lead.id)}
-                  onEdit={(e) => {
-                    setEditingStage(e);
-                    setNewStageName(e.nombre);
-                    setNewStageColor(e.color);
-                  }}
-                  onDelete={handleDeleteStage}
-                />
-              ))}
-              
-              {/* Botón Nueva Etapa */}
-              <div 
-                onClick={() => setIsNewStageModalOpen(true)}
-                className="w-80 h-[200px] border-2 border-dashed border-[var(--border-light)] rounded-3xl flex flex-col items-center justify-center p-6 text-center space-y-3 shrink-0 opacity-60 hover:opacity-100 transition-all cursor-pointer bg-white/30"
-              >
-                <div className="w-10 h-10 rounded-full bg-[var(--bg-input)] flex items-center justify-center">
-                  <Plus className="w-5 h-5 text-[var(--text-tertiary-light)]" />
+    <>
+      {isMobile ? (
+        <MobileLeadList 
+          leads={leads}
+          etapas={etapas}
+          onSelect={(lead) => setSelectedLeadId(lead.id)}
+          onNewLead={() => setIsNewLeadModalOpen(true)}
+          onConvert={handleConvertLead}
+          onWhatsApp={handleStartWhatsApp}
+        />
+      ) : (
+        <div className="p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
+          {/* HEADER & METRICAS */}
+          <div className="flex flex-col gap-6">
+            <div className="flex justify-between items-end">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-[var(--accent)] mb-1">
+                  <Target className="w-4 h-4" />
+                  <span className="text-xs font-bold uppercase tracking-widest">Leads & Funnel</span>
                 </div>
-                <div>
-                  <h4 className="text-sm font-bold text-[var(--text-primary-light)]">Nueva Etapa</h4>
-                  <p className="text-[11px] text-[var(--text-tertiary-light)]">Personaliza tu embudo</p>
-                </div>
+                <h1 className="text-2xl font-bold text-[var(--text-primary-light)]">Gestión de Prospectos</h1>
+                <p className="text-sm text-[var(--text-tertiary-light)]">Convierte leads de Meta Ads y orgánicos en clientes.</p>
+              </div>
+
+              <div className="flex items-center gap-2 bg-[var(--bg-input)] p-1 rounded-xl border border-[var(--border-light)]">
+                <button 
+                  onClick={() => setView('kanban')}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-lg transition-all",
+                    view === 'kanban' ? "bg-white text-[var(--text-primary-light)] shadow-sm" : "text-[var(--text-tertiary-light)] hover:text-[var(--text-secondary-light)]"
+                  )}
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  Kanban
+                </button>
+                <button 
+                  onClick={() => setView('list')}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-lg transition-all",
+                    view === 'list' ? "bg-white text-[var(--text-primary-light)] shadow-sm" : "text-[var(--text-tertiary-light)] hover:text-[var(--text-secondary-light)]"
+                  )}
+                >
+                  <List className="w-3.5 h-3.5" />
+                  Lista
+                </button>
               </div>
             </div>
-          </DndContext>
-        </div>
-      ) : (
-        <div className="bg-white border border-[var(--border-light)] rounded-3xl overflow-hidden shadow-sm">
-           <table className="w-full text-left">
-              <thead>
-                <tr className="border-b border-[var(--border-light)] bg-[var(--bg-input)]/30">
-                  <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">Lead</th>
-                  <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">Origen</th>
-                  <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">Etapa</th>
-                  <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">Temperatura</th>
-                  <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">Creado</th>
-                  <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">Actividad</th>
-                  <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border-light)]">
-                  {filteredLeads.map(lead => (
-                    <tr 
-                      key={lead.id} 
-                      className="hover:bg-[var(--bg-main)]/50 transition-colors group cursor-pointer"
-                      onClick={() => setSelectedLeadId(lead.id)}
-                    >
-                    <td className="p-4">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-bold text-[var(--text-primary-light)]">{lead.nombre}</span>
-                        {lead.telefono ? (
-                          <div onClick={(e) => e.stopPropagation()}>
-                            <PhoneActionMenu 
-                              phoneNumber={lead.telefono} 
-                              contactoId={lead.contactoId} 
-                              nombre={lead.nombre} 
-                              className="text-[11px] text-[var(--text-tertiary-light)]"
-                            />
-                          </div>
-                        ) : (
-                          <span className="text-[11px] text-[var(--text-tertiary-light)]">{lead.email || "Sin contacto"}</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <Badge className={cn(
-                        "text-[9px] font-black uppercase px-2 py-0.5",
-                        lead.origen === 'meta_ads' 
-                          ? "bg-emerald-100 text-emerald-700" 
-                          : lead.origen === 'organico' 
-                            ? "bg-sky-100 text-sky-700" 
-                            : "bg-slate-100 text-slate-600"
-                      )}>
-                        {lead.origen === 'meta_ads' ? 'Meta Ads' : lead.origen === 'organico' ? 'Orgánico' : 'Manual'}
-                      </Badge>
-                    </td>
-                    <td className="p-4" onClick={(e) => e.stopPropagation()}>
-                      <Select 
-                        value={lead.etapaId} 
-                        onValueChange={(val) => handleUpdateLeadField(lead.id, 'etapaId', val)}
-                      >
-                        <SelectTrigger className="h-8 border-transparent hover:border-input bg-transparent shadow-none px-2 font-semibold text-xs gap-2">
-                          <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: etapas.find(e => e.id === lead.etapaId)?.color || '#ccc' }} />
-                          <span className="truncate">
-                            {etapas.find(e => e.id === lead.etapaId)?.nombre || "Sin etapa"}
-                          </span>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {etapas.map(e => (
-                            <SelectItem key={e.id} value={e.id}>
-                              <div className="flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: e.color }} />
-                                {e.nombre}
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <MetricCard title="Leads este mes" value={metrics.enEsteMes} icon={Users} trend={metrics.tendenciaLeads} color="blue" />
+              <MetricCard title="Nuevos hoy" value={metrics.nuevosHoy} icon={Clock} trend="Nuevo" color="orange" />
+              <MetricCard title="Convertidos" value={metrics.convertidos} icon={CheckCircle2} color="green" />
+              <MetricCard title="Tasa de Cierre" value={`${metrics.tasaCierre}%`} icon={TrendingUp} color="purple" />
+            </div>
+          </div>
+
+          <div className="flex flex-col md:flex-row gap-4 mb-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-tertiary-light)]" />
+              <Input 
+                placeholder="Buscar por nombre, email o teléfono..." 
+                className="pl-10 h-11 bg-white border-[var(--border-light)] rounded-2xl shadow-sm focus:ring-1 focus:ring-[var(--accent)]"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            
+            <div className="flex gap-1.5 p-1 bg-[var(--bg-input)] rounded-2xl border border-[var(--border-light)]/50">
+              {[
+                { id: 'todos', label: 'Todos' },
+                { id: 'meta_ads', label: 'Meta Ads' },
+                { id: 'organico', label: 'Orgánico' },
+                { id: 'manual', label: 'Manual' }
+              ].map(pill => (
+                <button
+                  key={pill.id}
+                  onClick={() => setFiltroOrigen(pill.id as any)}
+                  className={cn(
+                    "px-4 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2",
+                    filtroOrigen === pill.id 
+                      ? "bg-white text-[var(--accent)] shadow-sm" 
+                      : "text-[var(--text-tertiary-light)] hover:text-[var(--text-secondary-light)]"
+                  )}
+                >
+                  {pill.label}
+                  <span className={cn(
+                    "px-1.5 py-0.5 rounded-full text-[10px] transition-colors",
+                    filtroOrigen === pill.id ? "bg-[var(--accent)]/10 text-[var(--accent)]" : "bg-black/5 text-[var(--text-tertiary-light)]"
+                  )}>
+                    {pill.id === 'todos' ? leads.length : leads.filter(l => l.origen === pill.id).length}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => {
+                  setNewLeadData({
+                    nombre: "",
+                    email: "",
+                    telefono: "",
+                    etapaId: etapas[0]?.id || "",
+                    temperatura: "frio",
+                    notas: ""
+                  });
+                  setIsNewLeadModalOpen(true);
+                }}
+                className="h-11 rounded-2xl bg-[var(--text-primary-light)] text-white hover:opacity-90 font-bold text-xs gap-2 px-6"
+              >
+                <Plus className="w-4 h-4" /> Nuevo Lead
+              </Button>
+            </div>
+          </div>
+
+          {/* VISTA CONTENIDO */}
+          {view === 'kanban' ? (
+            <div className="relative overflow-x-auto pb-4 custom-scrollbar">
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCorners}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+              >
+                <div className="flex gap-4 min-w-max">
+                  {etapas.map(etapa => (
+                    <KanbanColumn 
+                      key={etapa.id} 
+                      etapa={etapa} 
+                      leads={filteredLeads.filter(l => l.etapaId === etapa.id)}
+                      onSelected={(lead: any) => setSelectedLeadId(lead.id)}
+                      onEdit={(e) => {
+                        setEditingStage(e);
+                        setNewStageName(e.nombre);
+                        setNewStageColor(e.color);
+                      }}
+                      onDelete={handleDeleteStage}
+                    />
+                  ))}
+                  
+                  {/* Botón Nueva Etapa */}
+                  <div 
+                    onClick={() => setIsNewStageModalOpen(true)}
+                    className="w-80 h-[200px] border-2 border-dashed border-[var(--border-light)] rounded-3xl flex flex-col items-center justify-center p-6 text-center space-y-3 shrink-0 opacity-60 hover:opacity-100 transition-all cursor-pointer bg-white/30"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-[var(--bg-input)] flex items-center justify-center">
+                      <Plus className="w-5 h-5 text-[var(--text-tertiary-light)]" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-[var(--text-primary-light)]">Nueva Etapa</h4>
+                      <p className="text-[11px] text-[var(--text-tertiary-light)]">Personaliza tu embudo</p>
+                    </div>
+                  </div>
+                </div>
+              </DndContext>
+            </div>
+          ) : (
+            <div className="bg-white border border-[var(--border-light)] rounded-3xl overflow-hidden shadow-sm">
+               <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-[var(--border-light)] bg-[var(--bg-input)]/30">
+                      <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">Lead</th>
+                      <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">Origen</th>
+                      <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">Etapa</th>
+                      <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">Temperatura</th>
+                      <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">Creado</th>
+                      <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">Actividad</th>
+                      <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border-light)]">
+                      {filteredLeads.map(lead => (
+                        <tr 
+                          key={lead.id} 
+                          className="hover:bg-[var(--bg-main)]/50 transition-colors group cursor-pointer"
+                          onClick={() => setSelectedLeadId(lead.id)}
+                        >
+                        <td className="p-4">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-bold text-[var(--text-primary-light)]">{lead.nombre}</span>
+                            {lead.telefono ? (
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <PhoneActionMenu 
+                                  phoneNumber={lead.telefono} 
+                                  contactoId={lead.contactoId} 
+                                  nombre={lead.nombre} 
+                                  className="text-[11px] text-[var(--text-tertiary-light)]"
+                                />
                               </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="p-4">
-                       <TemperatureDot temperature={lead.temperatura} />
-                    </td>
-                    <td className="p-4 text-xs font-medium text-[var(--text-secondary-light)]">
-                      {lead.creadoEl ? formatDistanceToNow(lead.creadoEl.toDate(), { addSuffix: true, locale: es }) : 'Recién creado'}
-                    </td>
-                    <td className="p-4 text-xs font-medium text-[var(--text-tertiary-light)]">
-                      {lead.actualizadoEl ? formatDistanceToNow(lead.actualizadoEl.toDate(), { addSuffix: true, locale: es }) : '-'}
-                    </td>
-                    <td className="p-4 text-right">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                        <MoreVertical className="w-4 h-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-           </table>
+                            ) : (
+                              <span className="text-[11px] text-[var(--text-tertiary-light)]">{lead.email || "Sin contacto"}</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <Badge className={cn(
+                            "text-[9px] font-bold uppercase px-2 py-0.5",
+                            lead.origen === 'meta_ads' 
+                              ? "bg-emerald-100 text-emerald-700" 
+                              : lead.origen === 'organico' 
+                                ? "bg-sky-100 text-sky-700" 
+                                : "bg-slate-100 text-slate-600"
+                          )}>
+                            {lead.origen === 'meta_ads' ? 'Meta Ads' : lead.origen === 'organico' ? 'Orgánico' : 'Manual'}
+                          </Badge>
+                        </td>
+                        <td className="p-4" onClick={(e) => e.stopPropagation()}>
+                          <Select 
+                            value={lead.etapaId} 
+                            onValueChange={(val) => handleUpdateLeadField(lead.id, 'etapaId', val)}
+                          >
+                            <SelectTrigger className="h-8 border-transparent hover:border-input bg-transparent shadow-none px-2 font-semibold text-xs gap-2">
+                              <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: etapas.find(e => e.id === lead.etapaId)?.color || '#ccc' }} />
+                              <span className="truncate">
+                                {etapas.find(e => e.id === lead.etapaId)?.nombre || "Sin etapa"}
+                              </span>
+                            </SelectTrigger>
+                            <SelectContent>
+                              {etapas.map(e => (
+                                <SelectItem key={e.id} value={e.id}>
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: e.color }} />
+                                    {e.nombre}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="p-4">
+                           <TemperatureDot temperature={lead.temperatura} />
+                        </td>
+                        <td className="p-4 text-xs font-medium text-[var(--text-secondary-light)]">
+                          {lead.creadoEl ? formatDistanceToNow(lead.creadoEl.toDate(), { addSuffix: true, locale: es }) : 'Recién creado'}
+                        </td>
+                        <td className="p-4 text-xs font-medium text-[var(--text-tertiary-light)]">
+                          {lead.actualizadoEl ? formatDistanceToNow(lead.actualizadoEl.toDate(), { addSuffix: true, locale: es }) : '-'}
+                        </td>
+                        <td className="p-4 text-right">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+               </table>
+            </div>
+          )}
         </div>
       )}
 
@@ -842,51 +859,62 @@ export default function LeadsPage() {
           
           <form onSubmit={handleAddLead} className="space-y-5 py-4">
             <div className="space-y-2">
-              <Label>Nombre completo</Label>
+              <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 ml-1">Nombre completo</Label>
               <Input 
                 placeholder="Nombre del prospecto" 
                 value={newLeadData.nombre}
                 onChange={(e) => setNewLeadData(prev => ({ ...prev, nombre: e.target.value }))}
                 required
-                className="rounded-xl h-11"
+                className="h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-sm font-bold focus:bg-white transition-all shadow-sm"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Teléfono</Label>
+                <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 ml-1">Teléfono</Label>
                 <Input 
                   placeholder="Ej: +54..." 
                   value={newLeadData.telefono}
                   onChange={(e) => setNewLeadData(prev => ({ ...prev, telefono: e.target.value }))}
-                  className="rounded-xl h-11"
+                  className="h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-sm font-bold focus:bg-white transition-all shadow-sm"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Email</Label>
+                <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 ml-1">Email</Label>
                 <Input 
                   type="email"
                   placeholder="prospecto@mail.com" 
                   value={newLeadData.email}
                   onChange={(e) => setNewLeadData(prev => ({ ...prev, email: e.target.value }))}
-                  className="rounded-xl h-11"
+                  className="h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-sm font-bold focus:bg-white transition-all shadow-sm"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label>Etapa Inicial</Label>
-              <select 
-                className="w-full h-11 bg-white border border-[var(--border-light)] rounded-xl px-3 text-sm focus:ring-1 focus:ring-[var(--accent)] outline-none"
-                value={newLeadData.etapaId}
-                onChange={(e) => setNewLeadData(prev => ({ ...prev, etapaId: e.target.value }))}
+              <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 ml-1">Etapa Inicial</Label>
+              <Select 
+                value={newLeadData.etapaId} 
+                onValueChange={(v) => setNewLeadData(prev => ({ ...prev, etapaId: v }))}
               >
-                {etapas.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
-              </select>
+                <SelectTrigger className="h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-sm font-bold focus:ring-1 focus:ring-[var(--accent)] transition-all">
+                  <SelectValue placeholder="Seleccionar etapa..." />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl border-slate-100 shadow-xl">
+                  {etapas.map(e => (
+                    <SelectItem key={e.id} value={e.id || ""} className="rounded-xl font-bold py-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="size-2 rounded-full" style={{ backgroundColor: e.color }} />
+                        {e.nombre}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
-              <Label>Temperatura inicial</Label>
+              <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 ml-1">Temperatura inicial</Label>
               <div className="flex gap-2">
                 {(['frio', 'tibio', 'caliente'] as const).map(t => (
                   <button
@@ -894,10 +922,10 @@ export default function LeadsPage() {
                     type="button"
                     onClick={() => setNewLeadData(prev => ({ ...prev, temperatura: t }))}
                     className={cn(
-                      "flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all",
+                      "flex-1 py-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest border transition-all duration-300",
                       newLeadData.temperatura === t 
-                        ? "bg-[var(--accent)] text-white border-[var(--accent)] shadow-lg" 
-                        : "bg-white text-[var(--text-tertiary-light)] border-[var(--border-light)] hover:bg-[var(--bg-input)]"
+                        ? "bg-[var(--accent)] text-slate-900 border-[var(--accent)] shadow-md scale-[1.02]" 
+                        : "bg-slate-50/50 text-slate-400 border-slate-100 hover:bg-white"
                     )}
                   >
                     {t}
@@ -907,12 +935,12 @@ export default function LeadsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Notas internas</Label>
+              <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 ml-1">Notas internas</Label>
               <textarea 
                 placeholder="Observaciones iniciales sobre el prospecto..." 
                 value={newLeadData.notas}
                 onChange={(e) => setNewLeadData(prev => ({ ...prev, notas: e.target.value }))}
-                className="w-full min-h-[100px] bg-white border border-[var(--border-light)] rounded-xl p-3 text-sm focus:ring-1 focus:ring-[var(--accent)] outline-none resize-none transition-all shadow-inner"
+                className="w-full min-h-[100px] bg-slate-50/50 border border-slate-100 rounded-2xl p-4 text-sm font-medium focus:bg-white focus:ring-1 focus:ring-[var(--accent)] outline-none resize-none transition-all shadow-sm"
               />
             </div>
 
@@ -931,7 +959,7 @@ export default function LeadsPage() {
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }
 
@@ -948,8 +976,8 @@ function MetricCard({ title, value, icon: Icon, trend, color }: any) {
       <div className="space-y-1">
         <p className="text-[10px] font-bold text-[var(--text-tertiary-light)] uppercase tracking-widest">{title}</p>
         <div className="flex items-baseline gap-2">
-           <h3 className="text-2xl font-black text-[var(--text-primary-light)]">{value}</h3>
-           {trend && <span className="text-[10px] font-black text-green-600 uppercase">{trend}</span>}
+           <h3 className="text-2xl font-bold text-[var(--text-primary-light)]">{value}</h3>
+           {trend && <span className="text-[10px] font-bold text-green-600 uppercase">{trend}</span>}
         </div>
       </div>
       <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110", colorMap[color])}>
@@ -969,7 +997,7 @@ function KanbanColumn({ etapa, leads, onSelected, onEdit, onDelete }: { etapa: E
       <div className="flex items-center justify-between px-2">
         <div className="flex items-center gap-2.5">
           <div className="w-3 h-3 rounded-full" style={{ backgroundColor: etapa.color }} />
-          <h3 className="text-sm font-black text-[var(--text-primary-light)] uppercase tracking-tight flex items-center gap-2">
+          <h3 className="text-sm font-bold text-[var(--text-primary-light)] uppercase tracking-tight flex items-center gap-2">
             {etapa.nombre}
             <span className="text-[11px] font-bold text-[var(--text-tertiary-light)] bg-[var(--bg-input)] px-2 py-0.5 rounded-full">
               {leads.length}
@@ -1043,7 +1071,7 @@ function LeadCard({ lead, onClick }: { lead: Lead & { id: string }, onClick: () 
     >
       <div className="flex justify-between items-start mb-2">
          <Badge className={cn(
-            "text-[8px] font-black uppercase px-2 py-0.5 h-4",
+            "text-[8px] font-bold uppercase px-2 py-0.5 h-4",
             lead.origen === 'meta_ads' 
               ? "bg-emerald-100 text-emerald-700" 
               : lead.origen === 'organico' 
@@ -1105,7 +1133,7 @@ function LeadDetailContent({ lead, etapas, onClose, onConvert, onWhatsApp, onUpd
             <h2 className="text-xl font-bold text-[var(--text-primary-light)]">{lead.nombre}</h2>
             <div className="flex items-center gap-2">
               <Badge className={cn(
-                "text-[9px] font-black uppercase px-2 py-0.5",
+                "text-[9px] font-bold uppercase px-2 py-0.5",
                 lead.origen === 'meta_ads' 
                   ? "bg-emerald-100 text-emerald-700" 
                   : lead.origen === 'organico' 
@@ -1258,7 +1286,7 @@ function LeadDetailContent({ lead, etapas, onClose, onConvert, onWhatsApp, onUpd
 function Section({ title, children }: any) {
   return (
     <div className="space-y-3">
-      <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-tertiary-light)] opacity-70 ml-1">{title}</h3>
+      <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--text-tertiary-light)] opacity-70 ml-1">{title}</h3>
       {children}
     </div>
   );
@@ -1275,16 +1303,16 @@ function InfoRow({ label, value }: any) {
 
 function TempButton({ active, type, label, onClick }: any) {
   const colors: any = {
-    frio: active ? "bg-blue-500 text-white" : "text-blue-500 bg-white border-blue-100 hover:bg-blue-50",
-    tibio: active ? "bg-orange-500 text-white" : "text-orange-500 bg-white border-orange-100 hover:bg-orange-50",
-    caliente: active ? "bg-red-500 text-white" : "text-red-500 bg-white border-red-100 hover:bg-red-50",
+    frio: active ? "bg-blue-500 text-slate-900" : "text-blue-500 bg-white border-blue-100 hover:bg-blue-50",
+    tibio: active ? "bg-orange-500 text-slate-900" : "text-orange-500 bg-white border-orange-100 hover:bg-orange-50",
+    caliente: active ? "bg-red-500 text-slate-900" : "text-red-500 bg-white border-red-100 hover:bg-red-50",
   };
   
   return (
     <button 
       onClick={onClick}
       className={cn(
-        "flex-1 py-3 px-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all duration-300",
+        "flex-1 py-3 px-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border transition-all duration-300",
         colors[type],
         active ? "shadow-lg scale-[1.05] z-10" : "opacity-60"
       )}

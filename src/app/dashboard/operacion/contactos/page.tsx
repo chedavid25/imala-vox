@@ -39,7 +39,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
+import { useMobileLayout } from "@/hooks/useMobileLayout";
+import { MobileContactsContainer } from "@/components/mobile/contacts/MobileContactsContainer";
+
 export default function ContactosPage() {
+  const isMobile = useMobileLayout();
   const { contactos, loading: loadingContacts } = useContactos();
   const { currentWorkspaceId } = useWorkspaceStore();
   
@@ -141,6 +145,10 @@ export default function ContactosPage() {
       return matchesSearch && matchesTags;
     });
   }, [contactos, searchTerm, selectedTagIds]);
+
+  if (isMobile) {
+    return <MobileContactsContainer />;
+  }
 
   if (loadingContacts || loadingConfig) {
     return (

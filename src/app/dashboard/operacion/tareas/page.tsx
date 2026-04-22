@@ -77,9 +77,13 @@ import { TaskCalendarView } from "@/components/crm/tasks/TaskCalendarView";
 
 type FilterType = 'hoy' | 'semana' | 'mes' | 'atrasadas' | 'completadas' | 'todas';
 
+import { useMobileLayout } from "@/hooks/useMobileLayout";
+import { MobileTaskList } from "@/components/mobile/crm/MobileTaskList";
+
 export default function TareasPage() {
   const { currentWorkspaceId } = useWorkspaceStore();
   const { contactos } = useContactos();
+  const isMobile = useMobileLayout();
   
   const [tareas, setTareas] = useState<TareaCRM[]>([]);
   const [loading, setLoading] = useState(true);
@@ -303,342 +307,352 @@ export default function TareasPage() {
   };
 
   return (
-    <div className="flex h-full animate-in fade-in duration-500">
-      
-      {/* Sidebar de Filtros */}
-      <aside className="w-64 border-r border-[var(--border-light)] bg-[var(--bg-card)] p-6 space-y-8 shrink-0 hidden md:block">
-        <div>
-          <h2 className="text-[11px] font-semibold text-[var(--text-tertiary-light)] uppercase tracking-[0.2em] mb-4">Agenda</h2>
-          <nav className="space-y-1">
-            {[
-              { id: 'hoy', label: 'Para hoy', icon: CalendarIcon, color: 'text-emerald-500' },
-              { id: 'semana', label: 'Esta semana', icon: Clock, color: 'text-blue-500' },
-              { id: 'mes', label: 'Este mes', icon: CalendarIcon, color: 'text-indigo-500' },
-              { id: 'atrasadas', label: 'Atrasadas', icon: AlertCircle, color: 'text-rose-500' },
-              { id: 'completadas', label: 'Completadas', icon: CheckCircle2, color: 'text-slate-400' },
-              { id: 'todas', label: 'Todo el historial', icon: Filter, color: 'text-slate-500' },
-            ].map(item => (
-              <button
-                key={item.id}
-                onClick={() => setActiveFilter(item.id as FilterType)}
-                className={cn(
-                  "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-all",
-                  activeFilter === item.id 
-                    ? "bg-[var(--accent)]/10 text-[var(--text-primary-light)] shadow-sm" 
-                    : "text-[var(--text-secondary-light)] hover:bg-[var(--bg-main)]"
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <item.icon className={cn("size-4", item.color)} />
-                  {item.label}
-                </div>
-                {item.id === 'atrasadas' && tareas.filter(t => isBefore(new Date(`${t.fecha}T${t.hora || '00:00'}:00`), new Date()) && t.estado !== 'completada').length > 0 && (
-                  <span className="bg-rose-500 text-white text-[9px] px-1.5 py-0.5 rounded-full font-semibold">
-                    {tareas.filter(t => isBefore(new Date(`${t.fecha}T${t.hora || '00:00'}:00`), new Date()) && t.estado !== 'completada').length}
-                  </span>
-                )}
-              </button>
-            ))}
-          </nav>
-        </div>
-      </aside>
-
-      {/* Area Principal */}
-      <main className="flex-1 bg-[var(--bg-main)]/30 overflow-y-auto no-scrollbar flex flex-col">
-        <header className="p-8 pb-4">
-          <div className="flex items-center justify-between mb-8">
-            <div className="space-y-1">
-              <h1 className="text-3xl font-semibold text-[var(--text-primary-light)] tracking-tight">Tareas del CRM</h1>
-              <p className="text-[13px] text-[var(--text-secondary-light)] font-medium">Gestiona tus recordatorios y compromisos comerciales.</p>
+    <>
+      {isMobile ? (
+        <MobileTaskList 
+          tareas={tareas}
+          onToggleComplete={toggleComplete}
+          onEdit={(t) => { setEditingTask(t); setTaskForm(t as any); setIsAddingTask(true); }}
+          onNewTask={() => { setEditingTask(null); setIsAddingTask(true); }}
+        />
+      ) : (
+        <div className="flex h-full animate-in fade-in duration-500">
+          {/* Sidebar de Filtros */}
+          <aside className="w-64 border-r border-[var(--border-light)] bg-[var(--bg-card)] p-6 space-y-8 shrink-0 hidden md:block">
+            <div>
+              <h2 className="text-[11px] font-semibold text-[var(--text-tertiary-light)] uppercase tracking-[0.2em] mb-4">Agenda</h2>
+              <nav className="space-y-1">
+                {[
+                  { id: 'hoy', label: 'Para hoy', icon: CalendarIcon, color: 'text-emerald-500' },
+                  { id: 'semana', label: 'Esta semana', icon: Clock, color: 'text-blue-500' },
+                  { id: 'mes', label: 'Este mes', icon: CalendarIcon, color: 'text-indigo-500' },
+                  { id: 'atrasadas', label: 'Atrasadas', icon: AlertCircle, color: 'text-rose-500' },
+                  { id: 'completadas', label: 'Completadas', icon: CheckCircle2, color: 'text-slate-400' },
+                  { id: 'todas', label: 'Todo el historial', icon: Filter, color: 'text-slate-500' },
+                ].map(item => (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveFilter(item.id as FilterType)}
+                    className={cn(
+                      "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-all",
+                      activeFilter === item.id 
+                        ? "bg-[var(--accent)]/10 text-[var(--text-primary-light)] shadow-sm" 
+                        : "text-[var(--text-secondary-light)] hover:bg-[var(--bg-main)]"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <item.icon className={cn("size-4", item.color)} />
+                      {item.label}
+                    </div>
+                    {item.id === 'atrasadas' && tareas.filter(t => isBefore(new Date(`${t.fecha}T${t.hora || '00:00'}:00`), new Date()) && t.estado !== 'completada').length > 0 && (
+                      <span className="bg-rose-500 text-white text-[9px] px-1.5 py-0.5 rounded-full font-semibold">
+                        {tareas.filter(t => isBefore(new Date(`${t.fecha}T${t.hora || '00:00'}:00`), new Date()) && t.estado !== 'completada').length}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </nav>
             </div>
-            
-             <div className="flex items-center gap-3 bg-[var(--bg-card)] p-1.5 rounded-2xl border border-[var(--border-light)] shadow-sm">
-                <Button variant={viewMode === 'lista' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('lista')} className={cn("rounded-xl h-9", viewMode === 'lista' ? "bg-[var(--accent)] text-black" : "text-slate-500")}>
-                  <List className="size-4 mr-2" /> Lista
-                </Button>
-                <Button variant={viewMode === 'canvas' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('canvas')} className={cn("rounded-xl h-9", viewMode === 'canvas' ? "bg-[var(--accent)] text-black" : "text-slate-500")}>
-                  <LayoutGrid className="size-4 mr-2" /> Canvas
-                </Button>
-                <Button variant={viewMode === 'calendario' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('calendario')} className={cn("rounded-xl h-9", viewMode === 'calendario' ? "bg-[var(--accent)] text-black" : "text-slate-500")}>
-                  <CalendarIcon className="size-4 mr-2" /> Calendario
-                </Button>
-             </div>
+          </aside>
 
-            <div className="flex items-center gap-3">
-              {viewMode === 'canvas' && (
-                <Select value={canvasGrouping} onValueChange={(v:any) => setCanvasGrouping(v)}>
-                  <SelectTrigger className="h-11 rounded-full border-none bg-slate-100/50 px-6 font-semibold text-slate-600 text-[13px] hover:bg-slate-100 transition-all">
-                    <SelectValue placeholder="Agrupar por..." />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-2xl border-none shadow-2xl bg-white p-2">
-                    <SelectItem value="estado" className="rounded-xl py-3 px-4 font-semibold text-slate-700 focus:bg-slate-50">Estado</SelectItem>
-                    <SelectItem value="prioridad" className="rounded-xl py-3 px-4 font-semibold text-slate-700 focus:bg-slate-50">Prioridad</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-
-              <Dialog open={isAddingTask} onOpenChange={setIsAddingTask}>
-                <Button 
-                  onClick={() => { setEditingTask(null); setIsAddingTask(true); }}
-                  className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-11 px-6 rounded-full font-semibold shadow-lg shadow-[var(--accent)]/20 transition-all hover:scale-105"
-                >
-                  <Plus className="size-4 mr-2" /> Nueva Tarea
-                </Button>
-                <DialogContent className="max-w-[650px] bg-white border-none shadow-2xl rounded-[32px] overflow-hidden p-0">
-                  <DialogHeader className="bg-slate-50/50 p-8 pb-4">
-                    <DialogTitle className="text-2xl font-semibold tracking-tight flex items-center gap-3">
-                      <div className="size-10 rounded-2xl bg-[var(--accent)] flex items-center justify-center text-[var(--accent-text)]">
-                        {editingTask ? <Pencil className="size-5" /> : <Plus className="size-5" />}
-                      </div>
-                      {editingTask ? "Editar Tarea" : "Programar Pendiente"}
-                    </DialogTitle>
-                  </DialogHeader>
-
-                  <div className="p-8 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
-                     <div className="space-y-2">
-                        <Label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 ml-1">¿Qué hay que hacer?</Label>
-                        <Input 
-                          placeholder="Ej: Llamar para cerrar contrato..." 
-                          className="h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-[15px] font-medium focus:bg-white transition-all shadow-sm"
-                          value={taskForm.titulo}
-                          onChange={e => setTaskForm({...taskForm, titulo: e.target.value})}
-                        />
-                     </div>
-                     
-                     <div className="grid grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                           <Label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 ml-1">Fecha</Label>
-                           <Input 
-                             type="date"
-                             className="h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-[15px] font-medium focus:bg-white transition-all shadow-sm"
-                             value={taskForm.fecha}
-                             onChange={e => setTaskForm({...taskForm, fecha: e.target.value})}
-                           />
-                        </div>
-                        <div className="space-y-2">
-                           <Label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 ml-1">Hora</Label>
-                           <Input 
-                             type="time"
-                             className="h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-[15px] font-medium focus:bg-white transition-all shadow-sm"
-                             value={taskForm.hora}
-                             onChange={e => setTaskForm({...taskForm, hora: e.target.value})}
-                           />
-                        </div>
-                     </div>
-
-                     <div className="grid grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                           <Label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 ml-1">Prioridad</Label>
-                           <Select 
-                            value={taskForm.prioridad} 
-                            onValueChange={(v:any) => setTaskForm({...taskForm, prioridad: v})}
-                           >
-                             <SelectTrigger className="h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-[15px] font-medium focus:bg-white transition-all shadow-sm">
-                               <SelectValue />
-                             </SelectTrigger>
-                             <SelectContent className="rounded-2xl border-none shadow-2xl bg-white p-2">
-                               <SelectItem value="alta" className="rounded-xl py-3 px-4 font-semibold text-rose-500 focus:bg-rose-50">Urgente 🔥</SelectItem>
-                               <SelectItem value="media" className="rounded-xl py-3 px-4 font-semibold text-amber-500 focus:bg-amber-50">Media ⚡</SelectItem>
-                               <SelectItem value="baja" className="rounded-xl py-3 px-4 font-semibold text-slate-400 focus:bg-slate-50">Baja 💤</SelectItem>
-                             </SelectContent>
-                           </Select>
-                        </div>
-                        <div className="space-y-2">
-                           <Label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 ml-1">Vincular Contacto</Label>
-                           <DropdownMenu>
-                             <DropdownMenuTrigger 
-                               render={
-                                <Button variant="outline" className="w-full h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-[15px] font-medium justify-between px-4 outline-none">
-                                  {taskForm.contactoId ? (
-                                    <span className="text-slate-800">{contactos.find(c => (c.id === taskForm.contactoId || (c as any).id === taskForm.contactoId))?.nombre}</span>
-                                  ) : (
-                                    <span className="text-slate-400 uppercase text-[10px] tracking-widest">Seleccionar...</span>
-                                  )}
-                                  <ChevronRight className="size-4 text-slate-300" />
-                                </Button>
-                               } 
-                             />
-                             <DropdownMenuContent className="w-[300px] rounded-2xl border-none shadow-2xl bg-white p-2">
-                                <div className="p-2 mb-2">
-                                  <Input 
-                                    placeholder="Buscar contacto..."
-                                    className="h-10 rounded-xl bg-slate-50 border-none"
-                                    value={searchContactTerm}
-                                    onChange={e => setSearchContactTerm(e.target.value)}
-                                    onKeyDown={e => e.stopPropagation()}
-                                  />
-                                </div>
-                                <div className="max-h-[250px] overflow-y-auto no-scrollbar">
-                                  <DropdownMenuItem 
-                                    onClick={() => setTaskForm({...taskForm, contactoId: ""})}
-                                    className="rounded-xl py-3 px-4 font-semibold text-slate-400 italic"
-                                  >
-                                    Ninguno
-                                  </DropdownMenuItem>
-                                  {filteredContacts.map(c => (
-                                    <DropdownMenuItem 
-                                      key={c.id} 
-                                      onClick={() => setTaskForm({...taskForm, contactoId: c.id!})}
-                                      className="rounded-xl py-3 px-4 font-semibold text-slate-700"
-                                    >
-                                      {c.nombre}
-                                    </DropdownMenuItem>
-                                  ))}
-                                </div>
-                             </DropdownMenuContent>
-                           </DropdownMenu>
-                        </div>
-                     </div>
-
-                     <div className="space-y-3 p-4 bg-slate-50/50 rounded-3xl border border-slate-100">
-                        <Label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 ml-1">Recurrencia Automática</Label>
-                        <div className="flex flex-wrap gap-2">
-                          {(['ninguna', 'diaria', 'semanal', 'intervalo'] as const).map(tipo => (
-                            <Button
-                              key={tipo}
-                              variant={taskForm.recurrencia.tipo === tipo ? 'default' : 'outline'}
-                              size="sm"
-                              className={cn(
-                                "rounded-full px-4 h-9 font-semibold text-[11px] capitalize transition-all",
-                                taskForm.recurrencia.tipo === tipo 
-                                  ? "bg-indigo-500 text-white shadow-lg shadow-indigo-200" 
-                                  : "bg-white text-slate-500 border-slate-100"
-                              )}
-                              onClick={() => setTaskForm({
-                                ...taskForm, 
-                                recurrencia: { ...taskForm.recurrencia, tipo }
-                              })}
-                            >
-                              {tipo === 'intervalo' ? 'Cada X días' : tipo}
-                            </Button>
-                          ))}
-                        </div>
-
-                        {taskForm.recurrencia.tipo === 'intervalo' && (
-                          <div className="pt-2 animate-in slide-in-from-top-2">
-                            <Label className="text-[10px] font-semibold text-slate-400 mb-1 block uppercase ml-1">¿Cada cuántos días?</Label>
-                            <div className="flex items-center gap-3">
-                              <Input 
-                                type="number"
-                                min="1"
-                                className="h-10 w-20 rounded-xl bg-white border-slate-200 font-semibold text-center"
-                                value={taskForm.recurrencia.config.intervaloDias}
-                                onChange={e => setTaskForm({
-                                  ...taskForm,
-                                  recurrencia: {
-                                    ...taskForm.recurrencia,
-                                    config: { ...taskForm.recurrencia.config, intervaloDias: parseInt(e.target.value) }
-                                  }
-                                })}
-                              />
-                              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Días naturales</span>
-                            </div>
-                          </div>
-                        )}
-                        
-                        {taskForm.recurrencia.tipo === 'semanal' && (
-                          <div className="pt-2 animate-in slide-in-from-top-2">
-                            <Label className="text-[10px] font-semibold text-slate-400 mb-2 block uppercase ml-1">Días de la semana</Label>
-                            <div className="flex gap-2">
-                              {['D','L','M','X','J','V','S'].map((dia, idx) => (
-                                <button
-                                  key={idx}
-                                  onClick={() => {
-                                    const dias = [...taskForm.recurrencia.config.diasSemana];
-                                    const index = dias.indexOf(idx);
-                                    if (index > -1) dias.splice(index, 1);
-                                    else dias.push(idx);
-                                    setTaskForm({...taskForm, recurrencia: {...taskForm.recurrencia, config: {...taskForm.recurrencia.config, diasSemana: dias}}});
-                                  }}
-                                  className={cn(
-                                    "size-9 rounded-xl font-semibold text-[11px] transition-all border",
-                                    taskForm.recurrencia.config.diasSemana.includes(idx)
-                                      ? "bg-indigo-500 text-white border-indigo-400 shadow-md"
-                                      : "bg-white text-slate-400 border-slate-100 hover:border-slate-300"
-                                  )}
-                                >
-                                  {dia}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                     </div>
+          {/* Area Principal */}
+          <main className="flex-1 bg-[var(--bg-main)]/30 overflow-y-auto no-scrollbar flex flex-col">
+            <header className="p-8 pb-4">
+              <div className="flex items-center justify-between mb-8">
+                <div className="space-y-1">
+                  <h1 className="text-3xl font-semibold text-[var(--text-primary-light)] tracking-tight">Tareas del CRM</h1>
+                  <p className="text-[13px] text-[var(--text-secondary-light)] font-medium">Gestiona tus recordatorios y compromisos comerciales.</p>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5 bg-[var(--bg-card)] p-1 rounded-2xl border border-[var(--border-light)] shadow-sm">
+                    <Button variant={viewMode === 'lista' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('lista')} className={cn("rounded-xl h-9 px-4", viewMode === 'lista' ? "bg-[var(--accent)] text-black font-bold" : "text-slate-500 font-medium")}>
+                      <List className="size-4 mr-2" /> Lista
+                    </Button>
+                    <Button variant={viewMode === 'canvas' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('canvas')} className={cn("rounded-xl h-9 px-4", viewMode === 'canvas' ? "bg-[var(--accent)] text-black font-bold" : "text-slate-500 font-medium")}>
+                      <LayoutGrid className="size-4 mr-2" /> Canvas
+                    </Button>
+                    <Button variant={viewMode === 'calendario' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('calendario')} className={cn("rounded-xl h-9 px-4", viewMode === 'calendario' ? "bg-[var(--accent)] text-black font-bold" : "text-slate-500 font-medium")}>
+                      <CalendarIcon className="size-4 mr-2" /> Calendario
+                    </Button>
                   </div>
 
-                  <DialogFooter className="p-8 bg-slate-50/30 border-t border-slate-100 rounded-b-[32px]">
-                     <Button 
-                      variant="ghost" 
-                      onClick={() => { setIsAddingTask(false); setEditingTask(null); }}
-                      className="h-12 px-8 rounded-2xl font-semibold text-slate-400 hover:text-slate-600"
-                     >
-                       Cancelar
-                     </Button>
-                     <Button 
-                       onClick={handleSaveTask}
-                       className="h-12 px-10 rounded-2xl font-semibold bg-[var(--accent)] text-[var(--accent-text)] shadow-xl shadow-[var(--accent)]/30 hover:scale-105 active:scale-95 transition-all"
-                     >
-                       {editingTask ? "Guardar Cambios" : "Agendar Ahora"}
-                     </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </div>
-        </header>
+                  {viewMode === 'canvas' && (
+                    <Select value={canvasGrouping} onValueChange={(v:any) => setCanvasGrouping(v)}>
+                      <SelectTrigger className="h-11 rounded-2xl border-none bg-slate-100/50 px-6 font-semibold text-slate-600 text-[13px] hover:bg-slate-100 transition-all">
+                        <SelectValue placeholder="Agrupar por..." />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-2xl border-none shadow-2xl bg-white p-2">
+                        <SelectItem value="estado" className="rounded-xl py-3 px-4 font-semibold text-slate-700 focus:bg-slate-50">Estado</SelectItem>
+                        <SelectItem value="prioridad" className="rounded-xl py-3 px-4 font-semibold text-slate-700 focus:bg-slate-50">Prioridad</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
 
-        <section className="p-8 pt-4 space-y-4">
-          {viewMode === 'lista' ? (
-            <div className="flex-1 px-8 pb-12">
-               <div className="max-w-4xl mx-auto space-y-4">
-                 {filteredTareas.length > 0 ? (
-                   filteredTareas.map(task => (
-                     <TaskCard 
-                      key={task.id}
-                      task={task} 
-                      contactos={contactos}
-                      onToggleComplete={toggleComplete}
-                      onEdit={(t) => { setEditingTask(t); setTaskForm(t as any); setIsAddingTask(true); }}
-                      onDelete={handleDelete}
-                     />
-                   ))
-                 ) : (
-                   <div className="h-[400px] flex flex-col items-center justify-center text-slate-300">
-                      <div className="size-16 rounded-3xl bg-slate-50 flex items-center justify-center mb-4">
-                        <Check className="size-8" />
+                  <Button 
+                    onClick={() => { setEditingTask(null); setIsAddingTask(true); }}
+                    className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-11 px-6 rounded-full font-bold shadow-lg shadow-[var(--accent)]/20 transition-all hover:scale-105"
+                  >
+                    <Plus className="size-4 mr-2" /> Nueva Tarea
+                  </Button>
+                </div>
+              </div>
+            </header>
+
+            <section className="p-8 pt-4">
+              {viewMode === 'lista' ? (
+                <div className="flex-1 pb-12">
+                  <div className="max-w-4xl mx-auto space-y-4">
+                    {filteredTareas.length > 0 ? (
+                      filteredTareas.map(task => (
+                        <TaskCard 
+                          key={task.id}
+                          task={task} 
+                          contactos={contactos}
+                          onToggleComplete={toggleComplete}
+                          onEdit={(t) => { setEditingTask(t); setTaskForm(t as any); setIsAddingTask(true); }}
+                          onDelete={handleDelete}
+                        />
+                      ))
+                    ) : (
+                      <div className="h-[400px] flex flex-col items-center justify-center text-slate-300">
+                          <div className="size-16 rounded-3xl bg-slate-50 flex items-center justify-center mb-4">
+                            <Check className="size-8" />
+                          </div>
+                          <p className="font-black uppercase tracking-widest text-[10px]">¡Todo al día!</p>
                       </div>
-                      <p className="font-black uppercase tracking-widest text-[10px]">¡Todo al día!</p>
-                   </div>
-                 )}
-               </div>
-            </div>
-          ) : viewMode === 'canvas' ? (
-            <TaskCanvasView 
-              tareas={filteredTareas}
-              contactos={contactos}
-              grouping={canvasGrouping}
-              onTaskUpdate={(taskId, updates) => {
-                // TaskCanvasView pasa (taskId: string, updates: Partial<TareaCRM>)
-                // Necesitamos construir un objeto task fake con el id para handleQuickUpdate
-                handleQuickUpdate({ id: taskId } as TareaCRM, updates);
-              }}
-              onEdit={(t) => { setEditingTask(t); setTaskForm(t as any); setIsAddingTask(true); }}
-              onDelete={handleDelete}
-            />
-          ) : (
-            <TaskCalendarView 
-              tareas={tareas}
-              viewMode={calendarView}
-              onViewModeChange={setCalendarView}
-              onAddTask={(date) => {
-                setTaskForm({ ...taskForm, fecha: date });
-                setIsAddingTask(true);
-              }}
-              onEditTask={(t) => { setEditingTask(t); setTaskForm(t as any); setIsAddingTask(true); }}
-            />
-          )}
-        </section>
-      </main>
-    </div>
+                    )}
+                  </div>
+                </div>
+              ) : viewMode === 'canvas' ? (
+                <TaskCanvasView 
+                  tareas={filteredTareas}
+                  contactos={contactos}
+                  grouping={canvasGrouping}
+                  onTaskUpdate={(taskId, updates) => {
+                    handleQuickUpdate({ id: taskId } as TareaCRM, updates);
+                  }}
+                  onEdit={(t) => { setEditingTask(t); setTaskForm(t as any); setIsAddingTask(true); }}
+                  onDelete={handleDelete}
+                />
+              ) : (
+                <TaskCalendarView 
+                  tareas={tareas}
+                  viewMode={calendarView}
+                  onViewModeChange={setCalendarView}
+                  onAddTask={(date) => {
+                    setTaskForm({ ...taskForm, fecha: date });
+                    setIsAddingTask(true);
+                  }}
+                  onEditTask={(t) => { setEditingTask(t); setTaskForm(t as any); setIsAddingTask(true); }}
+                />
+              )}
+            </section>
+          </main>
+        </div>
+      )}
+
+      {/* Modal Unificado de Tareas */}
+      <Dialog open={isAddingTask} onOpenChange={setIsAddingTask}>
+        <DialogContent className="max-w-[650px] bg-white border-none shadow-2xl rounded-[32px] overflow-hidden p-0">
+          <DialogHeader className="bg-slate-50/50 p-8 pb-4">
+            <DialogTitle className="text-2xl font-black tracking-tight flex items-center gap-3">
+              <div className="size-10 rounded-2xl bg-[var(--accent)] flex items-center justify-center text-[var(--accent-text)]">
+                {editingTask ? <Pencil className="size-5" /> : <Plus className="size-5" />}
+              </div>
+              {editingTask ? "Editar Tarea" : "Programar Pendiente"}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="p-8 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
+              <div className="space-y-2">
+                <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 ml-1">¿Qué hay que hacer?</Label>
+                <Input 
+                  placeholder="Ej: Llamar para cerrar contrato..." 
+                  className="h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-[15px] font-bold focus:bg-white transition-all shadow-sm"
+                  value={taskForm.titulo}
+                  onChange={e => setTaskForm({...taskForm, titulo: e.target.value})}
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                    <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 ml-1">Fecha</Label>
+                    <Input 
+                      type="date"
+                      className="h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-[15px] font-bold focus:bg-white transition-all shadow-sm"
+                      value={taskForm.fecha}
+                      onChange={e => setTaskForm({...taskForm, fecha: e.target.value})}
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 ml-1">Hora</Label>
+                    <Input 
+                      type="time"
+                      className="h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-[15px] font-bold focus:bg-white transition-all shadow-sm"
+                      value={taskForm.hora}
+                      onChange={e => setTaskForm({...taskForm, hora: e.target.value})}
+                    />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                    <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 ml-1">Prioridad</Label>
+                    <Select 
+                      value={taskForm.prioridad} 
+                      onValueChange={(v:any) => setTaskForm({...taskForm, prioridad: v})}
+                    >
+                      <SelectTrigger className="h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-[15px] font-bold focus:bg-white transition-all shadow-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-2xl border-none shadow-2xl bg-white p-2">
+                        <SelectItem value="alta" className="rounded-xl py-3 px-4 font-bold text-rose-500 focus:bg-rose-50">Urgente 🔥</SelectItem>
+                        <SelectItem value="media" className="rounded-xl py-3 px-4 font-bold text-amber-500 focus:bg-amber-50">Media ⚡</SelectItem>
+                        <SelectItem value="baja" className="rounded-xl py-3 px-4 font-bold text-slate-400 focus:bg-slate-50">Baja 💤</SelectItem>
+                      </SelectContent>
+                    </Select>
+                </div>
+                <div className="space-y-2">
+                    <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 ml-1">Vincular Contacto</Label>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger 
+                        render={
+                        <Button variant="outline" className="w-full h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-[15px] font-bold justify-between px-4 outline-none">
+                          {taskForm.contactoId ? (
+                            <span className="text-slate-800">{contactos.find(c => (c.id === taskForm.contactoId || (c as any).id === taskForm.contactoId))?.nombre}</span>
+                          ) : (
+                            <span className="text-slate-400 uppercase text-[10px] tracking-widest">Seleccionar...</span>
+                          )}
+                          <ChevronRight className="size-4 text-slate-300" />
+                        </Button>
+                        } 
+                      />
+                      <DropdownMenuContent className="w-[300px] rounded-2xl border-none shadow-2xl bg-white p-2">
+                        <div className="p-2 mb-2">
+                          <Input 
+                            placeholder="Buscar contacto..."
+                            className="h-10 rounded-xl bg-slate-50 border-none"
+                            value={searchContactTerm}
+                            onChange={e => setSearchContactTerm(e.target.value)}
+                            onKeyDown={e => e.stopPropagation()}
+                          />
+                        </div>
+                        <div className="max-h-[250px] overflow-y-auto no-scrollbar">
+                          <DropdownMenuItem 
+                            onClick={() => setTaskForm({...taskForm, contactoId: ""})}
+                            className="rounded-xl py-3 px-4 font-bold text-slate-400 italic"
+                          >
+                            Ninguno
+                          </DropdownMenuItem>
+                          {filteredContacts.map(c => (
+                            <DropdownMenuItem 
+                              key={c.id} 
+                              onClick={() => setTaskForm({...taskForm, contactoId: c.id!})}
+                              className="rounded-xl py-3 px-4 font-bold text-slate-700"
+                            >
+                              {c.nombre}
+                            </DropdownMenuItem>
+                          ))}
+                        </div>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+              </div>
+
+              <div className="space-y-3 p-4 bg-slate-50/50 rounded-3xl border border-slate-100">
+                <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 ml-1">Recurrencia Automática</Label>
+                <div className="flex flex-wrap gap-2">
+                  {(['ninguna', 'diaria', 'semanal', 'intervalo'] as const).map(tipo => (
+                    <Button
+                      key={tipo}
+                      variant={taskForm.recurrencia.tipo === tipo ? 'default' : 'outline'}
+                      size="sm"
+                      className={cn(
+                        "rounded-full px-4 h-9 font-bold text-[11px] capitalize transition-all",
+                        taskForm.recurrencia.tipo === tipo 
+                          ? "bg-indigo-500 text-white shadow-lg shadow-indigo-200" 
+                          : "bg-white text-slate-500 border-slate-100"
+                      )}
+                      onClick={() => setTaskForm({
+                        ...taskForm, 
+                        recurrencia: { ...taskForm.recurrencia, tipo }
+                      })}
+                    >
+                      {tipo === 'intervalo' ? 'Cada X días' : tipo}
+                    </Button>
+                  ))}
+                </div>
+
+                {taskForm.recurrencia.tipo === 'intervalo' && (
+                  <div className="pt-2 animate-in slide-in-from-top-2">
+                    <Label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase ml-1">¿Cada cuántos días?</Label>
+                    <div className="flex items-center gap-3">
+                      <Input 
+                        type="number"
+                        min="1"
+                        className="h-10 w-20 rounded-xl bg-white border-slate-200 font-bold text-center"
+                        value={taskForm.recurrencia.config.intervaloDias}
+                        onChange={e => setTaskForm({
+                          ...taskForm,
+                          recurrencia: {
+                            ...taskForm.recurrencia,
+                            config: { ...taskForm.recurrencia.config, intervaloDias: parseInt(e.target.value) }
+                          }
+                        })}
+                      />
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Días naturales</span>
+                    </div>
+                  </div>
+                )}
+                
+                {taskForm.recurrencia.tipo === 'semanal' && (
+                  <div className="pt-2 animate-in slide-in-from-top-2">
+                    <Label className="text-[10px] font-bold text-slate-400 mb-2 block uppercase ml-1">Días de la semana</Label>
+                    <div className="flex gap-2">
+                      {['D','L','M','X','J','V','S'].map((dia, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            const dias = [...taskForm.recurrencia.config.diasSemana];
+                            const index = dias.indexOf(idx);
+                            if (index > -1) dias.splice(index, 1);
+                            else dias.push(idx);
+                            setTaskForm({...taskForm, recurrencia: {...taskForm.recurrencia, config: {...taskForm.recurrencia.config, diasSemana: dias}}});
+                          }}
+                          className={cn(
+                            "size-9 rounded-xl font-bold text-[11px] transition-all border",
+                            taskForm.recurrencia.config.diasSemana.includes(idx)
+                              ? "bg-indigo-500 text-white border-indigo-400 shadow-md"
+                              : "bg-white text-slate-400 border-slate-100 hover:border-slate-300"
+                          )}
+                        >
+                          {dia}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+          </div>
+
+          <DialogFooter className="p-8 bg-slate-50/30 border-t border-slate-100 rounded-b-[32px]">
+              <Button 
+              variant="ghost" 
+              onClick={() => { setIsAddingTask(false); setEditingTask(null); }}
+              className="h-12 px-8 rounded-2xl font-bold text-slate-400 hover:text-slate-600"
+              >
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleSaveTask}
+                className="h-12 px-10 rounded-2xl font-bold bg-[var(--accent)] text-[var(--accent-text)] shadow-xl shadow-[var(--accent)]/30 hover:scale-105 active:scale-95 transition-all"
+              >
+                {editingTask ? "Guardar Cambios" : "Agendar Ahora"}
+              </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

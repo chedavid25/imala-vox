@@ -6,7 +6,10 @@
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
-      "Bash(curl -s \"https://imala-vox.vercel.app/api/debug/meta-subscription?metaPageId=109569551706746\" -H \"x-admin-secret: debug-imala-2024\")"
+      "Bash(curl -s \"https://imala-vox.vercel.app/api/debug/meta-subscription?metaPageId=109569551706746\" -H \"x-admin-secret: debug-imala-2024\")",
+      "Bash(grep -E \"\\\\.tsx?$\")",
+      "Bash(xargs -I {} sh -c 'echo \"=== {} ===\" && head -50 \"{}\"')",
+      "Bash(xargs grep *)"
     ]
   }
 }

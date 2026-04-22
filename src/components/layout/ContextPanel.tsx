@@ -290,7 +290,7 @@ export function ContextPanel() {
                   type="text" 
                   value={editedName} 
                   onChange={(e) => setEditedName(e.target.value)}
-                  className="bg-transparent border-b border-[var(--accent)] text-[16px] font-black text-[var(--text-primary-light)] text-center w-full focus:outline-none"
+                  className="bg-transparent border-b border-[var(--accent)] text-[16px] font-bold text-[var(--text-primary-light)] text-center w-full focus:outline-none"
                   autoFocus
                   onKeyDown={(e) => e.key === 'Enter' && handleUpdateField("nombre", editedName).then(() => setIsEditingName(false))}
                 />
@@ -300,7 +300,7 @@ export function ContextPanel() {
               </div>
             ) : (
               <>
-                <h4 className="text-[16px] font-black text-[var(--text-primary-light)] tracking-tight">
+                <h4 className="text-[16px] font-bold text-[var(--text-primary-light)] tracking-tight">
                   {selectedContact?.nombre || "Prospecto"}
                 </h4>
                 <button 
@@ -313,7 +313,7 @@ export function ContextPanel() {
             )}
           </div>
           <div className="flex items-center justify-center gap-2 mt-1">
-            <Badge className="text-[10px] font-black bg-[var(--bg-sidebar)] text-[var(--accent)] border-none px-2.5 h-5 rounded-full shadow-sm">
+            <Badge className="text-[10px] font-bold bg-[var(--bg-sidebar)] text-[var(--accent)] border-none px-2.5 h-5 rounded-full shadow-sm">
               {selectedContact?.relacionTag || "LEAD"}
             </Badge>
             <div className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -325,9 +325,9 @@ export function ContextPanel() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
         <div className="px-4 border-b border-[var(--border-light)] bg-[var(--bg-main)]/30">
           <TabsList className="w-full bg-transparent h-12 justify-start gap-4">
-            <TabsTrigger value="perfil" className="text-[10px] font-black uppercase tracking-widest">Perfil</TabsTrigger>
-            <TabsTrigger value="interacciones" className="text-[10px] font-black uppercase tracking-widest">Salud</TabsTrigger>
-            <TabsTrigger value="objetos" className="text-[10px] font-black uppercase tracking-widest">Interés</TabsTrigger>
+            <TabsTrigger value="perfil" className="text-[10px] font-bold uppercase tracking-widest">Perfil</TabsTrigger>
+            <TabsTrigger value="interacciones" className="text-[10px] font-bold uppercase tracking-widest">Salud</TabsTrigger>
+            <TabsTrigger value="objetos" className="text-[10px] font-bold uppercase tracking-widest">Interés</TabsTrigger>
           </TabsList>
         </div>
 
@@ -337,15 +337,15 @@ export function ContextPanel() {
             {/* Información Básica */}
             <div className="space-y-4">
                <div className="flex items-center justify-between px-1">
-                  <Label className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest">Información Directa</Label>
+                  <Label className="text-[10px] font-bold text-[var(--text-tertiary-light)] uppercase tracking-widest">Información Directa</Label>
                   {suggestedData && (
-                    <Badge className="bg-emerald-500 text-white border-none animate-pulse text-[9px] font-black">Nuevos Datos</Badge>
+                    <Badge className="bg-emerald-500 text-white border-none animate-pulse text-[9px] font-bold">Nuevos Datos</Badge>
                   )}
                </div>
 
                {suggestedData && (
                   <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-xl flex flex-col gap-2 animate-in slide-in-from-right-4 duration-500">
-                    <p className="text-[10px] font-black text-emerald-600 uppercase flex items-center gap-1">
+                    <p className="text-[10px] font-bold text-emerald-600 uppercase flex items-center gap-1">
                       <Bot className="size-3" /> Sugerencia de la IA
                     </p>
                     <div className="flex flex-wrap gap-2">
@@ -376,7 +376,7 @@ export function ContextPanel() {
                <div className="grid gap-2">
                   <div className="bg-[var(--bg-input)]/50 p-3 rounded-xl border border-[var(--border-light)] group relative overflow-hidden">
                     <div className="flex items-center justify-between mb-1">
-                      <p className="text-[9px] font-black text-[var(--text-tertiary-light)] uppercase">WhatsApp</p>
+                      <p className="text-[9px] font-bold text-[var(--text-tertiary-light)] uppercase">WhatsApp</p>
                       <button 
                         onClick={() => setIsEditingPhone(!isEditingPhone)}
                         className="opacity-0 group-hover:opacity-100 p-1.5 bg-white hover:bg-[var(--accent)] hover:text-black rounded-lg shadow-sm transition-all text-slate-500"
@@ -405,7 +405,7 @@ export function ContextPanel() {
 
                   <div className="bg-[var(--bg-input)]/50 p-3 rounded-xl border border-[var(--border-light)] group relative overflow-hidden">
                     <div className="flex items-center justify-between mb-1">
-                      <p className="text-[9px] font-black text-[var(--text-tertiary-light)] uppercase">Email</p>
+                      <p className="text-[9px] font-bold text-[var(--text-tertiary-light)] uppercase">Email</p>
                       <button 
                         onClick={() => setIsEditingEmail(!isEditingEmail)}
                         className="opacity-0 group-hover:opacity-100 p-1.5 bg-white hover:bg-[var(--accent)] hover:text-black rounded-lg shadow-sm transition-all text-slate-500"
@@ -432,7 +432,7 @@ export function ContextPanel() {
                     )}
                   </div>
                   <div className="bg-[var(--bg-input)]/50 p-3 rounded-xl border border-[var(--border-light)] group relative overflow-hidden">
-                    <p className="text-[9px] font-black text-[var(--text-tertiary-light)] uppercase mb-1">Cumpleaños</p>
+                    <p className="text-[9px] font-bold text-[var(--text-tertiary-light)] uppercase mb-1">Cumpleaños</p>
                     <input 
                       type="date" 
                       value={selectedContact?.fechaNacimiento || ""} 
@@ -442,7 +442,7 @@ export function ContextPanel() {
                   </div>
                </div>
                <div className="space-y-3">
-                  <Label className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest px-1">Próximo Seguimiento</Label>
+                  <Label className="text-[10px] font-bold text-[var(--text-tertiary-light)] uppercase tracking-widest px-1">Próximo Seguimiento</Label>
                   <Button 
                     onClick={() => router.push("/dashboard/operacion/tareas")}
                     variant="outline"
@@ -468,7 +468,7 @@ export function ContextPanel() {
             {/* Tags Unificados */}
             <div className="space-y-4">
                <div className="flex items-center justify-between px-1">
-                  <Label className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest">Segmentación</Label>
+                  <Label className="text-[10px] font-bold text-[var(--text-tertiary-light)] uppercase tracking-widest">Segmentación</Label>
                   <DropdownMenu>
                     <DropdownMenuTrigger render={
                       <Button variant="ghost" size="icon" className="size-6 rounded-full hover:bg-[var(--bg-input)]">
@@ -479,7 +479,7 @@ export function ContextPanel() {
                        {categories.map(cat => (
                          <div key={cat.id}>
                             <DropdownMenuGroup>
-                              <DropdownMenuLabel className="text-[9px] font-black uppercase tracking-tighter text-[var(--text-tertiary-light)] bg-slate-50 py-1">{cat.nombre}</DropdownMenuLabel>
+                              <DropdownMenuLabel className="text-[9px] font-bold uppercase tracking-tighter text-[var(--text-tertiary-light)] bg-slate-50 py-1">{cat.nombre}</DropdownMenuLabel>
                               {masterTags.filter(t => t.categoriaId === cat.id).map(tag => (
                                 <DropdownMenuItem key={tag.id} onClick={() => handleAddTag(tag)} className="text-[12px] font-bold gap-2 py-2">
                                   <div className="size-2 rounded-full" style={{ backgroundColor: tag.colorBg }} />
@@ -539,7 +539,7 @@ export function ContextPanel() {
                       )}
                      >
                         <type.icon className={cn("size-4", interactionType === type.id ? `text-${type.color}-600` : "text-slate-400")} />
-                        <span className="text-[10px] font-black uppercase tracking-wider">{type.label}</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider">{type.label}</span>
                      </button>
                    ))}
                 </div>
@@ -568,7 +568,7 @@ export function ContextPanel() {
              {/* Historial */}
              <div className="space-y-4">
                 <div className="flex items-center justify-between px-1">
-                  <Label className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest">Historial CRM</Label>
+                  <Label className="text-[10px] font-bold text-[var(--text-tertiary-light)] uppercase tracking-widest">Historial CRM</Label>
                   <Badge variant="outline" className="text-[9px] font-bold px-2 py-0 h-4 border-slate-100 text-slate-400 italic">
                     {interacciones.length} registros
                   </Badge>
@@ -578,7 +578,7 @@ export function ContextPanel() {
                     {groupedInteracciones.map(([date, logs]) => (
                       <div key={date} className="space-y-3">
                          <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-sm py-1">
-                            <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
+                            <span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
                               {format(new Date(date + "T12:00:00"), "EEEE d 'de' MMMM", { locale: es })}
                             </span>
                          </div>

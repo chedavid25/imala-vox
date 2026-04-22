@@ -18,6 +18,9 @@ import { Loader2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
+import { useMobileLayout } from "@/hooks/useMobileLayout";
+import { MobileInboxContainer } from "@/components/mobile/inbox/MobileInboxContainer";
+
 export default function InboxPage() {
   return (
     <Suspense fallback={
@@ -37,6 +40,8 @@ function InboxContent() {
   const { conversaciones, loading: loadingConvs } = useConversaciones();
   const { currentWorkspaceId, setSelectedContactId, selectedChatId, setSelectedChatId } = useWorkspaceStore();
   const { mensajes, loading: loadingMsgs } = useMensajes(selectedChatId);
+  const isMobile = useMobileLayout();
+  const [isRequestingSuggestion, setIsRequestingSuggestion] = useState(false);
 
   // Sincronizar el contacto seleccionado en el store global cuando cambia el chat
   useEffect(() => {
@@ -79,6 +84,25 @@ function InboxContent() {
   }, [selectedChatId, currentWorkspaceId]);
 
   const selectedChat = conversaciones.find(c => c.id === selectedChatId);
+
+  const handleRequestSuggestion = async () => {
+    if (!currentWorkspaceId || !selectedChatId) return;
+    const { pedirSugerenciaIAAction } = await import("@/app/actions/ai");
+    
+    setIsRequestingSuggestion(true);
+    try {
+      const res = await pedirSugerenciaIAAction(currentWorkspaceId, selectedChatId);
+      if (res.success) {
+        toast.success("Sugerencia solicitada a la IA");
+      } else {
+        toast.error(res.error || "No se pudo generar la sugerencia");
+      }
+    } catch (error) {
+      toast.error("Error al conectar con la IA");
+    } finally {
+      setIsRequestingSuggestion(false);
+    }
+  };
 
   const handleSendMessage = async (text: string, isInternal: boolean = false) => {
     if (!currentWorkspaceId || !selectedChatId || !selectedChat) return;
@@ -175,6 +199,19 @@ function InboxContent() {
       toast.error(error.message || "Error al procesar el mensaje");
     }
   };
+
+  if (isMobile) {
+    return (
+      <MobileInboxContainer 
+        conversaciones={conversaciones}
+        selectedChatId={selectedChatId}
+        onSelectChat={(id) => setSelectedChatId(id)}
+        onSendMessage={handleSendMessage}
+        onRequestSuggestion={handleRequestSuggestion}
+        isRequestingSuggestion={isRequestingSuggestion}
+      />
+    );
+  }
 
   return (
     <div className="flex h-[calc(100vh-4rem)] w-full overflow-hidden bg-[var(--bg-main)]">
