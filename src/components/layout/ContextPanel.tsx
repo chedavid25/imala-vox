@@ -305,9 +305,9 @@ export function ContextPanel() {
                 </h4>
                 <button 
                   onClick={() => setIsEditingName(true)}
-                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-[var(--bg-input)] rounded-md transition-all"
+                  className="opacity-0 group-hover:opacity-100 p-1.5 bg-slate-100 hover:bg-[var(--accent)] hover:text-black rounded-lg transition-all text-slate-600 shadow-sm"
                 >
-                  <Pencil className="size-3 text-[var(--accent)]" />
+                  <Pencil className="size-3" />
                 </button>
               </>
             )}
@@ -379,9 +379,9 @@ export function ContextPanel() {
                       <p className="text-[9px] font-black text-[var(--text-tertiary-light)] uppercase">WhatsApp</p>
                       <button 
                         onClick={() => setIsEditingPhone(!isEditingPhone)}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white rounded transition-all"
+                        className="opacity-0 group-hover:opacity-100 p-1.5 bg-white hover:bg-[var(--accent)] hover:text-black rounded-lg shadow-sm transition-all text-slate-500"
                       >
-                        {isEditingPhone ? <X className="size-3 text-rose-500" /> : <Pencil className="size-3 text-[var(--accent)]" />}
+                        {isEditingPhone ? <X className="size-3 text-rose-500" /> : <Pencil className="size-3" />}
                       </button>
                     </div>
                     {isEditingPhone ? (
@@ -408,9 +408,9 @@ export function ContextPanel() {
                       <p className="text-[9px] font-black text-[var(--text-tertiary-light)] uppercase">Email</p>
                       <button 
                         onClick={() => setIsEditingEmail(!isEditingEmail)}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white rounded transition-all"
+                        className="opacity-0 group-hover:opacity-100 p-1.5 bg-white hover:bg-[var(--accent)] hover:text-black rounded-lg shadow-sm transition-all text-slate-500"
                       >
-                        {isEditingEmail ? <X className="size-3 text-rose-500" /> : <Pencil className="size-3 text-[var(--accent)]" />}
+                        {isEditingEmail ? <X className="size-3 text-rose-500" /> : <Pencil className="size-3" />}
                       </button>
                     </div>
                     {isEditingEmail ? (
