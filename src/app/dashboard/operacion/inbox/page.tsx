@@ -14,7 +14,12 @@ import { enviarMensajeAccion } from "@/app/actions/channels";
 import { getDoc } from "firebase/firestore";
 import { toast } from "sonner";
 
+import { useSearchParams } from "next/navigation";
+
 export default function InboxPage() {
+  const searchParams = useSearchParams();
+  const targetContactoId = searchParams.get('contactoId');
+  
   const { conversaciones, loading: loadingConvs } = useConversaciones();
   const { currentWorkspaceId, setSelectedContactId, selectedChatId, setSelectedChatId } = useWorkspaceStore();
   const { mensajes, loading: loadingMsgs } = useMensajes(selectedChatId);
@@ -28,6 +33,16 @@ export default function InboxPage() {
       setSelectedContactId(null);
     }
   }, [selectedChatId, conversaciones, setSelectedContactId]);
+
+  // Lógica para seleccionar automáticamente el chat si viene un contactoId por URL
+  useEffect(() => {
+    if (!loadingConvs && targetContactoId && conversaciones.length > 0) {
+      const targetConv = conversaciones.find(c => c.contactoId === targetContactoId);
+      if (targetConv && targetConv.id !== selectedChatId) {
+        setSelectedChatId(targetConv.id);
+      }
+    }
+  }, [targetContactoId, conversaciones, loadingConvs, selectedChatId, setSelectedChatId]);
   
   // Reseteo automático de mensajes no leídos al entrar en la charla
   useEffect(() => {

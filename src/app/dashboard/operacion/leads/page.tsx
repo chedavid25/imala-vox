@@ -65,6 +65,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
+import { PhoneActionMenu } from "@/components/crm/PhoneActionMenu";
 
 // DnD Kit Imports
 import {
@@ -640,7 +641,18 @@ export default function LeadsPage() {
                     <td className="p-4">
                       <div className="flex flex-col">
                         <span className="text-sm font-bold text-[var(--text-primary-light)]">{lead.nombre}</span>
-                        <span className="text-[11px] text-[var(--text-tertiary-light)]">{lead.telefono || lead.email || "Sin contacto"}</span>
+                        {lead.telefono ? (
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <PhoneActionMenu 
+                              phoneNumber={lead.telefono} 
+                              contactoId={lead.contactoId} 
+                              nombre={lead.nombre} 
+                              className="text-[11px] text-[var(--text-tertiary-light)]"
+                            />
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-[var(--text-tertiary-light)]">{lead.email || "Sin contacto"}</span>
+                        )}
                       </div>
                     </td>
                     <td className="p-4">
@@ -1161,7 +1173,19 @@ function LeadDetailContent({ lead, etapas, onClose, onConvert, onWhatsApp, onUpd
         {/* Info de contacto */}
         <Section title="Información de Contacto">
           <div className="space-y-4">
-            <InfoRow label="Teléfono" value={lead.telefono || "No especificado"} />
+            <div className="flex justify-between items-center py-1 border-b border-[var(--border-light)]/30">
+              <span className="text-xs font-medium text-[var(--text-tertiary-light)]">Teléfono</span>
+              {lead.telefono ? (
+                <PhoneActionMenu 
+                  phoneNumber={lead.telefono} 
+                  contactoId={lead.contactoId} 
+                  nombre={lead.nombre} 
+                  className="text-xs font-bold"
+                />
+              ) : (
+                <span className="text-xs font-bold text-[var(--text-primary-light)]">No especificado</span>
+              )}
+            </div>
             <InfoRow label="Email" value={lead.email || "No especificado"} />
           </div>
         </Section>

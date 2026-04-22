@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "mcp__plugin_claude-mem_mcp-search__search",
-      "mcp__plugin_claude-mem_mcp-search__list_corpora"
+      "mcp__plugin_claude-mem_mcp-search__list_corpora",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(curl -s \"https://imala-vox.vercel.app/api/debug/meta-subscription?metaPageId=109569551706746\" -H \"x-admin-secret: debug-imala-2024\")"
     ]
   }
 }

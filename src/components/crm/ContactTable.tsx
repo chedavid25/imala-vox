@@ -62,6 +62,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { formatDistanceToNow, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
+import { PhoneActionMenu } from "./PhoneActionMenu";
 
 interface ContactTableProps {
   contactos: (Contacto & { id: string })[];
@@ -151,7 +152,14 @@ export function ContactTable({ contactos, tags, categories }: ContactTableProps)
               <TableCell className="py-4">
                 <div className="flex flex-col">
                   <span className="text-[13px] font-bold text-[var(--text-primary-light)]">{contacto.nombre}</span>
-                  <span className="text-[11px] text-[var(--text-tertiary-light)] font-medium">{contacto.telefono}</span>
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <PhoneActionMenu 
+                      phoneNumber={contacto.telefono} 
+                      contactoId={contacto.id} 
+                      nombre={contacto.nombre} 
+                      className="text-[11px] text-[var(--text-tertiary-light)] font-medium"
+                    />
+                  </div>
                 </div>
               </TableCell>
               
