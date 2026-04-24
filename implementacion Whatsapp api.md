@@ -1,3 +1,292 @@
+# **Plan de Implementación: Canal WhatsApp Business API**
+
+## **Diagnóstico del estado actual**
+
+El backend de WhatsApp está **85% completo**. El webhook recibe mensajes correctamente, el envío funciona, los tipos de Firestore están definidos. Lo que **falta completamente** es:
+
+1. **Flujo de conexión en la UI** — No hay ninguna forma de conectar un canal WhatsApp desde el dashboard (el botón "Conectar Meta" solo maneja Facebook/Instagram via OAuth, flujo incompatible con WhatsApp Cloud API).  
+2. **Sync de webhooks para WhatsApp** — `sincronizarWebhooks` llama `/{pageId}/subscribed_apps`, que no aplica a WhatsApp.  
+3. **Bugs menores en el webhook handler** — historial vacío, versión API v18 en lugar de v19, modo copiloto no implementado, `contactoNombre` no se actualiza en conversación existente.
+
+---
+
+## **Archivos a modificar (NO crear archivos nuevos)**
+
+| Archivo | Cambios |
+| ----- | ----- |
+| `src/app/actions/channels.ts` | Agregar `sincronizarWebhooksWhatsApp`, fix API v18→v19 |
+| `src/app/api/webhooks/meta/route.ts` | Fix historial, copiloto, contactoNombre, increment convCount |
+| `src/app/dashboard/ajustes/canales/page.tsx` | Modal de conexión WhatsApp \+ fix botón sync \+ fix modal config |
+
+---
+
+## **CAMBIO 1 — `src/app/actions/channels.ts`**
+
+### **1a. Fix API version (línea 294\)**
+
+**Buscar:**
+
+```ts
+url = `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`;
+```
+
+**Reemplazar con:**
+
+```ts
+url = `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`;
+```
+
+### **1b. Agregar función `sincronizarWebhooksWhatsApp`**
+
+Insertar esta función **antes** de `enviarMensajeAccion` (antes de la línea 267), después del cierre de `configurarCanalIA`:
+
+```ts
+/**
+ * Para WhatsApp Cloud API, el webhook se registra a nivel de App en el panel de Meta.
+ * Esta función verifica que el token tenga acceso al Phone Number ID y marca el canal como verificado.
+ */
+export async function sincronizarWebhooksWhatsApp(wsId: string, canalId: string) {
+  try {
+    const canalPath = `${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CANALES}/${canalId}`;
+    const canalSnap = await adminDb.doc(canalPath).get();
+    if (!canalSnap.exists) throw new Error("Canal no encontrado");
+
+    const canalData = canalSnap.data() as any;
+    const phoneNumberId = canalData.metaPhoneNumberId;
+
+    const secretSnap = await adminDb.doc(`${canalPath}/secrets/config`).get();
+    if (!secretSnap.exists) throw new Error("No se encontraron los secretos del canal");
+
+    const { metaAccessToken } = secretSnap.data() as any;
+    if (!metaAccessToken || !phoneNumberId) {
+      throw new Error("Faltan credenciales de WhatsApp (Phone Number ID o Access Token)");
+    }
+
+    // Verificar que el token tiene acceso al Phone Number ID en Meta
+    const verifyRes = await fetch(
+      `https://graph.facebook.com/v19.0/${phoneNumberId}?fields=display_phone_number,verified_name&access_token=${metaAccessToken}`
+    );
+    const verifyData = await verifyRes.json();
+
+    if (!verifyRes.ok || verifyData.error) {
+      return {
+        success: false,
+        error: verifyData.error?.message || "No se pudo verificar el número. Revisá el Phone Number ID y el token."
+      };
+    }
+
+    await adminDb.doc(canalPath).update({
+      webhookVerified: true,
+      cuenta: verifyData.display_phone_number || canalData.cuenta,
+      actualizadoEl: Timestamp.now()
+    });
+
+    revalidatePath('/dashboard/ajustes/canales');
+    return { success: true, phoneNumber: verifyData.display_phone_number };
+  } catch (error: any) {
+    console.error("Error en sincronizarWebhooksWhatsApp:", error);
+    return { success: false, error: error.message };
+  }
+}
+```
+
+---
+
+## **CAMBIO 2 — `src/app/api/webhooks/meta/route.ts`**
+
+Reemplazar **completamente** la función `procesarMensajeWhatsapp` (líneas 492–620) con esta versión corregida:
+
+```ts
+/**
+ * Procesa mensajes entrantes de WhatsApp Cloud API.
+ */
+async function procesarMensajeWhatsapp(value: any, wabaId: string) {
+  try {
+    const message = value.messages?.[0];
+    const contact = value.contacts?.[0];
+    
+    if (!message || message.type !== 'text') return;
+
+    const senderId = message.from;
+    const text = message.text.body;
+    const contactoNombreIncoming = contact?.profile?.name || senderId;
+
+    // 1. Identificar Workspace y Canal
+    const wsQuery = await adminDb
+      .collectionGroup(COLLECTIONS.CANALES)
+      .where('metaPhoneNumberId', '==', value.metadata.phone_number_id)
+      .where('tipo', '==', 'whatsapp')
+      .where('status', '==', 'connected')
+      .limit(1)
+      .get();
+
+    if (wsQuery.empty) {
+      console.warn(`❌ Mensaje de WA ${senderId} ignorado: Canal no encontrado para phone_number_id ${value.metadata.phone_number_id}`);
+      return;
+    }
+
+    const canalDoc = wsQuery.docs[0];
+    const canalId = canalDoc.id;
+    const wsId = canalDoc.ref.parent.parent!.id;
+    const canalData = canalDoc.data() as any;
+
+    // 2. Obtener o crear contacto
+    const contactosRef = adminDb.collection(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CONTACTOS}`);
+    let contactoId = "";
+    let contactoNombre = contactoNombreIncoming;
+
+    const contactSnap = await contactosRef.where('telefono', '==', senderId).limit(1).get();
+
+    if (contactSnap.empty) {
+      const res = await contactosRef.add({
+        nombre: contactoNombre,
+        telefono: senderId,
+        canalOrigen: 'whatsapp',
+        aiBlocked: false,
+        esContactoCRM: false,
+        creadoEl: Timestamp.now()
+      });
+      contactoId = res.id;
+    } else {
+      const cDoc = contactSnap.docs[0];
+      contactoId = cDoc.id;
+      contactoNombre = cDoc.data().nombre || contactoNombre;
+    }
+
+    // 3. Obtener o crear conversación
+    const convRef = adminDb.collection(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CONVERSACIONES}`);
+    let convId = "";
+    const convSnap = await convRef
+      .where('contactoId', '==', contactoId)
+      .where('canalId', '==', canalId)
+      .limit(1)
+      .get();
+
+    if (convSnap.empty) {
+      const res = await convRef.add({
+        contactoId,
+        contactoNombre,
+        canal: 'whatsapp',
+        canalId,
+        agenteId: canalData.agenteId || null,
+        ultimoMensaje: text,
+        ultimaActividad: Timestamp.now(),
+        unreadCount: 1,
+        modoIA: 'auto',
+        creadoEl: Timestamp.now()
+      });
+      convId = res.id;
+      console.log(`🆕 Conversación WA creada: ${convId}`);
+    } else {
+      convId = convSnap.docs[0].id;
+      console.log(`💬 Conversación WA existente: ${convId}`);
+      await convRef.doc(convId).update({
+        ultimoMensaje: text,
+        contactoNombre,
+        ultimaActividad: Timestamp.now(),
+        unreadCount: (convSnap.docs[0].data().unreadCount || 0) + 1
+      });
+    }
+
+    // 4. Guardar mensaje
+    await convRef.doc(convId).collection(COLLECTIONS.MENSAJES).add({
+      text,
+      from: 'user',
+      creadoEl: Timestamp.now(),
+      visto: false
+    });
+
+    // 5. Trigger IA
+    if (canalData.aiEnabled && canalData.agenteId) {
+      const cDocSnap = await contactosRef.doc(contactoId).get();
+      if (cDocSnap.exists) {
+        const isBlocked = await isAIBlockedForContact(wsId, cDocSnap.data());
+        if (isBlocked) {
+          console.log(`Contacto WA ${senderId} bloqueado para IA. Sin respuesta automática.`);
+          return;
+        }
+      }
+
+      const convDocSnap = await convRef.doc(convId).get();
+      const convData = convDocSnap.data();
+
+      if (convData?.modoIA !== 'auto') {
+        console.log(`IA en modo ${convData?.modoIA || 'desconocido'}. No se enviará respuesta automática.`);
+        return;
+      }
+
+      let modoAgenteDefault = 'auto';
+      const agenteDoc = await adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.AGENTES}/${canalData.agenteId}`).get();
+      if (agenteDoc.exists) {
+        modoAgenteDefault = agenteDoc.data()?.modoDefault || 'auto';
+      }
+
+      const isCopiloto = convData?.modoIA === 'copiloto' || modoAgenteDefault === 'copiloto';
+
+      const historialSnap = await convRef.doc(convId)
+        .collection(COLLECTIONS.MENSAJES)
+        .orderBy('creadoEl', 'desc')
+        .limit(30)
+        .get();
+
+      const historial = historialSnap.docs.reverse().map(d => ({
+        from: d.data().from,
+        text: d.data().text
+      }));
+      if (historial.length > 0) historial.pop();
+
+      const { procesarMensajeConIA } = await import('@/lib/ai/engine');
+      const { enviarMensajeAccion } = await import('@/app/actions/channels');
+
+      try {
+        await enviarMensajeAccion(wsId, canalId, senderId, message.id, undefined, 'mark_read');
+
+        const respuestaIA = await procesarMensajeConIA({
+          wsId,
+          agenteId: canalData.agenteId,
+          conversacionId: convId,
+          textoUsuario: text,
+          historial,
+          isCopiloto,
+          contactoNombre
+        });
+
+        if (!isCopiloto && respuestaIA) {
+          await enviarMensajeAccion(wsId, canalId, senderId, respuestaIA);
+
+          const FieldValue = require('firebase-admin').firestore.FieldValue;
+          await adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}`).update({
+            "uso.convCount": FieldValue.increment(1)
+          });
+
+          console.log(`✅ Respuesta IA completada para WhatsApp - sender: ${senderId}`);
+        }
+      } catch (e) {
+        console.error("Error IA WA:", e);
+      }
+    }
+  } catch (err) {
+    console.error('Error procesando WA:', err);
+  }
+}
+```
+
+---
+
+## **CAMBIO 3 — `src/app/dashboard/ajustes/canales/page.tsx`**
+
+Este es el cambio más grande. Reemplazar el archivo completo con la versión siguiente. Los cambios clave son:
+
+* **Import `Input`** del componente UI  
+* **Import `sincronizarWebhooksWhatsApp` y `conectarCanalManual`** desde actions  
+* **Nuevo estado** para el modal de conexión WhatsApp  
+* **Nueva función `handleConnectWhatsApp`**  
+* **Botón adicional** "Conectar WhatsApp" en el header  
+* **Nuevo `<Dialog>` para WhatsApp** con formulario de 3 campos  
+* **Fix en `handleSyncWebhooks`** — branching por tipo de canal para llamar la función correcta  
+* **Fix en el modal de config** — mostrar `metaPhoneNumberId` para WhatsApp en lugar de `metaPageId`
+
+```ts
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -554,3 +843,43 @@ export default function CanalesPage() {
     </div>
   );
 }
+```
+
+---
+
+## **Configuración requerida en Meta for Developers (manual, una sola vez)**
+
+Esto NO es código — son pasos que el operador de Imala-Vox debe hacer en el panel de Meta:
+
+1. **Ir a** [developers.facebook.com](https://developers.facebook.com/) → Tu App → WhatsApp → Configuración de la API  
+2. **Webhook URL**: `https://<dominio-produccion>/api/webhooks/meta`  
+3. **Verify Token**: `imala-vox-webhook-2026` (ya está en `META_WEBHOOK_VERIFY_TOKEN`)  
+4. **Suscribir campo**: `messages` (obligatorio para recibir mensajes)  
+5. **App Secret**: asegurarse que `META_APP_SECRET` en las env vars coincide con el App Secret de la app
+
+---
+
+## **Variables de entorno — sin cambios**
+
+Las env vars existentes ya son suficientes para WhatsApp:
+
+```
+META_WEBHOOK_VERIFY_TOKEN=imala-vox-webhook-2026
+META_APP_SECRET=<ya configurado>
+NEXT_PUBLIC_META_APP_ID=<ya configurado>
+```
+
+---
+
+## **Orden de ejecución para Google Antigravity**
+
+1. Aplicar **Cambio 1** (`channels.ts`) — fix v18→v19 \+ nueva función `sincronizarWebhooksWhatsApp`  
+2. Aplicar **Cambio 2** (`webhooks/meta/route.ts`) — reemplazar `procesarMensajeWhatsapp` completa  
+3. Aplicar **Cambio 3** (`canales/page.tsx`) — reemplazar archivo completo  
+4. Verificar que TypeScript compila sin errores (`pnpm tsc --noEmit`)  
+5. **No crear archivos nuevos**
+
+---
+
+El núcleo del trabajo está en el **Cambio 3** (UI de conexión) y el **Cambio 2** (fix del webhook handler). El Cambio 1 es menor pero necesario para consistencia de versión API y para que el botón "Verificar" del modal funcione correctamente para WhatsApp
+

@@ -262,6 +262,54 @@ export async function configurarCanalIA(wsId: string, canalId: string, config: {
 }
 
 /**
+ * Para WhatsApp Cloud API, el webhook se registra a nivel de App en el panel de Meta.
+ * Esta función verifica que el token tenga acceso al Phone Number ID y marca el canal como verificado.
+ */
+export async function sincronizarWebhooksWhatsApp(wsId: string, canalId: string) {
+  try {
+    const canalPath = `${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CANALES}/${canalId}`;
+    const canalSnap = await adminDb.doc(canalPath).get();
+    if (!canalSnap.exists) throw new Error("Canal no encontrado");
+
+    const canalData = canalSnap.data() as any;
+    const phoneNumberId = canalData.metaPhoneNumberId;
+
+    const secretSnap = await adminDb.doc(`${canalPath}/secrets/config`).get();
+    if (!secretSnap.exists) throw new Error("No se encontraron los secretos del canal");
+
+    const { metaAccessToken } = secretSnap.data() as any;
+    if (!metaAccessToken || !phoneNumberId) {
+      throw new Error("Faltan credenciales de WhatsApp (Phone Number ID o Access Token)");
+    }
+
+    // Verificar que el token tiene acceso al Phone Number ID en Meta
+    const verifyRes = await fetch(
+      `https://graph.facebook.com/v19.0/${phoneNumberId}?fields=display_phone_number,verified_name&access_token=${metaAccessToken}`
+    );
+    const verifyData = await verifyRes.json();
+
+    if (!verifyRes.ok || verifyData.error) {
+      return {
+        success: false,
+        error: verifyData.error?.message || "No se pudo verificar el número. Revisá el Phone Number ID y el token."
+      };
+    }
+
+    await adminDb.doc(canalPath).update({
+      webhookVerified: true,
+      cuenta: verifyData.display_phone_number || canalData.cuenta,
+      actualizadoEl: Timestamp.now()
+    });
+
+    revalidatePath('/dashboard/ajustes/canales');
+    return { success: true, phoneNumber: verifyData.display_phone_number };
+  } catch (error: any) {
+    console.error("Error en sincronizarWebhooksWhatsApp:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * Envía un mensaje real a través de las APIs de Meta (WhatsApp, Instagram o Facebook).
  */
 export async function enviarMensajeAccion(
@@ -291,7 +339,7 @@ export async function enviarMensajeAccion(
     if (canalData.tipo === 'whatsapp') {
       const phoneNumberId = canalData.metaPhoneNumberId;
       if (!phoneNumberId) throw new Error("ID de teléfono no configurado para WhatsApp");
-      url = `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`;
+      url = `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`;
       
       if (senderAction === 'mark_read') {
         body = {

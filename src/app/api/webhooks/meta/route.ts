@@ -499,9 +499,9 @@ async function procesarMensajeWhatsapp(value: any, wabaId: string) {
     
     if (!message || message.type !== 'text') return;
 
-    const senderId = message.from; // Número de teléfono del cliente
+    const senderId = message.from;
     const text = message.text.body;
-    const contactoNombre = contact?.profile?.name || senderId;
+    const contactoNombreIncoming = contact?.profile?.name || senderId;
 
     // 1. Identificar Workspace y Canal
     const wsQuery = await adminDb
@@ -513,7 +513,7 @@ async function procesarMensajeWhatsapp(value: any, wabaId: string) {
       .get();
 
     if (wsQuery.empty) {
-      console.warn(`❌ Mensaje de WA ${senderId} ignorado: Canal no encontrado.`);
+      console.warn(`❌ Mensaje de WA ${senderId} ignorado: Canal no encontrado para phone_number_id ${value.metadata.phone_number_id}`);
       return;
     }
 
@@ -525,6 +525,8 @@ async function procesarMensajeWhatsapp(value: any, wabaId: string) {
     // 2. Obtener o crear contacto
     const contactosRef = adminDb.collection(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CONTACTOS}`);
     let contactoId = "";
+    let contactoNombre = contactoNombreIncoming;
+
     const contactSnap = await contactosRef.where('telefono', '==', senderId).limit(1).get();
 
     if (contactSnap.empty) {
@@ -532,11 +534,15 @@ async function procesarMensajeWhatsapp(value: any, wabaId: string) {
         nombre: contactoNombre,
         telefono: senderId,
         canalOrigen: 'whatsapp',
+        aiBlocked: false,
+        esContactoCRM: false,
         creadoEl: Timestamp.now()
       });
       contactoId = res.id;
     } else {
-      contactoId = contactSnap.docs[0].id;
+      const cDoc = contactSnap.docs[0];
+      contactoId = cDoc.id;
+      contactoNombre = cDoc.data().nombre || contactoNombre;
     }
 
     // 3. Obtener o crear conversación
@@ -562,10 +568,13 @@ async function procesarMensajeWhatsapp(value: any, wabaId: string) {
         creadoEl: Timestamp.now()
       });
       convId = res.id;
+      console.log(`🆕 Conversación WA creada: ${convId}`);
     } else {
       convId = convSnap.docs[0].id;
+      console.log(`💬 Conversación WA existente: ${convId}`);
       await convRef.doc(convId).update({
         ultimoMensaje: text,
+        contactoNombre,
         ultimaActividad: Timestamp.now(),
         unreadCount: (convSnap.docs[0].data().unreadCount || 0) + 1
       });
@@ -581,35 +590,69 @@ async function procesarMensajeWhatsapp(value: any, wabaId: string) {
 
     // 5. Trigger IA
     if (canalData.aiEnabled && canalData.agenteId) {
-      const convDoc = await convRef.doc(convId).get();
-      if (convDoc.data()?.modoIA !== 'auto') return;
-
       const cDocSnap = await contactosRef.doc(contactoId).get();
       if (cDocSnap.exists) {
         const isBlocked = await isAIBlockedForContact(wsId, cDocSnap.data());
-        if (isBlocked) return;
+        if (isBlocked) {
+          console.log(`Contacto WA ${senderId} bloqueado para IA. Sin respuesta automática.`);
+          return;
+        }
       }
+
+      const convDocSnap = await convRef.doc(convId).get();
+      const convData = convDocSnap.data();
+
+      if (convData?.modoIA !== 'auto') {
+        console.log(`IA en modo ${convData?.modoIA || 'desconocido'}. No se enviará respuesta automática.`);
+        return;
+      }
+
+      let modoAgenteDefault = 'auto';
+      const agenteDoc = await adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.AGENTES}/${canalData.agenteId}`).get();
+      if (agenteDoc.exists) {
+        modoAgenteDefault = agenteDoc.data()?.modoDefault || 'auto';
+      }
+
+      const isCopiloto = convData?.modoIA === 'copiloto' || modoAgenteDefault === 'copiloto';
+
+      const historialSnap = await convRef.doc(convId)
+        .collection(COLLECTIONS.MENSAJES)
+        .orderBy('creadoEl', 'desc')
+        .limit(30)
+        .get();
+
+      const historial = historialSnap.docs.reverse().map(d => ({
+        from: d.data().from,
+        text: d.data().text
+      }));
+      if (historial.length > 0) historial.pop();
 
       const { procesarMensajeConIA } = await import('@/lib/ai/engine');
       const { enviarMensajeAccion } = await import('@/app/actions/channels');
 
       try {
-        // En WhatsApp enviamos 'visto' como señal de respuesta
         await enviarMensajeAccion(wsId, canalId, senderId, message.id, undefined, 'mark_read');
 
-        await procesarMensajeConIA({
+        const respuestaIA = await procesarMensajeConIA({
           wsId,
           agenteId: canalData.agenteId,
           conversacionId: convId,
           textoUsuario: text,
-          historial: [], // Simplificado por ahora
-          isCopiloto: false,
+          historial,
+          isCopiloto,
           contactoNombre
-        }).then(async (respuestaIA) => {
-          if (respuestaIA) {
-            await enviarMensajeAccion(wsId, canalId, senderId, respuestaIA);
-          }
         });
+
+        if (!isCopiloto && respuestaIA) {
+          await enviarMensajeAccion(wsId, canalId, senderId, respuestaIA);
+
+          const FieldValue = require('firebase-admin').firestore.FieldValue;
+          await adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}`).update({
+            "uso.convCount": FieldValue.increment(1)
+          });
+
+          console.log(`✅ Respuesta IA completada para WhatsApp - sender: ${senderId}`);
+        }
       } catch (e) {
         console.error("Error IA WA:", e);
       }
