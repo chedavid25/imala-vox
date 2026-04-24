@@ -80,7 +80,7 @@ export function MobileContactSheet({ open, onClose, contactoId }: MobileContactS
 
   if (!contact) return null;
 
-  const relacionTags = ["Prospecto", "Cliente", "VIP", "Inactivo", "Referido"];
+  const relacionTags = ["Lead", "Laboral", "Personal"];
 
   return (
     <BottomSheet 
@@ -121,7 +121,7 @@ export function MobileContactSheet({ open, onClose, contactoId }: MobileContactS
                    {relacionTags.map(tag => (
                      <button
                        key={tag}
-                       onClick={() => setEditForm({ ...editForm, relacionTag: tag })}
+                       onClick={() => setEditForm({ ...editForm, relacionTag: tag as any })}
                        className={cn(
                          "px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all border",
                          editForm.relacionTag === tag 
