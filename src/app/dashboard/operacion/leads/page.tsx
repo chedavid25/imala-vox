@@ -895,7 +895,7 @@ export default function LeadsPage() {
               <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 ml-1">Etapa Inicial</Label>
               <Select 
                 value={newLeadData.etapaId} 
-                onValueChange={(v) => setNewLeadData(prev => ({ ...prev, etapaId: v }))}
+                onValueChange={(v) => setNewLeadData(prev => ({ ...prev, etapaId: v || "" }))}
               >
                 <SelectTrigger className="h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-sm font-bold focus:ring-1 focus:ring-[var(--accent)] transition-all">
                   <SelectValue placeholder="Seleccionar etapa..." />
