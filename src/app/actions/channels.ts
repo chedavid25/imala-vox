@@ -341,6 +341,10 @@ export async function enviarMensajeAccion(
       if (!phoneNumberId) throw new Error("ID de teléfono no configurado para WhatsApp");
       url = `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`;
       
+      // Asegurar que el destinatario solo tenga números (Meta rechaza el + en sandbox)
+      const destinatarioLimpio = destinatario.replace(/\D/g, '');
+      console.log(`[WA-SEND] Enviando a: ${destinatarioLimpio} via ${phoneNumberId}`);
+      
       if (senderAction === 'mark_read') {
         body = {
           messaging_product: "whatsapp",
@@ -351,7 +355,7 @@ export async function enviarMensajeAccion(
         body = {
           messaging_product: "whatsapp",
           recipient_type: "individual",
-          to: destinatario,
+          to: destinatarioLimpio,
           type: media.tipo,
           [media.tipo]: { link: media.url, caption: texto || "" }
         };
@@ -359,7 +363,7 @@ export async function enviarMensajeAccion(
         body = {
           messaging_product: "whatsapp",
           recipient_type: "individual",
-          to: destinatario,
+          to: destinatarioLimpio,
           type: "text",
           text: { body: texto }
         };
