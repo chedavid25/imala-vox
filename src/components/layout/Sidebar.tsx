@@ -31,8 +31,10 @@ import {
   PanelLeftClose,
   PanelLeftOpen
 } from "lucide-react";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { signOut, onAuthStateChanged, User } from "firebase/auth";
+import { collection, onSnapshot } from "firebase/firestore";
+import { COLLECTIONS } from "@/lib/types/firestore";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -49,13 +51,28 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { sidebarCollapsed, toggleSidebar } = useUIStore();
+  const [totalUnread, setTotalUnread] = useState(0);
 
   // Detectar si estamos dentro de la configuración de un agente específico
   const isAgentSubRoute = pathname.includes("/dashboard/ajustes/agentes/") && 
                           pathname.split("/").length > 4;
   
-  const { currentAgentName } = useWorkspaceStore();
+  const { currentAgentName, currentWorkspaceId } = useWorkspaceStore();
   const agentId = isAgentSubRoute ? pathname.split("/")[4] : null;
+
+  useEffect(() => {
+    if (!currentWorkspaceId) return;
+    const q = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES);
+    const unsub = onSnapshot(q, (snap) => {
+      const total = snap.docs.reduce((sum, doc) => {
+        const data = doc.data();
+        if (data.estado === 'resuelto') return sum;
+        return sum + (data.unreadCount || 0);
+      }, 0);
+      setTotalUnread(total);
+    });
+    return () => unsub();
+  }, [currentWorkspaceId]);
 
   const widthClass = sidebarCollapsed ? "w-[var(--sidebar-collapsed)]" : "w-[var(--sidebar-width)]";
 
@@ -169,7 +186,7 @@ export function Sidebar() {
               Operación
             </div>
           )}
-          <NavItem label="Bandeja de entrada" href="/dashboard/operacion/inbox" icon={Inbox} active={pathname.startsWith("/dashboard/operacion/inbox")} collapsed={sidebarCollapsed} />
+          <NavItem label="Bandeja de entrada" href="/dashboard/operacion/inbox" icon={Inbox} active={pathname.startsWith("/dashboard/operacion/inbox")} collapsed={sidebarCollapsed} badge={totalUnread} />
           <NavItem label="Leads" href="/dashboard/operacion/leads" icon={Target} active={pathname.startsWith("/dashboard/operacion/leads")} collapsed={sidebarCollapsed} />
           <NavItem label="Tareas" href="/dashboard/operacion/tareas" icon={Clock} active={pathname.startsWith("/dashboard/operacion/tareas")} collapsed={sidebarCollapsed} />
           <NavItem label="Contactos" href="/dashboard/operacion/contactos" icon={Users} active={pathname.startsWith("/dashboard/operacion/contactos")} collapsed={sidebarCollapsed} />
@@ -313,9 +330,10 @@ interface NavItemProps {
   icon: any;
   active?: boolean;
   collapsed?: boolean;
+  badge?: number;
 }
 
-function NavItem({ label, href, icon: Icon, active = false, collapsed = false }: NavItemProps) {
+function NavItem({ label, href, icon: Icon, active = false, collapsed = false, badge = 0 }: NavItemProps) {
   return (
     <Link
       href={href}
@@ -323,16 +341,30 @@ function NavItem({ label, href, icon: Icon, active = false, collapsed = false }:
       className={cn(
         "flex items-center rounded-lg text-[13px] transition-all duration-200 group border-l-3 relative overflow-hidden",
         collapsed ? "justify-center px-1 py-3" : "px-3 py-2 gap-3",
-        active 
-          ? "bg-[var(--bg-sidebar-hover)] text-[var(--accent)] border-l-[var(--accent)] font-medium shadow-lg shadow-black/10" 
+        active
+          ? "bg-[var(--bg-sidebar-hover)] text-[var(--accent)] border-l-[var(--accent)] font-medium shadow-lg shadow-black/10"
           : "text-[var(--text-secondary-dark)] hover:bg-[var(--bg-sidebar-hover)] hover:text-[var(--text-primary-dark)] border-l-transparent font-normal"
       )}
     >
-      <Icon className={cn("transition-colors shrink-0", collapsed ? "w-5 h-5" : "w-4 h-4", active ? "text-[var(--accent)]" : "text-current group-hover:text-[var(--text-primary-dark)]")} />
+      <div className="relative shrink-0">
+        <Icon className={cn("transition-colors", collapsed ? "w-5 h-5" : "w-4 h-4", active ? "text-[var(--accent)]" : "text-current group-hover:text-[var(--text-primary-dark)]")} />
+        {badge > 0 && collapsed && (
+          <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-[14px] bg-red-500 text-white text-[8px] font-black rounded-full flex items-center justify-center px-0.5 leading-none">
+            {badge > 99 ? '99+' : badge}
+          </span>
+        )}
+      </div>
       {!collapsed && (
-        <span className="truncate animate-in fade-in slide-in-from-left-1 duration-300">
-          {label}
-        </span>
+        <>
+          <span className="truncate flex-1 animate-in fade-in slide-in-from-left-1 duration-300">
+            {label}
+          </span>
+          {badge > 0 && (
+            <span className="ml-auto min-w-[18px] h-[18px] bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-1 leading-none shrink-0">
+              {badge > 99 ? '99+' : badge}
+            </span>
+          )}
+        </>
       )}
     </Link>
   );
