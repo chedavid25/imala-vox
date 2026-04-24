@@ -5,11 +5,11 @@ import { CanalBadge } from "@/components/ui/CanalBadge";
 import { useContactos } from "@/hooks/useContactos";
 import { IndicadorIA } from "@/components/ui/IndicadorIA";
 import { cn } from "@/lib/utils";
-import { Send, Paperclip, Smile, Sparkles, CheckCircle2, UserPlus, MoreVertical, MessageCircle, ChevronDown, CheckCircle } from "lucide-react";
+import { Send, Paperclip, Smile, Sparkles, CheckCircle2, UserPlus, MoreVertical, MessageCircle, ChevronDown, CheckCircle, Clock, AlertTriangle, FileText, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { db } from "@/lib/firebase";
-import { doc, updateDoc, collection, onSnapshot, query, Timestamp } from "firebase/firestore";
+import { doc, updateDoc, collection, onSnapshot, query, Timestamp, addDoc } from "firebase/firestore";
 import { COLLECTIONS, Agente } from "@/lib/types/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { auth } from "@/lib/firebase";
@@ -24,6 +24,9 @@ import {
 import { Trash2, BellOff, CheckCircle as CheckIcon } from "lucide-react";
 import { deleteDoc } from "firebase/firestore";
 import { pedirSugerenciaIAAction } from "@/app/actions/ai";
+import { listarPlantillasWA, enviarPlantillaWA, PlantillaWA } from "@/app/actions/channels";
+import { getDoc } from "firebase/firestore";
+import { Contacto } from "@/lib/types/firestore";
 import { Loader2 } from "lucide-react";
 
 interface ChatWindowProps {
@@ -40,10 +43,24 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
   const scrollRef = useRef<HTMLDivElement>(null);
   const { currentWorkspaceId } = useWorkspaceStore();
   const [isRequestingSuggestion, setIsRequestingSuggestion] = useState(false);
+  const [plantillas, setPlantillas] = useState<PlantillaWA[]>([]);
+  const [loadingPlantillas, setLoadingPlantillas] = useState(false);
+  const [selectedPlantilla, setSelectedPlantilla] = useState<PlantillaWA | null>(null);
+  const [variableValues, setVariableValues] = useState<string[]>([]);
+  const [enviandoPlantilla, setEnviandoPlantilla] = useState(false);
 
   const selectedContact = contactos.find(c => c.id === conversacion?.contactoId);
   const contactName = selectedContact?.nombre || conversacion?.contactoNombre || "Desconocido";
   const contactFoto = selectedContact?.avatarUrl || null;
+
+  const isWhatsApp = conversacion?.canal === 'whatsapp';
+  const ultimoMensajeClienteDate = conversacion?.ultimoMensajeCliente?.toDate?.();
+  const isWindowExpired = isWhatsApp && (
+    !ultimoMensajeClienteDate || Date.now() - ultimoMensajeClienteDate.getTime() > 24 * 60 * 60 * 1000
+  );
+  const horasRestantes = ultimoMensajeClienteDate
+    ? Math.max(0, Math.ceil((24 * 60 * 60 * 1000 - (Date.now() - ultimoMensajeClienteDate.getTime())) / (60 * 60 * 1000)))
+    : 0;
 
   // Cargar agentes y humanos para reasignación
   useEffect(() => {
@@ -177,6 +194,95 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
       toast.success("IA reanudada (Modo Automático)");
     } catch (error) {
       toast.error("Error al reanudar la IA");
+    }
+  };
+
+  const extraerVariables = (plantilla: PlantillaWA): number => {
+    const body = plantilla.components.find(c => c.type === 'BODY');
+    if (!body?.text) return 0;
+    const matches = body.text.match(/\{\{(\d+)\}\}/g);
+    return matches ? Math.max(...matches.map(m => parseInt(m.replace(/\D/g, '')))) : 0;
+  };
+
+  const handleSeleccionarPlantilla = (p: PlantillaWA) => {
+    setSelectedPlantilla(p);
+    const cantidad = extraerVariables(p);
+    setVariableValues(Array(cantidad).fill(''));
+  };
+
+  const handleCargarPlantillas = async () => {
+    if (!currentWorkspaceId || !conversacion?.canalId) return;
+    setLoadingPlantillas(true);
+    try {
+      const res = await listarPlantillasWA(currentWorkspaceId, conversacion.canalId);
+      if (res.success && res.plantillas) {
+        setPlantillas(res.plantillas);
+        if (res.plantillas.length === 0) toast.info("No hay plantillas aprobadas en esta cuenta de WhatsApp.");
+      } else {
+        toast.error(res.error || "No se pudieron cargar las plantillas");
+      }
+    } finally {
+      setLoadingPlantillas(false);
+    }
+  };
+
+  const handleEnviarPlantilla = async () => {
+    if (!currentWorkspaceId || !conversacion || !selectedPlantilla) return;
+    const cantVars = extraerVariables(selectedPlantilla);
+    if (cantVars > 0 && variableValues.some(v => !v.trim())) {
+      toast.error("Completá todos los campos de la plantilla antes de enviar.");
+      return;
+    }
+
+    setEnviandoPlantilla(true);
+    try {
+      const contactSnap = await getDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS, conversacion.contactoId));
+      if (!contactSnap.exists()) throw new Error("Contacto no encontrado");
+      const contactData = contactSnap.data() as Contacto;
+      const destinatario = (contactData as any).metaId || contactData.telefono;
+      if (!destinatario) throw new Error("No se pudo determinar el destinatario");
+
+      const res = await enviarPlantillaWA(
+        currentWorkspaceId,
+        conversacion.canalId,
+        destinatario,
+        selectedPlantilla.name,
+        selectedPlantilla.language,
+        variableValues
+      );
+
+      if (!res.success) {
+        toast.error(`Error al enviar plantilla: ${res.error}`);
+        return;
+      }
+
+      // Guardar en Firestore como mensaje del operador
+      const body = selectedPlantilla.components.find(c => c.type === 'BODY');
+      let textoEnviado = body?.text || `[Plantilla: ${selectedPlantilla.name}]`;
+      variableValues.forEach((v, i) => {
+        textoEnviado = textoEnviado.replace(`{{${i + 1}}}`, v);
+      });
+
+      const messagesRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES, conversacion.id, COLLECTIONS.MENSAJES);
+      await addDoc(messagesRef, {
+        text: textoEnviado,
+        from: 'operator',
+        creadoEl: Timestamp.now(),
+        metadata: { isTemplate: true, templateName: selectedPlantilla.name }
+      });
+      await updateDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES, conversacion.id), {
+        ultimoMensaje: textoEnviado,
+        ultimaActividad: Timestamp.now()
+      });
+
+      toast.success("Plantilla enviada correctamente");
+      setSelectedPlantilla(null);
+      setVariableValues([]);
+      setPlantillas([]);
+    } catch (e: any) {
+      toast.error(e.message || "Error al enviar la plantilla");
+    } finally {
+      setEnviandoPlantilla(false);
     }
   };
 
@@ -351,6 +457,32 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
       {/* Composer Area */}
       <div className="px-6 py-4 border-t border-[var(--border-light)] bg-[var(--bg-card)] space-y-3 shadow-[0_-4px_15px_-5px_rgba(0,0,0,0.1)] flex-shrink-0">
         
+        {/* Banner ventana 24hs WhatsApp */}
+        {isWhatsApp && isWindowExpired && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3.5 flex items-start gap-3 animate-in fade-in slide-in-from-bottom-2">
+            <div className="w-8 h-8 rounded-lg bg-amber-100 border border-amber-200 flex items-center justify-center shrink-0 mt-0.5">
+              <AlertTriangle className="w-4 h-4 text-amber-600" />
+            </div>
+            <div className="flex-1 min-w-0 space-y-1.5">
+              <p className="text-[12px] font-black text-amber-800 uppercase tracking-wide">Ventana de 24hs expirada</p>
+              <p className="text-[12px] text-amber-700 leading-relaxed">
+                WhatsApp no permite enviar mensajes libres fuera de las 24hs. Para retomar la conversación, <span className="font-bold">escribile primero desde WhatsApp Business en tu celular</span>. Cuando el cliente responda, podrás continuar desde aquí.
+              </p>
+              <p className="text-[11px] text-amber-600 font-medium">
+                Las notas internas siguen disponibles mientras esperás.
+              </p>
+            </div>
+          </div>
+        )}
+        {isWhatsApp && !isWindowExpired && horasRestantes <= 6 && (
+          <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-2.5 flex items-center gap-2.5 animate-in fade-in">
+            <Clock className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+            <p className="text-[11px] text-blue-700 font-medium">
+              Ventana WhatsApp: quedan <span className="font-bold">{horasRestantes}h</span> para responder libremente.
+            </p>
+          </div>
+        )}
+
         {/* Sugerencia Copiloto */}
         {conversacion.sugerenciaIA && (
           <div className="bg-gradient-to-r from-purple-50 to-purple-100/30 border border-purple-200/80 p-3 rounded-[12px] flex flex-col gap-2 relative shadow-sm animate-in slide-in-from-bottom-2 fade-in">
@@ -396,63 +528,149 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
         </div>
 
         {/* Input Box */}
-        <div className={cn(
-          "rounded-xl border transition-all duration-200 focus-within:ring-2 focus-within:ring-[var(--accent)]/20 overflow-hidden",
-          mode === 'internal' ? "bg-yellow-50/30 border-yellow-200" : "bg-[var(--bg-input)] border-[var(--border-light)]"
-        )}>
-          <Textarea 
-            placeholder={mode === 'internal' ? "Escribe una nota interna para tu equipo..." : "Responde al cliente..."}
-            className="border-none bg-transparent focus-visible:ring-0 resize-none min-h-[90px] p-4 text-[14px] leading-relaxed no-scrollbar"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
-          />
-          
-          <div className="px-4 py-3 flex items-center justify-between border-t border-[var(--border-light)] bg-[var(--bg-card)]/50">
-            <div className="flex items-center gap-1.5">
-              <button className="p-2 hover:bg-[var(--bg-input)] rounded-lg text-[var(--text-tertiary-light)] transition-colors">
-                <Paperclip className="w-4 h-4" />
-              </button>
-              <button className="p-2 hover:bg-[var(--bg-input)] rounded-lg text-[var(--text-tertiary-light)] transition-colors">
-                <Smile className="w-4 h-4" />
-              </button>
-              <div className="w-[1px] h-4 bg-[var(--border-light)] mx-1" />
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={handleRequestSuggestion}
-                disabled={isRequestingSuggestion}
-                className="h-8 gap-1.5 font-black text-[10px] text-[var(--accent)] bg-[var(--bg-sidebar)] hover:bg-[var(--bg-sidebar-hover)] hover:text-white px-4 rounded-full border border-[var(--accent)]/20 shadow-lg shadow-black/10 transition-all hover:scale-[1.02] active:scale-[0.98]"
-              >
-                {isRequestingSuggestion ? (
-                  <Loader2 className="size-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="w-3.5 h-3.5 fill-[var(--accent)]/20" />
+        {mode === 'public' && isWindowExpired ? (
+          /* Selector de Plantillas (ventana 24hs cerrada) */
+          <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-input)] overflow-hidden">
+            {plantillas.length === 0 ? (
+              <div className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <FileText className="w-4 h-4 text-[var(--text-tertiary-light)]" />
+                  <span className="text-[13px] text-[var(--text-secondary-light)]">Enviar una plantilla aprobada por Meta</span>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleCargarPlantillas}
+                  disabled={loadingPlantillas}
+                  className="h-8 gap-1.5 font-black text-[10px] uppercase text-[var(--accent)] border border-[var(--accent)]/30 hover:bg-[var(--accent)]/10 rounded-lg"
+                >
+                  {loadingPlantillas ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                  Ver plantillas
+                </Button>
+              </div>
+            ) : (
+              <div className="p-3 space-y-3">
+                {/* Lista de plantillas */}
+                <div className="space-y-1.5 max-h-[160px] overflow-y-auto no-scrollbar">
+                  {plantillas.map(p => (
+                    <button
+                      key={p.id}
+                      onClick={() => handleSeleccionarPlantilla(p)}
+                      className={cn(
+                        "w-full text-left px-3 py-2.5 rounded-lg border transition-all",
+                        selectedPlantilla?.id === p.id
+                          ? "bg-[var(--accent)]/10 border-[var(--accent)]/30 text-[var(--accent)]"
+                          : "bg-[var(--bg-card)] border-[var(--border-light)] hover:border-[var(--accent)]/20 text-[var(--text-primary-light)]"
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[12px] font-bold truncate">{p.name}</span>
+                        <span className="text-[9px] font-black uppercase shrink-0 px-1.5 py-0.5 rounded-full bg-[var(--bg-input)] text-[var(--text-tertiary-light)]">{p.language}</span>
+                      </div>
+                      {p.components.find(c => c.type === 'BODY')?.text && (
+                        <p className="text-[11px] text-[var(--text-tertiary-light)] mt-1 truncate">
+                          {p.components.find(c => c.type === 'BODY')!.text}
+                        </p>
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Variables dinámicas */}
+                {selectedPlantilla && extraerVariables(selectedPlantilla) > 0 && (
+                  <div className="space-y-2 pt-1 border-t border-[var(--border-light)]">
+                    <p className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-wider">Completar variables</p>
+                    {variableValues.map((v, i) => (
+                      <input
+                        key={i}
+                        type="text"
+                        placeholder={`Variable {{${i + 1}}}`}
+                        value={v}
+                        onChange={e => {
+                          const next = [...variableValues];
+                          next[i] = e.target.value;
+                          setVariableValues(next);
+                        }}
+                        className="w-full px-3 py-2 text-[13px] rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] text-[var(--text-primary-light)] placeholder:text-[var(--text-tertiary-light)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                      />
+                    ))}
+                  </div>
                 )}
-                ASISTENTE IA
+              </div>
+            )}
+            {/* Botón enviar plantilla */}
+            {plantillas.length > 0 && (
+              <div className="px-3 pb-3 flex justify-end">
+                <Button
+                  onClick={handleEnviarPlantilla}
+                  disabled={!selectedPlantilla || enviandoPlantilla || (extraerVariables(selectedPlantilla!) > 0 && variableValues.some(v => !v.trim()))}
+                  className="h-9 px-5 gap-2 font-black text-[10px] uppercase tracking-widest rounded-xl bg-green-600 hover:bg-green-700 text-white shadow-xl shadow-green-600/20 transition-all"
+                >
+                  {enviandoPlantilla ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  Enviar plantilla
+                </Button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className={cn(
+            "rounded-xl border transition-all duration-200 focus-within:ring-2 focus-within:ring-[var(--accent)]/20 overflow-hidden",
+            mode === 'internal' ? "bg-yellow-50/30 border-yellow-200" : "bg-[var(--bg-input)] border-[var(--border-light)]"
+          )}>
+            <Textarea
+              placeholder={mode === 'internal' ? "Escribe una nota interna para tu equipo..." : "Responde al cliente..."}
+              className="border-none bg-transparent focus-visible:ring-0 resize-none min-h-[90px] p-4 text-[14px] leading-relaxed no-scrollbar"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+            />
+
+            <div className="px-4 py-3 flex items-center justify-between border-t border-[var(--border-light)] bg-[var(--bg-card)]/50">
+              <div className="flex items-center gap-1.5">
+                <button className="p-2 hover:bg-[var(--bg-input)] rounded-lg text-[var(--text-tertiary-light)] transition-colors">
+                  <Paperclip className="w-4 h-4" />
+                </button>
+                <button className="p-2 hover:bg-[var(--bg-input)] rounded-lg text-[var(--text-tertiary-light)] transition-colors">
+                  <Smile className="w-4 h-4" />
+                </button>
+                <div className="w-[1px] h-4 bg-[var(--border-light)] mx-1" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRequestSuggestion}
+                  disabled={isRequestingSuggestion}
+                  className="h-8 gap-1.5 font-black text-[10px] text-[var(--accent)] bg-[var(--bg-sidebar)] hover:bg-[var(--bg-sidebar-hover)] hover:text-white px-4 rounded-full border border-[var(--accent)]/20 shadow-lg shadow-black/10 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  {isRequestingSuggestion ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-3.5 h-3.5 fill-[var(--accent)]/20" />
+                  )}
+                  ASISTENTE IA
+                </Button>
+              </div>
+
+              <Button
+                onClick={handleSend}
+                disabled={!inputText.trim()}
+                className={cn(
+                  "h-9 px-5 gap-2 font-black text-[10px] uppercase tracking-widest rounded-xl transition-all shadow-xl",
+                  mode === 'internal'
+                    ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border border-yellow-200"
+                    : "bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] shadow-[var(--accent)]/20"
+                )}
+              >
+                <Send className="w-3.5 h-3.5" />
+                {mode === 'internal' ? 'Guardar Nota' : 'Enviar mensaje'}
               </Button>
             </div>
-
-            <Button 
-              onClick={handleSend}
-              disabled={!inputText.trim()}
-              className={cn(
-                "h-9 px-5 gap-2 font-black text-[10px] uppercase tracking-widest rounded-xl transition-all shadow-xl",
-                mode === 'internal' 
-                  ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border border-yellow-200" 
-                  : "bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] shadow-[var(--accent)]/20"
-              )}
-            >
-              <Send className="w-3.5 h-3.5" />
-              {mode === 'internal' ? 'Guardar Nota' : 'Enviar mensaje'}
-            </Button>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

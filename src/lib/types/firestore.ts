@@ -262,6 +262,7 @@ export interface Canal {
   status: 'connected' | 'disconnected' | 'error' | 'pending';
   metaPageId?: string;
   metaPhoneNumberId?: string; // solo WhatsApp
+  metaWABAId?: string;        // WhatsApp Business Account ID (para plantillas)
   metaInstagramId?: string;   // solo Instagram
   webhookVerified: boolean;
   aiEnabled: boolean;         // Nuevo: control maestro IA por canal

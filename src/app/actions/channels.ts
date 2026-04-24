@@ -283,8 +283,9 @@ export async function sincronizarWebhooksWhatsApp(wsId: string, canalId: string)
     }
 
     // Verificar que el token tiene acceso al Phone Number ID en Meta
+    // whatsapp_business_account nos da el WABA ID necesario para listar plantillas
     const verifyRes = await fetch(
-      `https://graph.facebook.com/v19.0/${phoneNumberId}?fields=display_phone_number,verified_name&access_token=${metaAccessToken}`
+      `https://graph.facebook.com/v19.0/${phoneNumberId}?fields=display_phone_number,verified_name,whatsapp_business_account&access_token=${metaAccessToken}`
     );
     const verifyData = await verifyRes.json();
 
@@ -295,9 +296,12 @@ export async function sincronizarWebhooksWhatsApp(wsId: string, canalId: string)
       };
     }
 
+    const wabaId = verifyData.whatsapp_business_account?.id || null;
+
     await adminDb.doc(canalPath).update({
       webhookVerified: true,
       cuenta: verifyData.display_phone_number || canalData.cuenta,
+      ...(wabaId && { metaWABAId: wabaId }),
       actualizadoEl: Timestamp.now()
     });
 
@@ -431,6 +435,147 @@ export async function enviarMensajeAccion(
 
   } catch (error: any) {
     console.error("Error en enviarMensajeAccion:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export interface PlantillaWA {
+  id: string;
+  name: string;
+  language: string;
+  status: string;
+  category: string;
+  components: Array<{
+    type: string;
+    text?: string;
+    buttons?: any[];
+  }>;
+}
+
+/**
+ * Lista las plantillas aprobadas del WABA asociado al canal WhatsApp.
+ * Si el canal no tiene metaWABAId almacenado, lo obtiene en tiempo real desde Meta.
+ */
+export async function listarPlantillasWA(wsId: string, canalId: string): Promise<{ success: boolean; plantillas?: PlantillaWA[]; error?: string }> {
+  try {
+    const canalPath = `${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CANALES}/${canalId}`;
+    const [canalSnap, secretSnap] = await Promise.all([
+      adminDb.doc(canalPath).get(),
+      adminDb.doc(`${canalPath}/secrets/config`).get()
+    ]);
+
+    if (!canalSnap.exists) throw new Error("Canal no encontrado");
+    if (!secretSnap.exists) throw new Error("Credenciales del canal no encontradas");
+
+    const canalData = canalSnap.data() as any;
+    const { metaAccessToken } = secretSnap.data() as any;
+
+    let wabaId: string = canalData.metaWABAId;
+
+    // Si no está guardado, intentar obtenerlo en tiempo real
+    if (!wabaId && canalData.metaPhoneNumberId) {
+      const res = await fetch(
+        `https://graph.facebook.com/v19.0/${canalData.metaPhoneNumberId}?fields=whatsapp_business_account&access_token=${metaAccessToken}`
+      );
+      const data = await res.json();
+      wabaId = data.whatsapp_business_account?.id;
+      if (wabaId) {
+        await adminDb.doc(canalPath).update({ metaWABAId: wabaId, actualizadoEl: Timestamp.now() });
+      }
+    }
+
+    if (!wabaId) {
+      return { success: false, error: "No se encontró el WABA ID. Re-sincronizá el canal en Ajustes → Canales." };
+    }
+
+    const res = await fetch(
+      `https://graph.facebook.com/v19.0/${wabaId}/message_templates?status=APPROVED&fields=id,name,language,status,category,components&limit=100&access_token=${metaAccessToken}`
+    );
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      return { success: false, error: data.error?.message || "No se pudieron obtener las plantillas" };
+    }
+
+    return { success: true, plantillas: data.data || [] };
+  } catch (error: any) {
+    console.error("Error en listarPlantillasWA:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Envía una plantilla aprobada por Meta a un destinatario WhatsApp.
+ * Se usa cuando la ventana de 24hs está cerrada.
+ */
+export async function enviarPlantillaWA(
+  wsId: string,
+  canalId: string,
+  destinatario: string,
+  templateName: string,
+  languageCode: string,
+  variables: string[]
+): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  try {
+    const canalPath = `${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CANALES}/${canalId}`;
+    const [canalSnap, secretSnap] = await Promise.all([
+      adminDb.doc(canalPath).get(),
+      adminDb.doc(`${canalPath}/secrets/config`).get()
+    ]);
+
+    if (!canalSnap.exists) throw new Error("Canal no encontrado");
+    if (!secretSnap.exists) throw new Error("Credenciales del canal no encontradas");
+
+    const canalData = canalSnap.data() as any;
+    const { metaAccessToken } = secretSnap.data() as any;
+    const phoneNumberId = canalData.metaPhoneNumberId;
+    if (!phoneNumberId) throw new Error("Phone Number ID no configurado");
+
+    // Normalización argentina igual que enviarMensajeAccion
+    let dest = destinatario.replace(/\D/g, '');
+    if (dest.length === 10) dest = `549${dest}`;
+    if (dest.startsWith('549') && dest.length === 13) {
+      const rest = dest.substring(3);
+      const areaLen = rest.startsWith('11') ? 2 : 3;
+      dest = `54${rest.substring(0, areaLen)}15${rest.substring(areaLen)}`;
+    }
+
+    const bodyParameters = variables.map(v => ({ type: "text", text: v }));
+
+    const body: any = {
+      messaging_product: "whatsapp",
+      to: dest,
+      type: "template",
+      template: {
+        name: templateName,
+        language: { code: languageCode },
+        ...(bodyParameters.length > 0 && {
+          components: [{ type: "body", parameters: bodyParameters }]
+        })
+      }
+    };
+
+    const res = await fetch(
+      `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`,
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${metaAccessToken}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(body)
+      }
+    );
+
+    const data = await res.json();
+    if (!res.ok) {
+      console.error("[enviarPlantillaWA] Error Meta:", data);
+      return { success: false, error: data.error?.message || "Error al enviar la plantilla" };
+    }
+
+    return { success: true, messageId: data.messages?.[0]?.id };
+  } catch (error: any) {
+    console.error("Error en enviarPlantillaWA:", error);
     return { success: false, error: error.message };
   }
 }

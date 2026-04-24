@@ -563,6 +563,7 @@ async function procesarMensajeWhatsapp(value: any, wabaId: string) {
         agenteId: canalData.agenteId || null,
         ultimoMensaje: text,
         ultimaActividad: Timestamp.now(),
+        ultimoMensajeCliente: Timestamp.now(),
         unreadCount: 1,
         modoIA: 'auto',
         creadoEl: Timestamp.now()
@@ -576,6 +577,7 @@ async function procesarMensajeWhatsapp(value: any, wabaId: string) {
         ultimoMensaje: text,
         contactoNombre,
         ultimaActividad: Timestamp.now(),
+        ultimoMensajeCliente: Timestamp.now(),
         unreadCount: (convSnap.docs[0].data().unreadCount || 0) + 1
       });
     }

@@ -166,6 +166,16 @@ function InboxContent() {
         return;
       }
 
+      // Verificar ventana de 24hs para WhatsApp
+      if (selectedChat.canal === 'whatsapp') {
+        const ultimoMensajeCliente = selectedChat.ultimoMensajeCliente?.toDate?.();
+        const windowExpired = !ultimoMensajeCliente || Date.now() - ultimoMensajeCliente.getTime() > 24 * 60 * 60 * 1000;
+        if (windowExpired) {
+          toast.error("La ventana de 24hs expiró. El cliente debe escribirte primero para poder responder.");
+          return;
+        }
+      }
+
       // Proceso de envío real para mensajes públicos
       const contactSnap = await getDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS, selectedChat.contactoId));
       if (!contactSnap.exists()) throw new Error("Contacto no encontrado");
