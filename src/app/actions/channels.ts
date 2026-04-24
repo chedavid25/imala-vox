@@ -341,15 +341,23 @@ export async function enviarMensajeAccion(
       if (!phoneNumberId) throw new Error("ID de teléfono no configurado para WhatsApp");
       url = `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`;
       
-      // Normalizar número al formato E.164 sin + que requiere WhatsApp Cloud API
-      // Casos: "+5493513376865" → "5493513376865" | "3513376865" (10 díg) → "5493513376865"
+      // Normalizar número argentino al formato legacy que usa la API de WhatsApp:
+      // E.164 "5493513376865" (con 9) → legacy "54351153376865" (con 15)
+      // El webhook entrega formato E.164 pero WhatsApp API espera el formato con 15
       let destinatarioLimpio = destinatario.replace(/\D/g, '');
+
+      // 10 dígitos = solo área + local sin código de país → normalizar primero
       if (destinatarioLimpio.length === 10) {
-        // Solo área + local sin código de país → agregar 549 (Argentina mobile)
         destinatarioLimpio = `549${destinatarioLimpio}`;
-      } else if (destinatarioLimpio.length === 11 && destinatarioLimpio.startsWith('9')) {
-        // Tiene el 9 pero le falta el código de país 54
-        destinatarioLimpio = `54${destinatarioLimpio}`;
+      }
+
+      // Argentina móvil: 549XXXXXXXXXX (13 dígitos) → 54AREA15LOCAL (14 dígitos)
+      // Buenos Aires usa código de área 2 dígitos (11), el resto usa 3 dígitos
+      if (destinatarioLimpio.startsWith('549') && destinatarioLimpio.length === 13) {
+        const rest = destinatarioLimpio.substring(3); // ej: "3513376865"
+        const areaLen = rest.startsWith('11') ? 2 : 3;
+        destinatarioLimpio = `54${rest.substring(0, areaLen)}15${rest.substring(areaLen)}`;
+        // ej: "54" + "351" + "15" + "3376865" = "54351153376865"
       }
 
       console.log(`[WA-SEND] Enviando a: ${destinatarioLimpio} (original: ${destinatario})`);
