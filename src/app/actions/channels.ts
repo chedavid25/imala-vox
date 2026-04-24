@@ -341,9 +341,16 @@ export async function enviarMensajeAccion(
       if (!phoneNumberId) throw new Error("ID de teléfono no configurado para WhatsApp");
       url = `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`;
       
-      // Asegurar que el destinatario solo tenga números (Meta rechaza el + en sandbox)
-      const destinatarioLimpio = destinatario.replace(/\D/g, '');
-      console.log(`[WA-SEND] Enviando a: ${destinatarioLimpio} via ${phoneNumberId}`);
+      // Asegurar que el destinatario solo tenga números
+      let destinatarioLimpio = destinatario.replace(/\D/g, '');
+      
+      // FIX ARGENTINA: El sandbox de Meta suele fallar con el 549. 
+      // Si el número empieza con 549 y tiene 13 dígitos, quitamos el 9.
+      if (destinatarioLimpio.startsWith('549') && destinatarioLimpio.length === 13) {
+        destinatarioLimpio = '54' + destinatarioLimpio.substring(3);
+      }
+
+      console.log(`[WA-SEND] Enviando a: ${destinatarioLimpio} (original: ${destinatario})`);
       
       if (senderAction === 'mark_read') {
         body = {
