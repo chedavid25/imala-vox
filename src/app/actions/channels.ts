@@ -341,13 +341,15 @@ export async function enviarMensajeAccion(
       if (!phoneNumberId) throw new Error("ID de teléfono no configurado para WhatsApp");
       url = `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`;
       
-      // Asegurar que el destinatario solo tenga números
+      // Normalizar número al formato E.164 sin + que requiere WhatsApp Cloud API
+      // Casos: "+5493513376865" → "5493513376865" | "3513376865" (10 díg) → "5493513376865"
       let destinatarioLimpio = destinatario.replace(/\D/g, '');
-      
-      // FIX ARGENTINA: El sandbox de Meta suele fallar con el 549. 
-      // Si el número empieza con 549 y tiene 13 dígitos, quitamos el 9.
-      if (destinatarioLimpio.startsWith('549') && destinatarioLimpio.length === 13) {
-        destinatarioLimpio = '54' + destinatarioLimpio.substring(3);
+      if (destinatarioLimpio.length === 10) {
+        // Solo área + local sin código de país → agregar 549 (Argentina mobile)
+        destinatarioLimpio = `549${destinatarioLimpio}`;
+      } else if (destinatarioLimpio.length === 11 && destinatarioLimpio.startsWith('9')) {
+        // Tiene el 9 pero le falta el código de país 54
+        destinatarioLimpio = `54${destinatarioLimpio}`;
       }
 
       console.log(`[WA-SEND] Enviando a: ${destinatarioLimpio} (original: ${destinatario})`);
