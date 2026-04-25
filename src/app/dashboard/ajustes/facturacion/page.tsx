@@ -15,7 +15,9 @@ import {
   Info,
   ExternalLink,
   ChevronDown,
-  HelpCircle
+  HelpCircle,
+  Lightbulb,
+  ArrowRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +64,17 @@ export default function FacturacionPage() {
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
   const [targetPlan, setTargetPlan] = useState<'starter' | 'pro' | 'agencia' | null>(null);
   const [isUpgradeDialogOpen, setIsUpgradeDialogOpen] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+
+  const ayudaFacturacion = {
+    titulo: "Facturación y Suscripciones",
+    descripcion: "Gestiona tu plan operativo, controla los gastos y accede a tu historial de facturación de forma transparente.",
+    items: [
+      { titulo: "Cotización Blue", detalle: "Los precios se basan en USD pero se cobran en ARS. Usamos la cotización blue del día (con ajuste trimestral) para mayor estabilidad." },
+      { titulo: "Ciclos de Pago", detalle: "Puedes elegir facturación mensual o anual. El plan anual incluye un 20% de descuento (2 meses gratis)." },
+      { titulo: "Cambios de Plan", detalle: "Los upgrades son inmediatos. Al cambiar de plan, MercadoPago procesará la diferencia o el nuevo ciclo automáticamente." },
+    ]
+  };
 
   useEffect(() => {
     obtenerCotizacionBlue().then(setCotizacion);
@@ -103,10 +116,10 @@ export default function FacturacionPage() {
 
   const currentPlan = workspace.plan;
   const statusLabels = {
-    prueba: { label: "En Prueba", color: "bg-amber-400/20 text-amber-500 border-amber-500/30" },
-    activo: { label: "Activo", color: "bg-emerald-400/20 text-emerald-500 border-emerald-500/30" },
-    pago_vencido: { label: "Pago Vencido", color: "bg-rose-400/20 text-rose-500 border-rose-500/30" },
-    cancelado: { label: "Cancelado", color: "bg-slate-400/20 text-slate-500 border-slate-500/30" },
+    prueba: { label: "En Prueba", color: "bg-amber-50 text-amber-600 border-amber-100" },
+    activo: { label: "Activo", color: "bg-emerald-50 text-emerald-600 border-emerald-100" },
+    pago_vencido: { label: "Pago Vencido", color: "bg-rose-50 text-rose-600 border-rose-100" },
+    cancelado: { label: "Cancelado", color: "bg-slate-50 text-slate-600 border-slate-100" },
   };
 
   const diasRestantes = workspace.pruebaTerminaEl
@@ -168,184 +181,248 @@ export default function FacturacionPage() {
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-12 animate-in fade-in duration-700 pb-20">
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2 text-[var(--accent)]">
-            <CreditCard className="w-5 h-5" />
-            <span className="text-[11px] font-black uppercase tracking-[0.2em]">Billing & Plans</span>
+      <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 mb-1">
+            <CreditCard className="w-4 h-4 text-[var(--text-tertiary-light)]" />
+            <span className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest">Gestión de Cuenta</span>
           </div>
-          <h1 className="text-3xl font-extrabold text-[var(--text-primary-light)] tracking-tight">Facturación y Gestión de Plan</h1>
-          <p className="text-[13px] text-[var(--text-secondary-light)] max-w-md leading-relaxed font-medium">
-            Controla tus suscripciones, historial de pagos y límites operativos.
-          </p>
+          <h1 className="text-3xl font-bold text-[var(--text-primary-light)] tracking-tight">Facturación y Gestión de Plan</h1>
+          <p className="text-sm text-[var(--text-tertiary-light)] font-medium max-w-md">Controla tus suscripciones, historial de pagos y límites operativos.</p>
         </div>
+
+        <button
+          onClick={() => setShowHelp(v => !v)}
+          className={cn(
+            "flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-bold transition-all shrink-0 h-11",
+            showHelp
+              ? "bg-[var(--bg-sidebar)] border-[var(--border-dark)] text-[var(--accent)]"
+              : "bg-white border-[var(--border-light)] text-[var(--text-secondary-light)] hover:bg-[var(--bg-input)] hover:text-[var(--text-primary-light)]"
+          )}
+        >
+          <HelpCircle className="w-4 h-4" />
+          ¿Cómo funciona el pago?
+          <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", showHelp && "rotate-180")} />
+        </button>
       </div>
+
+      {/* Panel de ayuda expandible */}
+      {showHelp && (
+        <div className="bg-white border border-[var(--border-light)] rounded-[32px] overflow-hidden shadow-sm animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="px-8 pt-8 pb-6 border-b border-[var(--border-light)]">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-2xl bg-[var(--bg-sidebar)] border border-[var(--border-dark)] flex items-center justify-center shrink-0 shadow-sm">
+                <Lightbulb className="w-5 h-5 text-[var(--accent)]" />
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="text-sm font-bold text-[var(--text-primary-light)]">{ayudaFacturacion.titulo}</h3>
+                <p className="text-sm text-[var(--text-secondary-light)] leading-relaxed">{ayudaFacturacion.descripcion}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-8 py-6 space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {ayudaFacturacion.items.map((item, i) => (
+                <div key={i} className="bg-[var(--bg-input)]/30 border border-[var(--border-light)] rounded-2xl p-4 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent-active)] shrink-0" />
+                    <span className="text-[12px] font-bold text-[var(--text-primary-light)] uppercase tracking-tight">{item.titulo}</span>
+                  </div>
+                  <p className="text-[12px] text-[var(--text-tertiary-light)] leading-relaxed pl-3.5 font-medium">{item.detalle}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* SECCIÓN 1: ESTADO ACTUAL */}
-        <Card className="lg:col-span-1 bg-[var(--bg-card)] border border-[var(--accent)]/20 rounded-2xl shadow-sm overflow-hidden p-6">
-          <CardHeader className="p-0 pb-4 border-b border-[var(--border-light)] bg-transparent">
-            <CardTitle className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary-light)]">Tu Plan Actual</CardTitle>
+        <Card className="lg:col-span-1 bg-white border border-[var(--border-light)] rounded-[32px] shadow-sm overflow-hidden flex flex-col">
+          <CardHeader className="px-8 pt-8 pb-4 border-b border-[var(--border-light)] bg-slate-50/30">
+            <CardTitle className="text-[10px] font-black uppercase tracking-widest text-[var(--text-tertiary-light)]">Suscripción Actual</CardTitle>
           </CardHeader>
-          <CardContent className="pt-8 space-y-8">
+          <CardContent className="p-8 flex-grow space-y-8">
             <div className="flex flex-col items-center text-center space-y-4">
-              <div className="size-16 rounded-3xl bg-[var(--accent)]/10 flex items-center justify-center border border-[var(--accent)]/20 shadow-inner">
-                <Zap className="size-8 text-[var(--accent)]" />
+              <div className="w-20 h-20 rounded-[2rem] bg-[var(--bg-sidebar)] flex items-center justify-center border border-[var(--border-dark)] shadow-sm">
+                <Zap className="size-10 text-[var(--accent)]" />
               </div>
               <div>
                 <h3 className="text-2xl font-black text-[var(--text-primary-light)] uppercase tracking-tight">Plan {workspace.plan}</h3>
-                <Badge className={cn("mt-2 rounded-full px-4 py-1 border font-bold text-[11px]", statusLabels[workspace.estado].color)}>
-                  {statusLabels[workspace.estado].label}
+                <Badge className={cn("mt-2 rounded-xl px-4 py-1 border font-black text-[10px] uppercase tracking-widest", statusLabels[workspace.estado as keyof typeof statusLabels]?.color)}>
+                  {statusLabels[workspace.estado as keyof typeof statusLabels]?.label}
                 </Badge>
               </div>
             </div>
 
             {workspace.estado === 'prueba' && (
-              <div className="space-y-4 p-5 bg-[var(--bg-main)]/50 rounded-2xl border border-[var(--border-light)] shadow-inner">
-                <div className="flex justify-between items-center text-xs font-bold">
-                  <span className="text-[var(--text-tertiary-light)] font-bold uppercase tracking-widest">Período de Prueba</span>
-                  <span className="text-[#F59E0B] font-bold text-sm">{diasRestantes} días restantes</span>
+              <div className="space-y-4 p-5 bg-[var(--bg-input)]/30 rounded-[2rem] border border-[var(--border-light)]">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest">Días de Prueba</span>
+                  <span className="text-amber-600 font-black text-xs uppercase tracking-widest">{diasRestantes} restantes</span>
                 </div>
-                <Progress value={porcentajePrueba} className="h-2 bg-[var(--border-light)] [&>div]:bg-[var(--accent)]" />
-                <p className="text-[10px] text-[var(--text-tertiary-light)] leading-relaxed font-medium">
-                  Tu acceso de cortesía vence el {workspace.pruebaTerminaEl?.toDate().toLocaleDateString()}. Suscribite para mantener tus agentes activos.
+                <Progress value={porcentajePrueba} className="h-2 bg-white border border-[var(--border-light)]" />
+                <p className="text-[10px] text-[var(--text-tertiary-light)] leading-relaxed font-medium text-center">
+                  Acceso de cortesía hasta el <strong>{workspace.pruebaTerminaEl?.toDate().toLocaleDateString()}</strong>.
                 </p>
               </div>
             )}
 
             <div className="space-y-4">
-              <div className="flex justify-between items-center py-2 border-b border-[var(--border-light)]">
-                <span className="text-xs font-bold text-[var(--text-tertiary-light)]">Precio ARS</span>
+              <div className="flex justify-between items-center py-2.5 border-b border-[var(--border-light)]">
+                <span className="text-[11px] font-bold text-[var(--text-tertiary-light)] uppercase tracking-tight">Precio ARS</span>
                 <span className="text-sm font-black text-[var(--text-primary-light)]">
                   {cotizacion 
-                    ? `$${Math.round((workspace.facturacion?.precioUSD || PLAN_LIMITS[workspace.plan as keyof typeof PLAN_LIMITS].priceMonthly) * cotizacion * 1.10).toLocaleString('es-AR')} / mes` 
-                    : 'Calculando...'}
+                    ? `$${Math.round((workspace.facturacion?.precioUSD || PLAN_LIMITS[workspace.plan as keyof typeof PLAN_LIMITS].priceMonthly) * cotizacion * 1.10).toLocaleString('es-AR')}` 
+                    : '...'}
                 </span>
               </div>
-              <div className="flex justify-between items-center py-2 border-b border-[var(--border-light)]">
-                <span className="text-xs font-bold text-[var(--text-tertiary-light)]">Cotización Blue</span>
-                <span className="text-xs font-bold text-[var(--text-secondary-light)] tracking-tight">
-                  {cotizacion ? `$${cotizacion.toLocaleString('es-AR')} ARS` : 'Cargando...'}
+              <div className="flex justify-between items-center py-2.5 border-b border-[var(--border-light)]">
+                <span className="text-[11px] font-bold text-[var(--text-tertiary-light)] uppercase tracking-tight">Dólar Blue</span>
+                <span className="text-xs font-black text-[var(--text-secondary-light)]">
+                  {cotizacion ? `$${cotizacion.toLocaleString('es-AR')}` : '...'}
                 </span>
               </div>
-              <div className="flex justify-between items-center py-2">
-                <span className="text-xs font-bold text-[var(--text-tertiary-light)]">Próxima Renovación</span>
+              <div className="flex justify-between items-center py-2.5">
+                <span className="text-[11px] font-bold text-[var(--text-tertiary-light)] uppercase tracking-tight">Renovación</span>
                 <span className="text-xs font-black text-[var(--text-primary-light)]">
                   {workspace.periodoVigenteHasta?.toDate().toLocaleDateString() || "N/A"}
                 </span>
               </div>
             </div>
 
-            <div className="flex items-start gap-3 p-4 bg-blue-500/5 rounded-2xl border border-blue-500/10">
-              <Info className="size-4 text-[var(--text-primary-light)] shrink-0 mt-0.5" />
-              <p className="text-[10px] text-[var(--text-primary-light)] leading-relaxed font-bold">
-                Los precios en ARS se ajustan trimestralmente basándose en el Dólar Blue para mantener la paridad operativa. La conversión incluye un spread operativo y gastos administrativos. Próximo ajuste: <strong className="font-black underline cursor-help decoration-[var(--accent)] decoration-2">{workspace.facturacion?.proximaActualizacion?.toDate().toLocaleDateString()}</strong>.
+            <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex items-start gap-3">
+              <Info className="size-4 text-blue-500 shrink-0 mt-0.5" />
+              <p className="text-[10px] text-blue-700 leading-relaxed font-medium">
+                Los precios en ARS se ajustan trimestralmente por paridad operativa. Próximo ajuste: <strong className="font-bold">{workspace.facturacion?.proximaActualizacion?.toDate().toLocaleDateString()}</strong>.
               </p>
             </div>
           </CardContent>
-          <CardFooter className="bg-[#1F1F1E] border-t border-white/5 p-4 flex justify-center items-center">
+          <CardFooter className="bg-slate-50/50 border-t border-[var(--border-light)] p-6 flex justify-center items-center">
              <Button 
                variant="ghost" 
-               className="text-[11px] font-bold text-rose-400 hover:text-rose-300 hover:bg-white/5 transition-all px-8" 
+               className="text-[10px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-600 hover:bg-rose-50 transition-all px-8 h-10 rounded-xl" 
                onClick={() => setIsCancelDialogOpen(true)}
              >
                {workspace.estado === 'cancelado' ? "Suscripción ya cancelada" : "Cancelar suscripción"}
              </Button>
 
              <Dialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
-               <DialogContent className="max-w-md bg-[var(--bg-card)] border-[var(--border-light)]">
-                 <DialogHeader>
-                   <DialogTitle className="text-xl font-black text-[var(--text-primary-light)]">¿Confirmar Cancelación?</DialogTitle>
-                   <DialogDescription className="text-sm text-[var(--text-tertiary-light)] pt-2 leading-relaxed">
-                     Estás a punto de cancelar tu suscripción a <strong>Plan {workspace.plan}</strong>. Perderás el acceso a tus agentes inteligentes y automatizaciones al finalizar el periodo actual.
-                   </DialogDescription>
+               <DialogContent className="max-w-md bg-white border-none shadow-2xl rounded-[32px] overflow-hidden p-0">
+                 <DialogHeader className="bg-rose-50/50 p-8 pb-4">
+                   <DialogTitle className="text-2xl font-black tracking-tight flex items-center gap-3 text-rose-900">
+                      <div className="size-10 rounded-2xl bg-rose-500 flex items-center justify-center text-white">
+                        <AlertCircle className="size-5" />
+                      </div>
+                      ¿Confirmar Cancelación?
+                   </DialogTitle>
                  </DialogHeader>
-                 <DialogFooter className="bg-transparent border-t-0 -mx-0 -mb-0 pt-6 gap-3">
-                   <Button 
-                    variant="outline" 
-                    onClick={() => setIsCancelDialogOpen(false)}
-                    className="flex-1 rounded-xl border-[var(--border-light)] font-bold text-xs"
-                   >
-                     Mantener Plan
-                   </Button>
-                   <Button 
-                    className="flex-1 bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs rounded-xl"
-                    onClick={() => {
-                      setIsCancelDialogOpen(false);
-                      toast.promise(cancelarSuscripcionMP(currentWorkspaceId!), {
-                        loading: 'Cancelando suscripción...',
-                        success: 'Suscripción cancelada correctamente',
-                        error: 'Error al cancelar'
-                      });
-                    }}
-                   >
-                     Confirmar Cancelación
-                   </Button>
+                 <div className="p-8 space-y-4">
+                    <p className="text-sm text-rose-800/70 leading-relaxed font-medium">
+                      Estás a punto de cancelar tu <strong>Plan {workspace.plan}</strong>. Perderás el acceso a tus agentes inteligentes y automatizaciones al finalizar el periodo actual.
+                    </p>
+                    <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 flex items-start gap-3">
+                      <Info className="size-4 text-amber-600 shrink-0 mt-0.5" />
+                      <p className="text-[11px] text-amber-700 font-bold leading-relaxed">
+                        Tus datos y configuraciones se mantendrán guardados por 30 días, pero tus agentes dejarán de responder mensajes.
+                      </p>
+                    </div>
+                 </div>
+                 <DialogFooter className="p-8 pt-0 flex flex-col gap-3">
+                    <Button 
+                      className="w-full bg-rose-600 hover:bg-rose-700 text-white font-black text-[10px] uppercase tracking-widest h-12 rounded-2xl shadow-xl shadow-rose-500/20"
+                      onClick={() => {
+                        setIsCancelDialogOpen(false);
+                        toast.promise(cancelarSuscripcionMP(currentWorkspaceId!), {
+                          loading: 'Cancelando suscripción...',
+                          success: 'Suscripción cancelada correctamente',
+                          error: 'Error al cancelar'
+                        });
+                      }}
+                    >
+                      Sí, confirmar cancelación
+                    </Button>
+                    <Button 
+                      variant="ghost"
+                      onClick={() => setIsCancelDialogOpen(false)}
+                      className="w-full text-slate-400 font-bold text-[10px] uppercase tracking-widest h-12 rounded-2xl"
+                    >
+                      No, mantener mi plan
+                    </Button>
                  </DialogFooter>
                </DialogContent>
              </Dialog>
           </CardFooter>
 
           <Dialog open={isUpgradeDialogOpen} onOpenChange={setIsUpgradeDialogOpen}>
-             <DialogContent className="max-w-md bg-[var(--bg-card)] border-[var(--border-light)] p-8">
-               <DialogHeader className="space-y-4">
-                 <div className="size-16 rounded-3xl bg-[var(--accent)]/10 flex items-center justify-center border border-[var(--accent)]/20 shadow-inner mx-auto mb-2">
-                    <Zap className="size-8 text-[var(--accent)]" />
+             <DialogContent className="max-w-md bg-white border-none shadow-2xl rounded-[32px] overflow-hidden p-0">
+               <DialogHeader className="bg-slate-50/50 p-8 pb-4">
+                 <div className="size-16 rounded-[2rem] bg-[var(--accent)] flex items-center justify-center text-white mx-auto mb-4 shadow-lg shadow-[var(--accent)]/20">
+                    <Zap className="size-8" />
                  </div>
-                 <DialogTitle className="text-2xl font-black text-[var(--text-primary-light)] text-center">¡Preparate para el cambio!</DialogTitle>
-                 <DialogDescription className="text-center text-[var(--text-secondary-light)] text-sm leading-relaxed px-2">
-                   Tu nuevo plan <strong>{targetPlan?.toUpperCase()}</strong> se activará ahora mismo y tendrás acceso inmediato a todas sus funcionalidades.
+                 <DialogTitle className="text-2xl font-black text-[var(--text-primary-light)] text-center tracking-tight">¡Preparate para el cambio!</DialogTitle>
+                 <DialogDescription className="text-center text-[var(--text-secondary-light)] text-sm leading-relaxed px-2 font-medium">
+                   Tu nuevo plan <strong>{targetPlan?.toUpperCase()}</strong> se activará ahora mismo y tendrás acceso inmediato.
                  </DialogDescription>
                </DialogHeader>
 
-               <div className="mt-8 p-6 bg-[#1F1F1E] rounded-3xl border border-white/5 space-y-4 shadow-2xl">
-                  <div className="flex justify-between items-center pb-4 border-b border-white/10">
-                    <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest">Próximo Cobro</span>
-                    <span className="text-sm font-black text-[var(--accent)]">{nextBillingDate()}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest">Monto Estimado</span>
-                    <div className="text-right">
-                      <p className="text-sm font-black text-white">${targetPlan ? (isAnual ? PLAN_LIMITS[targetPlan].priceYearly : PLAN_LIMITS[targetPlan].priceMonthly) : 0} USD</p>
-                      <p className="text-[9px] font-bold text-white/40 uppercase tracking-tighter">Equivalente en ARS</p>
+               <div className="p-8 pt-4 space-y-6">
+                 <div className="bg-slate-900 rounded-[2rem] p-6 space-y-4 shadow-2xl">
+                    <div className="flex justify-between items-center pb-4 border-b border-white/10">
+                      <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Próximo Cobro</span>
+                      <span className="text-sm font-black text-[var(--accent)]">{nextBillingDate()}</span>
                     </div>
-                  </div>
-               </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Monto Estimado</span>
+                      <div className="text-right">
+                        <p className="text-xl font-black text-white">${targetPlan ? (isAnual ? PLAN_LIMITS[targetPlan].priceYearly : PLAN_LIMITS[targetPlan].priceMonthly) : 0} <span className="text-xs text-white/40 uppercase tracking-widest">USD</span></p>
+                        <p className="text-[9px] font-black text-[var(--accent)] uppercase tracking-widest">Ciclo {isAnual ? 'Anual' : 'Mensual'}</p>
+                      </div>
+                    </div>
+                 </div>
 
-               <DialogFooter className="mt-8 flex flex-col gap-3">
-                 <Button 
-                   className="w-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-black text-xs uppercase tracking-widest h-12 rounded-2xl shadow-lg shadow-[var(--accent)]/20"
-                   onClick={confirmUpgrade}
-                 >
-                   Confirmar y pagar ahora
-                 </Button>
-                 <Button 
-                   variant="outline" 
-                   className="w-full text-[var(--text-tertiary-light)] font-bold text-[10px] uppercase tracking-widest border-[var(--border-light)]"
-                   onClick={() => setIsUpgradeDialogOpen(false)}
-                 >
-                   Volver
-                 </Button>
-               </DialogFooter>
+                 <div className="flex flex-col gap-3 pt-2">
+                   <Button 
+                     className="w-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-black text-[10px] uppercase tracking-widest h-12 rounded-2xl shadow-xl shadow-[var(--accent)]/20"
+                     onClick={confirmUpgrade}
+                   >
+                     Confirmar y pagar ahora
+                   </Button>
+                   <Button 
+                     variant="ghost" 
+                     className="w-full text-slate-400 font-bold text-[10px] uppercase tracking-widest"
+                     onClick={() => setIsUpgradeDialogOpen(false)}
+                   >
+                     Volver atrás
+                   </Button>
+                 </div>
+               </div>
              </DialogContent>
-           </Dialog>
+            </Dialog>
         </Card>
 
         {/* COMPARADOR DE PLANES */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <h3 className="text-xl font-bold text-[var(--text-primary-light)] tracking-tight">Mejorar Nivel de IA</h3>
-            <div className="flex items-center gap-3 p-1 bg-[var(--bg-input)] border border-[var(--border-light)] rounded-xl">
+            <div className="flex items-center gap-2 p-1 bg-white border border-[var(--border-light)] rounded-2xl shadow-sm">
                <button 
                  onClick={() => setIsAnual(false)}
-                 className={cn("px-4 py-1.5 text-[10px] font-bold uppercase rounded-lg transition-all", !isAnual ? "bg-[var(--accent)] text-[var(--accent-text)] shadow-lg" : "text-[var(--text-tertiary-light)]")}
+                 className={cn(
+                   "px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all", 
+                   !isAnual ? "bg-[var(--accent)] text-[var(--accent-text)] shadow-lg shadow-[var(--accent)]/20" : "text-[var(--text-tertiary-light)] hover:text-[var(--text-primary-light)]"
+                 )}
                >Mensual</button>
                <button 
                   onClick={() => setIsAnual(true)}
-                  className={cn("px-4 py-1.5 text-[10px] font-bold uppercase rounded-lg transition-all flex items-center gap-2", isAnual ? "bg-[var(--accent)] text-[var(--accent-text)] shadow-lg" : "text-[var(--text-tertiary-light)]")}
+                  className={cn(
+                    "px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-2", 
+                    isAnual ? "bg-[var(--accent)] text-[var(--accent-text)] shadow-lg shadow-[var(--accent)]/20" : "text-[var(--text-tertiary-light)] hover:text-[var(--text-primary-light)]"
+                  )}
                >
                  Anual 
-                 <Badge className="bg-[#22C55E]/15 text-[#22C55E] border-none h-5 px-2 py-0.5 text-[9px] font-black rounded-full">-20% — 2 meses gratis</Badge>
+                 <Badge className="bg-emerald-50 text-emerald-600 border-none px-2 py-0.5 text-[9px] font-black rounded-lg">-20%</Badge>
                </button>
             </div>
           </div>
@@ -358,65 +435,59 @@ export default function FacturacionPage() {
 
               return (
                 <Card key={p} className={cn(
-                  "relative flex flex-col bg-[var(--bg-card)] border-[var(--border-light)] transition-all",
-                  isCurrent ? "ring-2 ring-[var(--accent)] border-transparent scale-[1.02] shadow-2xl z-10" : "hover:border-[var(--accent)]/30"
+                  "relative flex flex-col bg-white border-[var(--border-light)] rounded-[28px] transition-all overflow-hidden",
+                  isCurrent ? "ring-2 ring-[var(--accent)] shadow-2xl z-10" : "hover:border-[var(--accent)]/30 hover:shadow-lg"
                 )}>
                   {isCurrent && (
                     <div className="absolute top-0 right-0">
-                      <div className="bg-[var(--accent)] text-[var(--accent-text)] text-[8px] font-black uppercase px-3 py-1 rounded-bl-xl shadow-lg">Actual</div>
+                      <div className="bg-[var(--accent)] text-[var(--accent-text)] text-[8px] font-black uppercase px-4 py-1.5 rounded-bl-2xl shadow-lg tracking-widest">Activo</div>
                     </div>
                   )}
-                  <CardHeader className="text-center p-6 space-y-1">
-                    <CardTitle className="text-lg font-black uppercase tracking-widest text-[var(--text-primary-light)]">{p}</CardTitle>
-                    <p className="text-[10px] text-[var(--text-tertiary-light)] font-bold italic">
-                      {p === 'starter' && "Ideal para el agente que empieza con IA"}
-                      {p === 'pro' && "Para equipos activos con volumen"}
-                      {p === 'agencia' && "Para equipos grandes y redes de oficinas"}
-                    </p>
+                  <CardHeader className="text-center p-8 space-y-2">
+                    <CardTitle className="text-sm font-black uppercase tracking-widest text-[var(--text-primary-light)]">{p}</CardTitle>
                     <div className="flex flex-col items-center pt-2">
                        {p === 'pro' && !isCurrent && (
-                        <div className="flex flex-col items-center animate-bounce-subtle">
-                           <Badge className="mb-1 bg-[#22C55E] text-white border-none text-[8px] font-black uppercase px-3 shadow-lg shadow-emerald-500/20">Más Popular</Badge>
-                           <div className="text-[9px] font-black text-emerald-500 uppercase tracking-tighter mb-1">Recomendado</div>
+                        <div className="flex flex-col items-center mb-2">
+                           <Badge className="bg-emerald-500 text-white border-none text-[8px] font-black uppercase px-3 py-1 rounded-full shadow-lg shadow-emerald-500/20 tracking-widest">Recomendado</Badge>
                         </div>
                       )}
-                      <div className="text-3xl font-black text-[var(--text-primary-light)]">${priceMonthly}</div>
-                      <span className="text-[10px] font-bold text-[var(--text-tertiary-light)] uppercase tracking-widest">USD / MES</span>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-3xl font-black text-[var(--text-primary-light)]">${priceMonthly}</span>
+                        <span className="text-[10px] font-bold text-[var(--text-tertiary-light)] uppercase tracking-widest">USD</span>
+                      </div>
+                      <span className="text-[9px] font-bold text-[var(--text-tertiary-light)] uppercase tracking-widest mt-1">Facturación {isAnual ? 'Anual' : 'Mensual'}</span>
                     </div>
                   </CardHeader>
-                  <CardContent className="flex-grow p-6 space-y-4 border-t border-[var(--border-light)]/50">
+
+                  <CardContent className="flex-grow px-8 pb-8 space-y-4 border-t border-slate-50 pt-6">
                     <div className="space-y-3">
-                      <div className="flex items-center gap-2 text-[11px] font-bold text-[var(--text-secondary-light)]">
-                        <Check className="size-3.5 text-emerald-500" />
-                        {limits.agentsIA} Agente Inteligente
-                        <InfoTooltip text="Un experto virtual entrenado con tu información que atiende, vende y agenda citas por vos las 24/7." />
-                      </div>
-                      <div className="flex items-center gap-2 text-[11px] font-bold text-[var(--text-secondary-light)]">
-                        <Check className="size-3.5 text-emerald-500" />
-                        {limits.convCountIA.toLocaleString()} Conversaciones
-                        <InfoTooltip text="Sesiones de chat con clientes. La IA puede intercambiar mensajes ilimitados en una misma sesión." />
-                      </div>
-                      <div className="flex items-center gap-2 text-[11px] font-bold text-[var(--text-secondary-light)]">
-                         <Check className="size-3.5 text-emerald-500" />
-                         CRM p/ {limits.crmContacts === 'unlimited' ? 'Contactos Ilimitados' : limits.crmContacts.toString() + ' contactos'}
-                         <InfoTooltip text="Capacidad máxima de clientes únicos guardados en tu base para seguimiento y re-marketing." />
-                      </div>
-                       <div className="flex items-center gap-2 text-[11px] font-bold text-[var(--text-secondary-light)]">
-                         <Check className="size-3.5 text-emerald-500" />
-                         Base de Conocimiento
-                         <InfoTooltip text="Documentación y archivos (PDF, Webs) que le das a tu IA para que aprenda sobre tu negocio." />
-                      </div>
-                      {/* Item API eliminado por solicitud */}
+                      {[
+                        { label: `${limits.agentsIA} Agente Inteligente`, tooltip: "Un experto virtual entrenado con tu información que atiende las 24/7." },
+                        { label: `${limits.convCountIA.toLocaleString()} Conversaciones`, tooltip: "Sesiones de chat con clientes. Mensajes ilimitados por sesión." },
+                        { label: limits.crmContacts === 'unlimited' ? 'Contactos Ilimitados' : `${limits.crmContacts.toLocaleString()} Contactos`, tooltip: "Capacidad máxima de clientes en tu base para seguimiento." },
+                        { label: "Base de Conocimiento", tooltip: "Documentación y archivos (PDF, Webs) que le das a tu IA." }
+                      ].map((item, idx) => (
+                        <div key={idx} className="flex items-center justify-between group">
+                          <div className="flex items-center gap-2 text-[11px] font-bold text-[var(--text-secondary-light)]">
+                            <div className="w-4 h-4 rounded-full bg-emerald-50 flex items-center justify-center">
+                              <Check className="size-2.5 text-emerald-600" />
+                            </div>
+                            {item.label}
+                          </div>
+                          <InfoTooltip text={item.tooltip} />
+                        </div>
+                      ))}
                     </div>
                   </CardContent>
-                  <CardFooter className="p-6">
+
+                  <CardFooter className="p-8 pt-0">
                     <Button 
                       disabled={isCurrent || loadingAction === p}
                       className={cn(
-                        "w-full h-10 font-bold uppercase text-[10px] tracking-widest rounded-xl transition-all",
+                        "w-full h-11 font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all",
                         isCurrent 
-                          ? "bg-[var(--bg-input)] text-[var(--text-tertiary-light)] cursor-default" 
-                          : "bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] shadow-lg"
+                          ? "bg-slate-100 text-slate-400 cursor-default" 
+                          : "bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] shadow-xl shadow-[var(--accent)]/10 hover:scale-[1.02]"
                       )}
                       onClick={() => workspace.estado === 'prueba' ? handleCreateSubscription(p) : handleUpgrade(p)}
                     >
@@ -432,72 +503,79 @@ export default function FacturacionPage() {
 
       {/* HISTORIAL DE PAGOS */}
       <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          <div className="size-10 rounded-2xl bg-[var(--bg-input)] border border-[var(--border-light)] flex items-center justify-center">
-            <History className="size-5 text-[var(--text-secondary-light)]" />
-          </div>
-          <div>
-            <h3 className="text-xl font-extrabold text-[var(--text-primary-light)] tracking-tight">Historial de Pagos</h3>
-            <p className="text-xs text-[var(--text-tertiary-light)] font-medium">Registro de todas las facturas y transacciones realizadas.</p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-white border border-[var(--border-light)] flex items-center justify-center shadow-sm">
+              <History className="size-5 text-[var(--text-secondary-light)]" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-[var(--text-primary-light)] tracking-tight">Historial de Pagos</h3>
+              <p className="text-xs text-[var(--text-tertiary-light)] font-medium">Registro de tus transacciones y facturas.</p>
+            </div>
           </div>
         </div>
 
-        <Card className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-3xl overflow-hidden shadow-xl shadow-black/5">
+        <Card className="bg-white border border-[var(--border-light)] rounded-[32px] overflow-hidden shadow-sm">
           <Table>
-            <TableHeader className="bg-[var(--bg-main)]/50">
+            <TableHeader className="bg-slate-50/50">
               <TableRow className="border-b border-[var(--border-light)] hover:bg-transparent">
-                <TableHead className="text-[10px] font-black uppercase tracking-widest h-12">Fecha</TableHead>
-                <TableHead className="text-[10px] font-black uppercase tracking-widest h-12">Concepto</TableHead>
-                <TableHead className="text-[10px] font-black uppercase tracking-widest h-12">Monto ARS</TableHead>
-                <TableHead className="text-[10px] font-black uppercase tracking-widest h-12">Monto USD</TableHead>
-                <TableHead className="text-[10px] font-black uppercase tracking-widest h-12 text-center">Estado</TableHead>
-                <TableHead className="text-[10px] font-black uppercase tracking-widest h-12 text-right">Detalle</TableHead>
+                <TableHead className="text-[10px] font-black uppercase tracking-widest h-14 pl-8">Fecha</TableHead>
+                <TableHead className="text-[10px] font-black uppercase tracking-widest h-14">Concepto</TableHead>
+                <TableHead className="text-[10px] font-black uppercase tracking-widest h-14">Monto ARS</TableHead>
+                <TableHead className="text-[10px] font-black uppercase tracking-widest h-14">USD</TableHead>
+                <TableHead className="text-[10px] font-black uppercase tracking-widest h-14 text-center">Estado</TableHead>
+                <TableHead className="text-[10px] font-black uppercase tracking-widest h-14 text-right pr-8">Acción</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {history.length === 0 ? (
                 <TableRow>
-                   <TableCell colSpan={6} className="h-32 text-center text-xs text-[var(--text-tertiary-light)] font-medium bg-[var(--bg-card)]">
-                     Aún no tienes movimientos registrados en tu historial.
+                   <TableCell colSpan={6} className="h-40 text-center text-xs text-[var(--text-tertiary-light)] font-medium">
+                     <div className="flex flex-col items-center gap-2 opacity-40">
+                        <History className="size-8 mb-2" />
+                        Aún no tienes movimientos registrados.
+                     </div>
                    </TableCell>
                 </TableRow>
               ) : (
                 history.map((event) => (
-                  <TableRow key={event.id} className="border-b border-[var(--border-light)] hover:bg-[var(--bg-main)]/30 transition-colors">
-                    <TableCell className="text-xs font-bold text-[var(--text-secondary-light)]">
+                  <TableRow key={event.id} className="border-b border-[var(--border-light)] hover:bg-slate-50/50 transition-colors">
+                    <TableCell className="text-xs font-bold text-[var(--text-secondary-light)] pl-8">
                       {event.creadoEl?.toDate().toLocaleDateString()}
                     </TableCell>
-                    <TableCell className="text-xs font-black text-[var(--text-primary-light)]">
+                    <TableCell className="text-xs font-bold text-[var(--text-primary-light)]">
                       {event.descripcion}
                     </TableCell>
-                    <TableCell className="text-xs font-bold text-[var(--text-secondary-light)]">
+                    <TableCell className="text-xs font-black text-[var(--text-primary-light)]">
                       ${event.monto?.toLocaleString('es-AR') || "-"}
                     </TableCell>
-                    <TableCell className="text-xs font-bold text-[var(--text-secondary-light)]">
+                    <TableCell className="text-[10px] font-bold text-[var(--text-tertiary-light)]">
                       ${event.montoUSD?.toLocaleString() || "-"}
                     </TableCell>
                     <TableCell className="text-center">
                        <Badge className={cn(
-                         "rounded-full px-3 py-0.5 text-[10px] font-bold border",
+                         "rounded-xl px-3 py-1 text-[9px] font-black uppercase tracking-widest border",
                          event.tipo === 'pago_exitoso' || event.tipo === 'upgrade' 
-                          ? "bg-emerald-400/10 text-emerald-500 border-emerald-500/20" 
-                          : "bg-rose-400/10 text-rose-500 border-rose-500/20"
+                          ? "bg-emerald-50 text-emerald-600 border-emerald-100" 
+                          : "bg-rose-50 text-rose-600 border-rose-100"
                        )}>
                          {event.tipo === 'pago_exitoso' ? 'Pagado' : (event.tipo.startsWith('pago_fallido') ? 'Fallo' : 'Ajuste')}
                        </Badge>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right pr-8">
                       {event.mpPagoId ? (
                         <a 
                           href={`https://www.mercadopago.com.ar/activities?query=${event.mpPagoId}`} 
                           target="_blank" 
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1.5 text-[10px] font-black text-[var(--accent)] hover:underline"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--bg-input)] text-[10px] font-black text-[var(--accent)] hover:bg-[var(--accent)] hover:text-white transition-all uppercase tracking-widest"
                         >
-                          Comprobante MP
+                          Ver Pago
                           <ExternalLink className="size-3" />
                         </a>
-                      ) : "-"}
+                      ) : (
+                        <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">S/D</span>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
@@ -508,23 +586,25 @@ export default function FacturacionPage() {
       </div>
 
       {/* FOOTER INFO */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-8 bg-[#1F1F1E] border border-white/5 rounded-[2.5rem] shadow-2xl">
-        <div className="space-y-4">
-          <div className="size-10 rounded-2xl bg-[var(--accent)]/10 border border-[var(--accent)]/20 flex items-center justify-center">
-            <ShieldCheck className="size-5 text-[var(--accent)]" />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-10 bg-slate-900 border border-white/5 rounded-[2.5rem] shadow-2xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-[var(--accent)]/10 blur-[100px] rounded-full -mr-32 -mt-32" />
+        
+        <div className="space-y-4 relative z-10">
+          <div className="size-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+            <ShieldCheck className="size-6 text-emerald-400" />
           </div>
-          <h4 className="text-lg font-bold text-white">Pagos 100% Protegidos</h4>
-          <p className="text-xs text-white/70 leading-relaxed font-medium">
-            Todas las transacciones son procesadas de forma segura a través de **MercadoPago**. Imalá Vox no almacena directamente los datos de tus tarjetas de crédito, garantizando la máxima seguridad posible certificados por estándares internacionales PCI DSS.
+          <h4 className="text-xl font-bold text-white tracking-tight">Pagos 100% Seguros</h4>
+          <p className="text-[13px] text-white/60 leading-relaxed font-medium max-w-sm">
+            Procesamos tus pagos a través de **MercadoPago**. No almacenamos datos de tus tarjetas, garantizando máxima seguridad con estándares PCI DSS.
           </p>
         </div>
-        <div className="space-y-4">
-          <div className="size-10 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-            <Clock className="size-5 text-blue-400" />
+        <div className="space-y-4 relative z-10">
+          <div className="size-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+            <Clock className="size-6 text-blue-400" />
           </div>
-          <h4 className="text-lg font-bold text-white">Renovación Automática</h4>
-          <p className="text-xs text-white/70 leading-relaxed font-medium">
-            Tu plan se renovará automáticamente al final de cada ciclo para que no pierdas conexión con tus clientes. Puedes cancelar o cambiar de plan en cualquier momento desde este panel. Los cambios de plan se aplican de forma inmediata.
+          <h4 className="text-xl font-bold text-white tracking-tight">Renovación Inteligente</h4>
+          <p className="text-[13px] text-white/60 leading-relaxed font-medium max-w-sm">
+            Tu plan se renueva automáticamente para evitar interrupciones. Puedes cancelar o cambiar de nivel en cualquier momento desde este panel.
           </p>
         </div>
       </div>
