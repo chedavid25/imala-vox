@@ -32,7 +32,9 @@ import {
   CheckCircle2,
   Circle,
   HelpCircle,
-  ArrowRight
+  ArrowRight,
+  Lightbulb,
+  AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -80,7 +82,18 @@ export default function CRMTagsPage() {
   const [editingCategory, setEditingCategory] = useState<CategoriaCRM | null>(null);
   const [isAddingTag, setIsAddingTag] = useState(false);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
-  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+
+  const ayudaEtiquetas = {
+    titulo: "¿Cómo organizar tus contactos?",
+    descripcion: "Usa las etiquetas para segmentar tu base de datos y controlar la salud relacional. Puedes crear grupos de etiquetas para diferentes propósitos.",
+    recomendacion: "Los grupos 'Exclusivos' actúan como semáforos: solo una etiqueta puede estar activa a la vez. Ideal para estados como 'Frío', 'Tibio' o 'Caliente'.",
+    items: [
+      { titulo: "Grupos Múltiples", detalle: "Permiten asignar varias etiquetas del mismo grupo a un contacto (ej: Intereses)." },
+      { titulo: "Grupos Exclusivos", detalle: "Solo permiten una etiqueta activa. Al marcar una, se desactiva la anterior (ej: Estados)." },
+      { titulo: "Salud Relacional", detalle: "Define cada cuántos días debes contactar al cliente según su etiqueta para que el sistema te avise." },
+    ]
+  };
 
   // Form states
   const [tagForm, setTagForm] = useState<Partial<EtiquetaCRM>>({
@@ -233,27 +246,35 @@ export default function CRMTagsPage() {
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500 pb-20 no-scrollbar">
       
-      <div className="flex justify-between items-end">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-2xl font-semibold text-[var(--text-primary-light)] flex items-center gap-2 tracking-tight">
-            <Layers className="w-6 h-6 text-[var(--accent)]" /> 
-            Etiquetas y Salud Relacional
-          </h1>
+          <div className="flex items-center gap-2 mb-1">
+            <Tags className="w-4 h-4 text-[var(--text-tertiary-light)]" />
+            <span className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest">Ajustes del Sistema</span>
+          </div>
+          <h1 className="text-2xl font-bold text-[var(--text-primary-light)] tracking-tight">Etiquetas y Salud Relacional</h1>
           <p className="text-sm text-[var(--text-tertiary-light)] font-medium">Organiza tus contactos con grupos de etiquetas y controla la salud relacional.</p>
         </div>
-        
-        <div className="flex gap-2">
-           <Button 
-             variant="ghost" 
-             size="icon" 
-             onClick={() => setIsHelpOpen(true)}
-             className="size-11 rounded-full border border-slate-100 text-slate-400 hover:text-[var(--accent)] hover:border-[var(--accent)]/30 transition-all"
-           >
-             <HelpCircle className="size-5" />
-           </Button>
-           <Dialog open={isAddingCategory} onOpenChange={(o) => { if(!o) setEditingCategory(null); setIsAddingCategory(o); }}>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowHelp(v => !v)}
+            className={cn(
+              "flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-bold transition-all shrink-0 h-11",
+              showHelp
+                ? "bg-[var(--bg-sidebar)] border-[var(--border-dark)] text-[var(--accent)]"
+                : "bg-white border-[var(--border-light)] text-[var(--text-secondary-light)] hover:bg-[var(--bg-input)] hover:text-[var(--text-primary-light)]"
+            )}
+          >
+            <HelpCircle className="w-4 h-4" />
+            ¿Cómo funciona?
+            <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", showHelp && "rotate-180")} />
+          </button>
+
+          <Dialog open={isAddingCategory} onOpenChange={(o) => { if(!o) setEditingCategory(null); setIsAddingCategory(o); }}>
             <DialogTrigger render={
-              <Button className="bg-[var(--accent)] text-[var(--accent-text)] rounded-full h-11 px-6 font-semibold shadow-lg shadow-[var(--accent)]/20 hover:scale-105 transition-all">
+              <Button className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-11 px-6 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-[var(--accent)]/20 transition-all hover:scale-[1.02] active:scale-95">
                 <Plus className="w-4 h-4 mr-2" />
                 Nuevo Grupo
               </Button>
@@ -363,6 +384,45 @@ export default function CRMTagsPage() {
         </div>
       </div>
 
+      {/* Panel de ayuda expandible */}
+      {showHelp && (
+        <div className="bg-white border border-[var(--border-light)] rounded-[32px] overflow-hidden shadow-sm animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="px-8 pt-8 pb-6 border-b border-[var(--border-light)]">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-2xl bg-[var(--bg-sidebar)] border border-[var(--border-dark)] flex items-center justify-center shrink-0 shadow-sm">
+                <Lightbulb className="w-5 h-5 text-[var(--accent)]" />
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="text-sm font-bold text-[var(--text-primary-light)]">{ayudaEtiquetas.titulo}</h3>
+                <p className="text-sm text-[var(--text-secondary-light)] leading-relaxed">{ayudaEtiquetas.descripcion}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-8 py-6 space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {ayudaEtiquetas.items.map((item, i) => (
+                <div key={i} className="bg-[var(--bg-input)]/30 border border-[var(--border-light)] rounded-2xl p-4 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent-active)] shrink-0" />
+                    <span className="text-[12px] font-bold text-[var(--text-primary-light)] uppercase tracking-tight">{item.titulo}</span>
+                  </div>
+                  <p className="text-[12px] text-[var(--text-tertiary-light)] leading-relaxed pl-3.5 font-medium">{item.detalle}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 flex items-start gap-3">
+              <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <p className="text-[12px] font-black text-amber-800 uppercase tracking-widest">Recomendación Pro</p>
+                <p className="text-[12px] text-amber-700 leading-relaxed font-medium">{ayudaEtiquetas.recomendacion}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-12">
         {categories.length === 0 ? (
           <div className="p-20 text-center border-2 border-dashed border-[var(--border-light)] rounded-[32px] bg-[var(--bg-card)]/30">
@@ -373,18 +433,18 @@ export default function CRMTagsPage() {
         ) : (
           categories.map(cat => (
             <section key={cat.id} className="space-y-4">
-               <div className="flex items-center justify-between px-2">
+                <div className="flex items-center justify-between px-2">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-white border border-[var(--border-light)] shadow-sm">
+                    <div className="w-10 h-10 rounded-2xl bg-white border border-[var(--border-light)] shadow-sm flex items-center justify-center">
                       {cat.tipo === 'exclusiva' ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <LayoutGrid className="w-5 h-5 text-blue-500" />}
                     </div>
                     <div>
-                      <h3 className="text-[17px] font-semibold tracking-tight flex items-center gap-2">
+                      <h3 className="text-lg font-bold tracking-tight flex items-center gap-2 text-[var(--text-primary-light)]">
                         {cat.nombre}
-                        {cat.tipo === 'exclusiva' && <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full text-[9px] font-semibold">SEMÁFORO</span>}
+                        {cat.tipo === 'exclusiva' && <span className="bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-lg text-[9px] font-black tracking-widest">SEMÁFORO</span>}
                       </h3>
-                      <p className="text-[11px] text-[var(--text-tertiary-light)] font-medium">
-                        Alerta: {cat.alertaDiasDefault || '0'} días • {cat.tipo === 'exclusiva' ? 'Solo una activa' : 'Varias a la vez'}
+                      <p className="text-[10px] text-[var(--text-tertiary-light)] font-bold uppercase tracking-widest opacity-70">
+                        Alerta: {cat.alertaDiasDefault || '0'} días • {cat.tipo === 'exclusiva' ? 'Exclusiva' : 'Múltiple'}
                       </p>
                     </div>
                   </div>
@@ -401,168 +461,64 @@ export default function CRMTagsPage() {
                         className="data-[state=checked]:bg-emerald-500 data-[state=unchecked]:bg-rose-500 border-none shadow-sm"
                       />
                     </div>
-                    <div className="flex gap-2">
-                      <Button variant="ghost" size="icon" onClick={() => { setEditingCategory(cat); setCategoryForm({...cat}); setIsAddingCategory(true); }} className="w-8 h-8"><Edit2 className="w-3.5 h-3.5" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDeleteCategory(cat.id!)} className="w-8 h-8"><Trash2 className="w-3.5 h-3.5" /></Button>
+                    <div className="flex items-center gap-2">
+                      <Button variant="ghost" size="icon" onClick={() => { setEditingCategory(cat); setCategoryForm({...cat}); setIsAddingCategory(true); }} className="w-9 h-9 rounded-xl hover:bg-white transition-all shadow-sm"><Edit2 className="w-4 h-4 text-slate-400 hover:text-[var(--accent)]" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleDeleteCategory(cat.id!)} className="w-9 h-9 rounded-xl hover:bg-rose-50 transition-all shadow-sm"><Trash2 className="w-4 h-4 text-slate-400 hover:text-rose-500" /></Button>
                     </div>
                   </div>
-               </div>
+                </div>
 
-               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                   {tags.filter(t => t.categoriaId === cat.id).map(tag => (
-                    <div key={tag.id} className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-[24px] p-5 flex flex-col gap-4 group transition-all shadow-sm">
+                    <div key={tag.id} className="bg-white border border-[var(--border-light)] rounded-[28px] p-6 flex flex-col gap-5 group transition-all shadow-sm hover:shadow-xl hover:shadow-[var(--accent)]/5 relative overflow-hidden">
                       <div className="flex items-start justify-between">
-                        <div className="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider" style={{ backgroundColor: tag.colorBg, color: tag.colorText }}>
+                        <div className="px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm" style={{ backgroundColor: tag.colorBg, color: tag.colorText }}>
                           {tag.nombre}
                         </div>
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                           <Button variant="ghost" size="icon" onClick={() => { setEditingTag(tag); setTagForm({...tag}); setIsAddingTag(true); }} className="w-7 h-7"><Edit2 className="w-3 h-3" /></Button>
-                           <Button variant="ghost" size="icon" onClick={() => handleDeleteTag(tag.id!)} className="w-7 h-7"><Trash2 className="w-3 h-3" /></Button>
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
+                           <Button variant="ghost" size="icon" onClick={() => { setEditingTag(tag); setTagForm({...tag}); setIsAddingTag(true); }} className="w-8 h-8 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors"><Edit2 className="w-3.5 h-3.5 text-slate-500" /></Button>
+                           <Button variant="ghost" size="icon" onClick={() => handleDeleteTag(tag.id!)} className="w-8 h-8 bg-rose-50 rounded-xl hover:bg-rose-100 transition-colors"><Trash2 className="w-3.5 h-3.5 text-rose-500" /></Button>
                         </div>
                       </div>
-                      <div className="space-y-4">
+                      <div className="space-y-4 pt-2">
                         <div className={cn(
-                          "flex items-center justify-between px-3 py-2 rounded-xl border transition-all shadow-sm",
-                          tag.aiBlocked ? "bg-rose-50 border-rose-100 text-rose-600" : "bg-purple-50 border-purple-100 text-purple-600"
+                          "flex items-center justify-between px-3.5 py-2 rounded-2xl border transition-all shadow-sm",
+                          tag.aiBlocked ? "bg-rose-50 border-rose-100 text-rose-600" : "bg-emerald-50 border-emerald-100 text-emerald-600"
                         )}>
                           <div className="flex items-center gap-2">
-                             <Bot className="size-4" />
+                             <Bot className="size-3.5" />
                              <span className="text-[10px] font-black uppercase tracking-wider">{tag.aiBlocked ? "IA OFF" : "IA ON"}</span>
                           </div>
                           <Switch 
                             checked={!tag.aiBlocked}
                             onCheckedChange={() => handleToggleIA(tag, false)}
-                            className="scale-90 data-[state=checked]:bg-purple-600 data-[state=unchecked]:bg-rose-500"
+                            className="scale-90 data-[state=checked]:bg-emerald-500 data-[state=unchecked]:bg-rose-500 border-none shadow-sm"
                           />
-                        </div>
-                        {tag.alertaDias && <div className="text-[9px] text-orange-600 font-bold px-1 flex items-center gap-1.5"><Clock className="w-3 h-3" /> Salud: {tag.alertaDias} días</div>}
+</div>
+                        {tag.alertaDias && (
+                          <div className="text-[9px] text-orange-600 font-black uppercase tracking-widest px-1 flex items-center gap-1.5 opacity-70">
+                            <Clock className="w-3 h-3" /> Salud: {tag.alertaDias} días
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
-                  <button onClick={() => { setTagForm({ ...tagForm, categoriaId: cat.id! }); setIsAddingTag(true); }} className="border-2 border-dashed border-[var(--border-light)] rounded-[24px] p-5 flex items-center justify-center gap-2 text-[var(--text-tertiary-light)] hover:border-[var(--accent)] hover:text-[var(--accent)] bg-[var(--bg-main)]/50 group transition-all hover:shadow-sm">
-                    <Plus className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                    <span className="text-[12px] font-semibold">Añadir etiqueta</span>
+                  <button 
+                    onClick={() => { setTagForm({ ...tagForm, categoriaId: cat.id! }); setIsAddingTag(true); }} 
+                    className="border-2 border-dashed border-[var(--border-light)] rounded-[28px] p-6 flex flex-col items-center justify-center gap-3 text-[var(--text-tertiary-light)] hover:border-[var(--accent)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/[0.02] group transition-all hover:shadow-xl hover:shadow-[var(--accent)]/5 min-h-[160px]"
+                  >
+                    <div className="w-10 h-10 rounded-2xl bg-[var(--bg-input)] group-hover:bg-[var(--accent)]/10 flex items-center justify-center transition-colors">
+                      <Plus className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                    </div>
+                    <span className="text-[11px] font-black uppercase tracking-widest">Añadir etiqueta</span>
                   </button>
-               </div>
+                </div>
             </section>
           ))
         )}
       </div>
 
-      {/* Modal de Ayuda */}
-      <Dialog open={isHelpOpen} onOpenChange={setIsHelpOpen}>
-        <DialogContent className="max-w-[620px] bg-white border-none shadow-2xl rounded-[32px] overflow-hidden p-0">
-          <DialogHeader className="bg-slate-50/50 p-8 pb-4">
-            <DialogTitle className="text-2xl font-semibold tracking-tight flex items-center gap-3">
-              <div className="size-10 rounded-2xl bg-indigo-500 flex items-center justify-center text-white">
-                <HelpCircle className="size-5" />
-              </div>
-              ¿Cómo funciona?
-            </DialogTitle>
-          </DialogHeader>
-          <div className="p-8 space-y-6 max-h-[70vh] overflow-y-auto no-scrollbar">
-            
-            {/* Paso 1 */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="size-6 rounded-full bg-[var(--accent)] text-[var(--accent-text)] flex items-center justify-center text-[11px] font-bold">1</div>
-                <h3 className="text-[14px] font-semibold text-slate-800">Creá un grupo de etiquetas</h3>
-              </div>
-              <p className="text-[13px] text-slate-500 pl-8 leading-relaxed">
-                Un grupo es como una "carpeta" para organizar etiquetas del mismo tipo. Por ejemplo: <strong>"Tipo de Cliente"</strong> o <strong>"Nivel de Interés"</strong>.
-              </p>
-            </div>
 
-            {/* Paso 2 */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="size-6 rounded-full bg-[var(--accent)] text-[var(--accent-text)] flex items-center justify-center text-[11px] font-bold">2</div>
-                <h3 className="text-[14px] font-semibold text-slate-800">Agregá etiquetas al grupo</h3>
-              </div>
-              <p className="text-[13px] text-slate-500 pl-8 leading-relaxed">
-                Dentro de cada grupo, creá las opciones. Hacé clic en <strong>"Añadir etiqueta"</strong> dentro del grupo.
-              </p>
-            </div>
-
-            {/* Paso 3 */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="size-6 rounded-full bg-[var(--accent)] text-[var(--accent-text)] flex items-center justify-center text-[11px] font-bold">3</div>
-                <h3 className="text-[14px] font-semibold text-slate-800">Asigná etiquetas a tus contactos</h3>
-              </div>
-              <p className="text-[13px] text-slate-500 pl-8 leading-relaxed">
-                Desde la ficha de cada contacto en el CRM, podés asignarle las etiquetas que necesites.
-              </p>
-            </div>
-
-            {/* Separador */}
-            <div className="h-px bg-slate-100" />
-
-            {/* Ejemplos */}
-            <div className="space-y-4">
-              <h3 className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Ejemplos prácticos</h3>
-              
-              {/* Ejemplo 1: Múltiple */}
-              <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 space-y-3">
-                <div className="flex items-center gap-2">
-                  <LayoutGrid className="size-4 text-blue-500" />
-                  <span className="text-[12px] font-semibold text-blue-700">Grupo Múltiple: "Tipo de Cliente"</span>
-                </div>
-                <div className="flex flex-wrap gap-2 pl-6">
-                  <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">Inversor</span>
-                  <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-green-100 text-green-800">Comprador</span>
-                  <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">Vendedor</span>
-                  <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800">Desarrollador</span>
-                </div>
-                <p className="text-[11px] text-blue-600/70 pl-6">
-                  ✓ Un contacto puede ser "Inversor" y "Comprador" al mismo tiempo.
-                </p>
-              </div>
-
-              {/* Ejemplo 2: Exclusiva */}
-              <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 space-y-3">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="size-4 text-emerald-500" />
-                  <span className="text-[12px] font-semibold text-emerald-700">Grupo Exclusivo: "Nivel de Interés"</span>
-                </div>
-                <div className="flex items-center gap-2 pl-6">
-                  <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-800">Caliente 🔥</span>
-                  <ArrowRight className="size-3 text-slate-300" />
-                  <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">Tibio ⚡</span>
-                  <ArrowRight className="size-3 text-slate-300" />
-                  <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">Frío 💤</span>
-                </div>
-                <p className="text-[11px] text-emerald-600/70 pl-6">
-                  ✓ Solo una puede estar activa. Si marcás "Caliente", se desactiva "Frío".
-                </p>
-              </div>
-            </div>
-
-            {/* Separador */}
-            <div className="h-px bg-slate-100" />
-
-            {/* Salud Relacional */}
-            <div className="p-4 bg-amber-50/50 rounded-2xl border border-amber-100 space-y-2">
-              <div className="flex items-center gap-2">
-                <Clock className="size-4 text-amber-500" />
-                <span className="text-[12px] font-semibold text-amber-700">Salud Relacional: ¿qué son los días de alerta?</span>
-              </div>
-              <p className="text-[11px] text-amber-700/70 pl-6 leading-relaxed">
-                Cada grupo tiene un número de "días de alerta". Si pasan esos días sin que tengas contacto con un cliente, 
-                el sistema te avisa automáticamente para que retomes la relación. Es como un recordatorio inteligente para no perder clientes.
-              </p>
-            </div>
-          </div>
-          <DialogFooter className="p-8 pt-0">
-            <Button 
-              onClick={() => setIsHelpOpen(false)} 
-              className="w-full h-12 rounded-2xl font-semibold bg-[var(--accent)] text-[var(--accent-text)] shadow-xl shadow-[var(--accent)]/30 hover:scale-[1.02] active:scale-95 transition-all"
-            >
-              ¡Entendido!
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Modal de Etiqueta — se abre desde el "+" de cada grupo */}
       <Dialog open={isAddingTag} onOpenChange={(o) => { if(!o) setEditingTag(null); setIsAddingTag(o); }}>
