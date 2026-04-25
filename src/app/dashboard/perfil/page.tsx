@@ -293,13 +293,12 @@ export default function PerfilPage() {
                       </div>
                     </div>
                     
-                    <Button 
-                      variant="outline"
-                      className="rounded-2xl border-white/10 text-white hover:bg-white/5 font-black text-[10px] uppercase tracking-widest px-8 h-12 transition-all shrink-0"
+                    <button
+                      className="rounded-2xl border border-white/20 bg-transparent text-white hover:bg-white/10 font-black text-[10px] uppercase tracking-widest px-8 h-12 transition-all shrink-0 flex items-center cursor-pointer"
                     >
                       Enviar Link
                       <ArrowRight className="ml-2 size-3.5" />
-                    </Button>
+                    </button>
                   </div>
                 </CardContent>
               </Card>
