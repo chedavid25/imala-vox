@@ -320,32 +320,37 @@ export default function TareasPage() {
           {/* Sidebar de Filtros */}
           <aside className="w-64 border-r border-[var(--border-light)] bg-[var(--bg-card)] p-6 space-y-8 shrink-0 hidden md:block">
             <div>
-              <h2 className="text-[11px] font-semibold text-[var(--text-tertiary-light)] uppercase tracking-[0.2em] mb-4">Agenda</h2>
+              <h2 className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-[0.2em] mb-5 ml-1">Agenda</h2>
               <nav className="space-y-1">
                 {[
-                  { id: 'hoy', label: 'Para hoy', icon: CalendarIcon, color: 'text-emerald-500' },
-                  { id: 'semana', label: 'Esta semana', icon: Clock, color: 'text-blue-500' },
-                  { id: 'mes', label: 'Este mes', icon: CalendarIcon, color: 'text-indigo-500' },
-                  { id: 'atrasadas', label: 'Atrasadas', icon: AlertCircle, color: 'text-rose-500' },
-                  { id: 'completadas', label: 'Completadas', icon: CheckCircle2, color: 'text-slate-400' },
-                  { id: 'todas', label: 'Todo el historial', icon: Filter, color: 'text-slate-500' },
+                  { id: 'hoy', label: 'Para hoy', icon: CalendarIcon, color: 'text-emerald-600', bgColor: 'bg-emerald-50 border-emerald-100' },
+                  { id: 'semana', label: 'Esta semana', icon: Clock, color: 'text-blue-600', bgColor: 'bg-blue-50 border-blue-100' },
+                  { id: 'mes', label: 'Este mes', icon: CalendarIcon, color: 'text-indigo-600', bgColor: 'bg-indigo-50 border-indigo-100' },
+                  { id: 'atrasadas', label: 'Atrasadas', icon: AlertCircle, color: 'text-rose-600', bgColor: 'bg-rose-50 border-rose-100' },
+                  { id: 'completadas', label: 'Completadas', icon: CheckCircle2, color: 'text-slate-500', bgColor: 'bg-slate-50 border-slate-200' },
+                  { id: 'todas', label: 'Todo el historial', icon: Filter, color: 'text-slate-600', bgColor: 'bg-slate-50 border-slate-200' },
                 ].map(item => (
                   <button
                     key={item.id}
                     onClick={() => setActiveFilter(item.id as FilterType)}
                     className={cn(
-                      "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-all",
+                      "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-all group",
                       activeFilter === item.id 
                         ? "bg-[var(--accent)]/10 text-[var(--text-primary-light)] shadow-sm" 
                         : "text-[var(--text-secondary-light)] hover:bg-[var(--bg-main)]"
                     )}
                   >
                     <div className="flex items-center gap-3">
-                      <item.icon className={cn("size-4", item.color)} />
+                      <div className={cn(
+                        "size-8 rounded-lg flex items-center justify-center border transition-transform group-hover:scale-110",
+                        activeFilter === item.id ? "bg-white border-white shadow-sm" : item.bgColor
+                      )}>
+                        <item.icon className={cn("size-4", item.color)} />
+                      </div>
                       {item.label}
                     </div>
                     {item.id === 'atrasadas' && tareas.filter(t => isBefore(new Date(`${t.fecha}T${t.hora || '00:00'}:00`), new Date()) && t.estado !== 'completada').length > 0 && (
-                      <span className="bg-rose-500 text-white text-[9px] px-1.5 py-0.5 rounded-full font-semibold">
+                      <span className="bg-rose-600 text-white text-[9px] px-1.5 py-0.5 rounded-full font-black shadow-sm">
                         {tareas.filter(t => isBefore(new Date(`${t.fecha}T${t.hora || '00:00'}:00`), new Date()) && t.estado !== 'completada').length}
                       </span>
                     )}
@@ -360,21 +365,48 @@ export default function TareasPage() {
             <header className="p-8 pb-4">
               <div className="flex items-center justify-between mb-8">
                 <div className="space-y-1">
-                  <h1 className="text-3xl font-semibold text-[var(--text-primary-light)] tracking-tight">Tareas del CRM</h1>
+                  <h1 className="text-2xl font-bold text-[var(--text-primary-light)] tracking-tight">Tareas del CRM</h1>
                   <p className="text-[13px] text-[var(--text-secondary-light)] font-medium">Gestiona tus recordatorios y compromisos comerciales.</p>
                 </div>
                 
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1.5 bg-[var(--bg-card)] p-1 rounded-2xl border border-[var(--border-light)] shadow-sm">
-                    <Button variant={viewMode === 'lista' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('lista')} className={cn("rounded-xl h-9 px-4", viewMode === 'lista' ? "bg-[var(--accent)] text-black font-bold" : "text-slate-500 font-medium")}>
-                      <List className="size-4 mr-2" /> Lista
-                    </Button>
-                    <Button variant={viewMode === 'canvas' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('canvas')} className={cn("rounded-xl h-9 px-4", viewMode === 'canvas' ? "bg-[var(--accent)] text-black font-bold" : "text-slate-500 font-medium")}>
-                      <LayoutGrid className="size-4 mr-2" /> Canvas
-                    </Button>
-                    <Button variant={viewMode === 'calendario' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('calendario')} className={cn("rounded-xl h-9 px-4", viewMode === 'calendario' ? "bg-[var(--accent)] text-black font-bold" : "text-slate-500 font-medium")}>
-                      <CalendarIcon className="size-4 mr-2" /> Calendario
-                    </Button>
+                  <div className="flex items-center gap-1 bg-[var(--bg-input)] p-1 rounded-xl border border-[var(--border-light)] shadow-sm">
+                    <button 
+                      onClick={() => setViewMode('lista')}
+                      className={cn(
+                        "flex items-center gap-2 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest rounded-lg transition-all",
+                        viewMode === 'lista' 
+                          ? "bg-white text-[var(--text-primary-light)] shadow-sm" 
+                          : "text-[var(--text-tertiary-light)] hover:text-[var(--text-secondary-light)]"
+                      )}
+                    >
+                      <List className="size-4" /> 
+                      Lista
+                    </button>
+                    <button 
+                      onClick={() => setViewMode('canvas')}
+                      className={cn(
+                        "flex items-center gap-2 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest rounded-lg transition-all",
+                        viewMode === 'canvas' 
+                          ? "bg-white text-[var(--text-primary-light)] shadow-sm" 
+                          : "text-[var(--text-tertiary-light)] hover:text-[var(--text-secondary-light)]"
+                      )}
+                    >
+                      <LayoutGrid className="size-4" /> 
+                      Canvas
+                    </button>
+                    <button 
+                      onClick={() => setViewMode('calendario')}
+                      className={cn(
+                        "flex items-center gap-2 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest rounded-lg transition-all",
+                        viewMode === 'calendario' 
+                          ? "bg-white text-[var(--text-primary-light)] shadow-sm" 
+                          : "text-[var(--text-tertiary-light)] hover:text-[var(--text-secondary-light)]"
+                      )}
+                    >
+                      <CalendarIcon className="size-4" /> 
+                      Calendario
+                    </button>
                   </div>
 
                   {viewMode === 'canvas' && (
@@ -391,7 +423,7 @@ export default function TareasPage() {
 
                   <Button 
                     onClick={() => { setEditingTask(null); setIsAddingTask(true); }}
-                    className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-11 px-6 rounded-full font-bold shadow-lg shadow-[var(--accent)]/20 transition-all hover:scale-105"
+                    className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-11 px-6 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-[var(--accent)]/20 transition-all hover:scale-[1.02]"
                   >
                     <Plus className="size-4 mr-2" /> Nueva Tarea
                   </Button>
@@ -415,11 +447,11 @@ export default function TareasPage() {
                         />
                       ))
                     ) : (
-                      <div className="h-[400px] flex flex-col items-center justify-center text-slate-300">
-                          <div className="size-16 rounded-3xl bg-slate-50 flex items-center justify-center mb-4">
+                      <div className="h-[400px] flex flex-col items-center justify-center text-[var(--text-tertiary-light)] opacity-40">
+                          <div className="size-16 rounded-[24px] bg-[var(--bg-input)] flex items-center justify-center mb-6">
                             <Check className="size-8" />
                           </div>
-                          <p className="font-black uppercase tracking-widest text-[10px]">¡Todo al día!</p>
+                          <p className="font-black uppercase tracking-[0.3em] text-[10px]">¡Todo al día!</p>
                       </div>
                     )}
                   </div>

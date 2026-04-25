@@ -84,25 +84,24 @@ export function TaskCard({
 
        <div className="flex-1 min-w-0 space-y-1">
           <div className="flex items-center gap-2 flex-wrap">
-             <h3 className={cn(
-               "text-[14px] font-semibold tracking-tight truncate",
-               task.estado === 'completada' ? "line-through text-slate-400" : "text-slate-800"
-             )}>{task.titulo}</h3>
-             
-             <Badge className={cn(
-               "text-[8px] font-semibold uppercase tracking-tighter px-1.5 h-4",
-               task.prioridad === 'alta' ? "bg-rose-50 text-rose-500" :
-               task.prioridad === 'media' ? "bg-amber-50 text-amber-500" :
-               "bg-slate-50 text-slate-400"
-             )}>
-               {task.prioridad}
-             </Badge>
+              <h3 className={cn(
+                "text-[14px] font-bold tracking-tight truncate",
+                task.estado === 'completada' ? "line-through text-slate-400" : "text-[var(--text-primary-light)]"
+              )}>{task.titulo}</h3>
+                          <span className={cn(
+                "inline-flex items-center px-1.5 py-0.5 rounded-full border text-[8px] font-black uppercase tracking-wider",
+                task.prioridad === 'alta' ? "bg-rose-50 border-rose-200 text-rose-600" :
+                task.prioridad === 'media' ? "bg-amber-50 border-amber-200 text-amber-600" :
+                "bg-[var(--bg-input)] border-[var(--border-light)] text-[var(--text-tertiary-light)]"
+              )}>
+                {task.prioridad}
+              </span>
 
-             {task.estado === 'proceso' && (
-                <Badge className="bg-blue-50 text-blue-500 text-[8px] font-semibold uppercase tracking-tighter px-1.5 h-4">
-                  En Proceso
-                </Badge>
-             )}
+              {task.estado === 'proceso' && (
+                 <span className="inline-flex items-center px-1.5 py-0.5 rounded-full border bg-blue-50 border-blue-200 text-blue-600 text-[8px] font-black uppercase tracking-wider">
+                   En Proceso
+                 </span>
+              )}
 
              {/* Selector rápido para móvil/canvas */}
              <DropdownMenu>
@@ -135,20 +134,20 @@ export function TaskCard({
           </div>
 
           {!compact && (
-            <div className="flex items-center gap-3 text-[10px] font-medium text-slate-400">
-               <div className="flex items-center gap-1">
-                  <CalendarIcon className="size-3" />
+            <div className="flex items-center gap-3 text-[10px] font-semibold text-[var(--text-tertiary-light)] tabular-nums">
+               <div className="flex items-center gap-1.5">
+                  <CalendarIcon className="size-3.5 opacity-60" />
                   {format(new Date(task.fecha + "T00:00:00"), "d MMM", { locale: es })}
                </div>
                {task.hora && (
-                 <div className="flex items-center gap-1 border-l border-slate-100 pl-3">
-                    <Clock className="size-3" />
+                 <div className="flex items-center gap-1.5 border-l border-[var(--border-light)] pl-3">
+                    <Clock className="size-3.5 opacity-60" />
                     {task.hora}
                  </div>
                )}
                {linkedContact && (
-                 <div className="flex items-center gap-1 border-l border-slate-100 pl-3 text-indigo-500 truncate max-w-[120px]">
-                    <User className="size-3" />
+                 <div className="flex items-center gap-1.5 border-l border-[var(--border-light)] pl-3 text-indigo-600 font-bold truncate max-w-[120px]">
+                    <User className="size-3.5 opacity-60" />
                     {linkedContact.nombre.split(' ')[0]}
                  </div>
                )}

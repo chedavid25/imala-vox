@@ -508,7 +508,7 @@ export default function LeadsPage() {
                 <button 
                   onClick={() => setView('kanban')}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-1.5 text-[11px] font-black uppercase tracking-widest rounded-lg transition-all",
+                    "flex items-center gap-2 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-widest rounded-lg transition-all",
                     view === 'kanban' 
                       ? "bg-white text-[var(--text-primary-light)] shadow-sm" 
                       : "text-[var(--text-tertiary-light)] hover:text-[var(--text-secondary-light)]"
@@ -520,7 +520,7 @@ export default function LeadsPage() {
                 <button 
                   onClick={() => setView('list')}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-1.5 text-[11px] font-black uppercase tracking-widest rounded-lg transition-all",
+                    "flex items-center gap-2 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-widest rounded-lg transition-all",
                     view === 'list' 
                       ? "bg-white text-[var(--text-primary-light)] shadow-sm" 
                       : "text-[var(--text-tertiary-light)] hover:text-[var(--text-secondary-light)]"
@@ -562,7 +562,7 @@ export default function LeadsPage() {
                   key={pill.id}
                   onClick={() => setFiltroOrigen(pill.id as any)}
                   className={cn(
-                    "px-4 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all whitespace-nowrap flex items-center gap-2",
+                    "px-4 py-1.5 rounded-xl text-[11px] font-semibold uppercase tracking-widest transition-all whitespace-nowrap flex items-center gap-2",
                     filtroOrigen === pill.id 
                       ? "bg-white text-[var(--text-primary-light)] shadow-sm" 
                       : "text-[var(--text-tertiary-light)] hover:text-[var(--text-secondary-light)]"
@@ -570,7 +570,7 @@ export default function LeadsPage() {
                 >
                   {pill.label}
                   <span className={cn(
-                    "px-1.5 py-0.5 rounded-full text-[9px] font-black transition-colors",
+                    "px-1.5 py-0.5 rounded-full text-[9px] font-bold transition-colors",
                     filtroOrigen === pill.id ? "bg-[var(--accent)] text-[var(--accent-text)]" : "bg-black/5 text-[var(--text-tertiary-light)]"
                   )}>
                     {pill.id === 'todos' ? leads.length : leads.filter(l => l.origen === pill.id).length}
