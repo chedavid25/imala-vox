@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { 
-  Target, 
-  LayoutGrid, 
-  List, 
-  Plus, 
-  Search, 
-  Filter, 
+import {
+  Target,
+  LayoutGrid,
+  List,
+  Plus,
+  Search,
+  Filter,
   ChevronRight,
   TrendingUp,
   Users,
@@ -17,7 +17,11 @@ import {
   MessageCircle,
   Loader2,
   Lock,
-  ExternalLink
+  ExternalLink,
+  Pencil,
+  Check,
+  X,
+  StickyNote
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -63,7 +67,7 @@ import { COLLECTIONS, Lead, EtapaEmbudo } from "@/lib/types/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
 import { es } from "date-fns/locale";
 import { PhoneActionMenu } from "@/components/crm/PhoneActionMenu";
 
@@ -893,12 +897,21 @@ export default function LeadsPage() {
 
             <div className="space-y-2">
               <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 ml-1">Etapa Inicial</Label>
-              <Select 
-                value={newLeadData.etapaId} 
+              <Select
+                value={newLeadData.etapaId}
                 onValueChange={(v) => setNewLeadData(prev => ({ ...prev, etapaId: v || "" }))}
               >
                 <SelectTrigger className="h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-sm font-bold focus:ring-1 focus:ring-[var(--accent)] transition-all">
-                  <SelectValue placeholder="Seleccionar etapa..." />
+                  {(() => {
+                    const etapa = etapas.find(e => e.id === newLeadData.etapaId);
+                    if (!etapa) return <span className="text-slate-400 font-normal">Seleccionar etapa...</span>;
+                    return (
+                      <div className="flex items-center gap-2">
+                        <div className="size-2 rounded-full shrink-0" style={{ backgroundColor: etapa.color }} />
+                        <span>{etapa.nombre}</span>
+                      </div>
+                    );
+                  })()}
                 </SelectTrigger>
                 <SelectContent className="rounded-2xl border-slate-100 shadow-xl">
                   {etapas.map(e => (
@@ -1111,18 +1124,61 @@ function LeadCard({ lead, onClick }: { lead: Lead & { id: string }, onClick: () 
 
 function LeadDetailContent({ lead, etapas, onClose, onConvert, onWhatsApp, onUpdateField, converting }: any) {
   const router = useRouter();
+  const { currentWorkspaceId } = useWorkspaceStore();
+
+  // Historial de notas
+  const [notasHistorial, setNotasHistorial] = useState<any[]>([]);
+  const [nuevaNota, setNuevaNota] = useState("");
+  const [guardandoNota, setGuardandoNota] = useState(false);
+
+  // Edición inline de campos de contacto
+  const [editingField, setEditingField] = useState<'telefono' | 'email' | null>(null);
+  const [editFieldValue, setEditFieldValue] = useState("");
+
+  useEffect(() => {
+    if (!currentWorkspaceId || !lead?.id) return;
+    const notasRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.LEADS, lead.id, "notasLead");
+    const q = query(notasRef, orderBy("creadoEl", "asc"));
+    const unsub = onSnapshot(q, (snap) => {
+      setNotasHistorial(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, [currentWorkspaceId, lead?.id]);
+
+  const handleAddNota = async () => {
+    if (!currentWorkspaceId || !nuevaNota.trim() || !lead?.id) return;
+    setGuardandoNota(true);
+    try {
+      const notasRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.LEADS, lead.id, "notasLead");
+      await addDoc(notasRef, { texto: nuevaNota.trim(), creadoEl: serverTimestamp() });
+      setNuevaNota("");
+    } catch {
+      toast.error("Error al guardar la nota");
+    } finally {
+      setGuardandoNota(false);
+    }
+  };
+
+  const handleStartEdit = (field: 'telefono' | 'email') => {
+    setEditFieldValue(lead[field] || "");
+    setEditingField(field);
+  };
+
+  const handleSaveField = async (field: 'telefono' | 'email') => {
+    await onUpdateField(field, editFieldValue.trim());
+    setEditingField(null);
+  };
 
   const handleStartWhatsApp = () => {
-    if (!lead.telefono) {
-      toast.error("Este lead no tiene número de teléfono");
-      return;
-    }
+    if (!lead.telefono) { toast.error("Este lead no tiene número de teléfono"); return; }
     if (lead.contactoId) {
       router.push(`/dashboard/operacion/inbox?contactoId=${lead.contactoId}`);
     } else {
       toast.info("Primero convertí el lead a contacto para iniciar una conversación.");
     }
   };
+
+  const etapaActual = etapas.find((e: any) => e.id === lead.etapaId);
 
   return (
     <div className="flex flex-col h-full bg-[var(--bg-main)]">
@@ -1134,23 +1190,21 @@ function LeadDetailContent({ lead, etapas, onClose, onConvert, onWhatsApp, onUpd
             <div className="flex items-center gap-2">
               <Badge className={cn(
                 "text-[9px] font-bold uppercase px-2 py-0.5",
-                lead.origen === 'meta_ads' 
-                  ? "bg-emerald-100 text-emerald-700" 
-                  : lead.origen === 'organico' 
-                    ? "bg-sky-100 text-sky-700" 
+                lead.origen === 'meta_ads'
+                  ? "bg-emerald-100 text-emerald-700"
+                  : lead.origen === 'organico'
+                    ? "bg-sky-100 text-sky-700"
                     : "bg-slate-100 text-slate-600"
               )}>
                 {lead.origen === 'meta_ads' ? 'Meta Ads' : lead.origen === 'organico' ? 'Orgánico' : 'Manual'}
               </Badge>
-              
-              <Select
-                value={lead.etapaId}
-                onValueChange={(val) => onUpdateField('etapaId', val)}
-              >
+
+              <Select value={lead.etapaId} onValueChange={(val) => onUpdateField('etapaId', val)}>
                 <SelectTrigger className="h-7 text-[10px] font-bold border-[var(--border-light)] rounded-full px-3 w-auto bg-transparent">
-                  <div className="w-2 h-2 rounded-full mr-1.5"
-                    style={{ backgroundColor: etapas.find((e: any) => e.id === lead.etapaId)?.color }} />
-                  <SelectValue placeholder="Etapa" />
+                  <div className="flex items-center gap-1.5">
+                    {etapaActual && <div className="w-2 h-2 rounded-full" style={{ backgroundColor: etapaActual.color }} />}
+                    <span>{etapaActual?.nombre || "Sin etapa"}</span>
+                  </div>
                 </SelectTrigger>
                 <SelectContent>
                   {etapas.map((e: any) => (
@@ -1171,25 +1225,19 @@ function LeadDetailContent({ lead, etapas, onClose, onConvert, onWhatsApp, onUpd
         </div>
 
         <div className="grid grid-cols-2 gap-3 mt-6">
-          <Button 
-            onClick={handleStartWhatsApp}
-            className="bg-[var(--accent)] text-[var(--accent-text)] font-bold text-xs rounded-xl h-12 shadow-lg shadow-[var(--accent)]/10"
-          >
-            <MessageCircle className="w-4 h-4 mr-2" />
-            Inbox WA
+          <Button onClick={handleStartWhatsApp} className="bg-[var(--accent)] text-[var(--accent-text)] font-bold text-xs rounded-xl h-12 shadow-lg shadow-[var(--accent)]/10">
+            <MessageCircle className="w-4 h-4 mr-2" /> Inbox WA
           </Button>
-          <Button 
-            onClick={lead.convertidoAContacto 
-              ? () => router.push(`/dashboard/operacion/contactos`) 
-              : onConvert}
+          <Button
+            onClick={lead.convertidoAContacto ? () => router.push(`/dashboard/operacion/contactos`) : onConvert}
             disabled={converting}
             variant="outline"
             className="border-[var(--border-light-strong)] font-bold text-xs rounded-xl h-12 hover:bg-white"
           >
-            {converting 
-              ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> 
-              : lead.convertidoAContacto 
-                ? <ExternalLink className="w-4 h-4 mr-2 text-green-500" /> 
+            {converting
+              ? <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              : lead.convertidoAContacto
+                ? <ExternalLink className="w-4 h-4 mr-2 text-green-500" />
                 : <TrendingUp className="w-4 h-4 mr-2 text-blue-500" />
             }
             {lead.convertidoAContacto ? 'Ver en CRM' : 'Convertir'}
@@ -1200,21 +1248,61 @@ function LeadDetailContent({ lead, etapas, onClose, onConvert, onWhatsApp, onUpd
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         {/* Info de contacto */}
         <Section title="Información de Contacto">
-          <div className="space-y-4">
-            <div className="flex justify-between items-center py-1 border-b border-[var(--border-light)]/30">
-              <span className="text-xs font-medium text-[var(--text-tertiary-light)]">Teléfono</span>
-              {lead.telefono ? (
-                <PhoneActionMenu 
-                  phoneNumber={lead.telefono} 
-                  contactoId={lead.contactoId} 
-                  nombre={lead.nombre} 
-                  className="text-xs font-bold"
-                />
+          <div className="space-y-3">
+            {/* Teléfono editable */}
+            <div className="flex justify-between items-center py-1 border-b border-[var(--border-light)]/30 gap-2">
+              <span className="text-xs font-medium text-[var(--text-tertiary-light)] shrink-0">Teléfono</span>
+              {editingField === 'telefono' ? (
+                <div className="flex items-center gap-1.5 flex-1 justify-end">
+                  <input
+                    autoFocus
+                    type="tel"
+                    value={editFieldValue}
+                    onChange={e => setEditFieldValue(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleSaveField('telefono'); if (e.key === 'Escape') setEditingField(null); }}
+                    className="flex-1 max-w-[160px] text-xs font-bold border border-[var(--accent)]/40 rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-[var(--accent)]/50"
+                  />
+                  <button onClick={() => handleSaveField('telefono')} className="p-1 text-green-600 hover:bg-green-50 rounded"><Check className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => setEditingField(null)} className="p-1 text-red-400 hover:bg-red-50 rounded"><X className="w-3.5 h-3.5" /></button>
+                </div>
               ) : (
-                <span className="text-xs font-bold text-[var(--text-primary-light)]">No especificado</span>
+                <div className="flex items-center gap-2">
+                  {lead.telefono
+                    ? <PhoneActionMenu phoneNumber={lead.telefono} contactoId={lead.contactoId} nombre={lead.nombre} className="text-xs font-bold" />
+                    : <span className="text-xs font-bold text-[var(--text-tertiary-light)]">No especificado</span>
+                  }
+                  <button onClick={() => handleStartEdit('telefono')} className="p-1 hover:bg-[var(--bg-input)] rounded text-[var(--text-tertiary-light)] hover:text-[var(--accent)] transition-colors">
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                </div>
               )}
             </div>
-            <InfoRow label="Email" value={lead.email || "No especificado"} />
+
+            {/* Email editable */}
+            <div className="flex justify-between items-center py-1 border-b border-[var(--border-light)]/30 gap-2">
+              <span className="text-xs font-medium text-[var(--text-tertiary-light)] shrink-0">Email</span>
+              {editingField === 'email' ? (
+                <div className="flex items-center gap-1.5 flex-1 justify-end">
+                  <input
+                    autoFocus
+                    type="email"
+                    value={editFieldValue}
+                    onChange={e => setEditFieldValue(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleSaveField('email'); if (e.key === 'Escape') setEditingField(null); }}
+                    className="flex-1 max-w-[180px] text-xs font-bold border border-[var(--accent)]/40 rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-[var(--accent)]/50"
+                  />
+                  <button onClick={() => handleSaveField('email')} className="p-1 text-green-600 hover:bg-green-50 rounded"><Check className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => setEditingField(null)} className="p-1 text-red-400 hover:bg-red-50 rounded"><X className="w-3.5 h-3.5" /></button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-[var(--text-primary-light)]">{lead.email || "No especificado"}</span>
+                  <button onClick={() => handleStartEdit('email')} className="p-1 hover:bg-[var(--bg-input)] rounded text-[var(--text-tertiary-light)] hover:text-[var(--accent)] transition-colors">
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </Section>
 
@@ -1245,37 +1333,58 @@ function LeadDetailContent({ lead, etapas, onClose, onConvert, onWhatsApp, onUpd
 
         {/* Temperatura */}
         <Section title="Temperatura">
-           <div className="flex gap-2">
-             <TempButton 
-              active={lead.temperatura === 'frio'} 
-              type="frio" 
-              label="FrÍo" 
-              onClick={() => onUpdateField('temperatura', 'frio')}
-            />
-             <TempButton 
-              active={lead.temperatura === 'tibio'} 
-              type="tibio" 
-              label="Tibio" 
-              onClick={() => onUpdateField('temperatura', 'tibio')}
-            />
-             <TempButton 
-              active={lead.temperatura === 'caliente'} 
-              type="caliente" 
-              label="Caliente" 
-              onClick={() => onUpdateField('temperatura', 'caliente')}
-            />
-           </div>
+          <div className="flex gap-2">
+            <TempButton active={lead.temperatura === 'frio'} type="frio" label="Frío" onClick={() => onUpdateField('temperatura', 'frio')} />
+            <TempButton active={lead.temperatura === 'tibio'} type="tibio" label="Tibio" onClick={() => onUpdateField('temperatura', 'tibio')} />
+            <TempButton active={lead.temperatura === 'caliente'} type="caliente" label="Caliente" onClick={() => onUpdateField('temperatura', 'caliente')} />
+          </div>
         </Section>
 
-        {/* Notas */}
+        {/* Notas — historial */}
         <Section title="Notas internas">
-          <div className="relative group">
-            <textarea 
-               className="w-full min-h-[120px] bg-white border border-[var(--border-light)] rounded-2xl p-4 text-sm focus:ring-1 focus:ring-[var(--accent)] outline-none transition-all resize-none shadow-inner"
-               placeholder="Añade observaciones sobre este prospecto..."
-               defaultValue={lead.notas}
-               onBlur={(e) => onUpdateField('notas', e.target.value)}
-            />
+          <div className="space-y-3">
+            {/* Nota heredada del campo legacy */}
+            {lead.notas && (
+              <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+                <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest mb-1.5 flex items-center gap-1">
+                  <StickyNote className="w-3 h-3" /> Nota inicial
+                </p>
+                <p className="text-[13px] text-amber-900 leading-relaxed whitespace-pre-wrap">{lead.notas}</p>
+              </div>
+            )}
+
+            {/* Historial de notas */}
+            {notasHistorial.map(nota => (
+              <div key={nota.id} className="bg-white border border-[var(--border-light)] rounded-xl p-3 shadow-sm">
+                <p className="text-[9px] font-bold text-[var(--text-tertiary-light)] uppercase tracking-widest mb-1.5">
+                  {nota.creadoEl?.toDate ? format(nota.creadoEl.toDate(), "d MMM yyyy · HH:mm", { locale: es }) : ""}
+                </p>
+                <p className="text-[13px] text-[var(--text-secondary-light)] leading-relaxed whitespace-pre-wrap">{nota.texto}</p>
+              </div>
+            ))}
+
+            {!lead.notas && notasHistorial.length === 0 && (
+              <p className="text-xs text-[var(--text-tertiary-light)] italic text-center py-3">Sin notas todavía</p>
+            )}
+
+            {/* Nueva nota */}
+            <div className="space-y-2 pt-1">
+              <textarea
+                className="w-full min-h-[80px] bg-white border border-[var(--border-light)] rounded-xl p-3 text-sm focus:ring-1 focus:ring-[var(--accent)] outline-none resize-none transition-all"
+                placeholder="Escribí una nueva nota..."
+                value={nuevaNota}
+                onChange={e => setNuevaNota(e.target.value)}
+              />
+              <Button
+                size="sm"
+                onClick={handleAddNota}
+                disabled={!nuevaNota.trim() || guardandoNota}
+                className="h-8 text-[11px] font-black bg-[var(--accent)] text-[var(--accent-text)] hover:opacity-90 gap-1.5"
+              >
+                {guardandoNota ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                Guardar nota
+              </Button>
+            </div>
           </div>
         </Section>
       </div>
