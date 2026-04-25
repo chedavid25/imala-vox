@@ -5,11 +5,12 @@ import { CanalBadge } from "@/components/ui/CanalBadge";
 import { useContactos } from "@/hooks/useContactos";
 import { IndicadorIA } from "@/components/ui/IndicadorIA";
 import { cn } from "@/lib/utils";
-import { Send, Paperclip, Smile, Sparkles, CheckCircle2, UserPlus, MoreVertical, MessageCircle, ChevronDown, CheckCircle, Clock, AlertTriangle, FileText, ChevronRight } from "lucide-react";
+import { Send, Paperclip, Smile, Sparkles, CheckCircle2, UserPlus, MoreVertical, MessageCircle, ChevronDown, CheckCircle, Clock, AlertTriangle, FileText, ChevronRight, ImageIcon, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
 import { doc, updateDoc, collection, onSnapshot, query, Timestamp, addDoc } from "firebase/firestore";
+import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { COLLECTIONS, Agente } from "@/lib/types/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { auth } from "@/lib/firebase";
@@ -24,7 +25,7 @@ import {
 import { Trash2, BellOff, CheckCircle as CheckIcon } from "lucide-react";
 import { deleteDoc } from "firebase/firestore";
 import { pedirSugerenciaIAAction } from "@/app/actions/ai";
-import { listarPlantillasWA, enviarPlantillaWA, PlantillaWA } from "@/app/actions/channels";
+import { listarPlantillasWA, enviarPlantillaWA, PlantillaWA, enviarMensajeAccion } from "@/app/actions/channels";
 import { getDoc } from "firebase/firestore";
 import { Contacto } from "@/lib/types/firestore";
 import { Loader2 } from "lucide-react";
@@ -48,6 +49,12 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
   const [selectedPlantilla, setSelectedPlantilla] = useState<PlantillaWA | null>(null);
   const [variableValues, setVariableValues] = useState<string[]>([]);
   const [enviandoPlantilla, setEnviandoPlantilla] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const selectedContact = contactos.find(c => c.id === conversacion?.contactoId);
   const contactName = selectedContact?.nombre || conversacion?.contactoNombre || "Desconocido";
@@ -194,6 +201,92 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
       toast.success("IA reanudada (Modo Automático)");
     } catch (error) {
       toast.error("Error al reanudar la IA");
+    }
+  };
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target as Node)) {
+        setShowEmojiPicker(false);
+      }
+    };
+    if (showEmojiPicker) document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showEmojiPicker]);
+
+  const handleEmojiClick = (emoji: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) { setInputText(prev => prev + emoji); return; }
+    const start = textarea.selectionStart ?? inputText.length;
+    const end = textarea.selectionEnd ?? inputText.length;
+    const newText = inputText.slice(0, start) + emoji + inputText.slice(end);
+    setInputText(newText);
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + emoji.length, start + emoji.length);
+    });
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentWorkspaceId || !conversacion) return;
+    e.target.value = "";
+
+    const maxMB = file.type.startsWith('video/') ? 16 : file.type.startsWith('image/') ? 5 : 100;
+    if (file.size > maxMB * 1024 * 1024) {
+      toast.error(`El archivo supera el límite de ${maxMB}MB`);
+      return;
+    }
+
+    const tipo: 'image' | 'video' | 'document' = file.type.startsWith('image/')
+      ? 'image' : file.type.startsWith('video/') ? 'video' : 'document';
+
+    setIsUploadingFile(true);
+    setUploadProgress(0);
+
+    try {
+      const ext = file.name.split('.').pop();
+      const path = `workspaces/${currentWorkspaceId}/chat-media/${conversacion.id}/${Date.now()}.${ext}`;
+      const fileRef = storageRef(storage, path);
+      const uploadTask = uploadBytesResumable(fileRef, file);
+
+      await new Promise<void>((resolve, reject) => {
+        uploadTask.on('state_changed',
+          snap => setUploadProgress(Math.round(snap.bytesTransferred / snap.totalBytes * 100)),
+          reject,
+          resolve
+        );
+      });
+
+      const downloadUrl = await getDownloadURL(fileRef);
+
+      const contactSnap = await getDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS, conversacion.contactoId));
+      if (!contactSnap.exists()) throw new Error("Contacto no encontrado");
+      const contactData = contactSnap.data() as Contacto;
+      const destinatario = (contactData as any).metaId || contactData.telefono;
+      if (!destinatario) throw new Error("No se pudo determinar el destinatario");
+
+      const res = await enviarMensajeAccion(currentWorkspaceId, conversacion.canalId, destinatario, undefined, { url: downloadUrl, tipo });
+      if (!res.success) { toast.error(`Error al enviar: ${res.error}`); return; }
+
+      const messagesRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES, conversacion.id, COLLECTIONS.MENSAJES);
+      await addDoc(messagesRef, {
+        text: `[${tipo === 'image' ? 'Imagen' : tipo === 'video' ? 'Video' : 'Archivo'}: ${file.name}]`,
+        from: 'operator',
+        creadoEl: Timestamp.now(),
+        metadata: { mediaUrl: downloadUrl, mediaType: tipo, fileName: file.name }
+      });
+      await updateDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES, conversacion.id), {
+        ultimoMensaje: `📎 ${file.name}`,
+        ultimaActividad: Timestamp.now()
+      });
+
+      toast.success("Archivo enviado");
+    } catch (err: any) {
+      toast.error(err.message || "Error al subir el archivo");
+    } finally {
+      setIsUploadingFile(false);
+      setUploadProgress(0);
     }
   };
 
@@ -618,6 +711,7 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
             mode === 'internal' ? "bg-yellow-50/30 border-yellow-200" : "bg-[var(--bg-input)] border-[var(--border-light)]"
           )}>
             <Textarea
+              ref={textareaRef}
               placeholder={mode === 'internal' ? "Escribe una nota interna para tu equipo..." : "Responde al cliente..."}
               className="border-none bg-transparent focus-visible:ring-0 resize-none min-h-[90px] p-4 text-[14px] leading-relaxed no-scrollbar"
               value={inputText}
@@ -630,14 +724,85 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
               }}
             />
 
-            <div className="px-4 py-3 flex items-center justify-between border-t border-[var(--border-light)] bg-[var(--bg-card)]/50">
+            {/* Barra de herramientas */}
+            <div className="px-4 py-3 flex items-center justify-between border-t border-[var(--border-light)] bg-[var(--bg-card)]/50 relative">
               <div className="flex items-center gap-1.5">
-                <button className="p-2 hover:bg-[var(--bg-input)] rounded-lg text-[var(--text-tertiary-light)] transition-colors">
-                  <Paperclip className="w-4 h-4" />
+
+                {/* Adjuntar archivo */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+                  onChange={handleFileSelect}
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploadingFile}
+                  className="p-2 hover:bg-[var(--bg-input)] rounded-lg text-[var(--text-tertiary-light)] hover:text-[var(--accent)] transition-colors relative"
+                  title="Adjuntar archivo"
+                >
+                  {isUploadingFile ? (
+                    <div className="relative w-4 h-4">
+                      <svg className="w-4 h-4 -rotate-90" viewBox="0 0 16 16">
+                        <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="2" strokeOpacity="0.2" />
+                        <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="2"
+                          strokeDasharray={`${2 * Math.PI * 6}`}
+                          strokeDashoffset={`${2 * Math.PI * 6 * (1 - uploadProgress / 100)}`}
+                          className="text-[var(--accent)] transition-all"
+                        />
+                      </svg>
+                      <span className="absolute inset-0 flex items-center justify-center text-[6px] font-black text-[var(--accent)]">{uploadProgress}</span>
+                    </div>
+                  ) : (
+                    <Paperclip className="w-4 h-4" />
+                  )}
                 </button>
-                <button className="p-2 hover:bg-[var(--bg-input)] rounded-lg text-[var(--text-tertiary-light)] transition-colors">
-                  <Smile className="w-4 h-4" />
-                </button>
+
+                {/* Selector de emojis */}
+                <div className="relative" ref={emojiPickerRef}>
+                  <button
+                    onClick={() => setShowEmojiPicker(v => !v)}
+                    className={cn(
+                      "p-2 rounded-lg transition-colors",
+                      showEmojiPicker
+                        ? "bg-[var(--accent)]/10 text-[var(--accent)]"
+                        : "hover:bg-[var(--bg-input)] text-[var(--text-tertiary-light)] hover:text-[var(--accent)]"
+                    )}
+                    title="Emojis"
+                  >
+                    <Smile className="w-4 h-4" />
+                  </button>
+
+                  {showEmojiPicker && (
+                    <div className="absolute bottom-full left-0 mb-2 w-[280px] bg-white border border-[var(--border-light)] rounded-2xl shadow-2xl p-3 z-50 animate-in fade-in zoom-in-95 slide-in-from-bottom-2">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest">Emojis</span>
+                        <button onClick={() => setShowEmojiPicker(false)} className="p-0.5 hover:bg-[var(--bg-input)] rounded text-[var(--text-tertiary-light)]">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-8 gap-0.5 max-h-[200px] overflow-y-auto no-scrollbar">
+                        {[
+                          "😀","😃","😄","😁","😆","😅","🤣","😂","🙂","🙃","😉","😊","😇","🥰","😍","🤩",
+                          "😘","😗","😚","😙","🥲","😋","😛","😜","🤪","😝","🤑","🤗","🤭","🤫","🤔","😐",
+                          "😑","😶","😏","😒","🙄","😬","🤥","😌","😔","😪","🤤","😴","😷","🤒","🤕","🤢",
+                          "👍","👎","👌","✌️","🤞","🤟","🤘","🤙","👋","🙌","👏","🤝","🙏","💪","🫶","❤️",
+                          "🧡","💛","💚","💙","💜","🖤","🤍","💔","💕","💞","💓","💗","💖","💘","💝","🔥",
+                          "⭐","✨","💥","🎉","🎊","🎈","🎁","🏆","🥇","👑","💎","🚀","💯","✅","❌","⚡",
+                        ].map((emoji, i) => (
+                          <button
+                            key={i}
+                            onClick={() => handleEmojiClick(emoji)}
+                            className="w-8 h-8 flex items-center justify-center text-[18px] hover:bg-[var(--bg-input)] rounded-lg transition-colors leading-none"
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
                 <div className="w-[1px] h-4 bg-[var(--border-light)] mx-1" />
                 <Button
                   variant="ghost"
