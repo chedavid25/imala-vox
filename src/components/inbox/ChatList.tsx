@@ -80,7 +80,7 @@ export function ChatList({ conversaciones, selectedId, onSelect }: ChatListProps
               className={cn(
                 "p-1.5 rounded-md transition-colors relative outline-none",
                 hasActiveFilters
-                  ? "bg-[var(--accent)]/10 text-[var(--accent)]"
+                  ? "bg-[var(--bg-sidebar)] border border-[var(--border-dark)] text-[var(--accent)]"
                   : "hover:bg-[var(--bg-input)] text-[var(--text-tertiary-light)]"
               )}
             >
@@ -100,7 +100,7 @@ export function ChatList({ conversaciones, selectedId, onSelect }: ChatListProps
                     onClick={() => setCanalFilter(c)}
                     className="flex items-center gap-2 px-2 py-2 rounded-xl text-xs font-bold cursor-pointer hover:bg-[var(--bg-input)]"
                   >
-                    <div className={cn("w-3.5 h-3.5 flex items-center justify-center", canalFilter === c ? "text-[var(--accent)]" : "text-transparent")}>
+                    <div className={cn("w-3.5 h-3.5 flex items-center justify-center", canalFilter === c ? "text-[var(--text-primary-light)]" : "text-transparent")}>
                       <Check className="w-3.5 h-3.5" />
                     </div>
                     {canalLabels[c]}
@@ -117,7 +117,7 @@ export function ChatList({ conversaciones, selectedId, onSelect }: ChatListProps
                   className="flex items-center gap-2 px-2 py-2 rounded-xl text-xs font-bold cursor-pointer hover:bg-[var(--bg-input)]"
                 >
                   {showResolved
-                    ? <Eye className="w-3.5 h-3.5 text-[var(--accent)]" />
+                    ? <Eye className="w-3.5 h-3.5 text-[var(--text-primary-light)]" />
                     : <EyeOff className="w-3.5 h-3.5 text-[var(--text-tertiary-light)]" />
                   }
                   {showResolved ? 'Ocultar resueltas' : 'Mostrar resueltas'}
@@ -131,13 +131,13 @@ export function ChatList({ conversaciones, selectedId, onSelect }: ChatListProps
         {hasActiveFilters && (
           <div className="flex items-center gap-1.5 flex-wrap">
             {canalFilter !== 'all' && (
-              <span className="flex items-center gap-1 px-2 py-0.5 bg-[var(--accent)]/10 text-[var(--accent)] text-[10px] font-black rounded-full border border-[var(--accent)]/20">
+              <span className="flex items-center gap-1 px-2 py-0.5 bg-[var(--bg-sidebar)] text-[var(--accent)] text-[10px] font-black rounded-full border border-[var(--border-dark)]">
                 {canalLabels[canalFilter]}
                 <button onClick={() => setCanalFilter('all')} className="ml-0.5 hover:text-red-500">×</button>
               </span>
             )}
             {showResolved && (
-              <span className="flex items-center gap-1 px-2 py-0.5 bg-[var(--accent)]/10 text-[var(--accent)] text-[10px] font-black rounded-full border border-[var(--accent)]/20">
+              <span className="flex items-center gap-1 px-2 py-0.5 bg-[var(--bg-sidebar)] text-[var(--accent)] text-[10px] font-black rounded-full border border-[var(--border-dark)]">
                 Con resueltas
                 <button onClick={() => setShowResolved(false)} className="ml-0.5 hover:text-red-500">×</button>
               </span>

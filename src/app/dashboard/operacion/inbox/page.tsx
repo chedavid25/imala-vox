@@ -25,7 +25,7 @@ export default function InboxPage() {
   return (
     <Suspense fallback={
       <div className="flex h-full items-center justify-center bg-[var(--bg-main)]">
-        <Loader2 className="w-8 h-8 animate-spin text-[var(--accent)]" />
+        <Loader2 className="w-8 h-8 animate-spin text-[var(--text-tertiary-light)]" />
       </div>
     }>
       <InboxContent />
