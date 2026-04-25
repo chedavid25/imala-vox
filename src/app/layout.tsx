@@ -6,13 +6,13 @@ import AppLayout from "@/components/layout/AppLayout";
 import { PwaRegister } from "@/components/layout/PwaRegister";
 
 export const metadata: Metadata = {
-  title: "Imalá Vox - SaaS de Gestión de Agentes IA",
+  title: "ImaláVox - SaaS de Gestión de Agentes IA",
   description: "Gestión inteligente de conversaciones para WhatsApp, Instagram y Facebook.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Imalá Vox",
+    title: "ImaláVox",
   },
   icons: {
     apple: "/icons/apple-touch-icon.png",
