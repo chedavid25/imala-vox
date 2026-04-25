@@ -187,6 +187,7 @@ export default function AgentesPage() {
           </DialogContent>
         </Dialog>
       </div>
+    </div>
 
       {/* Panel de ayuda expandible */}
       {showHelp && (
