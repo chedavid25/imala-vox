@@ -500,16 +500,18 @@ export default function LeadsPage() {
                   <Target className="w-4 h-4" />
                   <span className="text-xs font-bold uppercase tracking-widest">Leads & Funnel</span>
                 </div>
-                <h1 className="text-2xl font-bold text-[var(--text-primary-light)]">Gestión de Prospectos</h1>
-                <p className="text-sm text-[var(--text-tertiary-light)]">Convierte leads de Meta Ads y orgánicos en clientes.</p>
+                <h1 className="text-2xl font-bold text-[var(--text-primary-light)] tracking-tight">Gestión de Prospectos</h1>
+                <p className="text-sm text-[var(--text-tertiary-light)] font-medium">Convierte leads de Meta Ads y orgánicos en clientes.</p>
               </div>
 
-              <div className="flex items-center gap-2 bg-[var(--bg-input)] p-1 rounded-xl border border-[var(--border-light)]">
+              <div className="flex items-center gap-1 bg-[var(--bg-input)] p-1 rounded-xl border border-[var(--border-light)] shadow-sm">
                 <button 
                   onClick={() => setView('kanban')}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-lg transition-all",
-                    view === 'kanban' ? "bg-white text-[var(--text-primary-light)] shadow-sm" : "text-[var(--text-tertiary-light)] hover:text-[var(--text-secondary-light)]"
+                    "flex items-center gap-2 px-3 py-1.5 text-[11px] font-black uppercase tracking-widest rounded-lg transition-all",
+                    view === 'kanban' 
+                      ? "bg-white text-[var(--text-primary-light)] shadow-sm" 
+                      : "text-[var(--text-tertiary-light)] hover:text-[var(--text-secondary-light)]"
                   )}
                 >
                   <LayoutGrid className="w-3.5 h-3.5" />
@@ -518,8 +520,10 @@ export default function LeadsPage() {
                 <button 
                   onClick={() => setView('list')}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-lg transition-all",
-                    view === 'list' ? "bg-white text-[var(--text-primary-light)] shadow-sm" : "text-[var(--text-tertiary-light)] hover:text-[var(--text-secondary-light)]"
+                    "flex items-center gap-2 px-3 py-1.5 text-[11px] font-black uppercase tracking-widest rounded-lg transition-all",
+                    view === 'list' 
+                      ? "bg-white text-[var(--text-primary-light)] shadow-sm" 
+                      : "text-[var(--text-tertiary-light)] hover:text-[var(--text-secondary-light)]"
                   )}
                 >
                   <List className="w-3.5 h-3.5" />
@@ -540,8 +544,8 @@ export default function LeadsPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-tertiary-light)]" />
               <Input 
-                placeholder="Buscar por nombre, email o teléfono..." 
-                className="pl-10 h-11 bg-white border-[var(--border-light)] rounded-2xl shadow-sm focus:ring-1 focus:ring-[var(--accent)]"
+                placeholder="Buscar prospectos..." 
+                className="pl-10 h-11 bg-[var(--bg-input)] border-transparent rounded-2xl focus:border-[var(--accent-active)] focus:ring-2 focus:ring-[var(--accent)]/20 transition-all text-sm font-medium"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -558,16 +562,16 @@ export default function LeadsPage() {
                   key={pill.id}
                   onClick={() => setFiltroOrigen(pill.id as any)}
                   className={cn(
-                    "px-4 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2",
+                    "px-4 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all whitespace-nowrap flex items-center gap-2",
                     filtroOrigen === pill.id 
-                      ? "bg-white text-[var(--accent)] shadow-sm" 
+                      ? "bg-white text-[var(--text-primary-light)] shadow-sm" 
                       : "text-[var(--text-tertiary-light)] hover:text-[var(--text-secondary-light)]"
                   )}
                 >
                   {pill.label}
                   <span className={cn(
-                    "px-1.5 py-0.5 rounded-full text-[10px] transition-colors",
-                    filtroOrigen === pill.id ? "bg-[var(--accent)]/10 text-[var(--accent)]" : "bg-black/5 text-[var(--text-tertiary-light)]"
+                    "px-1.5 py-0.5 rounded-full text-[9px] font-black transition-colors",
+                    filtroOrigen === pill.id ? "bg-[var(--accent)] text-[var(--accent-text)]" : "bg-black/5 text-[var(--text-tertiary-light)]"
                   )}>
                     {pill.id === 'todos' ? leads.length : leads.filter(l => l.origen === pill.id).length}
                   </span>
@@ -588,7 +592,7 @@ export default function LeadsPage() {
                   });
                   setIsNewLeadModalOpen(true);
                 }}
-                className="h-11 rounded-2xl bg-[var(--text-primary-light)] text-white hover:opacity-90 font-bold text-xs gap-2 px-6"
+                className="h-11 rounded-2xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] shadow-lg shadow-[var(--accent)]/20 font-black text-[10px] uppercase tracking-widest gap-2 px-6 transition-all"
               >
                 <Plus className="w-4 h-4" /> Nuevo Lead
               </Button>
@@ -641,13 +645,13 @@ export default function LeadsPage() {
                <table className="w-full text-left">
                   <thead>
                     <tr className="border-b border-[var(--border-light)] bg-[var(--bg-input)]/30">
-                      <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">Lead</th>
-                      <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">Origen</th>
-                      <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">Etapa</th>
-                      <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">Temperatura</th>
-                      <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">Creado</th>
-                      <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">Actividad</th>
-                      <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]"></th>
+                      <th className="p-4 text-[10px] font-black uppercase tracking-[0.1em] text-[var(--text-tertiary-light)]">Lead</th>
+                      <th className="p-4 text-[10px] font-black uppercase tracking-[0.1em] text-[var(--text-tertiary-light)]">Origen</th>
+                      <th className="p-4 text-[10px] font-black uppercase tracking-[0.1em] text-[var(--text-tertiary-light)]">Etapa</th>
+                      <th className="p-4 text-[10px] font-black uppercase tracking-[0.1em] text-[var(--text-tertiary-light)]">Temperatura</th>
+                      <th className="p-4 text-[10px] font-black uppercase tracking-[0.1em] text-[var(--text-tertiary-light)]">Creado</th>
+                      <th className="p-4 text-[10px] font-black uppercase tracking-[0.1em] text-[var(--text-tertiary-light)]">Actividad</th>
+                      <th className="p-4 text-[10px] font-black uppercase tracking-[0.1em] text-[var(--text-tertiary-light)]"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--border-light)]">
@@ -675,16 +679,16 @@ export default function LeadsPage() {
                           </div>
                         </td>
                         <td className="p-4">
-                          <Badge className={cn(
-                            "text-[9px] font-bold uppercase px-2 py-0.5",
+                          <span className={cn(
+                            "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider",
                             lead.origen === 'meta_ads' 
-                              ? "bg-emerald-100 text-emerald-700" 
+                              ? "bg-emerald-50 border-emerald-200 text-emerald-700" 
                               : lead.origen === 'organico' 
-                                ? "bg-sky-100 text-sky-700" 
-                                : "bg-slate-100 text-slate-600"
+                                ? "bg-blue-50 border-blue-200 text-blue-600" 
+                                : "bg-[var(--bg-input)] border-[var(--border-light)] text-[var(--text-tertiary-light)]"
                           )}>
                             {lead.origen === 'meta_ads' ? 'Meta Ads' : lead.origen === 'organico' ? 'Orgánico' : 'Manual'}
-                          </Badge>
+                          </span>
                         </td>
                         <td className="p-4" onClick={(e) => e.stopPropagation()}>
                           <Select 
@@ -764,19 +768,19 @@ export default function LeadsPage() {
           
           <form onSubmit={handleAddStage} className="space-y-6 py-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Nombre de la etapa</Label>
+              <Label htmlFor="name" className="text-[11px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest ml-1">Nombre de la etapa</Label>
               <Input 
                 id="name"
                 placeholder="Ej: Negociación, Visita..." 
                 value={newStageName}
                 onChange={(e) => setNewStageName(e.target.value)}
                 required
-                className="h-11 rounded-xl"
+                className="bg-[var(--bg-input)] border-[var(--border-light)] focus:border-[var(--accent-active)] focus:ring-2 focus:ring-[var(--accent)]/20 rounded-xl h-11 text-sm font-bold"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="color">Color identificador</Label>
+              <Label htmlFor="color" className="text-[11px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest ml-1">Color identificador</Label>
               <div className="flex items-center gap-4">
                 <input 
                   id="color"
@@ -785,7 +789,7 @@ export default function LeadsPage() {
                   onChange={(e) => setNewStageColor(e.target.value)}
                   className="w-12 h-12 rounded-xl border-0 cursor-pointer bg-transparent"
                 />
-                <span className="text-xs font-mono text-[var(--text-tertiary-light)]">{newStageColor.toUpperCase()}</span>
+                <span className="text-[10px] font-black tabular-nums text-[var(--text-tertiary-light)]">{newStageColor.toUpperCase()}</span>
               </div>
             </div>
 
@@ -958,13 +962,13 @@ export default function LeadsPage() {
             </div>
 
             <DialogFooter className="pt-4">
-              <DialogClose render={<Button type="button" variant="ghost" className="rounded-xl" />}>
+              <DialogClose render={<Button type="button" variant="ghost" className="h-9 px-4 text-xs font-bold text-[var(--text-secondary-light)] hover:bg-[var(--bg-input)] hover:text-[var(--text-primary-light)] rounded-xl transition-colors" />}>
                 Cancelar
               </DialogClose>
               <Button 
                 type="submit" 
                 disabled={isSavingLead || !newLeadData.nombre}
-                className="bg-[var(--accent)] text-[var(--accent-text)] rounded-xl px-8 font-bold"
+                className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-9 px-8 font-black text-[10px] uppercase tracking-widest rounded-xl shadow-xl shadow-[var(--accent)]/20 transition-all"
               >
                 {isSavingLead ? <Loader2 className="w-4 h-4 animate-spin" /> : "Crear Lead"}
               </Button>
@@ -977,23 +981,30 @@ export default function LeadsPage() {
 }
 
 function MetricCard({ title, value, icon: Icon, trend, color }: any) {
-  const colorMap: any = {
-    blue: "bg-blue-50 text-blue-500",
-    orange: "bg-orange-50 text-orange-500",
-    green: "bg-green-50 text-green-500",
-    purple: "bg-purple-50 text-purple-500",
+  const colorStyles: any = {
+    blue: "bg-blue-50 border-blue-100 text-blue-600",
+    orange: "bg-amber-50 border-amber-100 text-amber-600",
+    green: "bg-emerald-50 border-emerald-100 text-emerald-600",
+    purple: "bg-purple-50 border-purple-100 text-purple-600",
   };
 
   return (
-    <div className="bg-white p-5 rounded-2xl border border-[var(--border-light)] flex items-center justify-between group hover:border-[var(--accent)] transition-all">
+    <div className="bg-white p-5 rounded-2xl border border-[var(--border-light)] flex items-center justify-between group hover:border-[var(--accent)] hover:shadow-md transition-all">
       <div className="space-y-1">
-        <p className="text-[10px] font-bold text-[var(--text-tertiary-light)] uppercase tracking-widest">{title}</p>
+        <p className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-[0.1em]">{title}</p>
         <div className="flex items-baseline gap-2">
-           <h3 className="text-2xl font-bold text-[var(--text-primary-light)]">{value}</h3>
-           {trend && <span className="text-[10px] font-bold text-green-600 uppercase">{trend}</span>}
+           <h3 className="text-2xl font-bold text-[var(--text-primary-light)] tracking-tight">{value}</h3>
+           {trend && (
+             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-100 text-[9px] font-black text-emerald-700 uppercase tracking-wider">
+               {trend}
+             </span>
+           )}
         </div>
       </div>
-      <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110", colorMap[color])}>
+      <div className={cn(
+        "w-11 h-11 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110 border shadow-sm", 
+        colorStyles[color]
+      )}>
         <Icon className="w-5 h-5" />
       </div>
     </div>
@@ -1010,9 +1021,9 @@ function KanbanColumn({ etapa, leads, onSelected, onEdit, onDelete }: { etapa: E
       <div className="flex items-center justify-between px-2">
         <div className="flex items-center gap-2.5">
           <div className="w-3 h-3 rounded-full" style={{ backgroundColor: etapa.color }} />
-          <h3 className="text-sm font-bold text-[var(--text-primary-light)] uppercase tracking-tight flex items-center gap-2">
+          <h3 className="text-[11px] font-black text-[var(--text-primary-light)] uppercase tracking-widest flex items-center gap-2">
             {etapa.nombre}
-            <span className="text-[11px] font-bold text-[var(--text-tertiary-light)] bg-[var(--bg-input)] px-2 py-0.5 rounded-full">
+            <span className="text-[10px] font-black text-[var(--text-tertiary-light)] bg-[var(--bg-input)] px-2.5 py-0.5 rounded-full border border-[var(--border-light)]">
               {leads.length}
             </span>
           </h3>
@@ -1042,7 +1053,7 @@ function KanbanColumn({ etapa, leads, onSelected, onEdit, onDelete }: { etapa: E
 
       <div 
         ref={setNodeRef}
-        className="flex-1 min-h-[500px] bg-[var(--bg-input)]/40 rounded-3xl p-3 space-y-3"
+        className="flex-1 min-h-[500px] bg-[var(--bg-input)]/40 rounded-2xl p-3 space-y-3 border border-[var(--border-light)]/50"
       >
         <SortableContext items={leads.map(l => l.id)} strategy={verticalListSortingStrategy}>
           {leads.map(lead => (
@@ -1083,16 +1094,16 @@ function LeadCard({ lead, onClick }: { lead: Lead & { id: string }, onClick: () 
       )}
     >
       <div className="flex justify-between items-start mb-2">
-         <Badge className={cn(
-            "text-[8px] font-bold uppercase px-2 py-0.5 h-4",
+         <span className={cn(
+            "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[8px] font-black uppercase tracking-wider",
             lead.origen === 'meta_ads' 
-              ? "bg-emerald-100 text-emerald-700" 
+              ? "bg-emerald-50 border-emerald-200 text-emerald-700" 
               : lead.origen === 'organico' 
-                ? "bg-sky-100 text-sky-700" 
-                : "bg-slate-100 text-slate-600"
+                ? "bg-blue-50 border-blue-200 text-blue-600" 
+                : "bg-[var(--bg-input)] border-[var(--border-light)] text-[var(--text-tertiary-light)]"
           )}>
             {lead.origen === 'meta_ads' ? 'Meta Ads' : lead.origen === 'organico' ? 'Orgánico' : 'Manual'}
-          </Badge>
+          </span>
           <TemperatureDot temperature={lead.temperatura} />
       </div>
 
@@ -1104,17 +1115,17 @@ function LeadCard({ lead, onClick }: { lead: Lead & { id: string }, onClick: () 
       </div>
 
       <div className="mt-4 pt-3 border-t border-[var(--border-light)] flex items-center justify-between">
-        <span className="text-[9px] font-bold text-[var(--text-tertiary-light)] uppercase flex items-center gap-1.5">
-          <Clock className="w-3 h-3" />
+        <span className="text-[10px] font-semibold text-[var(--text-tertiary-light)] tabular-nums uppercase tracking-wider flex items-center gap-1.5">
+          <Clock className="w-3.5 h-3.5" />
           {lead.creadoEl ? formatDistanceToNow(lead.creadoEl.toDate(), { addSuffix: true, locale: es }) : 'Hace un momento'}
         </span>
         
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button className="p-1.5 hover:bg-[var(--accent)]/10 text-[var(--accent)] rounded-lg transition-colors">
-            <MessageCircle className="w-3.5 h-3.5" />
+          <button className="p-1.5 hover:bg-[var(--bg-input)] text-[var(--text-secondary-light)] hover:text-[var(--text-primary-light)] rounded-lg transition-colors">
+            <MessageCircle className="w-4 h-4" />
           </button>
-          <button className="p-1.5 hover:bg-blue-50 text-blue-500 rounded-lg transition-colors">
-            <ChevronRight className="w-3.5 h-3.5" />
+          <button className="p-1.5 hover:bg-[var(--bg-input)] text-[var(--text-secondary-light)] hover:text-[var(--text-primary-light)] rounded-lg transition-colors">
+            <ChevronRight className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -1186,18 +1197,18 @@ function LeadDetailContent({ lead, etapas, onClose, onConvert, onWhatsApp, onUpd
       <div className="p-6 bg-white border-b border-[var(--border-light)]">
         <div className="flex justify-between items-start mb-4">
           <div className="space-y-1">
-            <h2 className="text-xl font-bold text-[var(--text-primary-light)]">{lead.nombre}</h2>
+            <h2 className="text-xl font-bold text-[var(--text-primary-light)] tracking-tight">{lead.nombre}</h2>
             <div className="flex items-center gap-2">
-              <Badge className={cn(
-                "text-[9px] font-bold uppercase px-2 py-0.5",
+              <span className={cn(
+                "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider",
                 lead.origen === 'meta_ads'
-                  ? "bg-emerald-100 text-emerald-700"
+                  ? "bg-emerald-50 border-emerald-200 text-emerald-700"
                   : lead.origen === 'organico'
-                    ? "bg-sky-100 text-sky-700"
-                    : "bg-slate-100 text-slate-600"
+                    ? "bg-blue-50 border-blue-200 text-blue-600"
+                    : "bg-[var(--bg-input)] border-[var(--border-light)] text-[var(--text-tertiary-light)]"
               )}>
                 {lead.origen === 'meta_ads' ? 'Meta Ads' : lead.origen === 'organico' ? 'Orgánico' : 'Manual'}
-              </Badge>
+              </span>
 
               <Select value={lead.etapaId} onValueChange={(val) => onUpdateField('etapaId', val)}>
                 <SelectTrigger className="h-7 text-[10px] font-bold border-[var(--border-light)] rounded-full px-3 w-auto bg-transparent">
@@ -1225,20 +1236,20 @@ function LeadDetailContent({ lead, etapas, onClose, onConvert, onWhatsApp, onUpd
         </div>
 
         <div className="grid grid-cols-2 gap-3 mt-6">
-          <Button onClick={handleStartWhatsApp} className="bg-[var(--accent)] text-[var(--accent-text)] font-bold text-xs rounded-xl h-12 shadow-lg shadow-[var(--accent)]/10">
+          <Button onClick={handleStartWhatsApp} className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-black text-[10px] uppercase tracking-widest rounded-xl h-12 shadow-xl shadow-[var(--accent)]/20 transition-all">
             <MessageCircle className="w-4 h-4 mr-2" /> Inbox WA
           </Button>
           <Button
             onClick={lead.convertidoAContacto ? () => router.push(`/dashboard/operacion/contactos`) : onConvert}
             disabled={converting}
             variant="outline"
-            className="border-[var(--border-light-strong)] font-bold text-xs rounded-xl h-12 hover:bg-white"
+            className="h-12 px-4 bg-[var(--bg-card)] border-[var(--border-light)] text-[var(--text-primary-light)] font-bold text-xs hover:bg-[var(--bg-input)] hover:border-[var(--border-light-strong)] transition-colors rounded-xl"
           >
             {converting
               ? <Loader2 className="w-4 h-4 animate-spin mr-2" />
               : lead.convertidoAContacto
-                ? <ExternalLink className="w-4 h-4 mr-2 text-green-500" />
-                : <TrendingUp className="w-4 h-4 mr-2 text-blue-500" />
+                ? <ExternalLink className="w-4 h-4 mr-2 text-emerald-600" />
+                : <TrendingUp className="w-4 h-4 mr-2 text-blue-600" />
             }
             {lead.convertidoAContacto ? 'Ver en CRM' : 'Convertir'}
           </Button>
@@ -1395,7 +1406,7 @@ function LeadDetailContent({ lead, etapas, onClose, onConvert, onWhatsApp, onUpd
 function Section({ title, children }: any) {
   return (
     <div className="space-y-3">
-      <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--text-tertiary-light)] opacity-70 ml-1">{title}</h3>
+      <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-tertiary-light)] ml-1">{title}</h3>
       {children}
     </div>
   );
