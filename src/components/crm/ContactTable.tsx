@@ -130,11 +130,11 @@ export function ContactTable({ contactos, tags, categories }: ContactTableProps)
     <Table className="table-fixed w-full">
       <TableHeader>
         <TableRow className="hover:bg-transparent bg-[var(--bg-main)]/30 border-b border-[var(--border-light)]">
-          <TableHead className="w-[200px] text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)] cursor-pointer" onClick={() => requestSort("nombre")}>Nombre</TableHead>
-          <TableHead className="w-[120px] text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">Salud Relacional</TableHead>
-          <TableHead className="w-[250px] text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">Categorías y Etiquetas</TableHead>
-          <TableHead className="w-[120px] text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)]">IA</TableHead>
-          <TableHead className="w-[80px] text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary-light)] text-right">Acciones</TableHead>
+          <TableHead className="w-[200px] text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-tertiary-light)] cursor-pointer py-5" onClick={() => requestSort("nombre")}>Nombre</TableHead>
+          <TableHead className="w-[140px] text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-tertiary-light)] py-5">Salud Relacional</TableHead>
+          <TableHead className="w-[250px] text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-tertiary-light)] py-5">Categorías y Etiquetas</TableHead>
+          <TableHead className="w-[120px] text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-tertiary-light)] py-5">IA</TableHead>
+          <TableHead className="w-[80px] text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-tertiary-light)] text-right py-5">Acciones</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -164,30 +164,30 @@ export function ContactTable({ contactos, tags, categories }: ContactTableProps)
               </TableCell>
               
               <TableCell>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   <div className={cn(
-                    "size-2.5 rounded-full",
-                    health.status === 'verde' ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" :
-                    health.status === 'amarillo' ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)] animate-pulse" :
-                    "bg-rose-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]"
+                    "size-2.5 rounded-full border border-white shadow-sm ring-1 ring-offset-2",
+                    health.status === 'verde' ? "bg-emerald-500 ring-emerald-500/20" :
+                    health.status === 'amarillo' ? "bg-amber-500 ring-amber-500/20 animate-pulse" :
+                    "bg-rose-500 ring-rose-500/20"
                   )} />
                   <div className="flex flex-col">
-                    <span className="text-[12px] font-black tabular-nums">{health.days} días</span>
-                    <span className="text-[9px] text-[var(--text-tertiary-light)] font-bold uppercase">Sin contacto</span>
+                    <span className="text-[12px] font-black text-[var(--text-primary-light)] tabular-nums leading-none mb-1">{health.days} días</span>
+                    <span className="text-[9px] text-[var(--text-tertiary-light)] font-bold uppercase tracking-tight">Sin contacto</span>
                   </div>
                 </div>
               </TableCell>
 
               <TableCell>
                 <div className="flex flex-wrap gap-1.5 max-w-[240px]">
-                  {(contacto.etiquetas || []).slice(0, 3).map(tId => {
+                   {(contacto.etiquetas || []).slice(0, 3).map(tId => {
                     const tag = tags.find(t => t.id === tId);
                     if (!tag) return null;
                     return (
                       <span 
                         key={tId} 
-                        className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-tighter"
-                        style={{ backgroundColor: tag.colorBg, color: tag.colorText }}
+                        className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border"
+                        style={{ backgroundColor: tag.colorBg + '15', color: tag.colorText, borderColor: tag.colorBg + '30' }}
                       >
                         {tag.nombre}
                       </span>
@@ -206,12 +206,12 @@ export function ContactTable({ contactos, tags, categories }: ContactTableProps)
 
               <TableCell>
                  {contacto.aiBlocked ? (
-                    <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-rose-50 border border-rose-100 text-[9px] font-black text-rose-500">
+                    <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-rose-50 border border-rose-100 text-[9px] font-black text-rose-500 tracking-wider">
                       <ShieldOff className="size-3" />
                       SILENCIADA
                     </div>
                  ) : (
-                    <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-100 text-[9px] font-black text-emerald-600">
+                    <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-100 text-[9px] font-black text-emerald-600 tracking-wider">
                       <Shield className="size-3" />
                       PILOTO
                     </div>

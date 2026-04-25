@@ -163,14 +163,14 @@ export default function ContactosPage() {
     <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-1">
-          <h1 className="text-3xl font-black text-slate-800 tracking-tight">Contactos CRM</h1>
-          <p className="text-[13px] text-slate-500 font-medium">Gestiona tu red de contactos y salud relacional.</p>
+          <h1 className="text-2xl font-bold text-[var(--text-primary-light)] tracking-tight">Contactos CRM</h1>
+          <p className="text-[13px] text-[var(--text-secondary-light)] font-medium">Gestiona tu red de contactos y salud relacional.</p>
         </div>
         <div className="flex items-center gap-3">
           <CSVImporter onImport={handleBulkImport} />
           
           <Dialog open={isAdding} onOpenChange={setIsAdding}>
-            <DialogTrigger render={<Button className="bg-[var(--accent)] text-[var(--accent-text)] h-11 px-6 shadow-lg shadow-[var(--accent)]/20 font-black rounded-full transition-all hover:scale-105 active:scale-95" />}>
+            <DialogTrigger render={<Button className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-11 px-6 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-[var(--accent)]/20 transition-all hover:scale-[1.02] active:scale-95" />}>
               <Plus className="w-4 h-4 mr-2" /> Nuevo Contacto
             </DialogTrigger>
             <DialogContent className="max-w-md bg-white rounded-3xl border-none shadow-2xl overflow-y-auto max-h-[90vh] no-scrollbar">
@@ -316,7 +316,7 @@ export default function ContactosPage() {
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-slate-300" />
           <Input 
             placeholder="Buscar por nombre o teléfono..." 
-            className="pl-11 h-12 border-none bg-slate-50/30 rounded-xl text-[13px] font-medium"
+            className="pl-11 h-12 border-none bg-slate-50/50 rounded-xl text-[13px] font-semibold text-[var(--text-primary-light)] focus:bg-white transition-all shadow-sm"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
           />
@@ -331,7 +331,7 @@ export default function ContactosPage() {
           )}
 
           <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" className="h-12 rounded-xl border-slate-100 px-5 gap-2 font-black text-slate-600 text-[11px] uppercase tracking-wider shadow-sm hover:bg-slate-50" />}>
+            <DropdownMenuTrigger render={<Button variant="outline" className="h-12 rounded-xl border-slate-100 px-5 gap-2 font-semibold text-[var(--text-secondary-light)] text-[11px] uppercase tracking-wider shadow-sm hover:bg-slate-50 transition-all" />}>
               <Filter className="size-3.5" /> Filtrar Segmentos
               <ChevronDown className="size-3.5 opacity-40 ml-1" />
             </DropdownMenuTrigger>
