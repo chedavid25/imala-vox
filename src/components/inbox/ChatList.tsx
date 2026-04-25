@@ -89,35 +89,39 @@ export function ChatList({ conversaciones, selectedId, onSelect }: ChatListProps
               )}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52 p-1.5 rounded-2xl border border-[var(--border-light)] bg-white shadow-xl">
-              <DropdownMenuLabel className="text-[9px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest px-2 py-1.5">
-                Canal
-              </DropdownMenuLabel>
-              {(['all', 'whatsapp', 'instagram', 'facebook'] as const).map(c => (
+              <DropdownMenuGroup>
+                <DropdownMenuLabel className="text-[9px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest px-2 py-1.5">
+                  Canal
+                </DropdownMenuLabel>
+                {(['all', 'whatsapp', 'instagram', 'facebook'] as const).map(c => (
+                  <DropdownMenuItem
+                    key={c}
+                    onClick={() => setCanalFilter(c)}
+                    className="flex items-center gap-2 px-2 py-2 rounded-xl text-xs font-bold cursor-pointer hover:bg-[var(--bg-input)]"
+                  >
+                    <div className={cn("w-3.5 h-3.5 flex items-center justify-center", canalFilter === c ? "text-[var(--accent)]" : "text-transparent")}>
+                      <Check className="w-3.5 h-3.5" />
+                    </div>
+                    {canalLabels[c]}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator className="bg-[var(--border-light)] my-1" />
+              <DropdownMenuGroup>
+                <DropdownMenuLabel className="text-[9px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest px-2 py-1.5">
+                  Estado
+                </DropdownMenuLabel>
                 <DropdownMenuItem
-                  key={c}
-                  onClick={() => setCanalFilter(c)}
+                  onClick={() => setShowResolved(v => !v)}
                   className="flex items-center gap-2 px-2 py-2 rounded-xl text-xs font-bold cursor-pointer hover:bg-[var(--bg-input)]"
                 >
-                  <div className={cn("w-3.5 h-3.5 flex items-center justify-center", canalFilter === c ? "text-[var(--accent)]" : "text-transparent")}>
-                    <Check className="w-3.5 h-3.5" />
-                  </div>
-                  {canalLabels[c]}
+                  {showResolved
+                    ? <Eye className="w-3.5 h-3.5 text-[var(--accent)]" />
+                    : <EyeOff className="w-3.5 h-3.5 text-[var(--text-tertiary-light)]" />
+                  }
+                  {showResolved ? 'Ocultar resueltas' : 'Mostrar resueltas'}
                 </DropdownMenuItem>
-              ))}
-              <DropdownMenuSeparator className="bg-[var(--border-light)] my-1" />
-              <DropdownMenuLabel className="text-[9px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest px-2 py-1.5">
-                Estado
-              </DropdownMenuLabel>
-              <DropdownMenuItem
-                onClick={() => setShowResolved(v => !v)}
-                className="flex items-center gap-2 px-2 py-2 rounded-xl text-xs font-bold cursor-pointer hover:bg-[var(--bg-input)]"
-              >
-                {showResolved
-                  ? <Eye className="w-3.5 h-3.5 text-[var(--accent)]" />
-                  : <EyeOff className="w-3.5 h-3.5 text-[var(--text-tertiary-light)]" />
-                }
-                {showResolved ? 'Ocultar resueltas' : 'Mostrar resueltas'}
-              </DropdownMenuItem>
+              </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
