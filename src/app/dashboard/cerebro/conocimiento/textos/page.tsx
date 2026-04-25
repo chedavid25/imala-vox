@@ -120,7 +120,7 @@ export default function TextosGlobalPage() {
         <h3 className="text-sm font-bold text-[var(--text-primary-light)]">Gestionar Textos Estáticos</h3>
         
         <Dialog>
-          <DialogTrigger asChild>
+          <DialogTrigger>
             <Button className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)]">
               <Plus className="w-4 h-4 mr-2" />
               Nuevo Texto
@@ -173,7 +173,7 @@ export default function TextosGlobalPage() {
               </div>
             </div>
             <DialogFooter>
-              <DialogClose asChild>
+              <DialogClose>
                 <Button onClick={handleCreate} disabled={isAdding || !newTexto.titulo} className="bg-[var(--accent)] text-[var(--accent-text)]">
                   {isAdding && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
                   Guardar Texto

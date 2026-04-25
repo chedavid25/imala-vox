@@ -138,7 +138,7 @@ export default function AgentesPage() {
           </button>
 
           <Dialog>
-            <DialogTrigger asChild>
+            <DialogTrigger>
               <Button className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-11 px-6 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-[var(--accent)]/20 transition-all hover:scale-[1.02] active:scale-95">
                 <Plus className="w-4 h-4 mr-2" />
                 Nuevo Agente
@@ -172,7 +172,7 @@ export default function AgentesPage() {
               </div>
             </div>
             <DialogFooter>
-              <DialogClose asChild>
+              <DialogClose>
                 <Button 
                   onClick={handleCrearAgente} 
                   disabled={isAdding || !newAgente.nombre}

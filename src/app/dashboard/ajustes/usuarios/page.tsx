@@ -420,7 +420,7 @@ export default function UsuariosPage() {
                       </TableCell>
                       <TableCell className="text-right px-8">
                          <DropdownMenu>
-                           <DropdownMenuTrigger asChild>
+                           <DropdownMenuTrigger>
                               <Button variant="ghost" size="icon" className="text-slate-300 hover:text-slate-600 rounded-xl">
                                 <MoreVertical className="size-4" />
                               </Button>

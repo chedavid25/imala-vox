@@ -794,7 +794,7 @@ export default function LeadsPage() {
             </div>
 
             <DialogFooter className="pt-4">
-              <DialogClose asChild>
+              <DialogClose>
                 <Button type="button" variant="ghost" className="rounded-xl">
                   Cancelar
                 </Button>
@@ -845,7 +845,7 @@ export default function LeadsPage() {
             </div>
 
             <DialogFooter className="pt-4">
-              <DialogClose asChild>
+              <DialogClose>
                 <Button type="button" variant="ghost" className="rounded-xl">
                   Cancelar
                 </Button>
@@ -966,7 +966,7 @@ export default function LeadsPage() {
             </div>
 
             <DialogFooter className="pt-4">
-              <DialogClose asChild>
+              <DialogClose>
                 <Button type="button" variant="ghost" className="h-9 px-4 text-xs font-bold text-[var(--text-secondary-light)] hover:bg-[var(--bg-input)] hover:text-[var(--text-primary-light)] rounded-xl transition-colors">
                   Cancelar
                 </Button>
@@ -1036,7 +1036,7 @@ function KanbanColumn({ etapa, leads, onSelected, onEdit, onDelete }: { etapa: E
         </div>
         
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+          <DropdownMenuTrigger>
             <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg">
               <MoreVertical className="w-3.5 h-3.5 text-[var(--text-tertiary-light)]" />
             </Button>

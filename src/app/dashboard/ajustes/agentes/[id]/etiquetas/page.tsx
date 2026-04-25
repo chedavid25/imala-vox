@@ -124,7 +124,7 @@ export default function AgenteEtiquetasPage() {
         </div>
         
         <Dialog>
-          <DialogTrigger asChild>
+          <DialogTrigger>
             <Button className="bg-[var(--accent)] text-[var(--accent-text)]">
               <Plus className="w-4 h-4 mr-2" />
               Nueva Etiqueta
@@ -173,7 +173,7 @@ export default function AgenteEtiquetasPage() {
               </div>
             </div>
             <DialogFooter>
-              <DialogClose asChild>
+              <DialogClose>
                 <Button onClick={handleCreate} disabled={isAdding || !newEtiqueta.nombre} className="bg-[var(--accent)] text-[var(--accent-text)]">
                   {isAdding && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
                   Crear Etiqueta

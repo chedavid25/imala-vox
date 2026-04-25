@@ -164,7 +164,7 @@ export default function ContactosPage() {
           <CSVImporter onImport={handleBulkImport} />
           
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
+            <DialogTrigger>
               <Button className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-11 px-6 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-[var(--accent)]/20 transition-all hover:scale-[1.02] active:scale-95" onClick={() => setIsDialogOpen(true)}>
                 <Plus className="w-4 h-4 mr-2" /> Nuevo Contacto
               </Button>
@@ -227,7 +227,7 @@ export default function ContactosPage() {
                 <div className="space-y-3">
                   <Label className="text-[10px] font-black uppercase text-slate-400 ml-1">Segmentación (Etiquetas)</Label>
                   <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
+                    <DropdownMenuTrigger>
                       <Button variant="outline" className="w-full justify-between h-11 rounded-2xl border-dashed border-2 bg-slate-50/50 hover:bg-slate-50">
                         <span className="text-xs font-bold text-slate-400">Seleccionar etiquetas...</span>
                         <Plus className="size-4 opacity-50" />
@@ -313,7 +313,7 @@ export default function ContactosPage() {
           )}
 
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+            <DropdownMenuTrigger>
               <Button variant="outline" className="h-12 rounded-xl border-slate-100 px-5 gap-2 font-semibold text-[var(--text-secondary-light)] text-[11px] uppercase tracking-wider shadow-sm hover:bg-slate-50 transition-all">
                 <Filter className="size-3.5" /> Filtrar Segmentos
                 <ChevronDown className="size-3.5 opacity-40 ml-1" />

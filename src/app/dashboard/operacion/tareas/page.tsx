@@ -548,7 +548,7 @@ export default function TareasPage() {
                 <div className="space-y-2">
                     <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 ml-1">Vincular Contacto</Label>
                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
+                      <DropdownMenuTrigger>
                         <Button variant="outline" className="w-full h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-[15px] font-bold justify-between px-4 outline-none">
                           {taskForm.contactoId ? (
                             <span className="text-slate-800">{contactos.find(c => (c.id === taskForm.contactoId || (c as any).id === taskForm.contactoId))?.nombre}</span>
