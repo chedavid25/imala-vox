@@ -385,12 +385,13 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
 
   if (!conversacion) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-12 text-center bg-[var(--bg-main)]">
-        <div className="w-16 h-16 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-light)] flex items-center justify-center mb-6 shadow-sm">
+      <div className="flex-1 flex flex-col items-center justify-center py-20 px-12 space-y-3 opacity-60 bg-[var(--bg-main)]/30">
+        <div className="w-16 h-16 rounded-2xl bg-[var(--bg-input)] border border-[var(--border-light)]
+                        flex items-center justify-center shadow-sm">
           <MessageCircle className="w-8 h-8 text-[var(--text-tertiary-light)]" />
         </div>
-        <h3 className="text-lg font-bold text-[var(--text-primary-light)] mb-2">Buzón de Entrada Omnicanal</h3>
-        <p className="text-sm text-[var(--text-secondary-light)] max-w-sm">
+        <p className="text-sm font-bold text-[var(--text-secondary-light)]">Buzón de Entrada Omnicanal</p>
+        <p className="text-xs text-[var(--text-tertiary-light)] text-center max-w-xs">
           Selecciona una conversación a la izquierda para comenzar a gestionar el contacto.
         </p>
       </div>
@@ -439,7 +440,7 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
             <Button
               size="sm"
               onClick={handleResumeIA}
-              className="h-8 gap-1.5 font-black text-[10px] bg-purple-600/10 text-purple-600 border border-purple-200 hover:bg-purple-600 hover:text-white transition-all animate-in fade-in zoom-in duration-300"
+              className="h-8 gap-1.5 font-black text-[10px] bg-purple-50 text-purple-600 border border-purple-200 hover:bg-purple-600 hover:text-white transition-all animate-in fade-in zoom-in duration-300 rounded-xl"
             >
               <Sparkles className="w-3 h-3" />
               REANUDAR IA
@@ -474,10 +475,10 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
             size="sm" 
             onClick={handleResolve}
             className={cn(
-              "h-8 gap-1.5 font-bold text-xs shadow-lg transition-all",
+              "h-8 gap-1.5 font-black text-[10px] uppercase tracking-wider shadow-lg transition-all rounded-xl",
               conversacion.estado === 'resuelto' 
-                ? "bg-[var(--success)]/20 text-[var(--success)] border border-[var(--success)]/30" 
-                : "bg-[var(--accent)] hover:opacity-90 text-[var(--accent-text)]"
+                ? "bg-emerald-50 text-emerald-600 border border-emerald-200" 
+                : "bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)]"
             )}
           >
             {conversacion.estado === 'resuelto' ? (
@@ -533,14 +534,14 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
                 <div className={cn(
                   "p-3.5 rounded-2xl text-[13.5px] leading-relaxed shadow-sm",
                   isNote 
-                    ? "bg-[#FEFCE8] border border-yellow-200 text-yellow-800" 
+                    ? "bg-[#FEFCE8] border border-yellow-200 text-yellow-800 rounded-2xl" 
                     : isMe 
-                      ? "bg-[var(--accent)] text-[var(--accent-text)] font-semibold rounded-tr-none" 
-                      : "bg-[var(--bg-card)] border border-[var(--border-light)] text-[var(--text-primary-light)] rounded-tl-none"
+                      ? "bg-[var(--accent)] text-[var(--accent-text)] font-semibold rounded-2xl rounded-tr-none" 
+                      : "bg-[var(--bg-card)] border border-[var(--border-light)] text-[var(--text-primary-light)] rounded-2xl rounded-tl-none"
                 )}>
                   {msg.text}
                 </div>
-                <div className="flex items-center gap-2 px-1 text-[10px] text-[var(--text-tertiary-light)] font-bold uppercase tracking-wider">
+                <div className="flex items-center gap-2 px-1 text-[10px] font-semibold text-[var(--text-tertiary-light)] tabular-nums uppercase tracking-wider">
                   {isNote ? "NOTA INTERNA" : isMe ? "AGENTE IMALÁ" : "CLIENTE"}
                   <span>•</span>
                   {msg.creadoEl ? new Date(msg.creadoEl.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
@@ -607,8 +608,10 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
           <button 
             onClick={() => setMode('public')}
             className={cn(
-              "px-4 py-1.5 rounded-md text-[11px] font-bold transition-all",
-              mode === 'public' ? "bg-[var(--bg-card)] text-[var(--accent)] shadow-sm" : "text-[var(--text-secondary-light)] hover:text-[var(--text-primary-light)]"
+              "px-4 py-1.5 rounded-md text-[11px] font-black tracking-widest transition-all",
+              mode === 'public' 
+                ? "bg-[var(--accent)] text-[var(--accent-text)] shadow-sm" 
+                : "text-[var(--text-secondary-light)] hover:text-[var(--text-primary-light)]"
             )}
           >
             MENSAJE PÚBLICO
@@ -616,8 +619,10 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
           <button 
             onClick={() => setMode('internal')}
             className={cn(
-              "px-4 py-1.5 rounded-md text-[11px] font-bold transition-all",
-              mode === 'internal' ? "bg-yellow-100/50 text-yellow-700 shadow-sm" : "text-[var(--text-secondary-light)] hover:text-[var(--text-primary-light)]"
+              "px-4 py-1.5 rounded-md text-[11px] font-black tracking-widest transition-all",
+              mode === 'internal' 
+                ? "bg-yellow-400 text-yellow-950 shadow-sm" 
+                : "text-[var(--text-secondary-light)] hover:text-[var(--text-primary-light)]"
             )}
           >
             NOTA INTERNA
@@ -747,7 +752,7 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
             <Textarea
               ref={textareaRef}
               placeholder={mode === 'internal' ? "Escribe una nota interna para tu equipo..." : "Responde al cliente..."}
-              className="border-none bg-transparent focus-visible:ring-0 resize-none min-h-[90px] p-4 text-[14px] leading-relaxed no-scrollbar"
+              className="border-none bg-transparent focus-visible:ring-0 resize-none min-h-[90px] p-4 text-[14px] leading-relaxed no-scrollbar text-[var(--text-primary-light)] placeholder:text-[var(--text-tertiary-light)]"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={(e) => {

@@ -168,13 +168,13 @@ export function ChatList({ conversaciones, selectedId, onSelect }: ChatListProps
             key={btn.id}
             onClick={() => setFilter(btn.id as any)}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all border",
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all border shadow-sm",
               filter === btn.id
-                ? "bg-[var(--accent)] text-[var(--accent-text)] border-transparent shadow-sm"
-                : "bg-transparent text-[var(--text-secondary-light)] border-[var(--border-light)] hover:bg-[var(--bg-card)]"
+                ? "bg-[var(--accent)] text-[var(--accent-text)] border-transparent"
+                : "bg-[var(--bg-card)] text-[var(--text-secondary-light)] border-[var(--border-light)] hover:bg-[var(--bg-input)] hover:border-[var(--border-light-strong)]"
             )}
           >
-            <btn.icon className="w-3 h-3" />
+            <btn.icon className="w-3.5 h-3.5" />
             {btn.label}
           </button>
         ))}
@@ -183,9 +183,15 @@ export function ChatList({ conversaciones, selectedId, onSelect }: ChatListProps
       {/* Lista de Chats */}
       <div className="flex-1 overflow-y-auto no-scrollbar">
         {filteredConversations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full p-8 text-center space-y-2 opacity-60">
-            <MessageSquare className="w-8 h-8 text-[var(--text-tertiary-light)]" />
-            <p className="text-xs font-medium text-[var(--text-tertiary-light)]">No se encontraron chats</p>
+          <div className="flex flex-col items-center justify-center py-20 px-8 space-y-3 opacity-60">
+            <div className="w-14 h-14 rounded-2xl bg-[var(--bg-input)] border border-[var(--border-light)]
+                            flex items-center justify-center">
+              <MessageSquare className="w-7 h-7 text-[var(--text-tertiary-light)]" />
+            </div>
+            <p className="text-sm font-bold text-[var(--text-secondary-light)]">Sin conversaciones</p>
+            <p className="text-xs text-[var(--text-tertiary-light)] text-center max-w-[200px]">
+              No se encontraron chats que coincidan con los filtros seleccionados.
+            </p>
           </div>
         ) : (
           filteredConversations.map((chat) => {
@@ -196,9 +202,9 @@ export function ChatList({ conversaciones, selectedId, onSelect }: ChatListProps
                 key={chat.id}
                 onClick={() => onSelect(chat.id)}
                 className={cn(
-                  "w-full p-3.5 border-b border-[var(--border-light)] text-left transition-all flex items-start gap-3 relative",
+                  "w-full p-3.5 border-b border-[var(--border-light)] text-left transition-all flex items-start gap-3 relative cursor-pointer",
                   selectedId === chat.id
-                    ? "bg-[#1F1F1E] before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:bg-[var(--accent)]"
+                    ? "bg-[var(--bg-sidebar)] border border-[var(--accent)]/20 shadow-sm"
                     : "hover:bg-[var(--bg-input)]/40 bg-transparent",
                   isResolved && "opacity-60"
                 )}
@@ -221,7 +227,10 @@ export function ChatList({ conversaciones, selectedId, onSelect }: ChatListProps
                     </span>
                   )}
                   <div className="absolute -bottom-1 -right-1 flex items-center justify-center shadow-2xl">
-                    <CanalBadge canal={chat.canal || 'whatsapp'} showText={false} className="border-2 border-[#121212] scale-[0.85]" />
+                    <CanalBadge canal={chat.canal || 'whatsapp'} showText={false} className={cn(
+                      "border-2 scale-[0.85]",
+                      selectedId === chat.id ? "border-[var(--bg-sidebar)]" : "border-white"
+                    )} />
                   </div>
                 </div>
 
@@ -229,7 +238,7 @@ export function ChatList({ conversaciones, selectedId, onSelect }: ChatListProps
                   <div className="flex justify-between items-center gap-1">
                     <span className={cn(
                       "text-[13.5px] truncate font-bold tracking-tight",
-                      selectedId === chat.id ? "text-white" : "text-[var(--text-primary-light)]"
+                      selectedId === chat.id ? "text-[var(--text-primary-dark)]" : "text-[var(--text-primary-light)]"
                     )}>
                       {contactInfo.nombre}
                     </span>
@@ -237,7 +246,7 @@ export function ChatList({ conversaciones, selectedId, onSelect }: ChatListProps
                       {isResolved && <CheckCircle2 className="w-3 h-3 text-green-500" />}
                       <span className={cn(
                         "text-[10px] font-semibold tabular-nums",
-                        selectedId === chat.id ? "text-white/40" : "text-[var(--text-tertiary-light)]"
+                        selectedId === chat.id ? "text-[var(--text-tertiary-dark)]" : "text-[var(--text-tertiary-light)]"
                       )}>
                         {chat.ultimaActividad ? formatDistanceToNow(chat.ultimaActividad.toDate(), { addSuffix: false, locale: es }) : ''}
                       </span>
@@ -248,7 +257,7 @@ export function ChatList({ conversaciones, selectedId, onSelect }: ChatListProps
                     <p className={cn(
                       "text-[12px] truncate flex-1 leading-snug",
                       selectedId === chat.id
-                        ? "text-white/60 font-medium"
+                        ? "text-[var(--text-secondary-dark)] font-medium"
                         : chat.unreadCount > 0
                           ? "font-bold text-[var(--text-primary-light)]"
                           : "text-[var(--text-secondary-light)]"
