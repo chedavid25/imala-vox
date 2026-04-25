@@ -15,6 +15,9 @@ import {
   Zap,
   UserCheck,
   Trash2,
+  HelpCircle,
+  ChevronDown,
+  Lightbulb
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -92,6 +95,18 @@ export default function CanalesPage() {
   const [waAccessToken, setWaAccessToken] = useState('');
   const [waDisplayName, setWaDisplayName] = useState('');
   const [isConnectingWA, setIsConnectingWA] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+
+  const ayudaCanales = {
+    titulo: "¿Cómo conectar tus canales de atención?",
+    descripcion: "Los canales permiten que Imalá Vox reciba y envíe mensajes de tus clientes. Puedes conectar WhatsApp mediante API o tus páginas de Facebook e Instagram vía Meta OAuth.",
+    recomendacion: "Para WhatsApp, asegúrate de usar un 'Access Token Permanente'. Los tokens temporales expiran en 24 horas y el agente dejará de responder.",
+    items: [
+      { titulo: "WhatsApp API", detalle: "Requiere el ID del número y un Token. Es ideal para cuentas oficiales y soporte masivo." },
+      { titulo: "Meta OAuth", detalle: "Inicia sesión con Facebook para conectar tus Páginas y cuentas de Instagram de forma automática." },
+      { titulo: "Webhooks", detalle: "Es el 'enlace' que avisa al sistema cuando llega un mensaje. Deben estar en estado 'OK' para funcionar." },
+    ]
+  };
 
   useEffect(() => {
     if (!currentWorkspaceId) return;
@@ -253,31 +268,88 @@ export default function CanalesPage() {
 
   return (
     <div className="p-8 max-w-5xl mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-[var(--accent)]">Canales de Atención</h1>
-          <p className="text-[var(--text-secondary-light)] mt-2">
-            Administra tus conexiones con Facebook, Instagram y WhatsApp.
-          </p>
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 mb-1">
+            <MessageSquare className="w-4 h-4 text-[var(--text-tertiary-light)]" />
+            <span className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest">Ajustes del Sistema</span>
+          </div>
+          <h1 className="text-2xl font-bold text-[var(--text-primary-light)] tracking-tight">Canales de Atención</h1>
+          <p className="text-sm text-[var(--text-tertiary-light)] font-medium">Administra tus conexiones con Facebook, Instagram y WhatsApp.</p>
         </div>
+
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowHelp(v => !v)}
+            className={cn(
+              "flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-bold transition-all shrink-0 h-11",
+              showHelp
+                ? "bg-[var(--bg-sidebar)] border-[var(--border-dark)] text-[var(--accent)]"
+                : "bg-white border-[var(--border-light)] text-[var(--text-secondary-light)] hover:bg-[var(--bg-input)] hover:text-[var(--text-primary-light)]"
+            )}
+          >
+            <HelpCircle className="w-4 h-4" />
+            ¿Cómo conectar?
+            <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", showHelp && "rotate-180")} />
+          </button>
+
           <Button
             onClick={() => setIsWAModalOpen(true)}
             variant="outline"
-            className="rounded-2xl font-bold px-5 h-12 border-[#25D366] text-[#25D366] hover:bg-[#25D366]/5 transition-all"
+            className="rounded-2xl font-black text-[10px] uppercase tracking-widest px-5 h-11 border-[#25D366] text-[#25D366] hover:bg-[#25D366]/5 transition-all shadow-lg shadow-[#25D366]/10"
           >
-            <MessageSquare className="w-5 h-5 mr-2" />
-            Conectar WhatsApp
+            <MessageSquare className="w-4 h-4 mr-2" />
+            WhatsApp
           </Button>
           <Button 
             onClick={handleOAuthConnect}
-            className="rounded-2xl bg-[var(--accent)] font-bold px-6 h-12 shadow-lg shadow-[var(--accent)]/20 hover:brightness-110 transition-all"
+            className="rounded-2xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-black text-[10px] uppercase tracking-widest px-6 h-11 shadow-xl shadow-[var(--accent)]/20 transition-all hover:scale-[1.02] active:scale-95"
           >
-            <Plus className="w-5 h-5 mr-2" />
-            Conectar Meta (FB / IG)
+            <Plus className="w-4 h-4 mr-2" />
+            Conectar Meta
           </Button>
         </div>
       </div>
+
+      {/* Panel de ayuda expandible */}
+      {showHelp && (
+        <div className="bg-white border border-[var(--border-light)] rounded-[32px] overflow-hidden shadow-sm animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="px-8 pt-8 pb-6 border-b border-[var(--border-light)]">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-2xl bg-[var(--bg-sidebar)] border border-[var(--border-dark)] flex items-center justify-center shrink-0 shadow-sm">
+                <Lightbulb className="w-5 h-5 text-[var(--accent)]" />
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="text-sm font-bold text-[var(--text-primary-light)]">{ayudaCanales.titulo}</h3>
+                <p className="text-sm text-[var(--text-secondary-light)] leading-relaxed">{ayudaCanales.descripcion}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-8 py-6 space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {ayudaCanales.items.map((item, i) => (
+                <div key={i} className="bg-[var(--bg-input)]/30 border border-[var(--border-light)] rounded-2xl p-4 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent-active)] shrink-0" />
+                    <span className="text-[12px] font-bold text-[var(--text-primary-light)] uppercase tracking-tight">{item.titulo}</span>
+                  </div>
+                  <p className="text-[12px] text-[var(--text-tertiary-light)] leading-relaxed pl-3.5 font-medium">{item.detalle}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 flex items-start gap-3">
+              <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <p className="text-[12px] font-black text-amber-800 uppercase tracking-widest">Atención con los Tokens</p>
+                <p className="text-[12px] text-amber-700 leading-relaxed font-medium">{ayudaCanales.recomendacion}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
@@ -307,73 +379,73 @@ export default function CanalesPage() {
                   <div 
                     key={canal.id}
                     className={cn(
-                      "group relative flex flex-col p-6 rounded-3xl border transition-all duration-300",
+                      "group relative flex flex-col p-7 rounded-[32px] border transition-all duration-300",
                       isConnected 
-                        ? "bg-white border-[var(--accent)]/30 shadow-sm" 
+                        ? "bg-white border-[var(--border-light)] shadow-sm hover:shadow-xl hover:shadow-[var(--accent)]/5" 
                         : "bg-[var(--bg-card)]/50 border-[var(--border-light)] grayscale opacity-80 hover:grayscale-0 hover:opacity-100 hover:bg-white"
                     )}
                   >
                     <div className="flex justify-between items-start mb-6">
                       <div 
-                        className="p-3 rounded-2xl"
-                        style={{ backgroundColor: isConnected ? `${config.color}15` : '#f3f4f6' }}
+                        className="p-3.5 rounded-2xl shadow-sm border border-white"
+                        style={{ backgroundColor: isConnected ? `${config.color}10` : '#f3f4f6' }}
                       >
                         <config.icon className="w-6 h-6" style={{ color: isConnected ? config.color : '#9ca3af' }} />
                       </div>
                       {isConnected ? (
-                        <Badge className="bg-green-50 text-green-700 border-green-100 px-3 py-1 text-[10px] uppercase font-black">
-                          Conectado
-                        </Badge>
+                        <div className="px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-600 text-[10px] font-black uppercase tracking-widest">
+                          Activo
+                        </div>
                       ) : (
-                        <Badge variant="outline" className="text-[var(--text-tertiary-light)] border-[var(--border-light)] px-3 py-1 text-[10px] uppercase font-bold">
-                          {canal.status === 'disconnected' ? 'Desconectado' : canal.status}
-                        </Badge>
+                        <div className="px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+                          {canal.status === 'disconnected' ? 'Off' : canal.status}
+                        </div>
                       )}
                     </div>
 
                     <div className="flex-1 space-y-2 mb-8">
-                      <h3 className="font-bold text-[15px]">{canal.nombre || config.nombre}</h3>
-                      <div className="space-y-1">
-                        <p className="text-[11px] text-[var(--text-secondary-light)] font-medium truncate">
+                      <h3 className="font-bold text-[16px] text-[var(--text-primary-light)] tracking-tight">{canal.nombre || config.nombre}</h3>
+                      <div className="space-y-1.5">
+                        <p className="text-[11px] text-[var(--text-tertiary-light)] font-bold uppercase tracking-widest truncate opacity-70">
                            {canal.cuenta || (canal.tipo === 'facebook' ? 'Página de Facebook' : 'Cuenta vinculada')}
                         </p>
-                        <div className="flex items-center gap-1.5">
-                          <div className={cn("w-1.5 h-1.5 rounded-full", canal.webhookVerified ? "bg-green-500" : "bg-amber-500")} />
-                          <span className="text-[9px] font-bold text-[var(--text-tertiary-light)] uppercase">
+                        <div className="flex items-center gap-2">
+                          <div className={cn("w-1.5 h-1.5 rounded-full", canal.webhookVerified ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" : "bg-amber-500")} />
+                          <span className="text-[9px] font-black text-[var(--text-tertiary-light)] uppercase tracking-wider">
                              {canal.webhookVerified ? "Webhooks OK" : "Sincro Pendiente"}
                           </span>
                           {canal.aiEnabled && (
-                            <Badge className="ml-auto bg-[var(--accent)]/5 text-[var(--accent)] border-none text-[8px] h-4 scale-90">
-                              IA ACTIVA
-                            </Badge>
+                            <div className="ml-auto bg-[var(--accent)] text-[var(--accent-text)] px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-tighter">
+                              IA ON
+                            </div>
                           )}
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                       <Button 
                         variant="outline" 
                         onClick={() => {
                           setSelectedCanal(canal);
                           setIsConfigModalOpen(true);
                         }}
-                        className="flex-1 h-9 text-[11px] font-bold rounded-xl border-[var(--border-light-strong)]"
+                        className="flex-1 h-10 text-[11px] font-black uppercase tracking-wider rounded-xl border-[var(--border-light)] bg-white hover:bg-[var(--bg-input)] transition-all"
                       >
                         Configurar
                       </Button>
                       
                       <DropdownMenu>
-                        <DropdownMenuTrigger className="h-9 w-9 rounded-xl hover:bg-[var(--bg-input)] flex items-center justify-center transition-colors">
+                        <DropdownMenuTrigger className="h-10 w-10 rounded-xl bg-[var(--bg-input)]/50 hover:bg-[var(--bg-input)] flex items-center justify-center transition-colors border border-[var(--border-light)]">
                           <MoreVertical className="w-4 h-4 text-[var(--text-tertiary-light)]" />
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="rounded-xl min-w-[200px]">
+                        <DropdownMenuContent align="end" className="rounded-2xl min-w-[200px] p-2 bg-white border-slate-100 shadow-2xl">
                           <DropdownMenuItem 
                             onClick={() => handleDelete(canal.id)}
-                            className="text-red-600 font-bold"
+                            className="text-rose-600 font-black text-[11px] uppercase tracking-widest p-3 rounded-xl hover:bg-rose-50 cursor-pointer"
                           >
                             <Trash2 className="w-4 h-4 mr-2" />
-                            Eliminar definitivamente
+                            Eliminar Canal
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -399,53 +471,53 @@ export default function CanalesPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-5 mt-6">
+          <div className="space-y-6 mt-6">
             <div className="space-y-2">
-              <Label className="text-[10px] uppercase font-bold text-[var(--text-tertiary-light)]">Phone Number ID *</Label>
+              <Label className="text-[10px] uppercase font-black text-[var(--text-tertiary-light)] ml-1">Phone Number ID *</Label>
               <Input
                 placeholder="Ej: 123456789012345"
                 value={waPhoneNumberId}
                 onChange={(e) => setWaPhoneNumberId(e.target.value)}
-                className="h-11 rounded-xl"
+                className="h-12 rounded-2xl bg-slate-50 border-none px-4 text-sm font-semibold"
               />
-              <p className="text-[10px] text-[var(--text-tertiary-light)]">Encontralo en Meta for Developers → Tu App → WhatsApp → Configuración de la API</p>
+              <p className="text-[9px] text-[var(--text-tertiary-light)] px-1 font-medium">Encontralo en Meta for Developers → Tu App → WhatsApp → Configuración de la API</p>
             </div>
 
             <div className="space-y-2">
-              <Label className="text-[10px] uppercase font-bold text-[var(--text-tertiary-light)]">Access Token permanente *</Label>
+              <Label className="text-[10px] uppercase font-black text-[var(--text-tertiary-light)] ml-1">Access Token permanente *</Label>
               <Input
                 placeholder="EAAxxxxxx..."
                 value={waAccessToken}
                 onChange={(e) => setWaAccessToken(e.target.value)}
                 type="password"
-                className="h-11 rounded-xl"
+                className="h-12 rounded-2xl bg-slate-50 border-none px-4 text-sm font-semibold"
               />
-              <p className="text-[10px] text-[var(--text-tertiary-light)]">Generá un System User Token en Meta Business Suite → Configuración del negocio → Usuarios del sistema</p>
+              <p className="text-[9px] text-[var(--text-tertiary-light)] px-1 font-medium">Generá un System User Token en Meta Business Suite → Configuración del negocio</p>
             </div>
 
             <div className="space-y-2">
-              <Label className="text-[10px] uppercase font-bold text-[var(--text-tertiary-light)]">Nombre para mostrar (opcional)</Label>
+              <Label className="text-[10px] uppercase font-black text-[var(--text-tertiary-light)] ml-1">Nombre para mostrar (opcional)</Label>
               <Input
                 placeholder="Ej: Soporte WhatsApp"
                 value={waDisplayName}
                 onChange={(e) => setWaDisplayName(e.target.value)}
-                className="h-11 rounded-xl"
+                className="h-12 rounded-2xl bg-slate-50 border-none px-4 text-sm font-semibold"
               />
             </div>
 
-            <div className="p-4 rounded-2xl bg-amber-50 border border-amber-100 text-[11px] text-amber-800 space-y-1">
-              <p className="font-bold">Antes de conectar, asegurate que en Meta for Developers:</p>
-              <ol className="list-decimal list-inside space-y-0.5 text-amber-700">
-                <li>El Webhook URL esté configurado a: <code className="font-mono bg-amber-100 px-1 rounded">/api/webhooks/meta</code></li>
-                <li>El Verify Token sea: <code className="font-mono bg-amber-100 px-1 rounded">imala-vox-webhook-2026</code></li>
-                <li>El campo <code className="font-mono bg-amber-100 px-1 rounded">messages</code> esté suscripto en Webhooks</li>
+            <div className="p-5 rounded-[24px] bg-amber-50 border border-amber-100 space-y-2">
+              <p className="text-[11px] font-black text-amber-800 uppercase tracking-wider">Configuración en Meta:</p>
+              <ol className="list-decimal list-inside space-y-1 text-[11px] text-amber-700 font-medium">
+                <li>Webhook URL: <code className="font-mono bg-amber-100 px-1.5 py-0.5 rounded">/api/webhooks/meta</code></li>
+                <li>Verify Token: <code className="font-mono bg-amber-100 px-1.5 py-0.5 rounded">imala-vox-webhook-2026</code></li>
+                <li>Suscribirse al campo <code className="font-mono bg-amber-100 px-1.5 py-0.5 rounded font-black">messages</code></li>
               </ol>
             </div>
 
             <Button
               onClick={handleConnectWhatsApp}
               disabled={isConnectingWA || !waPhoneNumberId.trim() || !waAccessToken.trim()}
-              className="w-full h-12 rounded-2xl font-bold bg-[#25D366] hover:bg-[#22c55e] text-white"
+              className="w-full h-12 rounded-2xl font-black text-[11px] uppercase tracking-widest bg-[#25D366] hover:bg-[#22c55e] text-white shadow-xl shadow-[#25D366]/20 transition-all active:scale-95"
             >
               {isConnectingWA ? <Loader2 className="animate-spin w-5 h-5" /> : "Conectar WhatsApp"}
             </Button>
@@ -481,12 +553,12 @@ export default function CanalesPage() {
               </div>
 
               <div className="space-y-4">
-                <div className="grid gap-1">
-                  <Label className="text-[10px] uppercase font-bold text-[var(--text-tertiary-light)]">
+                <div className="grid gap-1.5">
+                  <Label className="text-[10px] uppercase font-black text-[var(--text-tertiary-light)] ml-1">
                     {selectedCanal.tipo === 'whatsapp' ? 'Phone Number ID' : 'Meta Page ID'}
                   </Label>
-                  <div className="flex items-center gap-3 bg-[var(--bg-input)] p-3 rounded-xl border border-[var(--border-light)]">
-                    <code className="text-xs font-mono flex-1 truncate">
+                  <div className="flex items-center gap-3 bg-slate-50 p-4 rounded-2xl border-none">
+                    <code className="text-[13px] font-mono flex-1 truncate font-bold text-[var(--text-primary-light)]">
                       {selectedCanal.tipo === 'whatsapp' ? selectedCanal.metaPhoneNumberId : selectedCanal.metaPageId}
                     </code>
                     <button onClick={() => { 
@@ -494,7 +566,7 @@ export default function CanalesPage() {
                       navigator.clipboard.writeText(val || ''); 
                       toast.success("Copiado"); 
                     }}>
-                      <Copy className="w-4 h-4 text-[var(--text-tertiary-light)] hover:text-[var(--accent)]" />
+                      <Copy className="w-4 h-4 text-[var(--text-tertiary-light)] hover:text-[var(--accent)] transition-colors" />
                     </button>
                   </div>
                 </div>
@@ -512,21 +584,21 @@ export default function CanalesPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-[10px] uppercase font-bold text-[var(--text-tertiary-light)]">Agente Asignado</Label>
+                  <Label className="text-[10px] uppercase font-black text-[var(--text-tertiary-light)] ml-1">Agente Asignado</Label>
                   <Select 
                     disabled={isSavingConfig || !selectedCanal.aiEnabled}
                     value={selectedCanal.agenteId || ""}
                     onValueChange={(val) => handleUpdateAIConfig(!!selectedCanal.aiEnabled, val)}
                   >
-                    <SelectTrigger className="h-10 rounded-xl">
+                    <SelectTrigger className="h-12 rounded-2xl bg-slate-50 border-none px-4 font-semibold">
                       <SelectValue placeholder="Seleccionar un agente..." />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="rounded-2xl border-slate-100 shadow-2xl bg-white">
                       {agentes.map(a => (
-                        <SelectItem key={a.id} value={a.id}>
-                          <div className="flex flex-col items-start py-0.5">
-                            <span className="font-bold text-xs">{a.nombre}</span>
-                            <span className="text-[9px] text-[var(--text-tertiary-light)]">{a.rolAgente}</span>
+                        <SelectItem key={a.id} value={a.id} className="rounded-xl py-2.5">
+                          <div className="flex flex-col items-start">
+                            <span className="font-bold text-[13px]">{a.nombre}</span>
+                            <span className="text-[10px] text-[var(--text-tertiary-light)] font-medium uppercase tracking-tight">{a.rolAgente}</span>
                           </div>
                         </SelectItem>
                       ))}
@@ -539,9 +611,9 @@ export default function CanalesPage() {
                     onClick={handleSyncWebhooks}
                     disabled={isSyncing}
                     variant="outline"
-                    className="w-full h-11 rounded-2xl font-bold border-[var(--accent)] text-[var(--accent)]"
+                    className="w-full h-12 rounded-2xl font-black text-[11px] uppercase tracking-widest border-[var(--accent)] text-[var(--accent)] hover:bg-[var(--accent)]/5 shadow-lg shadow-[var(--accent)]/5 transition-all"
                   >
-                    {isSyncing ? <Loader2 className="animate-spin" /> : (
+                    {isSyncing ? <Loader2 className="animate-spin w-5 h-5" /> : (
                       selectedCanal.tipo === 'whatsapp' ? "Verificar número de WhatsApp" : "Sincronizar Webhooks en Meta"
                     )}
                   </Button>
