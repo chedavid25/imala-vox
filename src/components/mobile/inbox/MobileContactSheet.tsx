@@ -28,8 +28,6 @@ export function MobileContactSheet({ open, onClose, contactoId }: MobileContactS
   const [editForm, setEditForm] = useState<Partial<Contacto>>({});
   const [isSaving, setIsSaving] = useState(false);
 
-  if (!contact) return null;
-
   // Cargar etiquetas para resolver nombres
   React.useEffect(() => {
     if (!currentWorkspaceId || !open) return;
