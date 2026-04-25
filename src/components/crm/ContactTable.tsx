@@ -172,7 +172,7 @@ export function ContactTable({ contactos, tags, categories }: ContactTableProps)
                     "bg-rose-500 ring-rose-500/20"
                   )} />
                   <div className="flex flex-col">
-                    <span className="text-[12px] font-black text-[var(--text-primary-light)] tabular-nums leading-none mb-1">{health.days} días</span>
+                    <span className="text-[12px] font-bold text-[var(--text-primary-light)] tabular-nums leading-none mb-1">{health.days} días</span>
                     <span className="text-[9px] text-[var(--text-tertiary-light)] font-bold uppercase tracking-tight">Sin contacto</span>
                   </div>
                 </div>

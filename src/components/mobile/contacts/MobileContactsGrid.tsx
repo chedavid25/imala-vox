@@ -83,7 +83,7 @@ function ContactCard({ contact, tags, categories, onClick }: {
     >
       {/* Indicador de Salud Relacional (Esquina) */}
       <div className={cn(
-        "absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-tighter",
+        "absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-full text-[9px] font-bold uppercase tracking-tighter",
         health.status === 'verde' ? "bg-emerald-50 text-emerald-600" :
         health.status === 'amarillo' ? "bg-amber-50 text-amber-600 animate-pulse" :
         health.status === 'rojo' ? "bg-rose-50 text-rose-600" : "bg-slate-50 text-slate-400"

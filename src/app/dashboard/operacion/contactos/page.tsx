@@ -20,13 +20,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -54,7 +47,8 @@ export default function ContactosPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   
-  const [isAdding, setIsAdding] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Estado del formulario de nuevo contacto
   const [newContact, setNewContact] = useState({
@@ -62,7 +56,6 @@ export default function ContactosPage() {
     telefono: "",
     email: "",
     fechaNacimiento: "",
-    relacionTag: "Lead" as "Personal" | "Laboral" | "Lead",
     etiquetas: [] as string[],
   });
 
@@ -117,7 +110,7 @@ export default function ContactosPage() {
       toast.error("Nombre y teléfono son obligatorios");
       return;
     }
-    setIsAdding(true);
+    setIsSaving(true);
     try {
       const contactsRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS);
       await addDoc(contactsRef, {
@@ -127,11 +120,12 @@ export default function ContactosPage() {
         creadoEl: Timestamp.now()
       });
       toast.success("Contacto registrado con éxito");
-      setNewContact({ nombre: "", telefono: "", email: "", fechaNacimiento: "", relacionTag: "Lead", etiquetas: [] });
-      setIsAdding(false);
+      setNewContact({ nombre: "", telefono: "", email: "", fechaNacimiento: "", etiquetas: [] });
+      setIsDialogOpen(false);
+      setIsSaving(false);
     } catch (error) {
       toast.error("Error al registrar contacto");
-      setIsAdding(false);
+      setIsSaving(false);
     }
   };
 
@@ -169,8 +163,8 @@ export default function ContactosPage() {
         <div className="flex items-center gap-3">
           <CSVImporter onImport={handleBulkImport} />
           
-          <Dialog open={isAdding} onOpenChange={setIsAdding}>
-            <DialogTrigger render={<Button className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-11 px-6 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-[var(--accent)]/20 transition-all hover:scale-[1.02] active:scale-95" />}>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger render={<Button className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-11 px-6 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-[var(--accent)]/20 transition-all hover:scale-[1.02] active:scale-95" onClick={() => setIsDialogOpen(true)} />}>
               <Plus className="w-4 h-4 mr-2" /> Nuevo Contacto
             </DialogTrigger>
             <DialogContent className="max-w-md bg-white rounded-3xl border-none shadow-2xl overflow-y-auto max-h-[90vh] no-scrollbar">
@@ -227,22 +221,6 @@ export default function ContactosPage() {
                     </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label className="text-[10px] font-black uppercase text-slate-400 ml-1">Perfil de Relación</Label>
-                  <Select 
-                    value={newContact.relacionTag} 
-                    onValueChange={(v:any) => setNewContact({...newContact, relacionTag: v})}
-                  >
-                    <SelectTrigger className="h-11 rounded-2xl bg-slate-50 border-none px-4">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-2xl border-slate-100 shadow-xl bg-white">
-                      <SelectItem value="Lead">Lead 🔥</SelectItem>
-                      <SelectItem value="Laboral">Laboral 👔</SelectItem>
-                      <SelectItem value="Personal">Personal ⭐</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
 
                 <div className="space-y-3">
                   <Label className="text-[10px] font-black uppercase text-slate-400 ml-1">Segmentación (Etiquetas)</Label>
@@ -301,9 +279,9 @@ export default function ContactosPage() {
               </div>
 
               <DialogFooter>
-                <Button variant="ghost" onClick={() => setIsAdding(false)} className="rounded-xl h-12 font-bold text-slate-500">Cancelar</Button>
-                <Button onClick={handleAddContact} disabled={isAdding} className="bg-[var(--accent)] text-[var(--accent-text)] rounded-2xl px-8 h-12 font-black shadow-xl shadow-[var(--accent)]/30">
-                  {isAdding ? <Loader2 className="size-4 animate-spin" /> : "Guardar Registro"}
+                <Button variant="ghost" onClick={() => setIsDialogOpen(false)} className="rounded-xl h-12 font-bold text-slate-500">Cancelar</Button>
+                <Button onClick={handleAddContact} disabled={isSaving} className="bg-[var(--accent)] text-[var(--accent-text)] rounded-2xl px-8 h-12 font-black shadow-xl shadow-[var(--accent)]/30">
+                  {isSaving ? <Loader2 className="size-4 animate-spin" /> : "Guardar Registro"}
                 </Button>
               </DialogFooter>
             </DialogContent>

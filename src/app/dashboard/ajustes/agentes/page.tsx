@@ -13,7 +13,10 @@ import {
   Activity,
   UserCircle2,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  HelpCircle,
+  ChevronDown,
+  Lightbulb
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -39,10 +42,22 @@ export default function AgentesPage() {
   const [isAdding, setIsAdding] = useState(false);
   const router = useRouter();
 
+  const [showHelp, setShowHelp] = useState(false);
   const [newAgente, setNewAgente] = useState({
     nombre: "",
     rolAgente: "Asistente Virtual"
   });
+
+  const ayudaAgentes = {
+    titulo: "¿Cómo funcionan los Agentes IA?",
+    descripcion: "Los agentes son empleados virtuales especializados. Podés crear uno para ventas, otro para soporte, y cada uno tendrá su propia personalidad, base de conocimiento y canales asignados.",
+    recomendacion: "Para mejores resultados, definí un 'Objetivo' claro y específico en sus instrucciones. Un agente enfocado en una sola tarea es mucho más efectivo que uno que intenta hacerlo todo.",
+    items: [
+      { titulo: "Personalidad", detalle: "Definí cómo habla el agente (formal, amigable) y qué límites tiene para que nunca improvise fuera de su rol." },
+      { titulo: "Instrucciones", detalle: "Son el corazón del agente. Aquí le decís exactamente qué pasos seguir ante cada consulta del cliente." },
+      { titulo: "Conexión Cerebral", detalle: "Elegí qué partes de tu Base de Conocimiento activa cada agente para que solo maneje información relevante." },
+    ]
+  };
 
   useEffect(() => {
     if (!currentWorkspaceId) return;
@@ -97,19 +112,39 @@ export default function AgentesPage() {
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
-      <div className="flex justify-between items-center">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-2xl font-bold text-[var(--text-primary-light)]">Agentes IA</h1>
-          <p className="text-sm text-[var(--text-tertiary-light)]">Gestiona las personalidades y cerebros de tu workspace.</p>
+          <div className="flex items-center gap-2 mb-1">
+            <Bot className="w-4 h-4 text-[var(--text-tertiary-light)]" />
+            <span className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest">Ajustes del Sistema</span>
+          </div>
+          <h1 className="text-2xl font-bold text-[var(--text-primary-light)] tracking-tight">Agentes IA</h1>
+          <p className="text-sm text-[var(--text-tertiary-light)] font-medium">Gestiona las personalidades y cerebros de tu workspace.</p>
         </div>
 
-        <Dialog>
-          <DialogTrigger render={
-            <Button className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] shadow-sm font-semibold rounded-[var(--radius-md)]">
-              <Plus className="w-4 h-4 mr-2" />
-              Nuevo Agente
-            </Button>
-          } />
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowHelp(v => !v)}
+            className={cn(
+              "flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-bold transition-all shrink-0 h-11",
+              showHelp
+                ? "bg-[var(--bg-sidebar)] border-[var(--border-dark)] text-[var(--accent)]"
+                : "bg-white border-[var(--border-light)] text-[var(--text-secondary-light)] hover:bg-[var(--bg-input)] hover:text-[var(--text-primary-light)]"
+            )}
+          >
+            <HelpCircle className="w-4 h-4" />
+            ¿Cómo funcionan?
+            <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", showHelp && "rotate-180")} />
+          </button>
+
+          <Dialog>
+            <DialogTrigger render={
+              <Button className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-11 px-6 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-[var(--accent)]/20 transition-all hover:scale-[1.02] active:scale-95">
+                <Plus className="w-4 h-4 mr-2" />
+                Nuevo Agente
+              </Button>
+            } />
           <DialogContent className="bg-[var(--bg-card)] border-[var(--border-light)]">
             <DialogHeader>
               <DialogTitle>Crear Nuevo Agente</DialogTitle>
@@ -153,6 +188,45 @@ export default function AgentesPage() {
         </Dialog>
       </div>
 
+      {/* Panel de ayuda expandible */}
+      {showHelp && (
+        <div className="bg-white border border-[var(--border-light)] rounded-[32px] overflow-hidden shadow-sm animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="px-8 pt-8 pb-6 border-b border-[var(--border-light)]">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-2xl bg-[var(--bg-sidebar)] border border-[var(--border-dark)] flex items-center justify-center shrink-0 shadow-sm">
+                <Lightbulb className="w-5 h-5 text-[var(--accent)]" />
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="text-sm font-bold text-[var(--text-primary-light)]">{ayudaAgentes.titulo}</h3>
+                <p className="text-sm text-[var(--text-secondary-light)] leading-relaxed">{ayudaAgentes.descripcion}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-8 py-6 space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {ayudaAgentes.items.map((item, i) => (
+                <div key={i} className="bg-[var(--bg-input)]/30 border border-[var(--border-light)] rounded-2xl p-4 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent-active)] shrink-0" />
+                    <span className="text-[12px] font-bold text-[var(--text-primary-light)] uppercase tracking-tight">{item.titulo}</span>
+                  </div>
+                  <p className="text-[12px] text-[var(--text-tertiary-light)] leading-relaxed pl-3.5 font-medium">{item.detalle}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 flex items-start gap-3">
+              <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <p className="text-[12px] font-black text-amber-800 uppercase tracking-widest">Recomendación Pro</p>
+                <p className="text-[12px] text-amber-700 leading-relaxed font-medium">{ayudaAgentes.recomendacion}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="h-64 flex flex-col items-center justify-center gap-4 text-[var(--text-tertiary-light)]">
           <Loader2 className="w-8 h-8 animate-spin text-[var(--accent)]" />
@@ -179,11 +253,11 @@ export default function AgentesPage() {
             <div 
               key={agente.id}
               onClick={() => router.push(`/dashboard/ajustes/agentes/${agente.id}/instrucciones`)}
-              className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-2xl p-6 hover:shadow-xl hover:shadow-[var(--accent)]/5 transition-all cursor-pointer group"
+              className="bg-white border border-[var(--border-light)] rounded-[28px] p-7 hover:shadow-2xl hover:shadow-[var(--accent)]/10 transition-all cursor-pointer group active:scale-[0.98] relative"
             >
               <div className="flex justify-between items-start mb-6">
-                <div className="w-12 h-12 rounded-xl bg-[var(--bg-sidebar)] flex items-center justify-center border border-[var(--accent)]/20 group-hover:border-[var(--accent)]/50 transition-colors shadow-sm">
-                  <Bot className="w-6 h-6 text-[var(--accent)]" />
+                <div className="w-14 h-14 rounded-2xl bg-[var(--bg-input)] flex items-center justify-center border border-[var(--border-light)] group-hover:border-[var(--accent)]/40 transition-colors shadow-sm">
+                  <Bot className="w-7 h-7 text-[var(--text-tertiary-light)] group-hover:text-[var(--accent)] transition-colors" />
                 </div>
                 <div className={cn(
                   "px-3 py-1.5 rounded-full text-[10px] font-bold uppercase flex items-center gap-2 shadow-xl border transition-all duration-300",
@@ -196,26 +270,26 @@ export default function AgentesPage() {
                 </div>
               </div>
               
-              <div className="space-y-1 mb-6">
-                <h3 className="text-lg font-bold text-[var(--text-primary-light)] group-hover:text-[var(--accent-active)] transition-colors">
+              <div className="space-y-1.5 mb-6">
+                <h3 className="text-lg font-bold text-[var(--text-primary-light)] group-hover:text-[var(--accent-active)] transition-colors tracking-tight">
                   {agente.nombre}
                 </h3>
-                <p className="text-xs text-[var(--text-secondary-light)] font-medium line-clamp-1">
+                <p className="text-[11px] text-[var(--text-tertiary-light)] font-bold uppercase tracking-widest line-clamp-1 opacity-70">
                   {agente.rolAgente}
                 </p>
               </div>
 
-              <div className="flex items-center justify-between pt-5 border-t border-[var(--border-light)]/60">
+              <div className="flex items-center justify-between pt-6 border-t border-[var(--border-light)]/50">
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-[var(--accent)]" />
-                  <span className="text-[10px] font-bold text-[var(--text-tertiary-light)] uppercase tracking-wider">Base lista</span>
+                  <div className={cn("size-2 rounded-full", agente.activo ? "bg-[var(--accent)]" : "bg-slate-300")} />
+                  <span className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest">IA Configurada</span>
                 </div>
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  className="border border-[var(--border-light-strong)] bg-transparent text-[var(--text-primary-light)] hover:bg-[var(--bg-input)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)] transition-all font-semibold rounded-[var(--radius-md)] h-8 px-4 text-[12px] translate-y-1"
+                  className="bg-[var(--bg-input)] text-[var(--text-primary-light)] hover:bg-[var(--accent)] hover:text-[var(--accent-text)] transition-all font-bold rounded-xl h-9 px-5 text-[11px] uppercase tracking-wider shadow-sm"
                 >
-                  Configurar
+                  Entrar
                 </Button>
               </div>
             </div>
