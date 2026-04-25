@@ -54,6 +54,7 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
   const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const emojiButtonRef = useRef<HTMLButtonElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const selectedContact = contactos.find(c => c.id === conversacion?.contactoId);
@@ -206,7 +207,10 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target as Node)) {
+      if (
+        emojiPickerRef.current && !emojiPickerRef.current.contains(e.target as Node) &&
+        emojiButtonRef.current && !emojiButtonRef.current.contains(e.target as Node)
+      ) {
         setShowEmojiPicker(false);
       }
     };
@@ -620,6 +624,36 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
           </button>
         </div>
 
+        {/* Emoji Picker — fuera del overflow-hidden para no cortarse */}
+        {showEmojiPicker && (
+          <div ref={emojiPickerRef} className="w-[280px] bg-white border border-[var(--border-light)] rounded-2xl shadow-2xl p-3 z-50 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest">Emojis</span>
+              <button onClick={() => setShowEmojiPicker(false)} className="p-0.5 hover:bg-[var(--bg-input)] rounded text-[var(--text-tertiary-light)]">
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="grid grid-cols-8 gap-0.5 max-h-[200px] overflow-y-auto no-scrollbar">
+              {[
+                "😀","😃","😄","😁","😆","😅","🤣","😂","🙂","🙃","😉","😊","😇","🥰","😍","🤩",
+                "😘","😗","😚","😙","🥲","😋","😛","😜","🤪","😝","🤑","🤗","🤭","🤫","🤔","😐",
+                "😑","😶","😏","😒","🙄","😬","🤥","😌","😔","😪","🤤","😴","😷","🤒","🤕","🤢",
+                "👍","👎","👌","✌️","🤞","🤟","🤘","🤙","👋","🙌","👏","🤝","🙏","💪","🫶","❤️",
+                "🧡","💛","💚","💙","💜","🖤","🤍","💔","💕","💞","💓","💗","💖","💘","💝","🔥",
+                "⭐","✨","💥","🎉","🎊","🎈","🎁","🏆","🥇","👑","💎","🚀","💯","✅","❌","⚡",
+              ].map((emoji, i) => (
+                <button
+                  key={i}
+                  onClick={() => handleEmojiClick(emoji)}
+                  className="w-8 h-8 flex items-center justify-center text-[18px] hover:bg-[var(--bg-input)] rounded-lg transition-colors leading-none"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Input Box */}
         {mode === 'public' && isWindowExpired ? (
           /* Selector de Plantillas (ventana 24hs cerrada) */
@@ -760,49 +794,19 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
                 </button>
 
                 {/* Selector de emojis */}
-                <div className="relative" ref={emojiPickerRef}>
-                  <button
-                    onClick={() => setShowEmojiPicker(v => !v)}
-                    className={cn(
-                      "p-2 rounded-lg transition-colors",
-                      showEmojiPicker
-                        ? "bg-[var(--accent)]/10 text-[var(--accent)]"
-                        : "hover:bg-[var(--bg-input)] text-[var(--text-tertiary-light)] hover:text-[var(--accent)]"
-                    )}
-                    title="Emojis"
-                  >
-                    <Smile className="w-4 h-4" />
-                  </button>
-
-                  {showEmojiPicker && (
-                    <div className="absolute bottom-full left-0 mb-2 w-[280px] bg-white border border-[var(--border-light)] rounded-2xl shadow-2xl p-3 z-50 animate-in fade-in zoom-in-95 slide-in-from-bottom-2">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest">Emojis</span>
-                        <button onClick={() => setShowEmojiPicker(false)} className="p-0.5 hover:bg-[var(--bg-input)] rounded text-[var(--text-tertiary-light)]">
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-8 gap-0.5 max-h-[200px] overflow-y-auto no-scrollbar">
-                        {[
-                          "😀","😃","😄","😁","😆","😅","🤣","😂","🙂","🙃","😉","😊","😇","🥰","😍","🤩",
-                          "😘","😗","😚","😙","🥲","😋","😛","😜","🤪","😝","🤑","🤗","🤭","🤫","🤔","😐",
-                          "😑","😶","😏","😒","🙄","😬","🤥","😌","😔","😪","🤤","😴","😷","🤒","🤕","🤢",
-                          "👍","👎","👌","✌️","🤞","🤟","🤘","🤙","👋","🙌","👏","🤝","🙏","💪","🫶","❤️",
-                          "🧡","💛","💚","💙","💜","🖤","🤍","💔","💕","💞","💓","💗","💖","💘","💝","🔥",
-                          "⭐","✨","💥","🎉","🎊","🎈","🎁","🏆","🥇","👑","💎","🚀","💯","✅","❌","⚡",
-                        ].map((emoji, i) => (
-                          <button
-                            key={i}
-                            onClick={() => handleEmojiClick(emoji)}
-                            className="w-8 h-8 flex items-center justify-center text-[18px] hover:bg-[var(--bg-input)] rounded-lg transition-colors leading-none"
-                          >
-                            {emoji}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                <button
+                  ref={emojiButtonRef}
+                  onClick={() => setShowEmojiPicker(v => !v)}
+                  className={cn(
+                    "p-2 rounded-lg transition-colors",
+                    showEmojiPicker
+                      ? "bg-[var(--accent)]/10 text-[var(--accent)]"
+                      : "hover:bg-[var(--bg-input)] text-[var(--text-tertiary-light)] hover:text-[var(--accent)]"
                   )}
-                </div>
+                  title="Emojis"
+                >
+                  <Smile className="w-4 h-4" />
+                </button>
                 <div className="w-[1px] h-4 bg-[var(--border-light)] mx-1" />
                 <Button
                   variant="ghost"

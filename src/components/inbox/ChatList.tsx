@@ -76,20 +76,18 @@ export function ChatList({ conversaciones, selectedId, onSelect }: ChatListProps
           <h2 className="text-[17px] font-bold text-[var(--text-primary-light)] tracking-tight">Buzón</h2>
           <DropdownMenu>
             <DropdownMenuTrigger
-              render={
-                <button className={cn(
-                  "p-1.5 rounded-md transition-colors relative",
-                  hasActiveFilters
-                    ? "bg-[var(--accent)]/10 text-[var(--accent)]"
-                    : "hover:bg-[var(--bg-input)] text-[var(--text-tertiary-light)]"
-                )}>
-                  <Filter className="w-4 h-4" />
-                  {hasActiveFilters && (
-                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-[var(--accent)] rounded-full" />
-                  )}
-                </button>
-              }
-            />
+              className={cn(
+                "p-1.5 rounded-md transition-colors relative outline-none",
+                hasActiveFilters
+                  ? "bg-[var(--accent)]/10 text-[var(--accent)]"
+                  : "hover:bg-[var(--bg-input)] text-[var(--text-tertiary-light)]"
+              )}
+            >
+              <Filter className="w-4 h-4" />
+              {hasActiveFilters && (
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-[var(--accent)] rounded-full" />
+              )}
+            </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52 p-1.5 rounded-2xl border border-[var(--border-light)] bg-white shadow-xl">
               <DropdownMenuLabel className="text-[9px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest px-2 py-1.5">
                 Canal
