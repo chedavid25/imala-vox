@@ -157,12 +157,12 @@ export default function WebsGlobalPage() {
         <h3 className="text-sm font-bold text-[var(--text-primary-light)]">Indexar Sitios Web</h3>
         
         <Dialog onOpenChange={(open) => !open && setStep(1)}>
-          <DialogTrigger render={
+          <DialogTrigger asChild>
             <Button className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)]">
               <Plus className="w-4 h-4 mr-2" />
               Nuevo Sitio
             </Button>
-          } />
+          </DialogTrigger>
           <DialogContent className="bg-[var(--bg-card)] border-[var(--border-light)] max-w-lg">
             <DialogHeader>
               <DialogTitle>Indexar Sitio Web (Paso {step}/4)</DialogTitle>
@@ -257,12 +257,12 @@ export default function WebsGlobalPage() {
                   </div>
                   <div className="flex gap-2 pt-6">
                     <Button variant="outline" onClick={() => setStep(3)} className="flex-1">Atrás</Button>
-                    <DialogClose render={
+                    <DialogClose asChild>
                       <Button onClick={handleCreate} disabled={isAdding} className="flex-1 bg-[var(--accent)] text-[var(--accent-text)]">
                         {isAdding && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
                         Indexar Ahora
                       </Button>
-                    } />
+                    </DialogClose>
                   </div>
                 </div>
               )}

@@ -12,7 +12,6 @@ import {
   Settings, 
   Activity,
   UserCircle2,
-  Loader2,
   AlertCircle,
   HelpCircle,
   ChevronDown,
@@ -139,12 +138,12 @@ export default function AgentesPage() {
           </button>
 
           <Dialog>
-            <DialogTrigger render={
+            <DialogTrigger asChild>
               <Button className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-11 px-6 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-[var(--accent)]/20 transition-all hover:scale-[1.02] active:scale-95">
                 <Plus className="w-4 h-4 mr-2" />
                 Nuevo Agente
               </Button>
-            } />
+            </DialogTrigger>
           <DialogContent className="bg-[var(--bg-card)] border-[var(--border-light)]">
             <DialogHeader>
               <DialogTitle>Crear Nuevo Agente</DialogTitle>
@@ -173,7 +172,7 @@ export default function AgentesPage() {
               </div>
             </div>
             <DialogFooter>
-              <DialogClose render={
+              <DialogClose asChild>
                 <Button 
                   onClick={handleCrearAgente} 
                   disabled={isAdding || !newAgente.nombre}
@@ -182,7 +181,7 @@ export default function AgentesPage() {
                   {isAdding && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
                   Crear Agente
                 </Button>
-              } />
+              </DialogClose>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -298,5 +297,19 @@ export default function AgentesPage() {
         </div>
       )}
     </div>
+  );
+}
+
+function Loader2({ className }: { className?: string }) {
+  return (
+    <svg 
+      className={cn("animate-spin", className)} 
+      xmlns="http://www.w3.org/2000/svg" 
+      fill="none" 
+      viewBox="0 0 24 24"
+    >
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
   );
 }

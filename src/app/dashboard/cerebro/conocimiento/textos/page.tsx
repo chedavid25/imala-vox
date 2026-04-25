@@ -120,12 +120,12 @@ export default function TextosGlobalPage() {
         <h3 className="text-sm font-bold text-[var(--text-primary-light)]">Gestionar Textos Estáticos</h3>
         
         <Dialog>
-          <DialogTrigger render={
+          <DialogTrigger asChild>
             <Button className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)]">
               <Plus className="w-4 h-4 mr-2" />
               Nuevo Texto
             </Button>
-          } />
+          </DialogTrigger>
           <DialogContent className="bg-[var(--bg-card)] border-[var(--border-light)] max-w-2xl">
             <DialogHeader>
               <DialogTitle>Crear Bloque de Texto</DialogTitle>
@@ -173,12 +173,12 @@ export default function TextosGlobalPage() {
               </div>
             </div>
             <DialogFooter>
-              <DialogClose render={
+              <DialogClose asChild>
                 <Button onClick={handleCreate} disabled={isAdding || !newTexto.titulo} className="bg-[var(--accent)] text-[var(--accent-text)]">
                   {isAdding && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
                   Guardar Texto
                 </Button>
-              } />
+              </DialogClose>
             </DialogFooter>
           </DialogContent>
         </Dialog>

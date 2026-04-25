@@ -794,8 +794,10 @@ export default function LeadsPage() {
             </div>
 
             <DialogFooter className="pt-4">
-              <DialogClose render={<Button type="button" variant="ghost" className="rounded-xl" />}>
-                Cancelar
+              <DialogClose asChild>
+                <Button type="button" variant="ghost" className="rounded-xl">
+                  Cancelar
+                </Button>
               </DialogClose>
               <Button 
                 type="submit" 
@@ -843,8 +845,10 @@ export default function LeadsPage() {
             </div>
 
             <DialogFooter className="pt-4">
-              <DialogClose render={<Button type="button" variant="ghost" className="rounded-xl" />}>
-                Cancelar
+              <DialogClose asChild>
+                <Button type="button" variant="ghost" className="rounded-xl">
+                  Cancelar
+                </Button>
               </DialogClose>
               <Button 
                 type="submit" 
@@ -962,8 +966,10 @@ export default function LeadsPage() {
             </div>
 
             <DialogFooter className="pt-4">
-              <DialogClose render={<Button type="button" variant="ghost" className="h-9 px-4 text-xs font-bold text-[var(--text-secondary-light)] hover:bg-[var(--bg-input)] hover:text-[var(--text-primary-light)] rounded-xl transition-colors" />}>
-                Cancelar
+              <DialogClose asChild>
+                <Button type="button" variant="ghost" className="h-9 px-4 text-xs font-bold text-[var(--text-secondary-light)] hover:bg-[var(--bg-input)] hover:text-[var(--text-primary-light)] rounded-xl transition-colors">
+                  Cancelar
+                </Button>
               </DialogClose>
               <Button 
                 type="submit" 
@@ -1030,11 +1036,11 @@ function KanbanColumn({ etapa, leads, onSelected, onEdit, onDelete }: { etapa: E
         </div>
         
         <DropdownMenu>
-          <DropdownMenuTrigger render={
+          <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg">
               <MoreVertical className="w-3.5 h-3.5 text-[var(--text-tertiary-light)]" />
             </Button>
-          } />
+          </DropdownMenuTrigger>
           <DropdownMenuContent>
             <DropdownMenuItem onClick={() => onEdit(etapa)}>
               Editar Etapa
@@ -1454,5 +1460,19 @@ function TemperatureDot({ temperature }: { temperature: string }) {
       <div className={cn("w-2 h-2 rounded-full shadow-lg", colors[temperature])} />
       <span className="text-[10px] font-bold text-[var(--text-tertiary-light)] uppercase tracking-tight">{temperature}</span>
     </div>
+  );
+}
+
+function Loader2({ className }: { className?: string }) {
+  return (
+    <svg 
+      className={cn("animate-spin", className)} 
+      xmlns="http://www.w3.org/2000/svg" 
+      fill="none" 
+      viewBox="0 0 24 24"
+    >
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
   );
 }
