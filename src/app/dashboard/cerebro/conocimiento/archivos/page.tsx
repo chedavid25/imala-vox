@@ -132,7 +132,7 @@ export default function ArchivosGlobalPage() {
         />
         <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent)]/0 to-[var(--accent)]/[0.02] group-hover:to-[var(--accent)]/[0.05] transition-all" />
         <div className="relative flex flex-col items-center justify-center space-y-4 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-[var(--bg-input)] flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+          <div className="w-16 h-16 rounded-2xl bg-[var(--bg-sidebar)] border border-[var(--border-dark)] flex items-center justify-center group-hover:scale-110 transition-transform duration-500 shadow-sm">
             <UploadCloud className="w-8 h-8 text-[var(--accent)]" />
           </div>
           <div className="space-y-1">
@@ -149,7 +149,7 @@ export default function ArchivosGlobalPage() {
 
       <div className="flex justify-between items-center pt-4">
         <h3 className="text-sm font-bold text-[var(--text-primary-light)] flex items-center gap-2">
-          <HardDrive className="w-4 h-4 text-[var(--accent)]" />
+          <HardDrive className="w-4 h-4 text-[var(--text-secondary-light)]" />
           Archivos del Workspace
         </h3>
         <p className="text-xs text-[var(--text-tertiary-light)] font-medium">
@@ -159,7 +159,7 @@ export default function ArchivosGlobalPage() {
 
       {loading ? (
         <div className="h-48 flex items-center justify-center">
-          <Loader2 className="w-6 h-6 animate-spin text-[var(--accent)]" />
+          <Loader2 className="w-6 h-6 animate-spin text-[var(--text-tertiary-light)]" />
         </div>
       ) : archivos.length === 0 ? (
         <div className="p-12 text-center border border-[var(--border-light)] rounded-3xl bg-[var(--bg-card)]/50">
@@ -207,7 +207,7 @@ export default function ArchivosGlobalPage() {
               </div>
 
               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button variant="ghost" size="icon" className="w-8 h-8 rounded-full text-[var(--text-tertiary-light)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/5">
+                <Button variant="ghost" size="icon" className="w-8 h-8 rounded-full text-[var(--text-tertiary-light)] hover:text-[var(--text-primary-light)] hover:bg-[var(--bg-input)]">
                   <Download className="w-4 h-4" />
                 </Button>
                 <Button 

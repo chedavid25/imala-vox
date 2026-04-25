@@ -275,7 +275,7 @@ export default function WebsGlobalPage() {
           <DialogContent className="bg-[var(--bg-card)] border-[var(--border-light)] max-w-4xl max-h-[80vh] flex flex-col">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Globe className="w-5 h-5 text-[var(--accent)]" />
+                <Globe className="w-5 h-5 text-[var(--text-secondary-light)]" />
                 Contenido Extraído: {viewingWeb?.titulo}
               </DialogTitle>
             </DialogHeader>
@@ -300,7 +300,7 @@ export default function WebsGlobalPage() {
 
       {loading ? (
         <div className="h-48 flex items-center justify-center">
-          <Loader2 className="w-6 h-6 animate-spin text-[var(--accent)]" />
+          <Loader2 className="w-6 h-6 animate-spin text-[var(--text-tertiary-light)]" />
         </div>
       ) : webs.length === 0 ? (
         <div className="p-12 text-center border border-[var(--border-light)] rounded-3xl bg-[var(--bg-card)]/50">
@@ -314,22 +314,22 @@ export default function WebsGlobalPage() {
               className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-2xl p-5 hover:border-[var(--border-light-strong)] transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
             >
               <div className="flex items-start gap-4 min-w-0">
-                <div className="w-12 h-12 rounded-xl bg-[var(--bg-input)] flex items-center justify-center shrink-0 border border-[var(--border-light)]">
+                <div className="w-12 h-12 rounded-xl bg-[var(--bg-sidebar)] flex items-center justify-center shrink-0 border border-[var(--border-dark)] shadow-sm">
                   <Globe className="w-6 h-6 text-[var(--accent)]" />
                 </div>
                 <div className="min-w-0 space-y-1">
                   <div className="flex items-center gap-2">
                     <h4 className="text-sm font-bold text-[var(--text-primary-light)] truncate max-w-[300px]">{w.webUrl}</h4>
-                    <a href={w.webUrl ?? '#'} target="_blank" rel="noopener noreferrer" className="text-[var(--text-tertiary-light)] hover:text-[var(--accent)] transition-colors">
+                    <a href={w.webUrl ?? '#'} target="_blank" rel="noopener noreferrer" className="text-[var(--text-tertiary-light)] hover:text-[var(--text-primary-light)] transition-colors">
                       <ExternalLink className="w-3 h-3" />
                     </a>
                   </div>
                   <div className="flex flex-wrap items-center gap-3 text-[11px] font-medium text-[var(--text-tertiary-light)]">
                     <span className="flex items-center gap-1">
                       {w.estado === 'activo' ? (
-                        <CheckCircle2 className="w-3 h-3 text-[var(--success)]" />
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                       ) : w.estado === 'procesando' ? (
-                        <Loader2 className="w-3 h-3 animate-spin text-[var(--accent)]" />
+                        <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
                       ) : (
                         <AlertCircle className="w-3 h-3 text-[var(--error)]" />
                       )}
@@ -352,7 +352,7 @@ export default function WebsGlobalPage() {
                   size="sm" 
                   onClick={() => handleRefresh(w.id, w.webUrl!)}
                   disabled={w.estado === 'procesando'}
-                  className="text-xs h-8 text-[var(--text-tertiary-light)] hover:text-[var(--accent)]"
+                  className="text-xs h-8 text-[var(--text-tertiary-light)] hover:text-[var(--text-primary-light)] hover:bg-[var(--bg-input)]"
                 >
                   {w.estado === 'procesando' && <Loader2 className="w-3 h-3 animate-spin mr-1" />}
                   Actualizar
@@ -362,7 +362,7 @@ export default function WebsGlobalPage() {
                   variant="ghost" 
                   size="icon" 
                   onClick={() => setViewingWeb(w)}
-                  className="w-8 h-8 rounded-full text-[var(--text-tertiary-light)] hover:text-[var(--accent)]"
+                  className="w-8 h-8 rounded-full text-[var(--text-tertiary-light)] hover:text-[var(--text-primary-light)] hover:bg-[var(--bg-input)]"
                 >
                   <Eye className="w-4 h-4" />
                 </Button>

@@ -138,7 +138,7 @@ export default function TextosGlobalPage() {
                     <button 
                       key={s}
                       onClick={() => setNewTexto({...newTexto, titulo: s})}
-                      className="px-3 py-1 bg-[var(--bg-input)] hover:bg-[var(--accent)]/10 text-[11px] font-bold text-[var(--text-tertiary-light)] hover:text-[var(--accent)] rounded-full transition-all border border-[var(--border-light)]"
+                      className="px-3 py-1 bg-[var(--bg-input)] hover:bg-[var(--bg-sidebar)] text-[11px] font-bold text-[var(--text-secondary-light)] hover:text-[var(--accent)] rounded-full transition-all border border-[var(--border-light)] hover:border-[var(--border-dark)]"
                     >
                       {s}
                     </button>
@@ -186,7 +186,7 @@ export default function TextosGlobalPage() {
 
       {loading ? (
         <div className="h-48 flex items-center justify-center">
-          <Loader2 className="w-6 h-6 animate-spin text-[var(--accent)]" />
+          <Loader2 className="w-6 h-6 animate-spin text-[var(--text-tertiary-light)]" />
         </div>
       ) : textos.length === 0 ? (
         <div className="p-12 text-center border border-[var(--border-light)] rounded-3xl bg-[var(--bg-card)]/50">
@@ -202,7 +202,7 @@ export default function TextosGlobalPage() {
               <div className="space-y-3">
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-2">
-                    <Heading className="w-4 h-4 text-[var(--accent)]" />
+                    <Heading className="w-4 h-4 text-[var(--text-secondary-light)]" />
                     <h4 className="text-sm font-bold text-[var(--text-primary-light)] truncate max-w-[150px]">{t.titulo}</h4>
                   </div>
                   <Badge variant="outline" className="text-[9px] border-[var(--border-light)]">
