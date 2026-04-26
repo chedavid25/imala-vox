@@ -12,7 +12,9 @@
       "Bash(xargs grep *)",
       "WebSearch",
       "Bash(npx tsc *)",
-      "Bash(node -e \"try { require\\('react-icons/fa'\\); console.log\\('react-icons OK'\\); } catch\\(e\\) { console.log\\('not found'\\); }\")"
+      "Bash(node -e \"try { require\\('react-icons/fa'\\); console.log\\('react-icons OK'\\); } catch\\(e\\) { console.log\\('not found'\\); }\")",
+      "WebFetch(domain:atendium.com)",
+      "WebFetch(domain:respond.io)"
     ]
   }
 }

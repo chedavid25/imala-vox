@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { 
-  CreditCard, 
-  Check, 
-  ChevronRight, 
-  AlertCircle, 
-  Calendar, 
+import {
+  CreditCard,
+  Check,
+  X,
+  ChevronRight,
+  AlertCircle,
+  Calendar,
   ArrowUpRight,
   ShieldCheck,
   Zap,
@@ -54,6 +55,103 @@ import { COLLECTIONS, EventoFacturacion } from "@/lib/types/firestore";
 import { toast } from "sonner";
 import { crearSuscripcionMP, cancelarSuscripcionMP, cambiarPlan, obtenerCotizacionBlue } from "@/app/actions/billing";
 import { cn } from "@/lib/utils";
+
+type FeatureItem = { text: string; tooltip?: string };
+type FeatureGroup = { label: string; items: FeatureItem[]; locked?: boolean };
+type PlanDisplay = { inheritsFrom?: string; groups: FeatureGroup[] };
+
+const PLAN_DISPLAY: Record<'starter' | 'pro' | 'agencia', PlanDisplay> = {
+  starter: {
+    groups: [
+      {
+        label: "IA & Agentes",
+        items: [
+          { text: "1 Agente Inteligente", tooltip: "Experto virtual entrenado con tu información. Responde 24/7 en todos tus canales." },
+          { text: "1.000 conversaciones/mes", tooltip: "Cada conversación es una sesión con un cliente. Mensajes ilimitados por sesión." },
+          { text: "Base de conocimiento", tooltip: "Entrená a tu agente con archivos PDF, textos y sitios web." },
+        ],
+      },
+      {
+        label: "Canales",
+        items: [
+          { text: "WhatsApp · Instagram · Facebook" },
+        ],
+      },
+      {
+        label: "CRM",
+        items: [
+          { text: "1.500 contactos CRM" },
+          { text: "Leads, Tareas y Contactos" },
+          { text: "Etiquetas y segmentación" },
+        ],
+      },
+      {
+        label: "No incluido",
+        locked: true,
+        items: [
+          { text: "Catálogo de productos" },
+          { text: "Difusión masiva" },
+          { text: "Meta Ads · Captura de leads" },
+          { text: "Workflows automatizados" },
+        ],
+      },
+    ],
+  },
+  pro: {
+    inheritsFrom: "Starter",
+    groups: [
+      {
+        label: "IA & Agentes",
+        items: [
+          { text: "Hasta 3 Agentes Inteligentes", tooltip: "Cada agente con su propio rol, conocimiento y comportamiento independiente." },
+          { text: "3.000 conversaciones/mes" },
+          { text: "5.000 contactos CRM" },
+        ],
+      },
+      {
+        label: "Marketing",
+        items: [
+          { text: "Catálogo de productos (200 items)", tooltip: "Mostrá tus productos directamente en el chat y automatizaciones." },
+          { text: "Difusión masiva (hasta 1.000/envío)", tooltip: "Enviá mensajes en masa a segmentos de contactos con seguimiento." },
+          { text: "Meta Ads · Leads de campañas", tooltip: "Captura automática de leads desde campañas de Facebook e Instagram." },
+        ],
+      },
+      {
+        label: "No incluido",
+        locked: true,
+        items: [
+          { text: "Workflows automatizados" },
+        ],
+      },
+    ],
+  },
+  agencia: {
+    inheritsFrom: "Pro",
+    groups: [
+      {
+        label: "IA & Agentes",
+        items: [
+          { text: "Hasta 10 Agentes Inteligentes" },
+          { text: "10.000 conversaciones/mes" },
+          { text: "Contactos ilimitados" },
+        ],
+      },
+      {
+        label: "Marketing ampliado",
+        items: [
+          { text: "Catálogo ilimitado de productos" },
+          { text: "Difusión masiva sin límite" },
+        ],
+      },
+      {
+        label: "Automatización",
+        items: [
+          { text: "Workflows automatizados", tooltip: "Flujos visuales para automatizar respuestas, notificaciones y acciones complejas." },
+        ],
+      },
+    ],
+  },
+};
 
 export default function FacturacionPage() {
   const { workspace, currentWorkspaceId } = useWorkspaceStore();
@@ -459,25 +557,54 @@ export default function FacturacionPage() {
                     </div>
                   </CardHeader>
 
-                  <CardContent className="flex-grow px-8 pb-8 space-y-4 border-t border-slate-50 pt-6">
-                    <div className="space-y-3">
-                      {[
-                        { label: `${limits.agentsIA} Agente Inteligente`, tooltip: "Un experto virtual entrenado con tu información que atiende las 24/7." },
-                        { label: `${limits.convCountIA.toLocaleString()} Conversaciones`, tooltip: "Sesiones de chat con clientes. Mensajes ilimitados por sesión." },
-                        { label: limits.crmContacts === 'unlimited' ? 'Contactos Ilimitados' : `${limits.crmContacts.toLocaleString()} Contactos`, tooltip: "Capacidad máxima de clientes en tu base para seguimiento." },
-                        { label: "Base de Conocimiento", tooltip: "Documentación y archivos (PDF, Webs) que le das a tu IA." }
-                      ].map((item, idx) => (
-                        <div key={idx} className="flex items-center justify-between group">
-                          <div className="flex items-center gap-2 text-[11px] font-bold text-[var(--text-secondary-light)]">
-                            <div className="w-4 h-4 rounded-full bg-emerald-50 flex items-center justify-center">
-                              <Check className="size-2.5 text-emerald-600" />
+                  <CardContent className="flex-grow px-6 pb-6 border-t border-slate-50 pt-4 space-y-3">
+                    {(() => {
+                      const display = PLAN_DISPLAY[p];
+                      return (
+                        <>
+                          {display.inheritsFrom && (
+                            <div className="flex items-center gap-2 py-2 px-3 bg-emerald-50/70 rounded-xl border border-emerald-100">
+                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                              <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">
+                                Todo el {display.inheritsFrom}, más:
+                              </span>
                             </div>
-                            {item.label}
-                          </div>
-                          <InfoTooltip text={item.tooltip} />
-                        </div>
-                      ))}
-                    </div>
+                          )}
+                          {display.groups.map((group, gi) => (
+                            <div key={gi} className="space-y-1.5">
+                              <p className={cn(
+                                "text-[9px] font-black uppercase tracking-widest px-1 pt-0.5",
+                                group.locked ? "text-slate-300" : "text-[var(--text-tertiary-light)]"
+                              )}>
+                                {group.label}
+                              </p>
+                              {group.items.map((item, ii) => (
+                                <div key={ii} className="flex items-center justify-between min-h-[22px]">
+                                  <div className={cn(
+                                    "flex items-center gap-2 text-[11px] font-bold",
+                                    group.locked ? "text-slate-300" : "text-[var(--text-secondary-light)]"
+                                  )}>
+                                    {group.locked ? (
+                                      <div className="w-4 h-4 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
+                                        <X className="size-2.5 text-slate-300" />
+                                      </div>
+                                    ) : (
+                                      <div className="w-4 h-4 rounded-full bg-emerald-50 flex items-center justify-center shrink-0">
+                                        <Check className="size-2.5 text-emerald-600" />
+                                      </div>
+                                    )}
+                                    <span className={group.locked ? "line-through decoration-slate-200 decoration-1" : ""}>
+                                      {item.text}
+                                    </span>
+                                  </div>
+                                  {item.tooltip && !group.locked && <InfoTooltip text={item.tooltip} />}
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                        </>
+                      );
+                    })()}
                   </CardContent>
 
                   <CardFooter className="p-8 pt-0">
