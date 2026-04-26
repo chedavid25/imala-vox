@@ -5,7 +5,7 @@
   "start_url": "/dashboard/operacion/inbox",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#1F1F1E",
+  "background_color": "#FFFFFF",
   "theme_color": "#1F1F1E",
   "icons": [
     {
