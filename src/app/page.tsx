@@ -11,6 +11,7 @@ import {
 import { cn } from "@/lib/utils";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import { FloatingWhatsApp } from "@/components/ui/FloatingWhatsApp";
 
 // ─────────────────────────────────────────────
 // MOCKUP: Browser chrome wrapper
@@ -1040,6 +1041,7 @@ export default function LandingPage() {
       <FAQSection />
       <FinalCTASection />
       <FooterSection />
+      <FloatingWhatsApp />
     </div>
   );
 }

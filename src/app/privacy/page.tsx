@@ -2,6 +2,11 @@ import React from "react";
 import { Shield, Lock, Eye, Mail, ArrowLeft, Check } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Privacidad",
+};
 
 export default function PrivacyPage() {
   return (

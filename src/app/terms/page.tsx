@@ -2,6 +2,11 @@ import React from "react";
 import { FileText, CheckCircle, Globe, ShieldQuestion, ArrowLeft, Check } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Términos de Servicio",
+};
 
 export default function TermsPage() {
   return (
