@@ -14,7 +14,13 @@
       "Bash(npx tsc *)",
       "Bash(node -e \"try { require\\('react-icons/fa'\\); console.log\\('react-icons OK'\\); } catch\\(e\\) { console.log\\('not found'\\); }\")",
       "WebFetch(domain:atendium.com)",
-      "WebFetch(domain:respond.io)"
+      "WebFetch(domain:respond.io)",
+      "Bash(find src *)",
+      "Bash(ls src/middleware*)",
+      "Bash(cat next.config.ts)",
+      "Bash(cat next.config.js)",
+      "Bash(cat vercel.json)",
+      "Bash(ls public/sw.js)"
     ]
   }
 }
