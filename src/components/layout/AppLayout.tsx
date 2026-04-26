@@ -42,6 +42,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
     console.log("Ruta detectada:", normalizedPathname, "esPublica:", isPublicRoute);
   }, [normalizedPathname, isPublicRoute]);
 
+  // SOLUCIÓN RADICAL: Si es la raíz, devolvemos el contenido inmediatamente
+  // Esto evita que cualquier lógica de auth o useEffect pueda redirigir.
+  if (normalizedPathname === "/" || normalizedPathname === "") {
+    return <>{children}</>;
+  }
+
   // Efecto para recuperar el nombre del agente si estamos en una subruta de agentes
   useEffect(() => {
     const segments = normalizedPathname.split('/').filter(Boolean);
