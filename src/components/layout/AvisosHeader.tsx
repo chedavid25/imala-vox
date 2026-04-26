@@ -5,18 +5,14 @@ import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { COLLECTIONS, TareaCRM } from "@/lib/types/firestore";
-import { Bell, Clock, AlertCircle, ChevronRight } from "lucide-react";
+import { Bell, Clock, AlertCircle, ChevronRight, CheckCircle2, Zap } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuLabel,
-  DropdownMenuGroup,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
-import { format, isBefore } from "date-fns";
+import { format, isBefore, isToday } from "date-fns";
 import { es } from "date-fns/locale";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -25,6 +21,7 @@ export function AvisosHeader() {
   const { currentWorkspaceId } = useWorkspaceStore();
   const [tareasPendientes, setTareasPendientes] = useState<TareaCRM[]>([]);
   const [viewedCount, setViewedCount] = useState(0);
+  const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -53,103 +50,134 @@ export function AvisosHeader() {
   const badgeCount = Math.max(0, tareasPendientes.length - viewedCount);
 
   const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
     if (open) setViewedCount(tareasPendientes.length);
+  };
+
+  const isVencida = (fecha: string) => {
+    const taskDate = new Date(fecha + "T00:00:00");
+    return isBefore(taskDate, new Date()) && !isToday(taskDate);
   };
 
   return (
     <DropdownMenu onOpenChange={handleOpenChange}>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "size-9 rounded-xl transition-all relative",
-              badgeCount > 0
-                ? "bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)]/20"
-                : "text-[var(--text-tertiary-light)] hover:bg-[var(--bg-input)] hover:text-[var(--text-primary-light)]"
-            )}
-          >
-            <Bell className="size-4" />
-            {badgeCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-red-500 text-white text-[8px] font-black rounded-full flex items-center justify-center px-0.5 border-2 border-white leading-none">
-                {badgeCount > 99 ? "99+" : badgeCount}
-              </span>
-            )}
-          </Button>
-        }
-      />
+      {/* TRIGGER — Base UI no acepta asChild ni render en DropdownMenuTrigger wrapper */}
+      <DropdownMenuTrigger>
+        <button
+          className={cn(
+            "relative size-10 rounded-2xl flex items-center justify-center transition-all duration-200 border",
+            badgeCount > 0
+              ? "bg-[var(--accent)]/10 border-[var(--accent)]/20 text-[var(--accent)] hover:bg-[var(--accent)]/20"
+              : "bg-white border-[var(--border-light)] text-[var(--text-tertiary-light)] hover:bg-[var(--bg-input)] hover:text-[var(--text-primary-light)] hover:border-[var(--border-light-strong)]"
+          )}
+        >
+          <Bell className={cn("size-4 transition-transform duration-300", isOpen && "scale-90")} />
+          {badgeCount > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[8px] font-black rounded-full flex items-center justify-center px-1 border-2 border-white leading-none animate-in zoom-in-50 duration-200 shadow-lg shadow-red-500/30">
+              {badgeCount > 99 ? "99+" : badgeCount}
+            </span>
+          )}
+        </button>
+      </DropdownMenuTrigger>
 
       <DropdownMenuContent
         align="end"
-        className="w-[300px] p-2 bg-white border border-[var(--border-light)] shadow-2xl rounded-2xl"
+        className="w-[340px] p-0 bg-white border border-[var(--border-light)] shadow-[0_20px_60px_rgba(0,0,0,0.12)] rounded-[24px] overflow-hidden"
       >
-        <DropdownMenuGroup>
-          <DropdownMenuLabel className="px-3 py-2 flex items-center justify-between">
-            <span className="text-[11px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest">
-              Tareas pendientes
-            </span>
+        {/* HEADER DEL PANEL */}
+        <div className="px-6 pt-6 pb-4 border-b border-[var(--border-light)] bg-slate-50/50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="size-8 rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/20 flex items-center justify-center">
+                <Bell className="size-3.5 text-[var(--accent)]" />
+              </div>
+              <div>
+                <p className="text-[11px] font-black text-[var(--text-primary-light)] uppercase tracking-widest">Notificaciones</p>
+                <p className="text-[9px] font-bold text-[var(--text-tertiary-light)] uppercase tracking-widest">Tareas de hoy y vencidas</p>
+              </div>
+            </div>
             {tareasPendientes.length > 0 && (
-              <span className="text-[9px] font-black text-red-500 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded-full uppercase">
-                {tareasPendientes.length} urgente{tareasPendientes.length !== 1 ? "s" : ""}
+              <span className="text-[9px] font-black text-red-500 bg-red-50 border border-red-100 px-2.5 py-1 rounded-full uppercase tracking-widest">
+                {tareasPendientes.length} pendiente{tareasPendientes.length !== 1 ? "s" : ""}
               </span>
             )}
-          </DropdownMenuLabel>
+          </div>
+        </div>
 
-          <DropdownMenuSeparator className="bg-[var(--border-light)] mx-2" />
-
-          {tareasPendientes.length === 0 ? (
-            <div className="px-3 py-8 text-center space-y-2">
-              <Bell className="w-6 h-6 text-[var(--text-tertiary-light)] mx-auto opacity-30" />
-              <p className="text-[11px] text-[var(--text-tertiary-light)] font-medium">
-                Sin tareas pendientes para hoy
+        {/* CONTENIDO */}
+        {tareasPendientes.length === 0 ? (
+          <div className="px-6 py-12 text-center space-y-3 flex flex-col items-center">
+            <div className="size-14 rounded-[1.5rem] bg-emerald-50 border border-emerald-100 flex items-center justify-center mx-auto">
+              <CheckCircle2 className="size-7 text-emerald-500" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-bold text-[var(--text-primary-light)]">¡Todo al día!</p>
+              <p className="text-[11px] text-[var(--text-tertiary-light)] font-medium leading-relaxed">
+                No tienes tareas pendientes para hoy.
               </p>
             </div>
-          ) : (
-            <div className="max-h-[320px] overflow-y-auto no-scrollbar py-1 space-y-0.5">
-              {tareasPendientes.map(tarea => (
+          </div>
+        ) : (
+          <div className="max-h-[340px] overflow-y-auto no-scrollbar py-2 px-2 space-y-1">
+            {tareasPendientes.map(tarea => {
+              const vencida = isVencida(tarea.fecha);
+              return (
                 <DropdownMenuItem
                   key={tarea.id}
                   onClick={() => router.push("/dashboard/operacion/tareas")}
-                  className="px-3 py-3 rounded-xl hover:bg-[var(--bg-input)] cursor-pointer transition-all group"
+                  className="px-3 py-3.5 rounded-2xl hover:bg-[var(--bg-input)] cursor-pointer transition-all group outline-none"
                 >
-                  <div className="flex gap-3 w-full">
+                  <div className="flex gap-3 w-full items-start">
+                    {/* ICONO DE PRIORIDAD */}
                     <div className={cn(
-                      "size-8 rounded-xl flex items-center justify-center shrink-0 border",
-                      tarea.prioridad === "alta"
+                      "size-9 rounded-xl flex items-center justify-center shrink-0 border shadow-sm",
+                      tarea.prioridad === "alta" || vencida
                         ? "bg-red-50 text-red-500 border-red-100"
+                        : tarea.prioridad === "media"
+                        ? "bg-amber-50 text-amber-500 border-amber-100"
                         : "bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/20"
                     )}>
-                      {tarea.prioridad === "alta"
-                        ? <AlertCircle className="size-3.5" />
-                        : <Clock className="size-3.5" />
+                      {tarea.prioridad === "alta" || vencida
+                        ? <AlertCircle className="size-4" />
+                        : <Clock className="size-4" />
                       }
                     </div>
-                    <div className="flex-1 space-y-0.5 overflow-hidden">
-                      <p className="text-[12px] font-bold text-[var(--text-primary-light)] truncate group-hover:text-[var(--accent)] transition-colors">
+
+                    {/* CONTENIDO */}
+                    <div className="flex-1 space-y-1 overflow-hidden min-w-0">
+                      <p className="text-[12px] font-bold text-[var(--text-primary-light)] truncate group-hover:text-[var(--accent)] transition-colors leading-tight">
                         {tarea.titulo}
                       </p>
-                      <p className="text-[10px] font-medium text-[var(--text-tertiary-light)]">
-                        {format(new Date(tarea.fecha + "T00:00:00"), "d 'de' MMMM", { locale: es })} • {tarea.hora || "Sin hora"}
-                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] font-medium text-[var(--text-tertiary-light)]">
+                          {format(new Date(tarea.fecha + "T00:00:00"), "d 'de' MMMM", { locale: es })}
+                          {tarea.hora ? ` · ${tarea.hora}` : ""}
+                        </span>
+                        {vencida && (
+                          <span className="text-[8px] font-black text-red-500 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded-full uppercase tracking-widest">
+                            Vencida
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <ChevronRight className="size-3 text-[var(--text-tertiary-light)] mt-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                    <ChevronRight className="size-3.5 text-[var(--text-tertiary-light)] shrink-0 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all mt-1" />
                   </div>
                 </DropdownMenuItem>
-              ))}
-            </div>
-          )}
-        </DropdownMenuGroup>
+              );
+            })}
+          </div>
+        )}
 
-        <DropdownMenuSeparator className="bg-[var(--border-light)] mx-2" />
-        <div className="p-1">
-          <Button
-            variant="ghost"
-            className="w-full text-[11px] font-black uppercase text-[var(--text-tertiary-light)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/5 rounded-xl h-9"
+        {/* FOOTER */}
+        <div className="p-3 border-t border-[var(--border-light)] bg-slate-50/30">
+          <button
             onClick={() => router.push("/dashboard/operacion/tareas")}
+            className="w-full flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-[var(--text-tertiary-light)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/5 rounded-xl h-10 transition-all cursor-pointer"
           >
+            <Zap className="size-3" />
             Ver todas las tareas
-          </Button>
+          </button>
         </div>
       </DropdownMenuContent>
     </DropdownMenu>
