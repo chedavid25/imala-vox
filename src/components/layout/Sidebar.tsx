@@ -160,26 +160,14 @@ export function Sidebar() {
       "h-screen bg-[var(--bg-sidebar)] border-r border-[var(--border-dark)] flex flex-col shrink-0 relative transition-all duration-300 ease-in-out z-20",
       widthClass
     )}>
-      <div className="p-3 border-b border-[var(--border-dark)] h-[var(--header-height)] flex items-center justify-between overflow-hidden">
-        {!sidebarCollapsed && (
-          <div className="flex items-center gap-2.5 animate-in fade-in duration-300 min-w-0 flex-1">
-            <Image
-              src="/icons/icon-192.png"
-              alt="Imalá Vox"
-              width={30}
-              height={30}
-              className="rounded-xl shrink-0"
-            />
-            <h2 className="text-[var(--text-primary-dark)] font-bold text-base tracking-tight truncate">
-              Imalá Vox
-            </h2>
-          </div>
-        )}
-        {sidebarCollapsed && (
+      {/* HEADER del sidebar */}
+      {sidebarCollapsed ? (
+        /* MODO COLAPSADO: solo el logo, clickeable para expandir */
+        <div className="border-b border-[var(--border-dark)] h-[var(--header-height)] flex items-center justify-center">
           <button
             onClick={toggleSidebar}
-            className="flex-1 flex items-center justify-center animate-in zoom-in duration-300 hover:opacity-80 transition-opacity"
             title="Expandir menú"
+            className="p-1 hover:opacity-70 transition-opacity active:scale-95"
           >
             <Image
               src="/icons/icon-192.png"
@@ -189,17 +177,28 @@ export function Sidebar() {
               className="rounded-xl"
             />
           </button>
-        )}
-        
-        {!sidebarCollapsed && (
-          <button 
+        </div>
+      ) : (
+        /* MODO EXPANDIDO: logo + nombre + botón colapsar */
+        <div className="p-3 border-b border-[var(--border-dark)] h-[var(--header-height)] flex items-center gap-2.5 overflow-hidden">
+          <Image
+            src="/icons/icon-192.png"
+            alt="Imalá Vox"
+            width={30}
+            height={30}
+            className="rounded-xl shrink-0"
+          />
+          <h2 className="text-[var(--text-primary-dark)] font-bold text-base tracking-tight truncate flex-1 animate-in fade-in duration-300">
+            Imalá Vox
+          </h2>
+          <button
             onClick={toggleSidebar}
             className="p-1.5 hover:bg-[var(--bg-sidebar-hover)] rounded-lg transition-colors text-[var(--text-tertiary-dark)] shrink-0 active:scale-95"
           >
             <PanelLeftClose className="w-4 h-4" />
           </button>
-        )}
-      </div>
+        </div>
+      )}
       
       <nav className="flex-1 p-3 space-y-6 overflow-y-auto no-scrollbar">
         <div className="space-y-1">
