@@ -160,15 +160,15 @@ export function Sidebar() {
       "h-screen bg-[var(--bg-sidebar)] border-r border-[var(--border-dark)] flex flex-col shrink-0 relative transition-all duration-300 ease-in-out z-20",
       widthClass
     )}>
-      <div className="p-4 border-b border-[var(--border-dark)] h-[var(--header-height)] flex items-center justify-between overflow-hidden">
+      <div className="p-3 border-b border-[var(--border-dark)] h-[var(--header-height)] flex items-center justify-between overflow-hidden">
         {!sidebarCollapsed && (
-          <div className="flex items-center gap-2.5 animate-in fade-in duration-300 min-w-0">
+          <div className="flex items-center gap-2.5 animate-in fade-in duration-300 min-w-0 flex-1">
             <Image
               src="/icons/icon-192.png"
               alt="Imalá Vox"
-              width={28}
-              height={28}
-              className="rounded-lg shrink-0"
+              width={30}
+              height={30}
+              className="rounded-xl shrink-0"
             />
             <h2 className="text-[var(--text-primary-dark)] font-bold text-base tracking-tight truncate">
               Imalá Vox
@@ -176,23 +176,29 @@ export function Sidebar() {
           </div>
         )}
         {sidebarCollapsed && (
-          <div className="mx-auto animate-in zoom-in duration-300">
+          <button
+            onClick={toggleSidebar}
+            className="flex-1 flex items-center justify-center animate-in zoom-in duration-300 hover:opacity-80 transition-opacity"
+            title="Expandir menú"
+          >
             <Image
               src="/icons/icon-192.png"
               alt="Imalá Vox"
-              width={32}
-              height={32}
-              className="rounded-lg"
+              width={40}
+              height={40}
+              className="rounded-xl"
             />
-          </div>
+          </button>
         )}
         
-        <button 
-          onClick={toggleSidebar}
-          className="p-1.5 hover:bg-[var(--bg-sidebar-hover)] rounded-lg transition-colors text-[var(--text-tertiary-dark)] shrink-0 active:scale-95"
-        >
-          {sidebarCollapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
-        </button>
+        {!sidebarCollapsed && (
+          <button 
+            onClick={toggleSidebar}
+            className="p-1.5 hover:bg-[var(--bg-sidebar-hover)] rounded-lg transition-colors text-[var(--text-tertiary-dark)] shrink-0 active:scale-95"
+          >
+            <PanelLeftClose className="w-4 h-4" />
+          </button>
+        )}
       </div>
       
       <nav className="flex-1 p-3 space-y-6 overflow-y-auto no-scrollbar">
