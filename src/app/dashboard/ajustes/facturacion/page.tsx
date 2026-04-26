@@ -574,7 +574,7 @@ export default function FacturacionPage() {
                             <div key={gi} className="space-y-1.5">
                               <p className={cn(
                                 "text-[9px] font-black uppercase tracking-widest px-1 pt-0.5",
-                                group.locked ? "text-slate-300" : "text-[var(--text-tertiary-light)]"
+                                group.locked ? "text-slate-400" : "text-[var(--text-tertiary-light)]"
                               )}>
                                 {group.label}
                               </p>
@@ -582,18 +582,18 @@ export default function FacturacionPage() {
                                 <div key={ii} className="flex items-center justify-between min-h-[22px]">
                                   <div className={cn(
                                     "flex items-center gap-2 text-[11px] font-bold",
-                                    group.locked ? "text-slate-300" : "text-[var(--text-secondary-light)]"
+                                    group.locked ? "text-slate-400" : "text-[var(--text-secondary-light)]"
                                   )}>
                                     {group.locked ? (
-                                      <div className="w-4 h-4 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
-                                        <X className="size-2.5 text-slate-300" />
+                                      <div className="w-4 h-4 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
+                                        <X className="size-2.5 text-slate-400" />
                                       </div>
                                     ) : (
                                       <div className="w-4 h-4 rounded-full bg-emerald-50 flex items-center justify-center shrink-0">
                                         <Check className="size-2.5 text-emerald-600" />
                                       </div>
                                     )}
-                                    <span className={group.locked ? "line-through decoration-slate-200 decoration-1" : ""}>
+                                    <span className={group.locked ? "line-through decoration-slate-300 decoration-1" : ""}>
                                       {item.text}
                                     </span>
                                   </div>
