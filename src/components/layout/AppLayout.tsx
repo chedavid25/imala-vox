@@ -126,7 +126,15 @@ export default function AppLayout({ children }: AppLayoutProps) {
         }
       } else {
         setIsSessionLoading(false);
-        if (!isPublicRoute) {
+        // Usar window.location para evitar condición de carrera con el closure
+        const currentPath = typeof window !== "undefined" ? window.location.pathname : pathname;
+        const isCurrentPublic =
+          currentPath === "/" ||
+          currentPath.startsWith("/auth") ||
+          currentPath.startsWith("/onboarding") ||
+          currentPath.startsWith("/privacy") ||
+          currentPath.startsWith("/terms");
+        if (!isCurrentPublic) {
           router.push("/auth");
         }
       }
