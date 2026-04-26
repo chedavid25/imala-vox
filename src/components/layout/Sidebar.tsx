@@ -265,7 +265,7 @@ function SidebarFooter({ collapsed }: { collapsed: boolean }) {
   const handleSignOut = async () => {
     try {
       await signOut(auth);
-      router.push("/auth");
+      router.push("/");
     } catch (e) {
       console.error("Error signing out:", e);
     }
