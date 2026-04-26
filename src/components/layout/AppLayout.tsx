@@ -8,7 +8,6 @@ import { AvisosHeader } from "./AvisosHeader";
 import { usePathname, useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, query, where, getDocs, limit } from "firebase/firestore";
 import { COLLECTIONS, Workspace } from "@/lib/types/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { cn } from "@/lib/utils";
@@ -25,44 +24,34 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const { setWorkspace, setWorkspaceId, currentWorkspaceId, currentAgentName, setCurrentAgentName } = useWorkspaceStore();
   const [isSessionLoading, setIsSessionLoading] = useState(true);
   const isMobile = useMobileLayout();
-  
-  // Normalizamos el pathname para evitar errores durante la hidratación
+
   const normalizedPathname = pathname?.toLowerCase() || "/";
-  
+  const isLanding = normalizedPathname === "/" || normalizedPathname === "";
+
   const isPublicRoute =
-    normalizedPathname === "/" ||
-    normalizedPathname === "" ||
+    isLanding ||
     normalizedPathname.startsWith("/auth") ||
     normalizedPathname.startsWith("/onboarding") ||
     normalizedPathname.startsWith("/privacy") ||
     normalizedPathname.startsWith("/terms");
 
-  // Log para depuración (puedes verlo en la consola del navegador F12)
-  useEffect(() => {
-    console.log("Ruta detectada:", normalizedPathname, "esPublica:", isPublicRoute);
-  }, [normalizedPathname, isPublicRoute]);
+  // Todos los useEffect DEBEN ir antes de cualquier return condicional (Reglas de Hooks)
 
-  // SOLUCIÓN RADICAL: Si es la raíz, devolvemos el contenido inmediatamente
-  // Esto evita que cualquier lógica de auth o useEffect pueda redirigir.
-  if (normalizedPathname === "/" || normalizedPathname === "") {
-    return <>{children}</>;
-  }
-
-  // Efecto para recuperar el nombre del agente si estamos en una subruta de agentes
   useEffect(() => {
+    if (isLanding) return;
+
     const segments = normalizedPathname.split('/').filter(Boolean);
     const agentsIdx = segments.indexOf('agentes');
-    
-    // Si estamos en /dashboard/ajustes/agentes/[id]/...
+
     if (agentsIdx !== -1 && segments[agentsIdx + 1] && currentWorkspaceId) {
       const agentId = segments[agentsIdx + 1];
-      
+
       const fetchAgentName = async () => {
         try {
           const { doc, getDoc } = await import("firebase/firestore");
           const agentRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.AGENTES, agentId);
           const agentSnap = await getDoc(agentRef);
-          
+
           if (agentSnap.exists()) {
             setCurrentAgentName(agentSnap.data().nombre);
           } else {
@@ -73,26 +62,22 @@ export default function AppLayout({ children }: AppLayoutProps) {
           setCurrentAgentName(null);
         }
       };
-      
+
       fetchAgentName();
     } else {
       setCurrentAgentName(null);
     }
-  }, [pathname, currentWorkspaceId, setCurrentAgentName]);
+  }, [normalizedPathname, currentWorkspaceId, setCurrentAgentName, isLanding]);
 
   useEffect(() => {
-    // La landing "/" maneja su propia lógica de auth en el componente
-    if (normalizedPathname === "/" || normalizedPathname === "") {
-      setIsSessionLoading(false);
-      return;
-    }
+    // La landing maneja su propio estado de auth — no suscribir aquí
+    if (isLanding) return;
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         try {
-          const { collection, query, where, getDocs, limit, collectionGroup, getDoc, doc } = await import("firebase/firestore");
-          
-          // 1. Intentar cargar el espacio donde es dueño
+          const { collection, query, where, getDocs, limit, collectionGroup, getDoc } = await import("firebase/firestore");
+
           const qOwner = query(
             collection(db, COLLECTIONS.ESPACIOS),
             where("propietarioUid", "==", user.uid),
@@ -103,24 +88,23 @@ export default function AppLayout({ children }: AppLayoutProps) {
           let wsDocData = null;
 
           if (!ownerSnap.empty) {
-            const doc = ownerSnap.docs[0];
-            wsDocData = { ...doc.data(), id: doc.id } as Workspace;
+            const ownerDoc = ownerSnap.docs[0];
+            wsDocData = { ...ownerDoc.data(), id: ownerDoc.id } as Workspace;
           } else {
-            // 2. Intentar cargar donde es miembro
             const qMember = query(
               collectionGroup(db, COLLECTIONS.MIEMBROS),
               where("__name__", "==", user.uid),
               limit(1)
             );
             const memberSnap = await getDocs(qMember);
-            
+
             if (!memberSnap.empty) {
               const memberDoc = memberSnap.docs[0];
               const wsRef = memberDoc.ref.parent.parent;
               if (wsRef) {
                 const wsSnap = await getDoc(wsRef);
                 if (wsSnap.exists()) {
-                   wsDocData = { ...wsSnap.data(), id: wsSnap.id } as Workspace;
+                  wsDocData = { ...wsSnap.data(), id: wsSnap.id } as Workspace;
                 }
               }
             }
@@ -134,8 +118,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
             setWorkspaceId(wsDocData.id);
             setWorkspace(wsDocData);
 
-            // Solo redirigir desde /auth y /onboarding, no desde la landing "/"
-            if (isPublicRoute && normalizedPathname !== "/") {
+            // Redirigir a dashboard solo desde /auth y /onboarding, nunca desde la landing
+            if (isPublicRoute && !isLanding) {
               router.push("/dashboard/operacion/inbox");
             }
           }
@@ -153,7 +137,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
     });
 
     return () => unsubscribe();
-  }, [normalizedPathname, router, setWorkspace, setWorkspaceId, isPublicRoute]);
+  }, [normalizedPathname, isLanding, isPublicRoute, router, setWorkspace, setWorkspaceId]);
+
+  // Returns condicionales DESPUÉS de todos los hooks
+  if (isLanding) {
+    return <>{children}</>;
+  }
 
   if (isPublicRoute) {
     return <>{children}</>;
@@ -163,7 +152,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
     return <AppLoadingSkeleton />;
   }
 
-  // Fork Mobile
   if (isMobile) {
     return <MobileLayout>{children}</MobileLayout>;
   }
@@ -171,25 +159,23 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const getBreadcrumbs = () => {
     const segments = pathname.split('/').filter(Boolean);
     if (segments.length === 0) return ['Dashboard'];
-    
+
     return segments.map((segment, index) => {
-      let label = segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, ' ');
+      const label = segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, ' ');
       if (segment === 'dashboard') return 'Dashboard';
       if (segment === 'inbox') return 'Bandeja de entrada';
       if (segment === 'webs') return 'Sitios web';
       if (segment === 'agentes') return 'Agentes IA';
       if (segment === 'catalogo') return 'Catálogo';
-      
-      // Si el segmento anterior era 'agentes', usar el nombre del store si coincide con el ID
+
       if (segments[index - 1] === 'agentes' && currentAgentName) {
         return `Agente: ${currentAgentName}`;
       }
-      
-      // Fallback si es un ID pero no tenemos el nombre aún
+
       if (segments[index - 1] === 'agentes') {
         return `Agente: ${segment.slice(0, 8)}...`;
       }
-      
+
       return label;
     });
   };
@@ -207,8 +193,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
             {breadcrumbs.map((crumb, index) => (
               <React.Fragment key={index}>
                 <span className={cn(
-                  index === breadcrumbs.length - 1 
-                    ? "font-bold text-[var(--text-primary-light)]" 
+                  index === breadcrumbs.length - 1
+                    ? "font-bold text-[var(--text-primary-light)]"
                     : "text-[var(--text-tertiary-light)]"
                 )}>
                   {crumb}
@@ -221,7 +207,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           </div>
 
           <div className="flex items-center gap-4">
-             <AvisosHeader />
+            <AvisosHeader />
           </div>
         </header>
         <div className="flex-1 overflow-y-auto bg-[var(--bg-main)] custom-scrollbar">
@@ -245,13 +231,13 @@ function AppLoadingSkeleton() {
         </div>
       </div>
       <div className="flex-1 flex flex-col">
-          <div className="h-[var(--header-height)] border-b border-[var(--border-light)] bg-white animate-pulse" />
-          <div className="flex-1 p-8">
-             <div className="space-y-4">
-                <div className="h-8 w-48 bg-gray-200 rounded animate-pulse" />
-                <div className="h-64 w-full bg-gray-100 rounded-3xl animate-pulse" />
-             </div>
+        <div className="h-[var(--header-height)] border-b border-[var(--border-light)] bg-white animate-pulse" />
+        <div className="flex-1 p-8">
+          <div className="space-y-4">
+            <div className="h-8 w-48 bg-gray-200 rounded animate-pulse" />
+            <div className="h-64 w-full bg-gray-100 rounded-3xl animate-pulse" />
           </div>
+        </div>
       </div>
     </div>
   );
