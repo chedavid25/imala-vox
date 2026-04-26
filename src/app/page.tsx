@@ -407,60 +407,55 @@ function HeroSection() {
 // ─────────────────────────────────────────────
 function SocialProofSection() {
   const stats = [
-    { value: "24/7", label: "Disponibilidad del agente" },
-    { value: "< 2s", label: "Tiempo de respuesta" },
-    { value: "3", label: "Canales unificados" },
+    { value: "24/7", label: "Disponibilidad" },
+    { value: "< 2s", label: "Respuesta" },
+    { value: "4", label: "Canales" },
   ];
   return (
-    <section className="bg-white border-y border-[#E5E5E3] py-14">
-      <div className="max-w-7xl mx-auto px-6">
-        <p className="text-center text-xs font-black text-[#A3A39E] uppercase tracking-widest mb-10">
-          Conectado con las plataformas que ya usás
-        </p>
-        <div className="flex flex-wrap items-center justify-center gap-6 md:gap-12 mb-14">
-          {/* WhatsApp */}
-          <div className="flex items-center gap-2.5 opacity-60 hover:opacity-100 transition-opacity">
-            <div className="w-8 h-8 bg-[#25D366] rounded-xl flex items-center justify-center">
-              <MessageSquare className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-sm font-bold text-[#1A1A18]">WhatsApp Business</span>
+    <section className="bg-white border-y border-[#E5E5E3] py-20">
+      <div className="max-w-7xl mx-auto px-6 text-center">
+        {/* Título Resaltado */}
+        <div className="inline-block bg-[#1A1A18] px-6 py-2 rounded-full mb-12 shadow-xl shadow-black/10">
+          <p className="text-[10px] font-black text-[#C8FF00] uppercase tracking-[0.3em]">
+            Tu negocio conectado a todo el ecosistema de Meta
+          </p>
+        </div>
+
+        {/* Logos Oficiales a Color */}
+        <div className="flex flex-wrap items-center justify-center gap-10 md:gap-16 mb-20">
+          <div className="flex items-center gap-3 group cursor-pointer">
+            <img src="https://cdn.simpleicons.org/whatsapp/25D366" alt="WhatsApp" className="w-6 h-6 group-hover:scale-110 transition-transform" />
+            <span className="text-sm font-black text-[#1A1A18] tracking-tight">WhatsApp Business</span>
           </div>
-          {/* Instagram */}
-          <div className="flex items-center gap-2.5 opacity-60 hover:opacity-100 transition-opacity">
-            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 rounded-xl flex items-center justify-center">
-              <Globe className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-sm font-bold text-[#1A1A18]">Instagram</span>
+          <div className="flex items-center gap-3 group cursor-pointer">
+            <img src="https://cdn.simpleicons.org/instagram/E4405F" alt="Instagram" className="w-6 h-6 group-hover:scale-110 transition-transform" />
+            <span className="text-sm font-black text-[#1A1A18] tracking-tight">Instagram</span>
           </div>
-          {/* Facebook */}
-          <div className="flex items-center gap-2.5 opacity-60 hover:opacity-100 transition-opacity">
-            <div className="w-8 h-8 bg-[#1877F2] rounded-xl flex items-center justify-center">
-              <Globe className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-sm font-bold text-[#1A1A18]">Facebook</span>
+          <div className="flex items-center gap-3 group cursor-pointer">
+            <img src="https://cdn.simpleicons.org/facebook/1877F2" alt="Facebook" className="w-6 h-6 group-hover:scale-110 transition-transform" />
+            <span className="text-sm font-black text-[#1A1A18] tracking-tight">Facebook</span>
           </div>
-          {/* Meta */}
-          <div className="flex items-center gap-2.5 opacity-60 hover:opacity-100 transition-opacity">
-            <div className="w-8 h-8 bg-[#0081FB] rounded-xl flex items-center justify-center">
-              <Target className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-sm font-bold text-[#1A1A18]">Meta Ads</span>
-          </div>
-          {/* MercadoPago */}
-          <div className="flex items-center gap-2.5 opacity-60 hover:opacity-100 transition-opacity">
-            <div className="w-8 h-8 bg-[#009EE3] rounded-xl flex items-center justify-center text-white font-black text-xs">MP</div>
-            <span className="text-sm font-bold text-[#1A1A18]">MercadoPago</span>
+          <div className="flex items-center gap-3 group cursor-pointer">
+            <img src="https://cdn.simpleicons.org/meta/0668E1" alt="Meta Leads" className="w-6 h-6 group-hover:scale-110 transition-transform" />
+            <span className="text-sm font-black text-[#1A1A18] tracking-tight">Meta Leads</span>
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-8 max-w-2xl mx-auto">
-          {stats.map((s, i) => (
-            <div key={i} className="text-center">
-              <p className="text-3xl md:text-4xl font-black text-[#1A1A18]">{s.value}</p>
-              <p className="text-xs text-[#A3A39E] font-medium mt-1">{s.label}</p>
-            </div>
-          ))}
+        {/* Stats en Fondo Oscuro */}
+        <div className="bg-[#1F1F1E] rounded-[3rem] p-12 max-w-4xl mx-auto shadow-[0_40px_100px_rgba(0,0,0,0.15)]">
+          <div className="grid grid-cols-3 gap-8 items-center">
+            {stats.map((s, i) => (
+              <div key={i} className="space-y-3">
+                <p className={cn(
+                  "text-4xl md:text-6xl font-black",
+                  s.value === "4" ? "text-[#C8FF00] [text-shadow:0_0_30px_rgba(200,255,0,0.4)]" : "text-white"
+                )}>
+                  {s.value}
+                </p>
+                <p className="text-[10px] text-white/30 font-black uppercase tracking-widest">{s.label}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </section>
@@ -531,7 +526,7 @@ function SolutionSection() {
           <span className="text-xs font-black text-[#A3A39E] uppercase tracking-widest">La solución</span>
           <h2 className="text-3xl md:text-5xl font-black text-[#1A1A18] mt-3 leading-tight">
             Un agente que conoce tu negocio<br />
-            <span className="text-[#1A1A18]/40">mejor que nadie</span>
+            <span className="text-[#C8FF00]">mejor que nadie</span>
           </h2>
           <p className="text-base text-[#6B6B67] mt-4 max-w-xl mx-auto font-medium">
             Entrenás a Imalá Vox con tu información una sola vez. Él hace el resto.
@@ -630,8 +625,8 @@ function FeaturesSection() {
                 <ul className="space-y-3">
                   {f.bullets.map((b, bi) => (
                     <li key={bi} className="flex items-center gap-3">
-                      <div className="w-5 h-5 rounded-full bg-[#C8FF00]/10 border border-[#C8FF00]/20 flex items-center justify-center shrink-0">
-                        <Check className="w-3 h-3 text-[#C8FF00]" />
+                      <div className="w-5 h-5 rounded-full bg-[#C8FF00] flex items-center justify-center shrink-0 shadow-[0_2px_10px_rgba(200,255,0,0.2)]">
+                        <Check className="w-3 h-3 text-[#1A1A18]" strokeWidth={4} />
                       </div>
                       <span className={cn("text-sm font-bold", f.dark ? "text-white/70" : "text-[#1A1A18]")}>{b}</span>
                     </li>
@@ -656,22 +651,28 @@ function FeaturesSection() {
 function ChannelsSection() {
   const channels = [
     {
-      color: "bg-[#25D366]",
+      icon: "https://cdn.simpleicons.org/whatsapp/25D366",
       name: "WhatsApp Business",
       desc: "El canal #1 de consultas en Argentina y Latam. Respuestas automáticas, mensajes ricos con imágenes y catálogo, y seguimiento completo de cada conversación.",
       badge: "Más usado",
     },
     {
-      color: "bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400",
+      icon: "https://cdn.simpleicons.org/instagram/E4405F",
       name: "Instagram DMs",
       desc: "Capturá los leads que llegan por tus stories, publicaciones y perfil. El agente responde en segundos y los convierte en clientes antes de que se enfríen.",
       badge: null,
     },
     {
-      color: "bg-[#1877F2]",
+      icon: "https://cdn.simpleicons.org/facebook/1877F2",
       name: "Facebook Messenger",
-      desc: "Automatizá las respuestas de tu página de Facebook. Capturá leads de tus campañas de Meta Ads y convertí consultas en ventas sin intervención manual.",
+      desc: "Automatizá las respuestas de tu página de Facebook. Sincronizá tus chats y mantené el historial completo de cada cliente en un solo lugar.",
       badge: null,
+    },
+    {
+      icon: "https://cdn.simpleicons.org/meta/0668E1",
+      name: "Meta Leads",
+      desc: "Sincronización directa con tus campañas de anuncios. Capturá y procesá cada formulario de Meta Ads al instante para que no se enfríe ningún lead.",
+      badge: "Nuevo",
     },
   ];
   return (
@@ -683,16 +684,19 @@ function ChannelsSection() {
             Donde ya están tus clientes
           </h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {channels.map((c, i) => (
-            <div key={i} className="bg-white border border-[#E5E5E3] rounded-3xl p-8 space-y-4 relative overflow-hidden hover:shadow-lg transition-shadow">
+            <div key={i} className="bg-white border border-[#E5E5E3] rounded-3xl p-8 space-y-4 relative overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1">
               {c.badge && (
-                <div className="absolute top-6 right-6 bg-[#C8FF00] text-black text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest">
+                <div className={cn(
+                  "absolute top-6 right-6 text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest",
+                  c.badge === "Nuevo" ? "bg-black text-[#C8FF00]" : "bg-[#C8FF00] text-black"
+                )}>
                   {c.badge}
                 </div>
               )}
-              <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center", c.color)}>
-                <MessageSquare className="w-5 h-5 text-white" />
+              <div className="w-12 h-12 rounded-2xl bg-[#F5F5F4] flex items-center justify-center">
+                <img src={c.icon} alt={c.name} className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-bold text-[#1A1A18]">{c.name}</h3>
               <p className="text-sm text-[#6B6B67] leading-relaxed font-medium">{c.desc}</p>
@@ -840,9 +844,9 @@ function PricingSection() {
                               </div>
                             ) : (
                               <div className={cn("w-4 h-4 rounded-full flex items-center justify-center shrink-0",
-                                isPro ? "bg-black/15" : "bg-[#C8FF00]/10"
+                                isPro ? "bg-black" : "bg-[#C8FF00]"
                               )}>
-                                <Check className={cn("w-2.5 h-2.5", isPro ? "text-black" : "text-[#C8FF00]")} />
+                                <Check className={cn("w-2.5 h-2.5", isPro ? "text-[#C8FF00]" : "text-[#1A1A18]")} strokeWidth={4} />
                               </div>
                             )}
                             <span className={cn("text-[11px] font-bold",

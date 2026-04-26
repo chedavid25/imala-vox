@@ -5,9 +5,9 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // 1. Redirigir la raíz / hacia /auth
-  if (pathname === '/') {
-    return NextResponse.redirect(new URL('/auth', request.url))
-  }
+  // if (pathname === '/') {
+  //   return NextResponse.redirect(new URL('/auth', request.url))
+  // }
 
   // 2. Redirigir /dashboard/operacion a /dashboard/operacion/inbox
   if (pathname === '/dashboard/operacion' || pathname === '/dashboard/operacion/') {

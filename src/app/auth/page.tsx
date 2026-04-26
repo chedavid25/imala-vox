@@ -10,6 +10,8 @@ import {
   signInWithPopup
 } from "firebase/auth";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import Image from "next/image";
 import { 
   Bot, 
   ShieldCheck, 
@@ -19,7 +21,8 @@ import {
   ArrowRight,
   Mail,
   Lock,
-  User 
+  User,
+  Globe 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -146,12 +149,12 @@ export default function AuthPage() {
         </div>
 
         <div className="relative z-10">
-          <div className="flex items-center gap-2 mb-12 group cursor-pointer">
-            <div className="w-10 h-10 bg-[var(--accent)] rounded-xl flex items-center justify-center shadow-lg shadow-[var(--accent)]/20 animate-in zoom-in duration-500">
-                <Bot className="text-[var(--accent-text)] w-6 h-6" />
+          <Link href="/" className="flex items-center gap-3 mb-12 group cursor-pointer w-fit">
+            <div className="size-12 flex items-center justify-center group-hover:scale-105 transition-transform animate-in zoom-in duration-500">
+                <Image src="/icons/logo transparente vox.png" alt="Logo" width={48} height={48} className="rounded-md object-contain" />
             </div>
-            <h1 className="text-2xl font-bold tracking-tighter text-[var(--accent)]">Imalá Vox</h1>
-          </div>
+            <h1 className="text-2xl font-black tracking-tighter text-[var(--accent)]">Imalá Vox</h1>
+          </Link>
 
           <div className="space-y-8 mt-24">
             <h2 className="text-4xl font-bold leading-tight tracking-tight">
@@ -175,24 +178,29 @@ export default function AuthPage() {
                 title="Gestión de contactos inteligente" 
                 desc="Triage automático y escalada a humanos solo cuando es necesario." 
               />
+              <BulletItem 
+                icon={Globe} 
+                title="Omnicanalidad en el ecosistema de Meta" 
+                desc="Conectá WhatsApp, Instagram y Facebook para gestionar todos tus leads de Meta Ads en un solo lugar." 
+              />
             </div>
           </div>
         </div>
 
         <div className="relative z-10 text-[var(--text-tertiary-dark)] text-sm font-medium">
-          © 2024 Imalá Vox • Potenciando negocios con IA.
+          © 2026 Imalá Vox • Potenciando negocios con IA.
         </div>
       </div>
 
       {/* PANEL DERECHO: FORMULARIOS */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12">
         <div className="w-full max-w-md animate-in fade-in slide-in-from-right-4 duration-700">
-          <div className="lg:hidden flex items-center gap-2 mb-8">
-            <div className="w-8 h-8 bg-[var(--accent)] rounded-lg flex items-center justify-center">
-                <Bot className="text-[var(--accent-text)] w-5 h-5" />
+          <Link href="/" className="lg:hidden flex items-center gap-2 mb-8 group w-fit">
+            <div className="size-10 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Image src="/icons/logo transparente vox.png" alt="Logo" width={40} height={40} className="rounded-md object-contain" />
             </div>
-            <h1 className="text-xl font-bold text-[var(--text-primary-light)]">Imalá Vox</h1>
-          </div>
+            <h1 className="text-xl font-black tracking-tight text-[var(--text-primary-light)]">Imalá Vox</h1>
+          </Link>
 
           <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-8 bg-[var(--bg-input)] p-1 h-12 rounded-xl">
@@ -367,9 +375,9 @@ export default function AuthPage() {
             </TabsContent>
           </Tabs>
 
-          <p className="mt-8 text-center text-xs text-[var(--text-tertiary-light)] font-medium">
-            Al continuar, aceptas nuestros <button className="underline text-[var(--text-secondary-light)]">Términos de Servicio</button> <br />
-            y la <button className="underline text-[var(--text-secondary-light)]">Política de Privacidad</button>.
+          <p className="mt-8 text-center text-xs text-[var(--text-tertiary-light)] font-medium leading-relaxed">
+            Al continuar, aceptas nuestros <Link href="/terms" className="underline text-[var(--text-secondary-light)] hover:text-[var(--accent-active)] transition-colors">Términos de Servicio</Link> <br />
+            y la <Link href="/privacy" className="underline text-[var(--text-secondary-light)] hover:text-[var(--accent-active)] transition-colors">Política de Privacidad</Link>.
           </p>
         </div>
       </div>

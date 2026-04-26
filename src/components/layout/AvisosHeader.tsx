@@ -61,23 +61,21 @@ export function AvisosHeader() {
 
   return (
     <DropdownMenu onOpenChange={handleOpenChange}>
-      {/* TRIGGER — Base UI no acepta asChild ni render en DropdownMenuTrigger wrapper */}
-      <DropdownMenuTrigger>
-        <button
-          className={cn(
-            "relative size-10 rounded-2xl flex items-center justify-center transition-all duration-200 border",
-            badgeCount > 0
-              ? "bg-[var(--accent)]/10 border-[var(--accent)]/20 text-[var(--accent)] hover:bg-[var(--accent)]/20"
-              : "bg-white border-[var(--border-light)] text-[var(--text-tertiary-light)] hover:bg-[var(--bg-input)] hover:text-[var(--text-primary-light)] hover:border-[var(--border-light-strong)]"
-          )}
-        >
-          <Bell className={cn("size-4 transition-transform duration-300", isOpen && "scale-90")} />
-          {badgeCount > 0 && (
-            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[8px] font-black rounded-full flex items-center justify-center px-1 border-2 border-white leading-none animate-in zoom-in-50 duration-200 shadow-lg shadow-red-500/30">
-              {badgeCount > 99 ? "99+" : badgeCount}
-            </span>
-          )}
-        </button>
+      {/* TRIGGER — Aplicamos estilos directamente al Trigger para evitar anidamiento */}
+      <DropdownMenuTrigger
+        className={cn(
+          "relative size-10 rounded-2xl flex items-center justify-center transition-all duration-200 border outline-none",
+          badgeCount > 0
+            ? "bg-[var(--accent)]/10 border-[var(--accent)]/20 text-[var(--accent)] hover:bg-[var(--accent)]/20"
+            : "bg-white border-[var(--border-light)] text-[var(--text-tertiary-light)] hover:bg-[var(--bg-input)] hover:text-[var(--text-primary-light)] hover:border-[var(--border-light-strong)]"
+        )}
+      >
+        <Bell className={cn("size-4 transition-transform duration-300", isOpen && "scale-90")} />
+        {badgeCount > 0 && (
+          <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[8px] font-black rounded-full flex items-center justify-center px-1 border-2 border-white leading-none animate-in zoom-in-50 duration-200 shadow-lg shadow-red-500/30">
+            {badgeCount > 99 ? "99+" : badgeCount}
+          </span>
+        )}
       </DropdownMenuTrigger>
 
       <DropdownMenuContent

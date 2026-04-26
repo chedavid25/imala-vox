@@ -34,8 +34,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" className={`${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
-      <body className="antialiased overflow-hidden" suppressHydrationWarning>
+    <html lang="es" className={`${GeistSans.variable} ${GeistMono.variable} overflow-y-auto scroll-smooth`} suppressHydrationWarning>
+      <body className="antialiased overflow-y-auto" suppressHydrationWarning>
         <PwaRegister />
         <AppLayout>
           {children}
