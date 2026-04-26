@@ -435,7 +435,7 @@ export default function FacturacionPage() {
 
               return (
                 <Card key={p} className={cn(
-                  "relative flex flex-col bg-white border-[var(--border-light)] rounded-[28px] transition-all overflow-hidden",
+                  "relative flex flex-col bg-white border-[var(--border-light)] rounded-[28px] transition-all",
                   isCurrent ? "ring-2 ring-[var(--accent)] shadow-2xl z-10" : "hover:border-[var(--accent)]/30 hover:shadow-lg"
                 )}>
                   {isCurrent && (
@@ -608,6 +608,38 @@ export default function FacturacionPage() {
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+
+function InfoTooltip({ text }: { text: string }) {
+  const [show, setShow] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+  const [pos, setPos] = React.useState({ top: 0, left: 0 });
+
+  const handleEnter = () => {
+    if (ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      setPos({
+        top: rect.bottom + 8,
+        left: Math.min(rect.left - 200, window.innerWidth - 280),
+      });
+    }
+    setShow(true);
+  };
+
+  return (
+    <div ref={ref} className="relative inline-flex shrink-0" onMouseEnter={handleEnter} onMouseLeave={() => setShow(false)}>
+      <HelpCircle className="size-3.5 text-[var(--text-tertiary-light)] cursor-help hover:text-[var(--accent)] transition-colors" />
+      {show && (
+        <div
+          className="fixed w-60 p-3.5 bg-[#1F1F1E] text-white text-[11px] rounded-2xl shadow-2xl z-[9999] border border-white/10 leading-relaxed font-semibold pointer-events-none"
+          style={{ top: pos.top, left: pos.left }}
+        >
+          {text}
+        </div>
+      )}
     </div>
   );
 }
