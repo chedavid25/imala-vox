@@ -75,14 +75,17 @@ export function Sidebar() {
     return () => unsub();
   }, [currentWorkspaceId]);
 
-  const widthClass = sidebarCollapsed ? "w-[var(--sidebar-collapsed)]" : "w-[var(--sidebar-width)]";
+  const sidebarStyle: React.CSSProperties = {
+    width: sidebarCollapsed ? 'var(--sidebar-collapsed)' : 'var(--sidebar-width)',
+    transition: 'width 0.3s ease-in-out',
+  };
 
   if (isAgentSubRoute) {
     return (
-      <aside className={cn(
-        "h-screen bg-[var(--bg-sidebar)] border-r border-[var(--border-dark)] flex flex-col shrink-0 transition-all duration-300 ease-in-out z-20",
-        widthClass
-      )}>
+      <aside
+        className="h-screen bg-[var(--bg-sidebar)] border-r border-[var(--border-dark)] flex flex-col shrink-0 z-20"
+        style={sidebarStyle}
+      >
         <div className="p-4 border-b border-[var(--border-dark)] h-[var(--header-height)] flex items-center justify-between gap-2 overflow-hidden">
           <div className="flex items-center gap-2 min-w-0">
             <button 
@@ -156,49 +159,40 @@ export function Sidebar() {
   }
 
   return (
-    <aside className={cn(
-      "h-screen bg-[var(--bg-sidebar)] border-r border-[var(--border-dark)] flex flex-col shrink-0 relative transition-all duration-300 ease-in-out z-20",
-      widthClass
-    )}>
+    <aside
+      className="h-screen bg-[var(--bg-sidebar)] border-r border-[var(--border-dark)] flex flex-col shrink-0 relative z-20"
+      style={sidebarStyle}
+    >
       {/* HEADER del sidebar */}
-      {sidebarCollapsed ? (
-        /* MODO COLAPSADO: solo el logo, clickeable para expandir */
-        <div className="border-b border-[var(--border-dark)] h-[var(--header-height)] flex items-center justify-center">
-          <button
-            onClick={toggleSidebar}
-            title="Expandir menú"
-            className="p-1 hover:opacity-70 transition-opacity active:scale-95"
-          >
+      <div className={cn(
+        "border-b border-[var(--border-dark)] h-[var(--header-height)] flex items-center shrink-0",
+        sidebarCollapsed ? "justify-center" : "gap-2.5 px-3 justify-between"
+      )}>
+        {!sidebarCollapsed && (
+          <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
             <Image
               src="/icons/icon-192.png"
               alt="Imalá Vox"
-              width={40}
-              height={40}
-              className="rounded-xl"
+              width={28}
+              height={28}
+              className="rounded-xl shrink-0"
             />
-          </button>
-        </div>
-      ) : (
-        /* MODO EXPANDIDO: logo + nombre + botón colapsar */
-        <div className="p-3 border-b border-[var(--border-dark)] h-[var(--header-height)] flex items-center gap-2.5 overflow-hidden">
-          <Image
-            src="/icons/icon-192.png"
-            alt="Imalá Vox"
-            width={30}
-            height={30}
-            className="rounded-xl shrink-0"
-          />
-          <h2 className="text-[var(--text-primary-dark)] font-bold text-base tracking-tight truncate flex-1 animate-in fade-in duration-300">
-            Imalá Vox
-          </h2>
-          <button
-            onClick={toggleSidebar}
-            className="p-1.5 hover:bg-[var(--bg-sidebar-hover)] rounded-lg transition-colors text-[var(--text-tertiary-dark)] shrink-0 active:scale-95"
-          >
-            <PanelLeftClose className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+            <h2 className="text-[var(--text-primary-dark)] font-bold text-base tracking-tight truncate animate-in fade-in duration-200">
+              Imalá Vox
+            </h2>
+          </div>
+        )}
+        <button
+          onClick={toggleSidebar}
+          title={sidebarCollapsed ? "Expandir menú" : "Colapsar menú"}
+          className="p-1.5 hover:bg-[var(--bg-sidebar-hover)] rounded-lg transition-colors text-[var(--text-tertiary-dark)] hover:text-[var(--text-primary-dark)] shrink-0 active:scale-95"
+        >
+          {sidebarCollapsed
+            ? <PanelLeftOpen className="w-5 h-5" />
+            : <PanelLeftClose className="w-4 h-4" />
+          }
+        </button>
+      </div>
       
       <nav className="flex-1 p-3 space-y-6 overflow-y-auto no-scrollbar">
         <div className="space-y-1">
