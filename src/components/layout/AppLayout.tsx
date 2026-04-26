@@ -66,8 +66,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
   }, [pathname, currentWorkspaceId, setCurrentAgentName]);
 
   useEffect(() => {
+    // La landing "/" maneja su propia lógica de auth en el componente
+    if (pathname === "/") return;
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-// ... existing session logic ...
       if (user) {
         try {
           const { collection, query, where, getDocs, limit, collectionGroup, getDoc, doc } = await import("firebase/firestore");
@@ -126,15 +128,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         }
       } else {
         setIsSessionLoading(false);
-        // Usar window.location para evitar condición de carrera con el closure
-        const currentPath = typeof window !== "undefined" ? window.location.pathname : pathname;
-        const isCurrentPublic =
-          currentPath === "/" ||
-          currentPath.startsWith("/auth") ||
-          currentPath.startsWith("/onboarding") ||
-          currentPath.startsWith("/privacy") ||
-          currentPath.startsWith("/terms");
-        if (!isCurrentPublic) {
+        if (!isPublicRoute) {
           router.push("/auth");
         }
       }
