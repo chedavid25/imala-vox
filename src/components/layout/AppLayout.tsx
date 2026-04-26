@@ -28,13 +28,19 @@ export default function AppLayout({ children }: AppLayoutProps) {
   
   // Normalizamos el pathname para evitar errores durante la hidratación
   const normalizedPathname = pathname?.toLowerCase() || "/";
-
+  
   const isPublicRoute =
     normalizedPathname === "/" ||
+    normalizedPathname === "" ||
     normalizedPathname.startsWith("/auth") ||
     normalizedPathname.startsWith("/onboarding") ||
     normalizedPathname.startsWith("/privacy") ||
     normalizedPathname.startsWith("/terms");
+
+  // Log para depuración (puedes verlo en la consola del navegador F12)
+  useEffect(() => {
+    console.log("Ruta detectada:", normalizedPathname, "esPublica:", isPublicRoute);
+  }, [normalizedPathname, isPublicRoute]);
 
   // Efecto para recuperar el nombre del agente si estamos en una subruta de agentes
   useEffect(() => {
@@ -70,7 +76,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   useEffect(() => {
     // La landing "/" maneja su propia lógica de auth en el componente
-    if (normalizedPathname === "/") {
+    if (normalizedPathname === "/" || normalizedPathname === "") {
       setIsSessionLoading(false);
       return;
     }
