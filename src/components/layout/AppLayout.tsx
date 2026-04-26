@@ -26,16 +26,19 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [isSessionLoading, setIsSessionLoading] = useState(true);
   const isMobile = useMobileLayout();
   
+  // Normalizamos el pathname para evitar errores durante la hidratación
+  const normalizedPathname = pathname?.toLowerCase() || "/";
+
   const isPublicRoute =
-    pathname === "/" ||
-    pathname.toLowerCase().startsWith("/auth") ||
-    pathname.toLowerCase().startsWith("/onboarding") ||
-    pathname.toLowerCase().startsWith("/privacy") ||
-    pathname.toLowerCase().startsWith("/terms");
+    normalizedPathname === "/" ||
+    normalizedPathname.startsWith("/auth") ||
+    normalizedPathname.startsWith("/onboarding") ||
+    normalizedPathname.startsWith("/privacy") ||
+    normalizedPathname.startsWith("/terms");
 
   // Efecto para recuperar el nombre del agente si estamos en una subruta de agentes
   useEffect(() => {
-    const segments = pathname.split('/').filter(Boolean);
+    const segments = normalizedPathname.split('/').filter(Boolean);
     const agentsIdx = segments.indexOf('agentes');
     
     // Si estamos en /dashboard/ajustes/agentes/[id]/...
@@ -67,7 +70,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   useEffect(() => {
     // La landing "/" maneja su propia lógica de auth en el componente
-    if (pathname === "/") return;
+    if (normalizedPathname === "/") {
+      setIsSessionLoading(false);
+      return;
+    }
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -109,7 +115,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           }
 
           if (!wsDocData) {
-            if (pathname !== "/onboarding") {
+            if (normalizedPathname !== "/onboarding") {
               router.push("/onboarding");
             }
           } else {
@@ -117,7 +123,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             setWorkspace(wsDocData);
 
             // Solo redirigir desde /auth y /onboarding, no desde la landing "/"
-            if (isPublicRoute && pathname !== "/") {
+            if (isPublicRoute && normalizedPathname !== "/") {
               router.push("/dashboard/operacion/inbox");
             }
           }
@@ -135,7 +141,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
     });
 
     return () => unsubscribe();
-  }, [pathname, router, setWorkspace, setWorkspaceId, isPublicRoute]);
+  }, [normalizedPathname, router, setWorkspace, setWorkspaceId, isPublicRoute]);
 
   if (isPublicRoute) {
     return <>{children}</>;
