@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { 
@@ -161,14 +162,29 @@ export function Sidebar() {
     )}>
       <div className="p-4 border-b border-[var(--border-dark)] h-[var(--header-height)] flex items-center justify-between overflow-hidden">
         {!sidebarCollapsed && (
-          <h2 className="text-[var(--text-primary-dark)] font-bold text-lg tracking-tight truncate animate-in fade-in duration-300">
-            Imalá Vox
-          </h2>
+          <div className="flex items-center gap-2.5 animate-in fade-in duration-300 min-w-0">
+            <Image
+              src="/icons/icon-192.png"
+              alt="Imalá Vox"
+              width={28}
+              height={28}
+              className="rounded-lg shrink-0"
+            />
+            <h2 className="text-[var(--text-primary-dark)] font-bold text-base tracking-tight truncate">
+              Imalá Vox
+            </h2>
+          </div>
         )}
         {sidebarCollapsed && (
-           <div className="w-8 h-8 rounded-lg bg-[var(--accent)] flex items-center justify-center shrink-0 animate-in zoom-in duration-300 mx-auto">
-             <span className="text-black font-black text-xs">IV</span>
-           </div>
+          <div className="mx-auto animate-in zoom-in duration-300">
+            <Image
+              src="/icons/icon-192.png"
+              alt="Imalá Vox"
+              width={32}
+              height={32}
+              className="rounded-lg"
+            />
+          </div>
         )}
         
         <button 
