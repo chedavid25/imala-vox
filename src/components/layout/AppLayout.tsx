@@ -26,10 +26,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [isSessionLoading, setIsSessionLoading] = useState(true);
   const isMobile = useMobileLayout();
   
-  const isPublicRoute = 
-    pathname.toLowerCase().startsWith("/auth") || 
-    pathname.toLowerCase().startsWith("/onboarding") || 
-    pathname.toLowerCase().startsWith("/privacy") || 
+  const isPublicRoute =
+    pathname === "/" ||
+    pathname.toLowerCase().startsWith("/auth") ||
+    pathname.toLowerCase().startsWith("/onboarding") ||
+    pathname.toLowerCase().startsWith("/privacy") ||
     pathname.toLowerCase().startsWith("/terms");
 
   // Efecto para recuperar el nombre del agente si estamos en una subruta de agentes
@@ -113,7 +114,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
             setWorkspaceId(wsDocData.id);
             setWorkspace(wsDocData);
 
-            if (isPublicRoute) {
+            // Solo redirigir desde /auth y /onboarding, no desde la landing "/"
+            if (isPublicRoute && pathname !== "/") {
               router.push("/dashboard/operacion/inbox");
             }
           }
