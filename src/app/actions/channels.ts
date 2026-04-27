@@ -406,12 +406,14 @@ export async function enviarMensajeAccion(
               type: media.tipo,
               payload: { url: media.url, is_selectable: true }
             }
-          }
+          },
+          ...(tag && { messaging_type: "MESSAGE_TAG", tag })
         };
       } else {
         body = {
           recipient: { id: destinatario },
-          message: { text: texto }
+          message: { text: texto },
+          ...(tag ? { messaging_type: "MESSAGE_TAG", tag } : { messaging_type: "RESPONSE" })
         };
       }
     }
@@ -425,9 +427,19 @@ export async function enviarMensajeAccion(
       body: JSON.stringify(body)
     });
 
-    const data = await res.json();
+    let data = await res.json();
+    
     if (!res.ok) {
       console.error("Error en Meta API:", data);
+      
+      // Mensaje amigable para ventana de 24hs cerrada (Error #10)
+      if (data.error?.code === 10) {
+        return { 
+          success: false, 
+          error: "La ventana de 24hs de Meta está cerrada. Para volver a chatear, el cliente debe enviarte un nuevo mensaje o debés contactarlo desde la App oficial de Facebook/Instagram." 
+        };
+      }
+
       return { success: false, error: data.error?.message || "Error al enviar mensaje vía Meta" };
     }
 
