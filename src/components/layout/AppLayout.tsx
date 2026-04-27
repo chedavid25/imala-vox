@@ -13,6 +13,7 @@ import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { cn } from "@/lib/utils";
 import { useMobileLayout } from "@/hooks/useMobileLayout";
 import { MobileLayout } from "./MobileLayout";
+import { SplashScreen } from "./SplashScreen";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -148,8 +149,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
     return <>{children}</>;
   }
 
-  if (isSessionLoading) {
-    return <AppLoadingSkeleton />;
+  if (isSessionLoading || isMobile === null) {
+    return <SplashScreen />;
   }
 
   if (isMobile) {
@@ -219,26 +220,3 @@ export default function AppLayout({ children }: AppLayoutProps) {
   );
 }
 
-function AppLoadingSkeleton() {
-  return (
-    <div className="flex h-screen w-full overflow-hidden bg-[var(--bg-main)]">
-      <div className="w-[240px] h-full bg-[var(--bg-sidebar)] border-r border-[var(--border-dark)] p-4 space-y-8">
-        <div className="h-6 w-32 bg-white/10 rounded-md animate-pulse mb-12" />
-        <div className="space-y-4">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="h-8 w-full bg-white/5 rounded-lg animate-pulse" />
-          ))}
-        </div>
-      </div>
-      <div className="flex-1 flex flex-col">
-        <div className="h-[var(--header-height)] border-b border-[var(--border-light)] bg-white animate-pulse" />
-        <div className="flex-1 p-8">
-          <div className="space-y-4">
-            <div className="h-8 w-48 bg-gray-200 rounded animate-pulse" />
-            <div className="h-64 w-full bg-gray-100 rounded-3xl animate-pulse" />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}

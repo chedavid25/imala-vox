@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 
 export function useMobileLayout() {
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState<boolean | null>(null);
 
   useEffect(() => {
     // Definimos el breakpoint estándar de mobile/tablet
