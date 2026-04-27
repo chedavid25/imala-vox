@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { FloatingWhatsApp } from "@/components/ui/FloatingWhatsApp";
+import { Reveal } from "@/components/ui/Reveal";
 
 // ─────────────────────────────────────────────
 // MOCKUP: Browser chrome wrapper
@@ -327,7 +328,7 @@ function Navbar() {
 // ─────────────────────────────────────────────
 function HeroSection() {
   return (
-    <section className="relative bg-[#1F1F1E] min-h-screen flex flex-col items-center justify-center overflow-hidden pt-16">
+    <section id="inicio" className="relative bg-[#1F1F1E] min-h-screen flex flex-col items-center justify-center overflow-hidden pt-16">
       {/* Grid de puntos de fondo */}
       <div className="absolute inset-0 opacity-[0.03]" style={{
         backgroundImage: "radial-gradient(circle, #C8FF00 1px, transparent 1px)",
@@ -338,44 +339,52 @@ function HeroSection() {
 
       <div className="relative z-10 max-w-7xl mx-auto px-6 py-24 flex flex-col items-center text-center">
         {/* Badge */}
-        <div className="inline-flex items-center gap-2 bg-[#C8FF00]/10 border border-[#C8FF00]/20 text-[#C8FF00] text-xs font-black px-4 py-2 rounded-full mb-8 uppercase tracking-widest">
-          <Bot className="w-3.5 h-3.5" />
-          Agentes IA para WhatsApp, Instagram y Facebook
-        </div>
+        <Reveal animation="fade-in-up" delay={100}>
+          <div className="inline-flex items-center gap-2 bg-[#C8FF00]/10 border border-[#C8FF00]/20 text-[#C8FF00] text-xs font-black px-4 py-2 rounded-full mb-8 uppercase tracking-widest">
+            <Bot className="w-3.5 h-3.5" />
+            Agentes IA para WhatsApp, Instagram y Facebook
+          </div>
+        </Reveal>
 
         {/* Titular */}
-        <h1 className="text-5xl md:text-7xl font-black text-white leading-[1.05] tracking-tight mb-6 max-w-4xl">
-          Tus clientes escriben<br />
-          a las 3am.{" "}
-          <span className="text-[#C8FF00]">Tu negocio<br />
-          les responde.</span>
-        </h1>
+        <Reveal animation="fade-in-up" delay={200}>
+          <h1 className="text-5xl md:text-7xl font-black text-white leading-[1.05] tracking-tight mb-6 max-w-4xl">
+            Tus clientes escriben<br />
+            a las 3am.{" "}
+            <span className="text-[#C8FF00]">Tu negocio<br />
+            les responde.</span>
+          </h1>
+        </Reveal>
 
         {/* Subtítulo */}
-        <p className="text-lg md:text-xl text-white/55 max-w-2xl leading-relaxed mb-10 font-medium">
-          Imalá Vox crea agentes de inteligencia artificial que atienden, califican y venden por vos —
-          en todos tus canales, las 24 horas, sin que tengas que estar presente.
-        </p>
+        <Reveal animation="fade-in-up" delay={300}>
+          <p className="text-lg md:text-xl text-white/55 max-w-2xl leading-relaxed mb-10 font-medium">
+            Imalá Vox crea agentes de inteligencia artificial que atienden, califican y venden por vos —
+            en todos tus canales, las 24 horas, sin que tengas que estar presente.
+          </p>
+        </Reveal>
 
         {/* CTAs */}
-        <div className="flex flex-col sm:flex-row items-center gap-4 mb-16">
-          <Link
-            href="/auth"
-            className="w-full sm:w-auto bg-[#C8FF00] text-black font-black px-8 py-4 rounded-2xl text-base hover:bg-[#B8EF00] transition-all active:scale-95 shadow-2xl shadow-[#C8FF00]/20 flex items-center gap-2 justify-center"
-          >
-            Empezar gratis — 7 días
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-          <a
-            href="#funciones"
-            className="w-full sm:w-auto border border-white/15 text-white/70 font-bold px-8 py-4 rounded-2xl text-base hover:border-white/30 hover:text-white transition-all flex items-center gap-2 justify-center"
-          >
-            Ver funciones
-          </a>
-        </div>
+        <Reveal animation="fade-in-up" delay={400}>
+          <div className="flex flex-col sm:flex-row items-center gap-4 mb-16">
+            <Link
+              href="/auth"
+              className="w-full sm:w-auto bg-[#C8FF00] text-black font-black px-8 py-4 rounded-2xl text-base hover:bg-[#B8EF00] transition-all active:scale-95 shadow-2xl shadow-[#C8FF00]/20 flex items-center gap-2 justify-center"
+            >
+              Empezar gratis — 7 días
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+            <a
+              href="#funciones"
+              className="w-full sm:w-auto border border-white/15 text-white/70 font-bold px-8 py-4 rounded-2xl text-base hover:border-white/30 hover:text-white transition-all flex items-center gap-2 justify-center"
+            >
+              Ver funciones
+            </a>
+          </div>
+        </Reveal>
 
         {/* Mockup con stats flotantes */}
-        <div className="relative w-full max-w-4xl">
+        <Reveal animation="fade-in-up" delay={500} className="relative w-full max-w-4xl">
           {/* Stats flotantes */}
           <div className="absolute -top-4 -left-4 md:-left-8 z-20 bg-[#1F1F1E] border border-white/10 rounded-2xl px-4 py-2.5 shadow-2xl hidden sm:flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-[#C8FF00]/10 flex items-center justify-center">
@@ -397,7 +406,7 @@ function HeroSection() {
           </div>
           <InboxMockup />
           <p className="text-xs text-white/25 mt-4 font-medium">Sin tarjeta de crédito · Configuración en menos de 1 hora</p>
-        </div>
+        </Reveal>
       </div>
     </section>
   );
@@ -416,48 +425,49 @@ function SocialProofSection() {
     <section className="bg-white border-y border-[#E5E5E3] py-20">
       <div className="max-w-7xl mx-auto px-6 text-center">
         {/* Título Resaltado */}
-        <div className="inline-block bg-[#1A1A18] px-6 py-2 rounded-full mb-12 shadow-xl shadow-black/10">
-          <p className="text-[10px] font-black text-[#C8FF00] uppercase tracking-[0.3em]">
-            Tu negocio conectado a todo el ecosistema de Meta
-          </p>
-        </div>
+        <Reveal animation="fade-in-up">
+          <div className="inline-block bg-[#1A1A18] px-6 py-2 rounded-full mb-12 shadow-xl shadow-black/10">
+            <p className="text-[10px] font-black text-[#C8FF00] uppercase tracking-[0.3em]">
+              Tu negocio conectado a todo el ecosistema de Meta
+            </p>
+          </div>
+        </Reveal>
 
         {/* Logos Oficiales a Color */}
         <div className="flex flex-wrap items-center justify-center gap-10 md:gap-16 mb-20">
-          <div className="flex items-center gap-3 group cursor-pointer">
-            <img src="https://cdn.simpleicons.org/whatsapp/25D366" alt="WhatsApp" className="w-6 h-6 group-hover:scale-110 transition-transform" />
-            <span className="text-sm font-black text-[#1A1A18] tracking-tight">WhatsApp Business</span>
-          </div>
-          <div className="flex items-center gap-3 group cursor-pointer">
-            <img src="https://cdn.simpleicons.org/instagram/E4405F" alt="Instagram" className="w-6 h-6 group-hover:scale-110 transition-transform" />
-            <span className="text-sm font-black text-[#1A1A18] tracking-tight">Instagram</span>
-          </div>
-          <div className="flex items-center gap-3 group cursor-pointer">
-            <img src="https://cdn.simpleicons.org/facebook/1877F2" alt="Facebook" className="w-6 h-6 group-hover:scale-110 transition-transform" />
-            <span className="text-sm font-black text-[#1A1A18] tracking-tight">Facebook</span>
-          </div>
-          <div className="flex items-center gap-3 group cursor-pointer">
-            <img src="https://cdn.simpleicons.org/meta/0668E1" alt="Meta Leads" className="w-6 h-6 group-hover:scale-110 transition-transform" />
-            <span className="text-sm font-black text-[#1A1A18] tracking-tight">Meta Leads</span>
-          </div>
+          {[
+            { img: "whatsapp/25D366", label: "WhatsApp Business" },
+            { img: "instagram/E4405F", label: "Instagram" },
+            { img: "facebook/1877F2", label: "Facebook" },
+            { img: "meta/0668E1", label: "Meta Leads" },
+          ].map((logo, i) => (
+            <Reveal key={i} animation="zoom-in" delay={i * 100}>
+              <div className="flex items-center gap-3 group cursor-pointer">
+                <img src={`https://cdn.simpleicons.org/${logo.img}`} alt={logo.label} className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                <span className="text-sm font-black text-[#1A1A18] tracking-tight">{logo.label}</span>
+              </div>
+            </Reveal>
+          ))}
         </div>
 
         {/* Stats en Fondo Oscuro */}
-        <div className="bg-[#1F1F1E] rounded-[3rem] p-12 max-w-4xl mx-auto shadow-[0_40px_100px_rgba(0,0,0,0.15)]">
-          <div className="grid grid-cols-3 gap-8 items-center">
-            {stats.map((s, i) => (
-              <div key={i} className="space-y-3">
-                <p className={cn(
-                  "text-4xl md:text-6xl font-black",
-                  s.value === "4" ? "text-[#C8FF00] [text-shadow:0_0_30px_rgba(200,255,0,0.4)]" : "text-white"
-                )}>
-                  {s.value}
-                </p>
-                <p className="text-[10px] text-white/30 font-black uppercase tracking-widest">{s.label}</p>
-              </div>
-            ))}
+        <Reveal animation="fade-in-up" delay={200}>
+          <div className="bg-[#1F1F1E] rounded-[3rem] p-12 max-w-4xl mx-auto shadow-[0_40px_100px_rgba(0,0,0,0.15)]">
+            <div className="grid grid-cols-3 gap-8 items-center">
+              {stats.map((s, i) => (
+                <div key={i} className="space-y-3">
+                  <p className={cn(
+                    "text-4xl md:text-6xl font-black",
+                    s.value === "4" ? "text-[#C8FF00] [text-shadow:0_0_30px_rgba(200,255,0,0.4)]" : "text-white"
+                  )}>
+                    {s.value}
+                  </p>
+                  <p className="text-[10px] text-white/30 font-black uppercase tracking-widest">{s.label}</p>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        </Reveal>
       </div>
     </section>
   );
@@ -488,22 +498,24 @@ function ProblemSection() {
     <section className="bg-[#1F1F1E] py-24 relative overflow-hidden">
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-px h-16 bg-gradient-to-b from-transparent to-white/10" />
       <div className="max-w-7xl mx-auto px-6">
-        <div className="text-center mb-16">
+        <Reveal className="text-center mb-16">
           <span className="text-xs font-black text-[#C8FF00]/60 uppercase tracking-widest">El problema</span>
           <h2 className="text-3xl md:text-5xl font-black text-white mt-3 leading-tight">
             Gestionar mensajes manualmente<br />
             <span className="text-white/40">te está costando clientes</span>
           </h2>
-        </div>
+        </Reveal>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {pains.map((p, i) => (
-            <div key={i} className="bg-[#2A2A28] border border-white/5 rounded-3xl p-8 space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-[#C8FF00]/10 border border-[#C8FF00]/10 flex items-center justify-center">
-                <p.icon className="w-5 h-5 text-[#C8FF00]" />
+            <Reveal key={i} animation="fade-in-up" delay={i * 150}>
+              <div className="bg-[#2A2A28] border border-white/5 rounded-3xl p-8 h-full space-y-4">
+                <div className="w-12 h-12 rounded-2xl bg-[#C8FF00]/10 border border-[#C8FF00]/10 flex items-center justify-center">
+                  <p.icon className="w-5 h-5 text-[#C8FF00]" />
+                </div>
+                <h3 className="text-lg font-bold text-white">{p.title}</h3>
+                <p className="text-sm text-white/50 leading-relaxed font-medium">{p.desc}</p>
               </div>
-              <h3 className="text-lg font-bold text-white">{p.title}</h3>
-              <p className="text-sm text-white/50 leading-relaxed font-medium">{p.desc}</p>
-            </div>
+            </Reveal>
           ))}
         </div>
       </div>
@@ -521,9 +533,9 @@ function SolutionSection() {
     { icon: Target, tag: "Fidelizá", title: "Seguimiento automático con cara humana", desc: "Difusiones personalizadas, seguimiento de leads de Meta Ads y tareas automáticas para que ningún cliente quede en el olvido." },
   ];
   return (
-    <section className="bg-[#F5F5F4] py-24">
+    <section id="solucion" className="bg-[#F5F5F4] py-24 scroll-mt-16">
       <div className="max-w-7xl mx-auto px-6">
-        <div className="text-center mb-16">
+        <Reveal className="text-center mb-16">
           <span className="text-xs font-black text-[#A3A39E] uppercase tracking-widest">La solución</span>
           <h2 className="text-3xl md:text-5xl font-black text-[#1A1A18] mt-3 leading-tight">
             Un agente que conoce tu negocio<br />
@@ -532,19 +544,21 @@ function SolutionSection() {
           <p className="text-base text-[#6B6B67] mt-4 max-w-xl mx-auto font-medium">
             Entrenás a Imalá Vox con tu información una sola vez. Él hace el resto.
           </p>
-        </div>
+        </Reveal>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {pillars.map((p, i) => (
-            <div key={i} className="bg-white border border-[#E5E5E3] rounded-3xl p-8 space-y-4 hover:shadow-lg transition-shadow">
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-xl bg-[#1F1F1E] flex items-center justify-center">
-                  <p.icon className="w-4.5 h-4.5 text-[#C8FF00]" style={{ width: 18, height: 18 }} />
+            <Reveal key={i} animation="zoom-in" delay={i * 150}>
+              <div className="bg-white border border-[#E5E5E3] rounded-3xl p-8 h-full space-y-4 hover:shadow-lg transition-shadow">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 rounded-xl bg-[#1F1F1E] flex items-center justify-center">
+                    <p.icon className="w-4.5 h-4.5 text-[#C8FF00]" style={{ width: 18, height: 18 }} />
+                  </div>
+                  <span className="text-xs font-black text-[#A3A39E] uppercase tracking-widest">{p.tag}</span>
                 </div>
-                <span className="text-xs font-black text-[#A3A39E] uppercase tracking-widest">{p.tag}</span>
+                <h3 className="text-lg font-bold text-[#1A1A18] leading-snug">{p.title}</h3>
+                <p className="text-sm text-[#6B6B67] leading-relaxed font-medium">{p.desc}</p>
               </div>
-              <h3 className="text-lg font-bold text-[#1A1A18] leading-snug">{p.title}</h3>
-              <p className="text-sm text-[#6B6B67] leading-relaxed font-medium">{p.desc}</p>
-            </div>
+            </Reveal>
           ))}
         </div>
       </div>
@@ -558,6 +572,7 @@ function SolutionSection() {
 function FeaturesSection() {
   const features = [
     {
+      id: "agentes",
       dark: false,
       tag: "Agentes IA",
       title: "Entrenalo con tu información en minutos",
@@ -566,6 +581,7 @@ function FeaturesSection() {
       mockup: <KnowledgeMockup />,
     },
     {
+      id: "crm",
       dark: true,
       tag: "CRM Integrado",
       title: "Tu pipeline de ventas, sin herramientas extra",
@@ -574,6 +590,7 @@ function FeaturesSection() {
       mockup: <LeadsMockup />,
     },
     {
+      id: "difusion",
       dark: false,
       tag: "Difusión Masiva",
       title: "Llegá a todos tus clientes con un click",
@@ -609,11 +626,11 @@ function FeaturesSection() {
   return (
     <section id="funciones" className="scroll-mt-16">
       {features.map((f, i) => (
-        <div key={i} className={cn("py-24", f.dark ? "bg-[#1F1F1E]" : "bg-white")}>
+        <div key={f.id} className={cn("py-24", f.dark ? "bg-[#1F1F1E]" : "bg-white")}>
           <div className="max-w-7xl mx-auto px-6">
             <div className={cn("flex flex-col gap-12 items-center", i % 2 === 1 ? "lg:flex-row-reverse" : "lg:flex-row")}>
               {/* Texto */}
-              <div className="flex-1 space-y-6">
+              <Reveal animation={i % 2 === 0 ? "fade-in-left" : "fade-in-right"} className="flex-1 space-y-6">
                 <span className={cn("text-xs font-black uppercase tracking-widest", f.dark ? "text-[#C8FF00]/60" : "text-[#A3A39E]")}>
                   {f.tag}
                 </span>
@@ -633,11 +650,11 @@ function FeaturesSection() {
                     </li>
                   ))}
                 </ul>
-              </div>
+              </Reveal>
               {/* Mockup */}
-              <div className="flex-1 w-full max-w-lg">
+              <Reveal animation="zoom-in" delay={200} className="flex-1 w-full max-w-lg">
                 {f.mockup}
-              </div>
+              </Reveal>
             </div>
           </div>
         </div>
@@ -679,29 +696,31 @@ function ChannelsSection() {
   return (
     <section id="canales" className="scroll-mt-16 bg-[#F5F5F4] py-24">
       <div className="max-w-7xl mx-auto px-6">
-        <div className="text-center mb-16">
+        <Reveal className="text-center mb-16">
           <span className="text-xs font-black text-[#A3A39E] uppercase tracking-widest">Canales incluidos en todos los planes</span>
           <h2 className="text-3xl md:text-5xl font-black text-[#1A1A18] mt-3 leading-tight">
             Donde ya están tus clientes
           </h2>
-        </div>
+        </Reveal>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {channels.map((c, i) => (
-            <div key={i} className="bg-white border border-[#E5E5E3] rounded-3xl p-8 space-y-4 relative overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1">
-              {c.badge && (
-                <div className={cn(
-                  "absolute top-6 right-6 text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest",
-                  c.badge === "Nuevo" ? "bg-black text-[#C8FF00]" : "bg-[#C8FF00] text-black"
-                )}>
-                  {c.badge}
+            <Reveal key={i} animation="fade-in-up" delay={i * 100}>
+              <div className="bg-white border border-[#E5E5E3] rounded-3xl p-8 h-full space-y-4 relative overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1">
+                {c.badge && (
+                  <div className={cn(
+                    "absolute top-6 right-6 text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest",
+                    c.badge === "Nuevo" ? "bg-black text-[#C8FF00]" : "bg-[#C8FF00] text-black"
+                  )}>
+                    {c.badge}
+                  </div>
+                )}
+                <div className="w-12 h-12 rounded-2xl bg-[#F5F5F4] flex items-center justify-center">
+                  <img src={c.icon} alt={c.name} className="w-6 h-6" />
                 </div>
-              )}
-              <div className="w-12 h-12 rounded-2xl bg-[#F5F5F4] flex items-center justify-center">
-                <img src={c.icon} alt={c.name} className="w-6 h-6" />
+                <h3 className="text-lg font-bold text-[#1A1A18]">{c.name}</h3>
+                <p className="text-sm text-[#6B6B67] leading-relaxed font-medium">{c.desc}</p>
               </div>
-              <h3 className="text-lg font-bold text-[#1A1A18]">{c.name}</h3>
-              <p className="text-sm text-[#6B6B67] leading-relaxed font-medium">{c.desc}</p>
-            </div>
+            </Reveal>
           ))}
         </div>
       </div>
@@ -757,7 +776,7 @@ function PricingSection() {
     <section id="precios" className="scroll-mt-16 bg-[#1F1F1E] py-24 relative overflow-hidden">
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#C8FF00] opacity-[0.03] blur-[120px] rounded-full -mr-64 -mt-64 pointer-events-none" />
       <div className="max-w-7xl mx-auto px-6 relative z-10">
-        <div className="text-center mb-12">
+        <Reveal className="text-center mb-12">
           <span className="text-xs font-black text-[#C8FF00]/60 uppercase tracking-widest">Precios</span>
           <h2 className="text-3xl md:text-5xl font-black text-white mt-3 leading-tight">
             Elegí tu plan
@@ -784,99 +803,101 @@ function PricingSection() {
               <span className="bg-emerald-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full">−20%</span>
             </button>
           </div>
-        </div>
+        </Reveal>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {plans.map((p) => {
+          {plans.map((p, i) => {
             const price = isAnual ? PRICES[p].yearly : PRICES[p].monthly;
             const display = PRICING_FEATURES[p];
             const isPro = p === "pro";
             return (
-              <div key={p} className={cn(
-                "rounded-3xl flex flex-col relative overflow-hidden",
-                isPro
-                  ? "bg-[#C8FF00] shadow-2xl shadow-[#C8FF00]/10 scale-[1.03]"
-                  : "bg-[#2A2A28] border border-white/5"
-              )}>
-                {display.tag && (
-                  <div className={cn("text-center py-2 text-[9px] font-black uppercase tracking-widest",
-                    isPro ? "bg-black/10 text-black/60" : "bg-[#C8FF00]/10 text-[#C8FF00]"
-                  )}>
-                    {display.tag}
-                  </div>
-                )}
-                <div className="p-8 space-y-1">
-                  <h3 className={cn("text-xs font-black uppercase tracking-widest", isPro ? "text-black/50" : "text-white/40")}>
-                    {p}
-                  </h3>
-                  <div className="flex items-baseline gap-1 mt-1">
-                    <span className={cn("text-4xl font-black", isPro ? "text-black" : "text-white")}>${price}</span>
-                    <span className={cn("text-xs font-bold uppercase", isPro ? "text-black/40" : "text-white/30")}>USD/mes</span>
-                  </div>
-                  {isAnual && (
-                    <p className={cn("text-[10px] font-bold", isPro ? "text-black/50" : "text-white/30")}>
-                      Facturado anualmente
-                    </p>
+              <Reveal key={p} animation="fade-in-up" delay={i * 150}>
+                <div className={cn(
+                  "rounded-3xl flex flex-col h-full relative overflow-hidden",
+                  isPro
+                    ? "bg-[#C8FF00] shadow-2xl shadow-[#C8FF00]/10 scale-[1.03]"
+                    : "bg-[#2A2A28] border border-white/5"
+                )}>
+                  {display.tag && (
+                    <div className={cn("text-center py-2 text-[9px] font-black uppercase tracking-widest",
+                      isPro ? "bg-black/10 text-black/60" : "bg-[#C8FF00]/10 text-[#C8FF00]"
+                    )}>
+                      {display.tag}
+                    </div>
                   )}
-                </div>
-
-                <div className={cn("flex-1 px-8 pb-8 space-y-3 border-t", isPro ? "border-black/10" : "border-white/5")}>
-                  <div className="pt-5 space-y-3">
-                    {display.inheritsFrom && (
-                      <div className={cn("flex items-center gap-2 py-2 px-3 rounded-xl border text-[10px] font-black uppercase tracking-widest",
-                        isPro ? "bg-black/10 border-black/10 text-black/50" : "bg-[#C8FF00]/5 border-[#C8FF00]/10 text-[#C8FF00]/60"
-                      )}>
-                        <div className={cn("w-1.5 h-1.5 rounded-full", isPro ? "bg-black/30" : "bg-[#C8FF00]/40")} />
-                        Todo el {display.inheritsFrom}, más:
-                      </div>
+                  <div className="p-8 space-y-1">
+                    <h3 className={cn("text-xs font-black uppercase tracking-widest", isPro ? "text-black/50" : "text-white/40")}>
+                      {p}
+                    </h3>
+                    <div className="flex items-baseline gap-1 mt-1">
+                      <span className={cn("text-4xl font-black", isPro ? "text-black" : "text-white")}>${price}</span>
+                      <span className={cn("text-xs font-bold uppercase", isPro ? "text-black/40" : "text-white/30")}>USD/mes</span>
+                    </div>
+                    {isAnual && (
+                      <p className={cn("text-[10px] font-bold", isPro ? "text-black/50" : "text-white/30")}>
+                        Facturado anualmente
+                      </p>
                     )}
-                    {display.groups.map((g, gi) => (
-                      <div key={gi} className="space-y-1.5">
-                        <p className={cn("text-[9px] font-black uppercase tracking-widest px-1",
-                          g.locked ? (isPro ? "text-black/25" : "text-white/15") : (isPro ? "text-black/40" : "text-white/30")
-                        )}>{g.label}</p>
-                        {g.items.map((item, ii) => (
-                          <div key={ii} className="flex items-center gap-2">
-                            {g.locked ? (
-                              <div className={cn("w-4 h-4 rounded-full border flex items-center justify-center shrink-0",
-                                isPro ? "bg-black/5 border-black/10" : "bg-white/5 border-white/5"
-                              )}>
-                                <X className={cn("w-2.5 h-2.5", isPro ? "text-black/25" : "text-white/15")} />
-                              </div>
-                            ) : (
-                              <div className={cn("w-4 h-4 rounded-full flex items-center justify-center shrink-0",
-                                isPro ? "bg-black" : "bg-[#C8FF00]"
-                              )}>
-                                <Check className={cn("w-2.5 h-2.5", isPro ? "text-[#C8FF00]" : "text-[#1A1A18]")} strokeWidth={4} />
-                              </div>
-                            )}
-                            <span className={cn("text-[11px] font-bold",
-                              g.locked
-                                ? (isPro ? "text-black/25 line-through decoration-black/20 decoration-1" : "text-white/20 line-through decoration-white/10 decoration-1")
-                                : (isPro ? "text-black/80" : "text-white/70")
-                            )}>{item}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ))}
+                  </div>
+
+                  <div className={cn("flex-1 px-8 pb-8 space-y-3 border-t", isPro ? "border-black/10" : "border-white/5")}>
+                    <div className="pt-5 space-y-3">
+                      {display.inheritsFrom && (
+                        <div className={cn("flex items-center gap-2 py-2 px-3 rounded-xl border text-[10px] font-black uppercase tracking-widest",
+                          isPro ? "bg-black/10 border-black/10 text-black/50" : "bg-[#C8FF00]/5 border-[#C8FF00]/10 text-[#C8FF00]/60"
+                        )}>
+                          <div className={cn("w-1.5 h-1.5 rounded-full", isPro ? "bg-black/30" : "bg-[#C8FF00]/40")} />
+                          Todo el {display.inheritsFrom}, más:
+                        </div>
+                      )}
+                      {display.groups.map((g, gi) => (
+                        <div key={gi} className="space-y-1.5">
+                          <p className={cn("text-[9px] font-black uppercase tracking-widest px-1",
+                            g.locked ? (isPro ? "text-black/25" : "text-white/15") : (isPro ? "text-black/40" : "text-white/30")
+                          )}>{g.label}</p>
+                          {g.items.map((item, ii) => (
+                            <div key={ii} className="flex items-center gap-2">
+                              {g.locked ? (
+                                <div className={cn("w-4 h-4 rounded-full border flex items-center justify-center shrink-0",
+                                  isPro ? "bg-black/5 border-black/10" : "bg-white/5 border-white/5"
+                                )}>
+                                  <X className={cn("w-2.5 h-2.5", isPro ? "text-black/25" : "text-white/15")} />
+                                </div>
+                              ) : (
+                                <div className={cn("w-4 h-4 rounded-full flex items-center justify-center shrink-0",
+                                  isPro ? "bg-black" : "bg-[#C8FF00]"
+                                )}>
+                                  <Check className={cn("w-2.5 h-2.5", isPro ? "text-[#C8FF00]" : "text-[#1A1A18]")} strokeWidth={4} />
+                                </div>
+                              )}
+                              <span className={cn("text-[11px] font-bold",
+                                g.locked
+                                  ? (isPro ? "text-black/25 line-through decoration-black/20 decoration-1" : "text-white/20 line-through decoration-white/10 decoration-1")
+                                  : (isPro ? "text-black/80" : "text-white/70")
+                              )}>{item}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="px-8 pb-8">
+                    <Link
+                      href="/auth"
+                      className={cn(
+                        "w-full flex items-center justify-center gap-2 h-12 rounded-2xl text-xs font-black uppercase tracking-widest transition-all active:scale-95",
+                        isPro
+                          ? "bg-[#1F1F1E] text-[#C8FF00] hover:bg-[#161615] shadow-xl shadow-black/20"
+                          : "bg-[#C8FF00]/10 border border-[#C8FF00]/20 text-[#C8FF00] hover:bg-[#C8FF00]/20"
+                      )}
+                    >
+                      Probar gratis 7 días
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
                   </div>
                 </div>
-
-                <div className="px-8 pb-8">
-                  <Link
-                    href="/auth"
-                    className={cn(
-                      "w-full flex items-center justify-center gap-2 h-12 rounded-2xl text-xs font-black uppercase tracking-widest transition-all active:scale-95",
-                      isPro
-                        ? "bg-[#1F1F1E] text-[#C8FF00] hover:bg-[#161615] shadow-xl shadow-black/20"
-                        : "bg-[#C8FF00]/10 border border-[#C8FF00]/20 text-[#C8FF00] hover:bg-[#C8FF00]/20"
-                    )}
-                  >
-                    Probar gratis 7 días
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </Link>
-                </div>
-              </div>
+              </Reveal>
             );
           })}
         </div>
@@ -906,26 +927,28 @@ function FAQSection() {
   return (
     <section id="faq" className="scroll-mt-16 bg-white py-24">
       <div className="max-w-3xl mx-auto px-6">
-        <div className="text-center mb-14">
+        <Reveal className="text-center mb-14">
           <span className="text-xs font-black text-[#A3A39E] uppercase tracking-widest">FAQ</span>
           <h2 className="text-3xl md:text-4xl font-black text-[#1A1A18] mt-3">Preguntas frecuentes</h2>
-        </div>
+        </Reveal>
         <div className="space-y-3">
           {FAQS.map((f, i) => (
-            <div key={i} className="border border-[#E5E5E3] rounded-2xl overflow-hidden">
-              <button
-                className="w-full flex items-center justify-between px-6 py-5 text-left hover:bg-[#F5F5F4] transition-colors"
-                onClick={() => setOpen(open === i ? null : i)}
-              >
-                <span className="text-sm font-bold text-[#1A1A18] pr-4">{f.q}</span>
-                <ChevronDown className={cn("w-4 h-4 text-[#A3A39E] shrink-0 transition-transform", open === i && "rotate-180")} />
-              </button>
-              {open === i && (
-                <div className="px-6 pb-5">
-                  <p className="text-sm text-[#6B6B67] leading-relaxed font-medium">{f.a}</p>
-                </div>
-              )}
-            </div>
+            <Reveal key={i} animation="fade-in-up" delay={i * 50}>
+              <div className="border border-[#E5E5E3] rounded-2xl overflow-hidden">
+                <button
+                  className="w-full flex items-center justify-between px-6 py-5 text-left hover:bg-[#F5F5F4] transition-colors"
+                  onClick={() => setOpen(open === i ? null : i)}
+                >
+                  <span className="text-sm font-bold text-[#1A1A18] pr-4">{f.q}</span>
+                  <ChevronDown className={cn("w-4 h-4 text-[#A3A39E] shrink-0 transition-transform", open === i && "rotate-180")} />
+                </button>
+                {open === i && (
+                  <div className="px-6 pb-5">
+                    <p className="text-sm text-[#6B6B67] leading-relaxed font-medium">{f.a}</p>
+                  </div>
+                )}
+              </div>
+            </Reveal>
           ))}
         </div>
       </div>
@@ -944,7 +967,7 @@ function FinalCTASection() {
         backgroundSize: "28px 28px"
       }} />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-[#C8FF00] opacity-[0.05] blur-[120px] rounded-full pointer-events-none" />
-      <div className="relative z-10 max-w-4xl mx-auto px-6 text-center space-y-8">
+      <Reveal className="relative z-10 max-w-4xl mx-auto px-6 text-center space-y-8">
         <h2 className="text-4xl md:text-6xl font-black text-white leading-tight">
           Tu próximo cliente<br />
           ya te está escribiendo.<br />
@@ -965,7 +988,7 @@ function FinalCTASection() {
         <p className="text-xs text-white/25 font-medium">
           7 días de prueba · Sin tarjeta · Cancelás cuando querés
         </p>
-      </div>
+      </Reveal>
     </section>
   );
 }
@@ -1016,7 +1039,7 @@ function FooterSection() {
         </div>
 
         <div className="border-t border-white/5 pt-8 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-[10px] text-white/20 font-medium">© 2025 Imalá Vox · Todos los derechos reservados</p>
+          <p className="text-[10px] text-white/20 font-medium">© 2026 Imalá Vox · Todos los derechos reservados</p>
           <p className="text-[10px] text-white/20 font-medium">Hecho con ❤️ en Argentina 🇦🇷</p>
         </div>
       </div>
