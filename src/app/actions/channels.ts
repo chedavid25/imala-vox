@@ -322,7 +322,8 @@ export async function enviarMensajeAccion(
   destinatario: string, 
   texto?: string,
   media?: { url: string; tipo: 'image' | 'video' | 'document' },
-  senderAction?: 'typing_on' | 'typing_off' | 'mark_read'
+  senderAction?: 'typing_on' | 'typing_off' | 'mark_read',
+  tag?: 'CONFIRMED_EVENT_UPDATE' | 'POST_PURCHASE_UPDATE' | 'ACCOUNT_UPDATE' | 'HUMAN_AGENT'
 ) {
   try {
     if (!wsId || !canalId || !destinatario || (!texto && !media && !senderAction)) throw new Error("Faltan parámetros de envío");
