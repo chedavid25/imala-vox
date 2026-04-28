@@ -13,9 +13,9 @@ import { toast } from "sonner";
 
 const ALLOWED_PATHS = ["/dashboard/ajustes/facturacion"];
 
-const SUPPORT_WA = "https://wa.me/5493513376865?text=" + encodeURIComponent(
-  "Hola, necesito ayuda con mi cuenta en Imalá Vox."
-);
+const SUPPORT_WA =
+  "https://wa.me/5493513376865?text=" +
+  encodeURIComponent("Hola, necesito ayuda con mi cuenta en Imalá Vox.");
 
 function isExpired(workspace: {
   estado: string;
@@ -120,22 +120,23 @@ export function TrialExpiredGate() {
 
   return (
     <>
-      <div className="fixed inset-0 z-50 overflow-y-auto bg-[#F4F5F7]">
+      <div className="fixed inset-0 z-50 overflow-y-auto bg-[var(--bg-main)]">
+
         {/* Top bar */}
-        <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-6 h-14 flex items-center justify-between shadow-sm">
+        <div className="sticky top-0 z-10 bg-[var(--bg-card)] border-b border-[var(--border-light)] px-6 h-14 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-2.5">
-            <div className="size-8 rounded-lg bg-[var(--bg-sidebar)] flex items-center justify-center">
-              <Zap className="size-4 text-[var(--accent)]" />
+            <div className="w-8 h-8 rounded-xl bg-[var(--bg-sidebar)] border border-[var(--accent)]/30 flex items-center justify-center">
+              <Zap className="w-4 h-4 text-[var(--accent)]" />
             </div>
-            <span className="font-black text-sm tracking-tight text-slate-800">Imalá Vox</span>
+            <span className="font-black text-sm tracking-tight text-[var(--text-primary-light)]">Imalá Vox</span>
           </div>
           <a
             href={SUPPORT_WA}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors"
+            className="flex items-center gap-2 text-xs font-bold text-[var(--text-secondary-light)] hover:text-[var(--text-primary-light)] transition-colors"
           >
-            <svg viewBox="0 0 24 24" className="size-4 fill-current text-[#25D366]">
+            <svg viewBox="0 0 24 24" className="w-4 h-4 fill-[#25D366]">
               <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
             </svg>
             Contactar soporte
@@ -144,24 +145,28 @@ export function TrialExpiredGate() {
 
         {/* Content */}
         <div className="max-w-5xl mx-auto px-4 py-12 space-y-10">
+
           {/* Headline */}
           <div className="text-center space-y-2">
-            <h1 className="text-3xl md:text-4xl font-black text-slate-800 tracking-tight leading-tight">
+            <p className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest">
+              Acceso restringido
+            </p>
+            <h1 className="text-3xl md:text-4xl font-bold text-[var(--text-primary-light)] tracking-tight leading-tight">
               {headline}<br />
               Elegí el plan que mejor se adapta a tu negocio.
             </h1>
           </div>
 
-          {/* Ciclo toggle — mismo estilo que la landing */}
+          {/* Toggle mensual / anual */}
           <div className="flex items-center justify-center">
-            <div className="inline-flex items-center gap-1 bg-white border border-slate-200 rounded-2xl p-1 shadow-sm">
+            <div className="inline-flex items-center gap-1 bg-[var(--bg-input)] border border-[var(--border-light)] rounded-2xl p-1">
               <button
                 onClick={() => setCiclo("mensual")}
                 className={cn(
                   "px-5 py-2 text-xs font-black uppercase tracking-widest rounded-xl transition-all",
                   ciclo === "mensual"
-                    ? "bg-slate-800 text-white shadow-md"
-                    : "text-slate-500 hover:text-slate-700"
+                    ? "bg-[var(--bg-sidebar)] text-white shadow-md"
+                    : "text-[var(--text-tertiary-light)] hover:text-[var(--text-primary-light)]"
                 )}
               >
                 Mensual
@@ -171,8 +176,8 @@ export function TrialExpiredGate() {
                 className={cn(
                   "px-5 py-2 text-xs font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-2",
                   ciclo === "anual"
-                    ? "bg-slate-800 text-white shadow-md"
-                    : "text-slate-500 hover:text-slate-700"
+                    ? "bg-[var(--bg-sidebar)] text-white shadow-md"
+                    : "text-[var(--text-tertiary-light)] hover:text-[var(--text-primary-light)]"
                 )}
               >
                 Anual
@@ -191,35 +196,48 @@ export function TrialExpiredGate() {
               const price = ciclo === "anual" ? limits.priceYearly : limits.priceMonthly;
               const Icon = meta.icon;
               const isLoading = loading === plan;
+              const isDark = meta.highlight;
 
               return (
                 <div
                   key={plan}
                   className={cn(
-                    "relative rounded-[1.75rem] border-2 flex flex-col overflow-hidden transition-shadow",
-                    meta.highlight
-                      ? "border-slate-800 bg-white shadow-xl ring-2 ring-slate-800/10"
-                      : "border-slate-200 bg-white shadow-md hover:shadow-lg"
+                    "relative rounded-3xl border flex flex-col overflow-hidden transition-shadow",
+                    isDark
+                      ? "bg-[var(--bg-sidebar)] border-[var(--accent)]/20 shadow-2xl shadow-black/20"
+                      : "bg-[var(--bg-card)] border-[var(--border-light)] shadow-sm hover:shadow-md"
                   )}
                 >
-                  {meta.highlight && (
-                    <div className="absolute top-0 left-0 right-0 h-1 bg-slate-800" />
+                  {/* Accent strip top — solo en Pro */}
+                  {isDark && (
+                    <div className="h-1 w-full bg-[var(--accent)]" />
                   )}
 
                   <div className="p-7 space-y-5 flex-1">
-                    {/* Plan name */}
+
+                    {/* Plan name + badge */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
                         <div className={cn(
-                          "size-8 rounded-xl flex items-center justify-center",
-                          meta.highlight ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600"
+                          "w-8 h-8 rounded-xl flex items-center justify-center border shrink-0",
+                          isDark
+                            ? "bg-[var(--accent)] border-transparent"
+                            : "bg-[var(--bg-input)] border-[var(--border-light)]"
                         )}>
-                          <Icon className="size-4" />
+                          <Icon className={cn(
+                            "w-4 h-4",
+                            isDark ? "text-[var(--accent-text)]" : "text-[var(--text-secondary-light)]"
+                          )} />
                         </div>
-                        <span className="font-black text-slate-800 tracking-tight">{meta.label}</span>
+                        <span className={cn(
+                          "font-black tracking-tight text-sm",
+                          isDark ? "text-white" : "text-[var(--text-primary-light)]"
+                        )}>
+                          {meta.label}
+                        </span>
                       </div>
-                      {meta.highlight && (
-                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-600 bg-slate-100 rounded-full px-2.5 py-1">
+                      {isDark && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-[9px] font-black text-[var(--accent)] uppercase tracking-wider">
                           Más popular
                         </span>
                       )}
@@ -228,26 +246,45 @@ export function TrialExpiredGate() {
                     {/* Price */}
                     <div>
                       <div className="flex items-end gap-1.5">
-                        <span className="text-4xl font-black text-slate-800 tracking-tighter leading-none">
+                        <span className={cn(
+                          "text-4xl font-black tracking-tighter leading-none",
+                          isDark ? "text-white" : "text-[var(--text-primary-light)]"
+                        )}>
                           ${price}
                         </span>
-                        <span className="text-sm font-bold text-slate-400 mb-1">USD/mes</span>
+                        <span className={cn(
+                          "text-xs font-bold uppercase mb-1",
+                          isDark ? "text-white/40" : "text-[var(--text-tertiary-light)]"
+                        )}>
+                          USD/mes
+                        </span>
                       </div>
                       {ciclo === "anual" && (
-                        <p className="text-[11px] text-slate-400 font-medium mt-1">
+                        <p className={cn(
+                          "text-[11px] font-medium mt-1",
+                          isDark ? "text-white/40" : "text-[var(--text-tertiary-light)]"
+                        )}>
                           Facturado como ${price * 12} USD/año
                         </p>
                       )}
                     </div>
 
-                    <hr className="border-slate-100" />
+                    <div className={cn("border-t", isDark ? "border-white/10" : "border-[var(--border-light)]")} />
 
                     {/* Features */}
                     <ul className="space-y-2.5">
                       {meta.features.map((feat) => (
-                        <li key={feat} className="flex items-start gap-2.5 text-sm text-slate-600 font-medium">
-                          <Check className="size-4 mt-0.5 shrink-0 text-emerald-500" />
-                          {feat}
+                        <li key={feat} className="flex items-start gap-2.5">
+                          <Check className={cn(
+                            "w-4 h-4 mt-0.5 shrink-0",
+                            isDark ? "text-[var(--accent)]" : "text-emerald-600"
+                          )} />
+                          <span className={cn(
+                            "text-sm font-medium",
+                            isDark ? "text-white/70" : "text-[var(--text-secondary-light)]"
+                          )}>
+                            {feat}
+                          </span>
                         </li>
                       ))}
                     </ul>
@@ -259,13 +296,13 @@ export function TrialExpiredGate() {
                       onClick={() => handleSubscribe(plan)}
                       disabled={loading !== null}
                       className={cn(
-                        "w-full h-11 rounded-xl font-black text-sm uppercase tracking-wider transition-all",
-                        meta.highlight
-                          ? "bg-slate-800 hover:bg-slate-700 text-white shadow-lg"
-                          : "bg-slate-100 hover:bg-slate-200 text-slate-800"
+                        "w-full h-11 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all",
+                        isDark
+                          ? "bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] shadow-xl shadow-[var(--accent)]/20"
+                          : "bg-[var(--bg-card)] hover:bg-[var(--bg-input)] text-[var(--text-primary-light)] border border-[var(--border-light)]"
                       )}
                     >
-                      {isLoading ? <Loader2 className="size-4 animate-spin" /> : "Continuar"}
+                      {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Continuar"}
                     </Button>
                   </div>
                 </div>
@@ -274,13 +311,13 @@ export function TrialExpiredGate() {
           </div>
 
           {/* Footer */}
-          <p className="text-center text-sm text-slate-400 font-medium pb-8">
+          <p className="text-center text-sm text-[var(--text-tertiary-light)] font-medium pb-8">
             ¿Tenés dudas?{" "}
             <a
               href={SUPPORT_WA}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-slate-700 font-bold hover:underline"
+              className="text-[var(--text-primary-light)] font-bold hover:underline"
             >
               Escribinos por WhatsApp
             </a>
@@ -289,7 +326,7 @@ export function TrialExpiredGate() {
         </div>
       </div>
 
-      {/* Botón WhatsApp flotante sobre el gate */}
+      {/* Botón WhatsApp flotante — z-[100] queda por encima del gate z-50 */}
       <FloatingWhatsApp message="Hola, necesito ayuda con mi cuenta en Imalá Vox." />
     </>
   );
