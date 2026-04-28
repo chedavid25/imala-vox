@@ -13,6 +13,7 @@ import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { FloatingWhatsApp } from "@/components/ui/FloatingWhatsApp";
 import { Reveal } from "@/components/ui/Reveal";
+import { PLAN_LIMITS } from "@/lib/planLimits";
 
 // ─────────────────────────────────────────────
 // MOCKUP: Browser chrome wrapper
@@ -733,11 +734,6 @@ function ChannelsSection() {
 // ─────────────────────────────────────────────
 type Plan = 'starter' | 'pro' | 'agencia';
 
-const PRICES: Record<Plan, { monthly: number; yearly: number }> = {
-  starter: { monthly: 35, yearly: 29 },
-  pro:     { monthly: 79, yearly: 66 },
-  agencia: { monthly: 179, yearly: 149 },
-};
 
 type PlanFeatureGroup = { label: string; items: string[]; locked?: boolean };
 const PRICING_FEATURES: Record<Plan, { tag?: string; inheritsFrom?: string; groups: PlanFeatureGroup[] }> = {
@@ -800,14 +796,14 @@ function PricingSection() {
               )}
             >
               Anual
-              <span className="bg-emerald-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full">−20%</span>
+              <span className="bg-emerald-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full">−17%</span>
             </button>
           </div>
         </Reveal>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {plans.map((p, i) => {
-            const price = isAnual ? PRICES[p].yearly : PRICES[p].monthly;
+            const price = isAnual ? PLAN_LIMITS[p].priceYearly : PLAN_LIMITS[p].priceMonthly;
             const display = PRICING_FEATURES[p];
             const isPro = p === "pro";
             return (

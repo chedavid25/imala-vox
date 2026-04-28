@@ -20,7 +20,8 @@
       "Bash(cat next.config.ts)",
       "Bash(cat next.config.js)",
       "Bash(cat vercel.json)",
-      "Bash(ls public/sw.js)"
+      "Bash(ls public/sw.js)",
+      "Bash(grep -v \"^$\")"
     ]
   }
 }

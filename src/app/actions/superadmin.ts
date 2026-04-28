@@ -6,8 +6,11 @@ import { COLLECTIONS, PlataformaConfig } from '@/lib/types/firestore';
 import { cookies } from 'next/headers';
 import { Timestamp } from 'firebase-admin/firestore';
 
-const secretKey = process.env.ADMIN_JWT_SECRET || 'fallback-secret-imala-vox-2026';
-const ADMIN_JWT_SECRET = new TextEncoder().encode(secretKey);
+const secretKey = process.env.ADMIN_JWT_SECRET;
+if (!secretKey && process.env.NODE_ENV === 'production') {
+  throw new Error('ADMIN_JWT_SECRET env var is required in production');
+}
+const ADMIN_JWT_SECRET = new TextEncoder().encode(secretKey || 'fallback-secret-dev-only');
 
 // --- HELPERS ---
 
@@ -43,11 +46,6 @@ export async function verificarYSetearAdmin(uid: string): Promise<boolean> {
     const uidsPermitidos = config?.superAdminUids || [];
     const esAdmin = uidsPermitidos.includes(uid);
 
-    console.log("--- DEBUG ADMIN AUTH ---");
-    console.log("UID Recibido:", uid);
-    console.log("UIDs Permitidos en Firestore:", uidsPermitidos);
-    console.log("¿Es Admin?:", esAdmin);
-
     if (esAdmin) {
       const token = await new SignJWT({ uid })
         .setProtectedHeader({ alg: 'HS256' })
@@ -57,8 +55,8 @@ export async function verificarYSetearAdmin(uid: string): Promise<boolean> {
       const cookieStore = await cookies();
       cookieStore.set('imala-admin-session', token, {
         httpOnly: true,
-        secure: false, // Localhost fix
-        maxAge: 60 * 60 * 8, 
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 60 * 60 * 8,
         path: '/',
         sameSite: 'lax',
       });

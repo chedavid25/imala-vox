@@ -19,26 +19,29 @@ export async function POST(request: NextRequest) {
     const xRequestId = request.headers.get('x-request-id');
     const webhookSecret = process.env.MP_WEBHOOK_SECRET;
 
-    if (xSignature && webhookSecret && webhookSecret !== 'xxxx') {
+    const isProductionSecret = webhookSecret && webhookSecret !== 'xxxx';
+    if (isProductionSecret) {
+      if (!xSignature) {
+        return NextResponse.json({ error: 'Missing signature' }, { status: 401 });
+      }
       try {
         const parts = xSignature.split(',');
         const tsPart = parts.find(p => p.startsWith('ts='));
         const v1Part = parts.find(p => p.startsWith('v1='));
-        
         const ts = tsPart?.split('=')[1];
         const v1 = v1Part?.split('=')[1];
-        
-        if (ts && v1) {
-          const manifest = `id:${xRequestId};request-date:${ts};`;
-          const expected = crypto.createHmac('sha256', webhookSecret).update(manifest).digest('hex');
-          
-          if (v1 !== expected) {
-            console.error("MP Webhook: Invalid HMAC Signature");
-            return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
-          }
+        if (!ts || !v1) {
+          return NextResponse.json({ error: 'Invalid signature format' }, { status: 401 });
+        }
+        const manifest = `id:${xRequestId};request-date:${ts};`;
+        const expected = crypto.createHmac('sha256', webhookSecret).update(manifest).digest('hex');
+        if (v1 !== expected) {
+          console.error("MP Webhook: Invalid HMAC Signature");
+          return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
         }
       } catch (err) {
         console.error("MP Webhook: Error parsing signature", err);
+        return NextResponse.json({ error: 'Signature processing error' }, { status: 401 });
       }
     }
 

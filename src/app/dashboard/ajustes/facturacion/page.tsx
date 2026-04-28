@@ -221,7 +221,7 @@ export default function FacturacionPage() {
   };
 
   const diasRestantes = workspace.pruebaTerminaEl
-    ? Math.ceil((workspace.pruebaTerminaEl.toDate().getTime() - Date.now()) / 86400000)
+    ? Math.max(0, Math.ceil((workspace.pruebaTerminaEl.toDate().getTime() - Date.now()) / 86400000))
     : 0;
   
   const porcentajePrueba = Math.max(0, Math.min(100, (diasRestantes / 7) * 100));
