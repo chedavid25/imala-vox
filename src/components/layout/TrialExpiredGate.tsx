@@ -89,6 +89,15 @@ export function TrialExpiredGate() {
   const [ciclo, setCiclo] = useState<Ciclo>("mensual");
   const [loading, setLoading] = useState<PlanKey | null>(null);
 
+  // DEBUG — borrar después de confirmar
+  console.log('[TrialExpiredGate]', {
+    estado: workspace?.estado,
+    pruebaTerminaEl: workspace?.pruebaTerminaEl?.toDate?.()?.toISOString?.(),
+    isExpired: workspace ? isExpired(workspace) : 'no workspace',
+    pathname,
+    isAllowed: ALLOWED_PATHS.some((p) => pathname.startsWith(p)),
+  });
+
   if (!workspace) return null;
   if (!isExpired(workspace)) return null;
   if (ALLOWED_PATHS.some((p) => pathname.startsWith(p))) return null;
