@@ -67,6 +67,21 @@ export async function crearSuscripcionMP(wsId: string, plan: 'starter' | 'pro' |
     if (!wsSnap.exists) throw new Error("Workspace not found");
     const ws = wsSnap.data() as any;
 
+    // Cancelar suscripción existente para evitar cobros duplicados.
+    // Esto cubre el caso pago_vencido donde el cliente elige otro plan o tarjeta.
+    const existingSubId = ws.facturacion?.mpSuscripcionId;
+    if (existingSubId && accessToken) {
+      try {
+        await fetch(`https://api.mercadopago.com/preapproval/${existingSubId}`, {
+          method: 'PUT',
+          headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'cancelled' }),
+        });
+      } catch {
+        // Si ya estaba cancelada o no existe, continuar igual
+      }
+    }
+
     // MercadoPago requiere HTTPS para el back_url en suscripciones, incluso en sandbox.
     // Usamos una URL de dominio válido como fallback para desarrollo.
     const backUrl = process.env.NODE_ENV === 'development'

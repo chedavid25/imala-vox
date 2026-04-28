@@ -131,10 +131,12 @@ export function TrialExpiredGate() {
             </span>
             <h2 className="text-3xl md:text-5xl font-black text-white mt-3 leading-tight">
               {headline}<br />
-              Elegí tu plan
+              {isPagoVencido ? "Renová tu suscripción para recuperar el acceso." : "Elegí tu plan."}
             </h2>
             <p className="text-base text-white/40 mt-3 font-medium">
-              Sin contratos. Cancelás cuando querés.
+              {isPagoVencido
+                ? "Seleccioná un plan y completá el pago para volver a activar tu cuenta."
+                : "Sin contratos. Cancelás cuando querés."}
             </p>
 
             {/* Toggle — idéntico al de la landing */}
@@ -279,7 +281,7 @@ export function TrialExpiredGate() {
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
                         <>
-                          Suscribirme
+                          {isPagoVencido ? "Renovar" : "Suscribirme"}
                           <ArrowRight className="w-3.5 h-3.5" />
                         </>
                       )}
