@@ -2,9 +2,9 @@
 
 import React from "react";
 
-export function FloatingWhatsApp() {
+export function FloatingWhatsApp({ message: customMessage }: { message?: string } = {}) {
   const phoneNumber = "5493513376865";
-  const message = "¡Hola David! Vengo de la web y me gustaría saber más sobre Imalá Vox.";
+  const message = customMessage ?? "¡Hola David! Vengo de la web y me gustaría saber más sobre Imalá Vox.";
   const encodedMessage = encodeURIComponent(message);
   const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodedMessage}`;
 
