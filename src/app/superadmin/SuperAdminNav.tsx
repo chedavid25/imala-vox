@@ -44,7 +44,7 @@ export function SuperAdminNav({ children }: { children: React.ReactNode }) {
           </div>
           <span className="font-black text-xs uppercase tracking-[0.2em] text-white">SuperAdmin</span>
           <Badge className="ml-2 bg-white/10 text-white/60 border-transparent py-0.5 px-2.5 text-[9px] font-black tracking-widest uppercase">
-            Admin Mode
+            Modo Administrador
           </Badge>
         </div>
 

@@ -51,7 +51,7 @@ export default function SuperAdminPage() {
       {/* HEADER METRICS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
-          title="MRR (Monthly Revenue)" 
+          title="MRR (Ingresos Mensuales)" 
           value={`$${metricas.mrr.toLocaleString()}`} 
           trend="+12.5%" 
           trendUp={true}
@@ -99,7 +99,7 @@ export default function SuperAdminPage() {
                 <span className="text-xs text-white/40 block text-center uppercase tracking-[0.3em] mt-2">USD / Anual</span>
              </div>
              <p className="text-white/40 text-xs text-center max-w-sm font-medium">
-               Cálculo basado en el MRR actual multiplicado por 12 meses, sin proyectar crecimiento de adquisición constante.
+               Cálculo basado en el MRR actual multiplicado por 12 meses, sin proyectar crecimiento constante.
              </p>
           </CardContent>
         </Card>
