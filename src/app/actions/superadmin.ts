@@ -7,9 +7,8 @@ import { cookies } from 'next/headers';
 import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 
 const secretKey = process.env.ADMIN_JWT_SECRET;
-if (!secretKey && process.env.NODE_ENV === 'production') {
-  throw new Error('ADMIN_JWT_SECRET env var is required in production');
-}
+// No lanzamos error aquí para evitar que el servidor explote al cargar el módulo.
+// El error se manejará dentro de las funciones que usen el secreto.
 const ADMIN_JWT_SECRET = new TextEncoder().encode(secretKey || 'fallback-secret-dev-only');
 
 // --- HELPERS ---

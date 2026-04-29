@@ -16,15 +16,17 @@ function initAdminApp(): App {
     return getApps()[0];
   }
 
-  const serviceAccountKeyB64 = process.env.FIREBASE_SERVICE_ACCOUNT_KEY_B64;
+  let serviceAccountKeyB64 = process.env.FIREBASE_SERVICE_ACCOUNT_KEY_B64;
+  
   if (!serviceAccountKeyB64) {
-    throw new Error(
-      "Firebase Admin: Variable de entorno FIREBASE_SERVICE_ACCOUNT_KEY_B64 no encontrada. " +
-      "Agregala a .env.local"
-    );
+    console.error("❌ Firebase Admin: Variable FIREBASE_SERVICE_ACCOUNT_KEY_B64 no encontrada.");
+    throw new Error("Firebase Admin: Variable de entorno no encontrada.");
   }
 
   try {
+    // Limpiar posibles comillas o espacios accidentales
+    serviceAccountKeyB64 = serviceAccountKeyB64.trim().replace(/^["']|["']$/g, '');
+    
     // Decodificar Base64 a string
     const decodedKey = Buffer.from(serviceAccountKeyB64, 'base64').toString('utf-8');
     const serviceAccount = JSON.parse(decodedKey);
@@ -41,7 +43,7 @@ function initAdminApp(): App {
     });
   } catch (error: any) {
     console.error("❌ Error CRÍTICO al inicializar Firebase Admin:", error.message);
-    throw error;
+    throw new Error(`Error al inicializar Firebase Admin: ${error.message}`);
   }
 }
 
