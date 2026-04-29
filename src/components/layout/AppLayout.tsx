@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
+import Link from "next/link";
+import { ShieldCheck } from "lucide-react";
 import { Sidebar } from "./Sidebar";
 import { ContextPanel } from "./ContextPanel";
 import { NotificationBanner } from "./NotificationBanner";
@@ -15,6 +17,7 @@ import { useMobileLayout } from "@/hooks/useMobileLayout";
 import { MobileLayout } from "./MobileLayout";
 import { SplashScreen } from "./SplashScreen";
 import { TrialExpiredGate } from "./TrialExpiredGate";
+import { verificarYSetearAdmin } from "@/app/actions/superadmin";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -23,9 +26,10 @@ interface AppLayoutProps {
 export default function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { setWorkspace, setWorkspaceId, currentWorkspaceId, currentAgentName, setCurrentAgentName, setIsAdmin } = useWorkspaceStore();
+  const { setWorkspace, setWorkspaceId, currentWorkspaceId, currentAgentName, setCurrentAgentName, setIsAdmin, isAdmin } = useWorkspaceStore();
   const [isSessionLoading, setIsSessionLoading] = useState(true);
   const isMobile = useMobileLayout();
+  const adminJwtSetRef = useRef(false);
 
   const normalizedPathname = pathname?.toLowerCase() || "/";
   const isLanding = normalizedPathname === "/" || normalizedPathname === "";
@@ -119,7 +123,15 @@ export default function AppLayout({ children }: AppLayoutProps) {
           const configSnap = await configPromise;
           const adminEmails: string[] = configSnap.data()?.adminEmails || [];
           const isAdminUser = !!(user.email && adminEmails.includes(user.email));
-          if (isAdminUser) setIsAdmin(true);
+          if (isAdminUser) {
+            setIsAdmin(true);
+            // Setear cookie JWT si aún no se hizo en esta sesión (backup para cuando
+            // el flujo del popup de Google falla por COOP del navegador)
+            if (!adminJwtSetRef.current) {
+              adminJwtSetRef.current = true;
+              verificarYSetearAdmin(user.uid, user.email ?? undefined).catch(console.error);
+            }
+          }
 
           if (!wsDocData) {
             if (isAdminUser) {
@@ -228,6 +240,15 @@ export default function AppLayout({ children }: AppLayoutProps) {
           </div>
 
           <div className="flex items-center gap-4">
+            {isAdmin && (
+              <Link
+                href="/superadmin"
+                className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-[var(--accent)] hover:opacity-80 transition-opacity"
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                Panel Admin
+              </Link>
+            )}
             <AvisosHeader />
           </div>
         </header>

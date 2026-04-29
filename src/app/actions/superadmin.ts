@@ -4,7 +4,7 @@ import { SignJWT } from 'jose';
 import { adminDb } from '@/lib/firebase-admin';
 import { COLLECTIONS, PlataformaConfig } from '@/lib/types/firestore';
 import { cookies } from 'next/headers';
-import { Timestamp } from 'firebase-admin/firestore';
+import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 
 const secretKey = process.env.ADMIN_JWT_SECRET;
 if (!secretKey && process.env.NODE_ENV === 'production') {
@@ -52,9 +52,13 @@ export async function verificarYSetearAdmin(uid: string, email?: string): Promis
 
     // Si es admin por email pero el UID no está registrado aún, lo agrega automáticamente
     if (esAdminPorEmail && !esAdminPorUid) {
-      await adminDb.doc(COLLECTIONS.PLATAFORMA_CONFIG).update({
-        superAdminUids: [...uidsPermitidos, uid],
-      });
+      try {
+        await adminDb.doc(COLLECTIONS.PLATAFORMA_CONFIG).update({
+          superAdminUids: FieldValue.arrayUnion(uid),
+        });
+      } catch {
+        // No bloquear el login si el update falla
+      }
     }
 
     if (esAdmin) {
