@@ -61,12 +61,13 @@ const PRICING_FEATURES: Record<PlanKey, { tag?: string; inheritsFrom?: string; g
 };
 
 export function TrialExpiredGate() {
-  const { workspace, currentWorkspaceId } = useWorkspaceStore();
+  const { workspace, currentWorkspaceId, isAdmin } = useWorkspaceStore();
   const pathname = usePathname();
   const [isAnual, setIsAnual] = useState(false);
   const [loading, setLoading] = useState<PlanKey | null>(null);
 
   if (!workspace) return null;
+  if (isAdmin) return null;
   if (!isExpired(workspace)) return null;
   if (ALLOWED_PATHS.some((p) => pathname.startsWith(p))) return null;
 

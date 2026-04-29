@@ -7,11 +7,13 @@ interface WorkspaceState {
   selectedContactId: string | null;
   selectedChatId: string | null;
   currentAgentName: string | null;
+  isAdmin: boolean;
   setWorkspaceId: (id: string) => void;
   setWorkspace: (workspace: Workspace | null) => void;
   setSelectedContactId: (id: string | null) => void;
   setSelectedChatId: (id: string | null) => void;
   setCurrentAgentName: (name: string | null) => void;
+  setIsAdmin: (v: boolean) => void;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set) => ({
@@ -20,9 +22,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   selectedContactId: null,
   selectedChatId: null,
   currentAgentName: null,
+  isAdmin: false,
   setWorkspaceId: (id) => set({ currentWorkspaceId: id }),
   setWorkspace: (workspace) => set({ workspace }),
   setSelectedContactId: (id) => set({ selectedContactId: id }),
   setSelectedChatId: (id) => set({ selectedChatId: id }),
   setCurrentAgentName: (name) => set({ currentAgentName: name }),
+  setIsAdmin: (isAdmin) => set({ isAdmin }),
 }));

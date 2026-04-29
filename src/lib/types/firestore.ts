@@ -347,6 +347,7 @@ export interface PlataformaConfig {
   };
   proximoAjusteARS: Timestamp;
   superAdminUids: string[];
+  adminEmails: string[];
   overageRate: number;        // 0.018 — costo por conversación extra en plan Agencia
   trialDias: number;          // 7
 }

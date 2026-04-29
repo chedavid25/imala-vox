@@ -39,12 +39,23 @@ const serializeFirestoreData = (obj: any): any => {
 
 // --- AUTH ACTIONS ---
 
-export async function verificarYSetearAdmin(uid: string): Promise<boolean> {
+export async function verificarYSetearAdmin(uid: string, email?: string): Promise<boolean> {
   try {
     const configSnap = await adminDb.doc(COLLECTIONS.PLATAFORMA_CONFIG).get();
     const config = configSnap.data() as PlataformaConfig | undefined;
     const uidsPermitidos = config?.superAdminUids || [];
-    const esAdmin = uidsPermitidos.includes(uid);
+    const emailsPermitidos = config?.adminEmails || [];
+
+    const esAdminPorUid = uidsPermitidos.includes(uid);
+    const esAdminPorEmail = !!(email && emailsPermitidos.includes(email));
+    const esAdmin = esAdminPorUid || esAdminPorEmail;
+
+    // Si es admin por email pero el UID no está registrado aún, lo agrega automáticamente
+    if (esAdminPorEmail && !esAdminPorUid) {
+      await adminDb.doc(COLLECTIONS.PLATAFORMA_CONFIG).update({
+        superAdminUids: [...uidsPermitidos, uid],
+      });
+    }
 
     if (esAdmin) {
       const token = await new SignJWT({ uid })

@@ -62,7 +62,7 @@ export default function AuthPage() {
       const snap = await getDocs(q);
       
       // Verificar si es SuperAdmin y setear cookie
-      const esAdmin = await verificarYSetearAdmin(result.user.uid);
+      const esAdmin = await verificarYSetearAdmin(result.user.uid, result.user.email ?? undefined);
 
       toast.success("¡Bienvenido de nuevo!");
       
@@ -122,7 +122,7 @@ export default function AuthPage() {
       const snap = await getDocs(q);
       
       // Verificar si es SuperAdmin y setear cookie
-      const esAdmin = await verificarYSetearAdmin(result.user.uid);
+      const esAdmin = await verificarYSetearAdmin(result.user.uid, result.user.email ?? undefined);
 
       toast.success(`¡Hola, ${result.user.displayName}!`);
       

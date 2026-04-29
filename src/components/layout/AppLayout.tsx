@@ -23,7 +23,7 @@ interface AppLayoutProps {
 export default function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { setWorkspace, setWorkspaceId, currentWorkspaceId, currentAgentName, setCurrentAgentName } = useWorkspaceStore();
+  const { setWorkspace, setWorkspaceId, currentWorkspaceId, currentAgentName, setCurrentAgentName, setIsAdmin } = useWorkspaceStore();
   const [isSessionLoading, setIsSessionLoading] = useState(true);
   const isMobile = useMobileLayout();
 
@@ -78,7 +78,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         try {
-          const { collection, query, where, getDocs, limit, collectionGroup, getDoc } = await import("firebase/firestore");
+          const { collection, query, where, getDocs, limit, collectionGroup, getDoc, doc } = await import("firebase/firestore");
+
+          // Verificar admin y buscar workspace en paralelo
+          const configPromise = getDoc(doc(db, 'plataforma', 'config'));
 
           const qOwner = query(
             collection(db, COLLECTIONS.ESPACIOS),
@@ -112,8 +115,17 @@ export default function AppLayout({ children }: AppLayoutProps) {
             }
           }
 
+          // Resolver check de admin (ya corrió en paralelo)
+          const configSnap = await configPromise;
+          const adminEmails: string[] = configSnap.data()?.adminEmails || [];
+          const isAdminUser = !!(user.email && adminEmails.includes(user.email));
+          if (isAdminUser) setIsAdmin(true);
+
           if (!wsDocData) {
-            if (normalizedPathname !== "/onboarding") {
+            if (isAdminUser) {
+              // Admin sin workspace propio va al panel superadmin
+              if (isPublicRoute && !isLanding) router.push("/superadmin");
+            } else if (normalizedPathname !== "/onboarding") {
               router.push("/onboarding");
             }
           } else {
@@ -131,6 +143,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           setIsSessionLoading(false);
         }
       } else {
+        setIsAdmin(false);
         setIsSessionLoading(false);
         if (!isPublicRoute) {
           router.push("/auth");
@@ -139,7 +152,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
     });
 
     return () => unsubscribe();
-  }, [normalizedPathname, isLanding, isPublicRoute, router, setWorkspace, setWorkspaceId]);
+  }, [normalizedPathname, isLanding, isPublicRoute, router, setWorkspace, setWorkspaceId, setIsAdmin]);
 
   // Returns condicionales DESPUÉS de todos los hooks
   if (isLanding) {
