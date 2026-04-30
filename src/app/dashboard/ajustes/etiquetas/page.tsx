@@ -35,7 +35,7 @@ import {
   Lightbulb,
   AlertCircle
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { 
@@ -272,12 +272,14 @@ export default function CRMTagsPage() {
           </button>
 
           <Dialog open={isAddingCategory} onOpenChange={(o) => { if(!o) setEditingCategory(null); setIsAddingCategory(o); }}>
-            <DialogTrigger>
-              <Button className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-11 px-6 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-[var(--accent)]/20 transition-all hover:scale-[1.02] active:scale-95">
-                <Plus className="w-4 h-4 mr-2" />
-                Nuevo Grupo
-              </Button>
-            </DialogTrigger>
+            <DialogTrigger
+              render={
+                <button className={cn(buttonVariants({ variant: 'default' }), "bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-11 px-6 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-[var(--accent)]/20 transition-all hover:scale-[1.02] active:scale-95")}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nuevo Grupo
+                </button>
+              }
+            />
             <DialogContent className="max-w-[520px] bg-white border-none shadow-2xl rounded-[32px] overflow-hidden p-0">
               <DialogHeader className="bg-slate-50/50 p-8 pb-4">
                 <DialogTitle className="text-2xl font-semibold tracking-tight flex items-center gap-3">

@@ -20,7 +20,7 @@ import {
   UserCheck,
   Crown
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -418,13 +418,15 @@ export default function UsuariosPage() {
                            Activo
                          </div>
                       </TableCell>
-                      <TableCell className="text-right px-8">
-                         <DropdownMenu>
-                           <DropdownMenuTrigger>
-                              <Button variant="ghost" size="icon" className="text-slate-300 hover:text-slate-600 rounded-xl">
-                                <MoreVertical className="size-4" />
-                              </Button>
-                           </DropdownMenuTrigger>
+                         <TableCell className="text-right px-8">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger
+                              render={
+                                <button className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), "text-slate-300 hover:text-slate-600 rounded-xl")}>
+                                  <MoreVertical className="size-4" />
+                                </button>
+                              }
+                            />
                            <DropdownMenuContent align="end" className="bg-white border-slate-200 rounded-2xl shadow-2xl p-2 min-w-[160px]">
                               <DropdownMenuItem className="text-rose-500 font-bold text-[10px] uppercase tracking-widest gap-2 p-3 rounded-xl hover:bg-rose-50 cursor-pointer focus:bg-rose-50">
                                 <Trash2 className="size-3.5" />

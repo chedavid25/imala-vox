@@ -23,7 +23,7 @@ import {
   EyeOff,
   Palette
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -124,12 +124,14 @@ export default function AgenteEtiquetasPage() {
         </div>
         
         <Dialog>
-          <DialogTrigger>
-            <Button className="bg-[var(--accent)] text-[var(--accent-text)]">
-              <Plus className="w-4 h-4 mr-2" />
-              Nueva Etiqueta
-            </Button>
-          </DialogTrigger>
+          <DialogTrigger
+            render={
+              <button className={cn(buttonVariants({ variant: 'default' }), "bg-[var(--accent)] text-[var(--accent-text)] px-4 h-10 rounded-lg font-bold flex items-center justify-center")}>
+                <Plus className="w-4 h-4 mr-2" />
+                Nueva Etiqueta
+              </button>
+            }
+          />
           <DialogContent className="bg-[var(--bg-card)] border-[var(--border-light)]">
             <DialogHeader>
               <DialogTitle>Crear Etiqueta de IA</DialogTitle>

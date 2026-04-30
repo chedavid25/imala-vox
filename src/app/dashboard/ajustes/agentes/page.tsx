@@ -17,7 +17,7 @@ import {
   ChevronDown,
   Lightbulb
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { 
   Dialog, 
   DialogContent, 
@@ -138,12 +138,14 @@ export default function AgentesPage() {
           </button>
 
           <Dialog>
-            <DialogTrigger>
-              <Button className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-11 px-6 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-[var(--accent)]/20 transition-all hover:scale-[1.02] active:scale-95">
-                <Plus className="w-4 h-4 mr-2" />
-                Nuevo Agente
-              </Button>
-            </DialogTrigger>
+            <DialogTrigger
+              render={
+                <button className={cn(buttonVariants({ variant: 'default' }), "bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-11 px-6 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-[var(--accent)]/20 transition-all hover:scale-[1.02] active:scale-95")}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nuevo Agente
+                </button>
+              }
+            />
           <DialogContent className="bg-[var(--bg-card)] border-[var(--border-light)]">
             <DialogHeader>
               <DialogTitle>Crear Nuevo Agente</DialogTitle>
