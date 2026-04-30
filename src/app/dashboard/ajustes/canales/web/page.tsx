@@ -77,6 +77,11 @@ export default function WebChannelPage() {
   const [copied, setCopied] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const ayudaWidget = {
     titulo: "¿Cómo instalar el chat en tu sitio web?",
@@ -220,7 +225,7 @@ export default function WebChannelPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  if (loading) return null;
+  if (!isMounted || loading) return null;
 
   return (
     <div className="min-h-screen bg-[var(--bg-main)] p-8">

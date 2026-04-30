@@ -105,6 +105,11 @@ export default function CanalesPage() {
   const [waDisplayName, setWaDisplayName] = useState('');
   const [isConnectingWA, setIsConnectingWA] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const ayudaCanales = {
     titulo: "¿Cómo conectar tus canales de atención?",
@@ -273,7 +278,7 @@ export default function CanalesPage() {
     }
   };
 
-  if (!currentWorkspaceId) return null;
+  if (!isMounted || !currentWorkspaceId) return null;
 
   return (
     <div className="p-8 max-w-5xl mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
