@@ -129,7 +129,8 @@ export default function WebsGlobalPage() {
       });
 
       if (!response.ok) {
-        throw new Error(`Error en el proxy: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Error en el proxy: ${response.status}`);
       }
 
       const data = await response.json();
@@ -180,7 +181,8 @@ export default function WebsGlobalPage() {
       });
 
       if (!response.ok) {
-        throw new Error(`Error en el proxy: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Error en el proxy: ${response.status}`);
       }
 
       const data = await response.json();

@@ -16,14 +16,16 @@ export async function ejecutarScrapingProfundo(url: string, maxProperties: numbe
   let browser: Browser | null = null;
   
   try {
-    // 1. Lanzar el navegador con argumentos de camuflaje
+    // 1. Lanzar el navegador con argumentos de camuflaje y estabilidad para la nube
     browser = await puppeteer.launch({
       headless: true,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
       args: [
         "--no-sandbox", 
         "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage", // Importante para contenedores con poca RAM
+        "--disable-gpu",
         "--disable-blink-features=AutomationControlled", // Ocultar automatización
-        "--window-size=1920,1080"
       ]
     });
 
