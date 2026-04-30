@@ -608,7 +608,9 @@ export default function CanalesPage() {
                     onValueChange={(val) => handleUpdateAIConfig(!!selectedCanal.aiEnabled, val)}
                   >
                     <SelectTrigger className="h-12 rounded-2xl bg-slate-50 border-none px-4 font-semibold">
-                      <SelectValue placeholder="Seleccionar un agente..." />
+                      <SelectValue placeholder="Seleccionar un agente...">
+                        {selectedCanal.agenteId ? agentes.find(a => a.id === selectedCanal.agenteId)?.nombre : undefined}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent className="rounded-2xl border-slate-100 shadow-2xl bg-white">
                       {agentes.map(a => (

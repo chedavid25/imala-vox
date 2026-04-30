@@ -17,7 +17,10 @@ import {
   Image as ImageIcon,
   Zap,
   Eye,
-  Bot
+  Bot,
+  HelpCircle,
+  ChevronDown,
+  Lightbulb
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,8 +75,19 @@ export default function WebChannelPage() {
   const [loading, setLoading] = useState(true);
   const [canalWeb, setCanalWeb] = useState<Canal | null>(null);
   const [copied, setCopied] = useState(false);
-  const [embedMode, setEmbedMode] = useState<'script' | 'shortcode'>('script');
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+
+  const ayudaWidget = {
+    titulo: "¿Cómo instalar el chat en tu sitio web?",
+    descripcion: "Para que el chat aparezca en tu web, debes copiar el código del Script Universal y pegarlo en el código fuente de tu sitio. Es compatible con cualquier plataforma (HTML, WordPress, Wix, Shopify, etc.).",
+    recomendacion: "Asegúrate de agregar los dominios permitidos arriba. Si el dominio no está en la lista blanca, el widget se bloqueará por seguridad.",
+    items: [
+      { titulo: "Ubicación del código", detalle: "Copia el script y pégalo justo antes de cerrar la etiqueta </body> en tu plantilla global o footer." },
+      { titulo: "Identificador único", detalle: "Tu workspaceId ya está incluido en el código, no necesitas modificar nada manualmente." },
+      { titulo: "Carga asíncrona", detalle: "El script usa el atributo 'async' para no afectar la velocidad de carga de tu página." },
+    ]
+  };
 
   const [config, setConfig] = useState<WebConfig>({
     dominios: [],
@@ -189,7 +203,7 @@ export default function WebChannelPage() {
   };
 
   const host = typeof window !== 'undefined' ? window.location.origin : 'https://cdn.imalavox.com';
-  
+
   const embedCode = `<!-- Imalá Vox Widget -->
 <script src="${host}/widget.js" async></script>
 <script>
@@ -199,11 +213,8 @@ export default function WebChannelPage() {
   };
 </script>`;
 
-  const shortcode = `[imalavox id="${currentWorkspaceId}" agente="${config.agenteId || ''}"]`;
-
   const copyCode = () => {
-    const textToCopy = embedMode === 'script' ? embedCode : shortcode;
-    navigator.clipboard.writeText(textToCopy);
+    navigator.clipboard.writeText(embedCode);
     setCopied(true);
     toast.success("Código copiado al portapapeles");
     setTimeout(() => setCopied(false), 2000);
@@ -225,7 +236,7 @@ export default function WebChannelPage() {
             Volver a Canales
           </button>
           
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center">
@@ -235,15 +246,70 @@ export default function WebChannelPage() {
               </div>
               <p className="text-sm text-[var(--text-tertiary-light)] font-medium">Configura el widget de chat para tu sitio web.</p>
             </div>
-            
-            <Button 
-              onClick={handleSave}
-              className="rounded-2xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-black text-[11px] uppercase tracking-widest px-8 h-12 shadow-xl shadow-[var(--accent)]/20 transition-all hover:scale-[1.02] active:scale-95"
-            >
-              Guardar Cambios
-            </Button>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowHelp(v => !v)}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-bold transition-all shrink-0 h-11",
+                  showHelp
+                    ? "bg-[var(--bg-sidebar)] border-[var(--border-dark)] text-[var(--accent)]"
+                    : "bg-white border-[var(--border-light)] text-[var(--text-secondary-light)] hover:bg-[var(--bg-input)] hover:text-[var(--text-primary-light)]"
+                )}
+              >
+                <HelpCircle className="w-4 h-4" />
+                ¿Cómo instalar?
+                <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", showHelp && "rotate-180")} />
+              </button>
+
+              <Button 
+                onClick={handleSave}
+                className="rounded-2xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-black text-[11px] uppercase tracking-widest px-8 h-12 shadow-xl shadow-[var(--accent)]/20 transition-all hover:scale-[1.02] active:scale-95"
+              >
+                Guardar Cambios
+              </Button>
+            </div>
           </div>
         </div>
+
+        {/* Panel de ayuda expandible */}
+        {showHelp && (
+          <div className="bg-white border border-[var(--border-light)] rounded-[32px] overflow-hidden shadow-sm animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="px-8 pt-8 pb-6 border-b border-[var(--border-light)]">
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-2xl bg-[var(--bg-sidebar)] border border-[var(--border-dark)] flex items-center justify-center shrink-0 shadow-sm">
+                  <Lightbulb className="w-5 h-5 text-[var(--accent)]" />
+                </div>
+                <div className="space-y-1.5">
+                  <h3 className="text-sm font-bold text-[var(--text-primary-light)]">{ayudaWidget.titulo}</h3>
+                  <p className="text-sm text-[var(--text-secondary-light)] leading-relaxed">{ayudaWidget.descripcion}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-8 py-6 space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {ayudaWidget.items.map((item, i) => (
+                  <div key={i} className="bg-[var(--bg-input)]/30 border border-[var(--border-light)] rounded-2xl p-4 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent-active)] shrink-0" />
+                      <span className="text-[12px] font-bold text-[var(--text-primary-light)] uppercase tracking-tight">{item.titulo}</span>
+                    </div>
+                    <p className="text-[12px] text-[var(--text-tertiary-light)] leading-relaxed pl-3.5 font-medium">{item.detalle}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 flex items-start gap-3">
+                <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <p className="text-[12px] font-black text-amber-800 uppercase tracking-widest">Dominios Permitidos</p>
+                  <p className="text-[12px] text-amber-700 leading-relaxed font-medium">{ayudaWidget.recomendacion}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
@@ -300,25 +366,9 @@ export default function WebChannelPage() {
 
               <div className="flex items-center justify-between relative z-10">
                 <div className="flex items-center gap-4">
-                  <div className="flex p-1 bg-white/5 rounded-xl border border-white/10">
-                    <button 
-                      onClick={() => setEmbedMode('script')}
-                      className={cn(
-                        "px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                        embedMode === 'script' ? "bg-[var(--accent)] text-[var(--accent-text)] shadow-lg" : "text-white/40 hover:text-white"
-                      )}
-                    >
-                      Script Universal
-                    </button>
-                    <button 
-                      onClick={() => setEmbedMode('shortcode')}
-                      className={cn(
-                        "px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                        embedMode === 'shortcode' ? "bg-[var(--accent)] text-[var(--accent-text)] shadow-lg" : "text-white/40 hover:text-white"
-                      )}
-                    >
-                      WordPress Shortcode
-                    </button>
+                  <div className="flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-[var(--accent)]" />
+                    <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">Script Universal</span>
                   </div>
                 </div>
                 <Button 
@@ -327,20 +377,18 @@ export default function WebChannelPage() {
                   className="text-[var(--accent)] hover:bg-[var(--accent)]/10 font-bold text-xs h-9 rounded-xl px-4"
                 >
                   {copied ? <CheckCircle2 className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
-                  {copied ? "Copiado" : "Copiar"}
+                  {copied ? "Copiado" : "Copiar Código"}
                 </Button>
               </div>
 
               <div className="relative z-10">
                 <pre className="bg-black/40 rounded-2xl p-6 font-mono text-[11px] text-[var(--text-secondary-dark)] overflow-x-auto border border-white/5 custom-scrollbar leading-relaxed min-h-[80px] flex items-center">
-                  {embedMode === 'script' ? embedCode : shortcode}
+                  {embedCode}
                 </pre>
               </div>
               
               <p className="text-[11px] text-[var(--text-tertiary-dark)] font-medium relative z-10">
-                {embedMode === 'script' 
-                  ? "Copia este código y pégalo justo antes de cerrar la etiqueta </body> en tu sitio web."
-                  : "Usa este shortcode en cualquier página o widget de tu WordPress (Requiere el plugin de Imalá Vox)."}
+                Copia este código y pégalo justo antes de cerrar la etiqueta <code className="text-[var(--accent)] font-bold">&lt;/body&gt;</code> en tu sitio web para activar el chat.
               </p>
             </section>
 
@@ -355,16 +403,18 @@ export default function WebChannelPage() {
                 <div className="space-y-2">
                   <Label className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-[0.1em]">Agente Responsable</Label>
                   <Select 
-                    value={config.agenteId || null} 
+                    value={config.agenteId || ""} 
                     onValueChange={handleAgenteChange}
                   >
                     <SelectTrigger className="h-12 rounded-2xl bg-[var(--bg-input)]/50 border-none font-bold text-sm px-6">
-                      <SelectValue placeholder="Selecciona un agente..." />
+                      <SelectValue placeholder="Selecciona un agente...">
+                        {config.agenteId ? agentes.find(a => a.id === config.agenteId)?.nombre : undefined}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent className="rounded-2xl border-slate-100 shadow-2xl bg-white p-2">
                       {agentes.map(a => (
                         <SelectItem key={a.id} value={a.id!} className="rounded-xl py-3 px-4">
-                          <div className="flex flex-col">
+                          <div className="flex flex-col items-start">
                             <span className="font-bold text-[13px]">{a.nombre}</span>
                             <span className="text-[10px] text-[var(--text-tertiary-light)] uppercase tracking-tight">{a.rolAgente}</span>
                           </div>
