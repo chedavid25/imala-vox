@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { adminDb } from "@/lib/firebase-admin";
 import { COLLECTIONS } from "@/lib/types/firestore";
 
 export async function OPTIONS() {
@@ -19,16 +18,20 @@ export async function GET(req: NextRequest) {
   const workspaceId = searchParams.get("workspaceId");
 
   if (!workspaceId) {
-    return NextResponse.json({ error: "Missing workspaceId" }, { status: 400 });
+    return NextResponse.json({ error: "Missing workspaceId" }, { 
+      status: 400,
+      headers: { "Access-Control-Allow-Origin": "*" } 
+    });
   }
 
   try {
-    const q = query(
-      collection(db, COLLECTIONS.ESPACIOS, workspaceId, COLLECTIONS.CANALES),
-      where("tipo", "==", "web")
-    );
-
-    const snap = await getDocs(q);
+    // Usamos adminDb para saltar las reglas de seguridad y obtener la config del canal web
+    const snap = await adminDb
+      .collection(COLLECTIONS.ESPACIOS)
+      .doc(workspaceId)
+      .collection(COLLECTIONS.CANALES)
+      .where("tipo", "==", "web")
+      .get();
     
     if (snap.empty) {
       return NextResponse.json({ error: "Web channel not found" }, { 
