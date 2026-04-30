@@ -10,10 +10,13 @@
   const workspaceId = configParams.workspaceId;
   if (!workspaceId) return;
 
-  const container = document.createElement('div');
-  container.id = 'imalavox-container';
-  container.style.display = 'none';
-  document.body.appendChild(container);
+  // 1. CREAR EL CONTENEDOR PRINCIPAL
+  const hostElement = document.createElement('div');
+  hostElement.id = 'imalavox-widget-root';
+  document.body.appendChild(hostElement);
+
+  // 2. CREAR EL SHADOW DOM (Aislamiento total de CSS)
+  const shadow = hostElement.attachShadow({ mode: 'open' });
 
   async function initWidget() {
     try {
@@ -26,15 +29,18 @@
       const accentColor = cfg.colorButton || '#C8FF00';
       const headerColor = cfg.colorHeader || '#1A1A18';
 
+      // 3. INYECTAR ESTILOS DENTRO DEL SHADOW DOM
       const style = document.createElement('style');
-      style.innerHTML = `
-        #imalavox-container {
+      style.textContent = `
+        :host {
+          all: initial; /* Reset total */
           position: fixed; bottom: 24px; right: 24px;
-          z-index: 999999;
-          font-family: 'Inter', -apple-system, system-ui, sans-serif;
-          display: block !important;
+          z-index: 999999999;
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         }
-        
+
+        * { box-sizing: border-box; }
+
         #imalavox-button {
           width: 64px; height: 64px; border-radius: 22px;
           background: ${accentColor};
@@ -43,14 +49,13 @@
           transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
           border: 1px solid rgba(255,255,255,0.1);
         }
-        #imalavox-button:hover { transform: scale(1.05) translateY(-2px); box-shadow: 0 12px 40px rgba(0,0,0,0.2); }
-        #imalavox-button svg { width: 28px; height: 28px; color: #1A1A18; }
+        #imalavox-button:hover { transform: scale(1.05) translateY(-2px); }
+        #imalavox-button svg { width: 28px; height: 28px; color: #1A1A18; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
         
         #imalavox-window {
           position: absolute; bottom: 85px; right: 0;
           width: 400px; height: 620px; max-height: calc(100vh - 140px);
-          background: rgba(255, 255, 255, 0.95);
-          backdrop-filter: blur(20px);
+          background: white;
           border-radius: 32px;
           box-shadow: 0 20px 60px rgba(0,0,0,0.15);
           display: none; flex-direction: column; overflow: hidden;
@@ -61,70 +66,53 @@
         #imalavox-window.open { display: flex; opacity: 1; transform: translateY(0) scale(1); }
         
         .imalavox-header { 
-          padding: 24px; 
-          background: ${headerColor}; 
-          color: white; 
-          display: flex; 
-          align-items: center; 
-          gap: 16px;
-          box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+          padding: 24px; background: ${headerColor}; color: white; 
+          display: flex; align-items: center; gap: 16px;
         }
         .imalavox-header-logo { 
-          width: 48px; height: 48px; border-radius: 16px; 
-          background: rgba(255,255,255,0.1); 
-          display: flex; align-items: center; justify-content: center; 
-          overflow: hidden; border: 1px solid rgba(255,255,255,0.1);
+          width: 48px; height: 48px; border-radius: 16px; background: rgba(255,255,255,0.1); 
+          display: flex; align-items: center; justify-content: center; overflow: hidden;
         }
         .imalavox-header-logo img { width: 100%; height: 100%; object-fit: cover; }
-        .imalavox-header-text h3 { margin: 0; font-size: 16px; font-weight: 800; letter-spacing: -0.02em; }
-        .imalavox-header-text p { margin: 2px 0 0; font-size: 11px; font-weight: 600; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.05em; }
+        .imalavox-header-text h3 { margin: 0; font-size: 16px; font-weight: 800; color: white; }
+        .imalavox-header-text p { margin: 2px 0 0; font-size: 10px; font-weight: 600; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.05em; color: white; }
         
         .imalavox-messages { flex: 1; padding: 24px; background: #F8F9FB; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
         .imalavox-msg { max-width: 85%; padding: 14px 18px; border-radius: 20px; font-size: 14px; line-height: 1.5; font-weight: 500; }
-        .imalavox-msg-bot { 
-          background: white; color: #1A1A18; align-self: flex-start; 
-          border-bottom-left-radius: 6px; 
-          box-shadow: 0 4px 12px rgba(0,0,0,0.03); 
-        }
-        .imalavox-msg-user { 
-          background: ${accentColor}; color: #1A1A18; align-self: flex-end; 
-          border-bottom-right-radius: 6px; 
-          box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
-        }
+        .imalavox-msg-bot { background: white; color: #1A1A18; align-self: flex-start; border-bottom-left-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+        .imalavox-msg-user { background: ${accentColor}; color: #1A1A18; align-self: flex-end; border-bottom-right-radius: 6px; }
         
         .imalavox-input-area { 
-          padding: 20px; background: white; 
-          display: flex; gap: 12px; align-items: center;
+          padding: 20px; background: white; display: flex; gap: 12px; align-items: center;
           border-top: 1px solid rgba(0,0,0,0.05);
         }
         .imalavox-input { 
-          flex: 1; border: 1px solid rgba(0,0,0,0.05); 
-          background: #F1F3F7; padding: 12px 20px; 
-          border-radius: 18px; font-size: 14px; font-weight: 500;
-          outline: none; transition: all 0.2s;
+          flex: 1; border: 1px solid rgba(0,0,0,0.08); background: #F1F3F7; 
+          padding: 12px 20px; border-radius: 18px; font-size: 14px; outline: none;
         }
-        .imalavox-input:focus { background: white; border-color: ${accentColor}; box-shadow: 0 0 0 4px ${accentColor}20; }
         
         .imalavox-send { 
           width: 44px; height: 44px; border-radius: 14px; 
-          background: ${accentColor}; border: none; 
-          cursor: pointer; display: flex; align-items: center; justify-content: center;
+          background: #1A1A18; border: none; cursor: pointer; 
+          display: flex; align-items: center; justify-content: center;
           transition: all 0.2s;
         }
-        .imalavox-send:hover { transform: scale(1.05); }
-        .imalavox-send svg { width: 20px; height: 20px; color: #1A1A18; }
+        .imalavox-send:hover { transform: scale(1.05); background: #333; }
+        .imalavox-send svg { width: 20px; height: 20px; color: white; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
         
         @media (max-width: 480px) {
           #imalavox-window { width: calc(100vw - 32px); height: calc(100vh - 120px); bottom: 80px; right: -8px; }
         }
       `;
-      document.head.appendChild(style);
+      shadow.appendChild(style);
 
-      container.innerHTML = `
+      // 4. CONSTRUIR UI
+      const ui = document.createElement('div');
+      ui.innerHTML = `
         <div id="imalavox-window">
           <div class="imalavox-header">
             <div class="imalavox-header-logo">
-              ${cfg.logoHeaderUrl ? `<img src="${cfg.logoHeaderUrl}" />` : `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"></path><rect width="16" height="12" x="4" y="8" rx="2"></rect><path d="M2 14h2"></path><path d="M20 14h2"></path><path d="M15 13v2"></path><path d="M9 13v2"></path></svg>`}
+              ${cfg.logoHeaderUrl ? `<img src="${cfg.logoHeaderUrl}" />` : `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8V4H8"></path><rect width="16" height="12" x="4" y="8" rx="2"></rect><path d="M2 14h2"></path><path d="M20 14h2"></path><path d="M15 13v2"></path><path d="M9 13v2"></path></svg>`}
             </div>
             <div class="imalavox-header-text">
               <h3>${cfg.headerText || 'Imalá Vox'}</h3>
@@ -135,24 +123,26 @@
           <div class="imalavox-input-area">
             <input type="text" class="imalavox-input" id="imalavox-chat-input" placeholder="Type a message...">
             <button class="imalavox-send" id="imalavox-chat-send">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 14-7-7 14-2-7-5-2Z"></path><path d="m19 5-7 7"></path></svg>
+              <svg viewBox="0 0 24 24"><path d="m5 12 14-7-7 14-2-7-5-2Z"></path><path d="m19 5-7 7"></path></svg>
             </button>
           </div>
         </div>
         <div id="imalavox-button">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+          <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
         </div>
       `;
+      shadow.appendChild(ui);
 
-      const btn = document.getElementById('imalavox-button');
-      const win = document.getElementById('imalavox-window');
-      const msgBox = document.getElementById('imalavox-chat-messages');
-      const input = document.getElementById('imalavox-chat-input');
-      const send = document.getElementById('imalavox-chat-send');
+      // 5. EVENTOS
+      const btn = shadow.getElementById('imalavox-button');
+      const win = shadow.getElementById('imalavox-window');
+      const msgBox = shadow.getElementById('imalavox-chat-messages');
+      const input = shadow.getElementById('imalavox-chat-input');
+      const send = shadow.getElementById('imalavox-chat-send');
 
       const toggleChat = () => {
-        win.classList.toggle('open');
-        if (win.classList.contains('open')) input.focus();
+        const isOpen = win.classList.toggle('open');
+        if (isOpen) input.focus();
       };
 
       btn.onclick = toggleChat;
@@ -178,7 +168,7 @@
         if (!text) return;
         addMessage(text, false);
         input.value = '';
-        setTimeout(() => addMessage("I'm processing your request... an agent will be with you shortly."), 1200);
+        setTimeout(() => addMessage("Lo siento, estoy en modo demostración. Pronto podré responderte de verdad."), 1200);
       };
 
       send.onclick = handleSend;
