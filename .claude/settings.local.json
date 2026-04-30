@@ -21,7 +21,21 @@
       "Bash(cat next.config.js)",
       "Bash(cat vercel.json)",
       "Bash(ls public/sw.js)",
-      "Bash(grep -v \"^$\")"
+      "Bash(grep -v \"^$\")",
+      "WebFetch(domain:docs.astropay.com)",
+      "WebFetch(domain:developers.astropay.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:web.archive.org)",
+      "WebFetch(domain:corefy.com)",
+      "WebFetch(domain:developers.ecommpay.com)",
+      "WebFetch(domain:developer.globalpayments.com)",
+      "WebFetch(domain:www.astropay.com)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:socket.dev)",
+      "WebFetch(domain:developers-wallet.astropay.com)",
+      "WebFetch(domain:www.astropay.co.zw)",
+      "WebFetch(domain:doc.epg-services.com)",
+      "WebFetch(domain:akurateco.com)"
     ]
   }
 }

@@ -17,7 +17,8 @@ import {
   Trash2,
   HelpCircle,
   ChevronDown,
-  Lightbulb
+  Lightbulb,
+  Globe
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +49,7 @@ import { cn } from "@/lib/utils";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 import { COLLECTIONS, Canal } from "@/lib/types/firestore";
+import { useRouter } from "next/navigation";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { toast } from "sonner";
 import { 
@@ -77,9 +79,16 @@ const CANALES_CONFIG = [
     color: '#1877F2',
     icon: MessageCircle,
   },
+  {
+    tipo: 'web' as const,
+    nombre: 'Chat Web (Widget)',
+    color: '#C8FF00',
+    icon: Globe,
+  },
 ];
 
 export default function CanalesPage() {
+  const router = useRouter();
   const { currentWorkspaceId } = useWorkspaceStore();
   const [canales, setCanales] = useState<(Canal & { id: string })[]>([]);
   const [loading, setLoading] = useState(true);
@@ -308,6 +317,14 @@ export default function CanalesPage() {
           >
             <Plus className="w-4 h-4 mr-2" />
             Conectar Meta
+          </Button>
+
+          <Button
+            onClick={() => router.push('/dashboard/ajustes/canales/web')}
+            className="rounded-2xl bg-white border border-[var(--border-light)] text-[var(--text-primary-light)] font-black text-[10px] uppercase tracking-widest px-6 h-11 hover:bg-[var(--bg-input)] transition-all shadow-sm active:scale-95"
+          >
+            <Globe className="w-4 h-4 mr-2 text-[var(--accent-active)]" />
+            Chat Web
           </Button>
         </div>
       </div>

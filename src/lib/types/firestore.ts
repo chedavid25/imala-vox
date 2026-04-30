@@ -256,7 +256,7 @@ export interface Mensaje {
 
 export interface Canal {
   id?: string;
-  tipo: 'whatsapp' | 'instagram' | 'facebook';
+  tipo: 'whatsapp' | 'instagram' | 'facebook' | 'web';
   nombre: string;
   cuenta: string;        // número de teléfono o @usuario
   status: 'connected' | 'disconnected' | 'error' | 'pending';
@@ -267,6 +267,21 @@ export interface Canal {
   webhookVerified: boolean;
   aiEnabled: boolean;         // Nuevo: control maestro IA por canal
   agenteId?: string | null;   // Nuevo: agente específico asignado a este canal
+  
+  // Configuración específica para el Canal Web (Widget)
+  configWeb?: {
+    dominios: string[];
+    headerText: string;
+    welcomeMessage: string;
+    showWelcomeMessage: boolean;
+    colorHeader: string;
+    colorButton: string;
+    logoHeaderUrl: string;
+    logoButtonUrl?: string;
+    autoOpenDelay: number;
+    openAutomatically: boolean;
+  };
+
   creadoEl: Timestamp;
   actualizadoEl: Timestamp;
 }
