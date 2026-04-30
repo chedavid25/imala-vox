@@ -2,7 +2,6 @@
   if (window.ImalaVoxWidget) return;
   window.ImalaVoxWidget = true;
 
-  // 1. DETECTAR EL HOST AUTOMÁTICAMENTE (desde donde se carga este script)
   const script = document.currentScript;
   const scriptUrl = new URL(script.src);
   const host = scriptUrl.origin;
@@ -18,62 +17,105 @@
 
   async function initWidget() {
     try {
-      // Usar el host detectado para las llamadas a la API
       const response = await fetch(`${host}/api/widget/config?workspaceId=${workspaceId}`);
       if (!response.ok) throw new Error("Config not found");
-      
       const data = await response.json();
       const cfg = data.config;
-      
       if (!cfg) return;
+
+      const accentColor = cfg.colorButton || '#C8FF00';
+      const headerColor = cfg.colorHeader || '#1A1A18';
 
       const style = document.createElement('style');
       style.innerHTML = `
         #imalavox-container {
-          position: fixed;
-          bottom: 20px;
-          right: 20px;
+          position: fixed; bottom: 24px; right: 24px;
           z-index: 999999;
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+          font-family: 'Inter', -apple-system, system-ui, sans-serif;
           display: block !important;
         }
+        
         #imalavox-button {
-          width: 60px; height: 60px; border-radius: 30px;
-          background: ${cfg.colorButton || '#C8FF00'};
-          box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+          width: 64px; height: 64px; border-radius: 22px;
+          background: ${accentColor};
+          box-shadow: 0 8px 32px rgba(0,0,0,0.15);
           cursor: pointer; display: flex; align-items: center; justify-content: center;
-          transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+          transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+          border: 1px solid rgba(255,255,255,0.1);
         }
-        #imalavox-button:hover { transform: scale(1.1); }
+        #imalavox-button:hover { transform: scale(1.05) translateY(-2px); box-shadow: 0 12px 40px rgba(0,0,0,0.2); }
         #imalavox-button svg { width: 28px; height: 28px; color: #1A1A18; }
         
         #imalavox-window {
-          position: absolute; bottom: 80px; right: 0;
-          width: 380px; height: 600px; max-height: calc(100vh - 120px);
-          background: white; border-radius: 24px;
-          box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+          position: absolute; bottom: 85px; right: 0;
+          width: 400px; height: 620px; max-height: calc(100vh - 140px);
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(20px);
+          border-radius: 32px;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.15);
           display: none; flex-direction: column; overflow: hidden;
-          transform-origin: bottom right; transition: all 0.3s ease;
-          opacity: 0; transform: scale(0.9);
+          border: 1px solid rgba(0,0,0,0.05);
+          transform-origin: bottom right; transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+          opacity: 0; transform: translateY(20px) scale(0.95);
         }
-        #imalavox-window.open { display: flex; opacity: 1; transform: scale(1); }
+        #imalavox-window.open { display: flex; opacity: 1; transform: translateY(0) scale(1); }
         
-        .imalavox-header { padding: 20px; background: ${cfg.colorHeader || '#1A1A18'}; color: white; display: flex; align-items: center; gap: 12px; }
-        .imalavox-header-logo { width: 40px; height: 40px; border-radius: 20px; background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .imalavox-header { 
+          padding: 24px; 
+          background: ${headerColor}; 
+          color: white; 
+          display: flex; 
+          align-items: center; 
+          gap: 16px;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .imalavox-header-logo { 
+          width: 48px; height: 48px; border-radius: 16px; 
+          background: rgba(255,255,255,0.1); 
+          display: flex; align-items: center; justify-content: center; 
+          overflow: hidden; border: 1px solid rgba(255,255,255,0.1);
+        }
         .imalavox-header-logo img { width: 100%; height: 100%; object-fit: cover; }
-        .imalavox-header-text h3 { margin: 0; font-size: 14px; font-weight: 700; }
-        .imalavox-header-text p { margin: 2px 0 0; font-size: 10px; opacity: 0.7; }
+        .imalavox-header-text h3 { margin: 0; font-size: 16px; font-weight: 800; letter-spacing: -0.02em; }
+        .imalavox-header-text p { margin: 2px 0 0; font-size: 11px; font-weight: 600; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.05em; }
         
-        .imalavox-messages { flex: 1; padding: 20px; background: #F8F9FA; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
-        .imalavox-msg { max-width: 85%; padding: 12px 16px; border-radius: 18px; font-size: 13px; line-height: 1.5; }
-        .imalavox-msg-bot { background: white; color: #1A1A18; align-self: flex-start; border-bottom-left-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .imalavox-messages { flex: 1; padding: 24px; background: #F8F9FB; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+        .imalavox-msg { max-width: 85%; padding: 14px 18px; border-radius: 20px; font-size: 14px; line-height: 1.5; font-weight: 500; }
+        .imalavox-msg-bot { 
+          background: white; color: #1A1A18; align-self: flex-start; 
+          border-bottom-left-radius: 6px; 
+          box-shadow: 0 4px 12px rgba(0,0,0,0.03); 
+        }
+        .imalavox-msg-user { 
+          background: ${accentColor}; color: #1A1A18; align-self: flex-end; 
+          border-bottom-right-radius: 6px; 
+          box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
+        }
         
-        .imalavox-input-area { padding: 15px; background: white; border-top: 1px solid #EEE; display: flex; gap: 10px; }
-        .imalavox-input { flex: 1; border: none; background: #F1F3F5; padding: 10px 15px; border-radius: 20px; font-size: 13px; outline: none; }
-        .imalavox-send { width: 36px; height: 36px; border-radius: 18px; background: ${cfg.colorButton || '#C8FF00'}; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .imalavox-input-area { 
+          padding: 20px; background: white; 
+          display: flex; gap: 12px; align-items: center;
+          border-top: 1px solid rgba(0,0,0,0.05);
+        }
+        .imalavox-input { 
+          flex: 1; border: 1px solid rgba(0,0,0,0.05); 
+          background: #F1F3F7; padding: 12px 20px; 
+          border-radius: 18px; font-size: 14px; font-weight: 500;
+          outline: none; transition: all 0.2s;
+        }
+        .imalavox-input:focus { background: white; border-color: ${accentColor}; box-shadow: 0 0 0 4px ${accentColor}20; }
+        
+        .imalavox-send { 
+          width: 44px; height: 44px; border-radius: 14px; 
+          background: ${accentColor}; border: none; 
+          cursor: pointer; display: flex; align-items: center; justify-content: center;
+          transition: all 0.2s;
+        }
+        .imalavox-send:hover { transform: scale(1.05); }
+        .imalavox-send svg { width: 20px; height: 20px; color: #1A1A18; }
         
         @media (max-width: 480px) {
-          #imalavox-window { width: calc(100vw - 40px); height: calc(100vh - 100px); bottom: 70px; }
+          #imalavox-window { width: calc(100vw - 32px); height: calc(100vh - 120px); bottom: 80px; right: -8px; }
         }
       `;
       document.head.appendChild(style);
@@ -82,23 +124,23 @@
         <div id="imalavox-window">
           <div class="imalavox-header">
             <div class="imalavox-header-logo">
-              ${cfg.logoHeaderUrl ? `<img src="${cfg.logoHeaderUrl}" />` : `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8V4H8"></path><rect width="16" height="12" x="4" y="8" rx="2"></rect><path d="M2 14h2"></path><path d="M20 14h2"></path><path d="M15 13v2"></path><path d="M9 13v2"></path></svg>`}
+              ${cfg.logoHeaderUrl ? `<img src="${cfg.logoHeaderUrl}" />` : `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"></path><rect width="16" height="12" x="4" y="8" rx="2"></rect><path d="M2 14h2"></path><path d="M20 14h2"></path><path d="M15 13v2"></path><path d="M9 13v2"></path></svg>`}
             </div>
             <div class="imalavox-header-text">
               <h3>${cfg.headerText || 'Imalá Vox'}</h3>
-              <p>Online</p>
+              <p>Online Now</p>
             </div>
           </div>
           <div class="imalavox-messages" id="imalavox-chat-messages"></div>
           <div class="imalavox-input-area">
-            <input type="text" class="imalavox-input" id="imalavox-chat-input" placeholder="Escribe un mensaje...">
+            <input type="text" class="imalavox-input" id="imalavox-chat-input" placeholder="Type a message...">
             <button class="imalavox-send" id="imalavox-chat-send">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m5 12 14-7-7 14-2-7-5-2Z"></path><path d="m19 5-7 7"></path></svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 14-7-7 14-2-7-5-2Z"></path><path d="m19 5-7 7"></path></svg>
             </button>
           </div>
         </div>
         <div id="imalavox-button">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
         </div>
       `;
 
@@ -124,13 +166,11 @@
       };
 
       if (cfg.showWelcomeMessage && cfg.welcomeMessage) {
-        setTimeout(() => addMessage(cfg.welcomeMessage), 1000);
+        setTimeout(() => addMessage(cfg.welcomeMessage), 800);
       }
 
       if (cfg.openAutomatically) {
-        setTimeout(() => {
-          if (!win.classList.contains('open')) toggleChat();
-        }, (cfg.autoOpenDelay || 5) * 1000);
+        setTimeout(() => { if (!win.classList.contains('open')) toggleChat(); }, (cfg.autoOpenDelay || 5) * 1000);
       }
 
       const handleSend = () => {
@@ -138,7 +178,7 @@
         if (!text) return;
         addMessage(text, false);
         input.value = '';
-        setTimeout(() => addMessage("Gracias por tu mensaje. Un agente te contactará pronto."), 1000);
+        setTimeout(() => addMessage("I'm processing your request... an agent will be with you shortly."), 1200);
       };
 
       send.onclick = handleSend;
