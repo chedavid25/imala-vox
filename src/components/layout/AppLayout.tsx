@@ -243,10 +243,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
             {isAdmin && (
               <Link
                 href="/superadmin"
-                className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-[var(--accent)] hover:opacity-80 transition-opacity"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--accent)]/15 border border-[var(--accent)]/20 text-[10px] font-black uppercase tracking-[0.12em] text-[var(--accent-active)] hover:bg-[var(--accent)] hover:text-[var(--accent-text)] transition-all group shadow-sm active:scale-95"
               >
-                <ShieldCheck className="w-3.5 h-3.5" />
-                Panel Admin
+                <ShieldCheck className="w-3.5 h-3.5 transition-colors" />
+                <span>Panel Admin</span>
               </Link>
             )}
             <AvisosHeader />

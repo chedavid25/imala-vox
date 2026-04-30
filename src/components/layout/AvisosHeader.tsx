@@ -64,15 +64,15 @@ export function AvisosHeader() {
       {/* TRIGGER — Aplicamos estilos directamente al Trigger para evitar anidamiento */}
       <DropdownMenuTrigger
         className={cn(
-          "relative size-10 rounded-2xl flex items-center justify-center transition-all duration-200 border outline-none",
+          "relative size-10 rounded-xl flex items-center justify-center transition-all duration-300 border outline-none shadow-sm active:scale-95",
           badgeCount > 0
-            ? "bg-[var(--accent)]/10 border-[var(--accent)]/20 text-[var(--accent)] hover:bg-[var(--accent)]/20"
-            : "bg-white border-[var(--border-light)] text-[var(--text-tertiary-light)] hover:bg-[var(--bg-input)] hover:text-[var(--text-primary-light)] hover:border-[var(--border-light-strong)]"
+            ? "bg-[var(--accent)]/10 border-[var(--accent)]/30 text-[var(--accent-active)] hover:bg-[var(--accent)]/20"
+            : "bg-[var(--bg-input)]/50 border-[var(--border-light)] text-[var(--text-tertiary-light)] hover:bg-[var(--bg-input)] hover:text-[var(--text-primary-light)] hover:border-[var(--border-light-strong)]"
         )}
       >
         <Bell className={cn("size-4 transition-transform duration-300", isOpen && "scale-90")} />
         {badgeCount > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[8px] font-black rounded-full flex items-center justify-center px-1 border-2 border-white leading-none animate-in zoom-in-50 duration-200 shadow-lg shadow-red-500/30">
+          <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[8px] font-black rounded-full flex items-center justify-center px-1 border-2 border-white leading-none animate-in zoom-in-50 duration-300 shadow-[0_4px_12px_rgba(239,68,68,0.4)]">
             {badgeCount > 99 ? "99+" : badgeCount}
           </span>
         )}
