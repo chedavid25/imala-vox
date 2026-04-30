@@ -43,6 +43,8 @@ import {
   updateDoc,
   serverTimestamp 
 } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { storage } from "@/lib/firebase";
 import { COLLECTIONS, Canal, Agente } from "@/lib/types/firestore";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -71,6 +73,7 @@ export default function WebChannelPage() {
   const [canalWeb, setCanalWeb] = useState<Canal | null>(null);
   const [copied, setCopied] = useState(false);
   const [embedMode, setEmbedMode] = useState<'script' | 'shortcode'>('script');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const [config, setConfig] = useState<WebConfig>({
     dominios: [],
@@ -463,26 +466,40 @@ export default function WebChannelPage() {
                         <ImageIcon className="w-6 h-6 text-[var(--text-tertiary-light)]" />
                       )}
                     </div>
-                    <div className="flex-1 space-y-2">
+                      <div className="flex-1 space-y-2">
                       <Input 
                         type="file" 
                         accept="image/*"
                         className="hidden" 
                         ref={fileInputRef}
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const file = e.target.files?.[0];
-                          if (file) {
-                            const url = URL.createObjectURL(file);
+                          if (!file || !currentWorkspaceId) return;
+                          
+                          try {
+                            setUploadingLogo(true);
+                            const storageRef = ref(storage, `${COLLECTIONS.ESPACIOS}/${currentWorkspaceId}/canales/web/logo_${Date.now()}`);
+                            await uploadBytes(storageRef, file);
+                            const url = await getDownloadURL(storageRef);
+                            
                             setConfig((prev: WebConfig) => ({ ...prev, logoHeaderUrl: url }));
+                            toast.success("Logo subido correctamente");
+                          } catch (error) {
+                            console.error(error);
+                            toast.error("Error al subir el logo");
+                          } finally {
+                            setUploadingLogo(false);
                           }
                         }}
                       />
                       <Button 
                         variant="outline"
+                        disabled={uploadingLogo}
                         onClick={() => fileInputRef.current?.click()}
                         className="h-10 rounded-xl border-[var(--border-light)] font-bold text-xs"
                       >
-                        Subir Imagen
+                        {uploadingLogo ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : null}
+                        {uploadingLogo ? "Subiendo..." : "Subir Imagen"}
                       </Button>
                       <p className="text-[9px] text-[var(--text-tertiary-light)] font-medium">Recomendado: 128x128px PNG o JPG.</p>
                     </div>
