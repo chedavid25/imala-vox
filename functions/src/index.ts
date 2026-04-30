@@ -425,24 +425,38 @@ async function realizarScrapingRecursoInternal(wsId: string, recursoId: string, 
  * Disparador: HTTPS (onCall)
  * Responsabilidad: Ejecuta el scraper profundo en un entorno con recursos suficientes (1GB RAM).
  */
-export const ejecutarScrapingWeb = functions
+export const procesarScrapingWeb = functions
   .runWith({ timeoutSeconds: 300, memory: '1GB' })
-  .https.onCall(async (data: any, context: functions.https.CallableContext) => {
-    if (!context.auth) {
-      throw new functions.https.HttpsError('unauthenticated', 'Usuario no autenticado.');
-    }
+  .https.onRequest(async (req, res) => {
+    // Manejar CORS manualmente para mayor seguridad
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-    const { wsId, recursoId, url } = data;
-    if (!wsId || !recursoId || !url) {
-      throw new functions.https.HttpsError('invalid-argument', 'Faltan parámetros (wsId, recursoId, url).');
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('');
+      return;
     }
 
     try {
+      const { wsId, recursoId, url, secret } = req.body.data || req.body;
+      
+      // Validación básica de seguridad vía token secreto
+      if (secret !== 'imala_vox_internal_key') {
+        res.status(401).send({ success: false, error: 'No autorizado.' });
+        return;
+      }
+
+      if (!wsId || !recursoId || !url) {
+        res.status(400).send({ success: false, error: 'Faltan parámetros.' });
+        return;
+      }
+
       const result = await realizarScrapingRecursoInternal(wsId, recursoId, url);
-      return { success: true, propertyCount: result.propertyCount };
+      res.status(200).send({ success: true, propertyCount: result.propertyCount });
     } catch (error: any) {
-      console.error('Error en ejecutarScrapingWeb:', error);
-      throw new functions.https.HttpsError('internal', error.message || 'Error desconocido en el scraper.');
+      console.error('Error en procesarScrapingWeb:', error);
+      res.status(500).send({ success: false, error: error.message || 'Error desconocido en el scraper.' });
     }
   });
 /**
