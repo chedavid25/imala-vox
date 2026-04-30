@@ -2,7 +2,6 @@
 
 import { db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
-import { getFunctions, httpsCallable } from "firebase/functions";
 import { COLLECTIONS } from "@/lib/types/firestore";
 
 // Polyfill para evitar error "DOMMatrix is not defined" en pdf-parse
@@ -76,54 +75,3 @@ export async function subirYProcesarArchivoAction(
   }
 }
 
-export async function scrapearWebAction(
-  wsId: string,
-  recursoId: string,
-  url: string
-) {
-  try {
-    if (!wsId || !recursoId || !url) throw new Error("Faltan parámetros de scraping.");
-
-    const docRef = doc(db, COLLECTIONS.ESPACIOS, wsId, COLLECTIONS.CONOCIMIENTO, recursoId);
-
-    // 1. Marcar como procesando
-    await updateDoc(docRef, { 
-      estado: 'procesando',
-      errorMensaje: null 
-    });
-
-    console.log(`Iniciando scraping profundo vía Cloud Function para: ${url}`);
-    
-    // 2. Ejecutar la función en la nube
-    const functions = getFunctions();
-    const scrapeFunc = httpsCallable(functions, 'ejecutarScrapingWeb');
-    
-    const result: any = await scrapeFunc({ wsId, recursoId, url });
-
-    if (!result.data?.success) {
-      throw new Error(result.data?.error || "Error desconocido en la Cloud Function.");
-    }
-
-    return {
-      success: true,
-      message: `Scraping completado. Se indexaron ${result.data.propertyCount} propiedades.`
-    };
-
-  } catch (error: any) {
-    console.error("Error en scrapearWebAction:", error);
-    
-    // Registrar el error en el documento para que el usuario lo vea
-    if (recursoId && wsId) {
-      const docRef = doc(db, COLLECTIONS.ESPACIOS, wsId, COLLECTIONS.CONOCIMIENTO, recursoId);
-      await updateDoc(docRef, { 
-        estado: 'error',
-        errorMensaje: error.message 
-      });
-    }
-
-    return {
-      success: false,
-      error: error.message || "Error al procesar el sitio web."
-    };
-  }
-}

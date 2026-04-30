@@ -15,7 +15,8 @@ import {
   getDocs,
   updateDoc
 } from "firebase/firestore";
-import { scrapearWebAction } from "@/app/actions/knowledge";
+import { functions, auth } from "@/lib/firebase";
+import { httpsCallable } from "firebase/functions";
 import { COLLECTIONS, RecursoConocimiento } from "@/lib/types/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { 
@@ -30,7 +31,7 @@ import {
   Eye,
   Link as LinkIcon
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -112,15 +113,36 @@ export default function WebsGlobalPage() {
       setNewWeb({ url: "", descripcion: "", modo: "single", frecuencia: "manual" });
       setStep(1);
 
-      // Disparar scraping en segundo plano
-      const res = await scrapearWebAction(currentWorkspaceId, docRef.id, urlToScrape);
-      if (res.success) {
-        toast.success(res.message);
-      } else {
-        toast.error("Error en lectura: " + res.error);
+      // Obtener el ID Token del usuario para pasarlo al proxy y validar auth
+      const token = await auth.currentUser?.getIdToken();
+
+      // Llamar al proxy interno para evitar errores de CORS
+      const response = await fetch('/api/proxy-scraper', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          wsId: currentWorkspaceId,
+          recursoId: docRef.id,
+          url: urlToScrape,
+          token
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error en el proxy: ${response.status}`);
       }
-    } catch (err) {
-      toast.error("Error al registrar el sitio");
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success("¡Indexación completada con éxito!");
+      } else {
+        console.error("Error devuelto por la función:", data);
+        toast.error("Error en lectura: " + (data.error || "Desconocido"));
+      }
+    } catch (err: any) {
+      console.error("Error completo al llamar a la función:", err);
+      toast.error("Error de conexión: " + (err.message || "Error desconocido"));
     } finally {
       setIsAdding(false);
     }
@@ -143,11 +165,35 @@ export default function WebsGlobalPage() {
   const handleRefresh = async (id: string, url: string) => {
     if (!currentWorkspaceId) return;
     toast.info("Actualizando información del sitio...");
-    const res = await scrapearWebAction(currentWorkspaceId, id, url);
-    if (res.success) {
-      toast.success(res.message);
-    } else {
-      toast.error("Error al actualizar: " + res.error);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      
+      const response = await fetch('/api/proxy-scraper', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          wsId: currentWorkspaceId,
+          recursoId: id,
+          url,
+          token
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error en el proxy: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.success) {
+        toast.success("Información actualizada");
+      } else {
+        console.error("Error en refresh:", data);
+        toast.error("Error al actualizar: " + (data.error || "Desconocido"));
+      }
+    } catch (err: any) {
+      console.error("Error completo en refresh:", err);
+      toast.error("Error al conectar con el servidor: " + err.message);
     }
   };
 
@@ -157,12 +203,14 @@ export default function WebsGlobalPage() {
         <h3 className="text-sm font-bold text-[var(--text-primary-light)]">Indexar Sitios Web</h3>
         
         <Dialog onOpenChange={(open) => !open && setStep(1)}>
-          <DialogTrigger>
-            <Button className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)]">
-              <Plus className="w-4 h-4 mr-2" />
-              Nuevo Sitio
-            </Button>
-          </DialogTrigger>
+          <DialogTrigger
+            render={
+              <button className={cn(buttonVariants({ variant: 'default' }), "bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] px-4 h-10 rounded-lg font-bold flex items-center justify-center")}>
+                <Plus className="w-4 h-4 mr-2" />
+                Nuevo Sitio
+              </button>
+            }
+          />
           <DialogContent className="bg-[var(--bg-card)] border-[var(--border-light)] max-w-lg">
             <DialogHeader>
               <DialogTitle>Indexar Sitio Web (Paso {step}/4)</DialogTitle>
@@ -257,12 +305,18 @@ export default function WebsGlobalPage() {
                   </div>
                   <div className="flex gap-2 pt-6">
                     <Button variant="outline" onClick={() => setStep(3)} className="flex-1">Atrás</Button>
-                    <DialogClose>
-                      <Button onClick={handleCreate} disabled={isAdding} className="flex-1 bg-[var(--accent)] text-[var(--accent-text)]">
-                        {isAdding && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-                        Indexar Ahora
-                      </Button>
-                    </DialogClose>
+                    <DialogClose
+                      render={
+                        <button 
+                          onClick={handleCreate} 
+                          disabled={isAdding} 
+                          className={cn(buttonVariants(), "flex-1 bg-[var(--accent)] text-[var(--accent-text)] px-4 h-10 rounded-lg font-bold flex items-center justify-center")}
+                        >
+                          {isAdding && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                          Indexar Ahora
+                        </button>
+                      }
+                    />
                   </div>
                 </div>
               )}

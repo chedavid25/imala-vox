@@ -25,7 +25,7 @@ import {
   Loader2,
   Trash
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -40,6 +40,7 @@ import {
   DialogClose
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 const SUGGESTIONS = [
   "Horarios de atención",
@@ -120,12 +121,14 @@ export default function TextosGlobalPage() {
         <h3 className="text-sm font-bold text-[var(--text-primary-light)]">Gestionar Textos Estáticos</h3>
         
         <Dialog>
-          <DialogTrigger>
-            <Button className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)]">
-              <Plus className="w-4 h-4 mr-2" />
-              Nuevo Texto
-            </Button>
-          </DialogTrigger>
+          <DialogTrigger
+            render={
+              <button className={cn(buttonVariants({ variant: 'default' }), "bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] px-4 h-10 rounded-lg font-bold flex items-center justify-center")}>
+                <Plus className="w-4 h-4 mr-2" />
+                Nuevo Texto
+              </button>
+            }
+          />
           <DialogContent className="bg-[var(--bg-card)] border-[var(--border-light)] max-w-2xl">
             <DialogHeader>
               <DialogTitle>Crear Bloque de Texto</DialogTitle>
@@ -173,12 +176,18 @@ export default function TextosGlobalPage() {
               </div>
             </div>
             <DialogFooter>
-              <DialogClose>
-                <Button onClick={handleCreate} disabled={isAdding || !newTexto.titulo} className="bg-[var(--accent)] text-[var(--accent-text)]">
-                  {isAdding && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-                  Guardar Texto
-                </Button>
-              </DialogClose>
+              <DialogClose
+                render={
+                  <button 
+                    onClick={handleCreate} 
+                    disabled={isAdding || !newTexto.titulo} 
+                    className={cn(buttonVariants(), "bg-[var(--accent)] text-[var(--accent-text)] px-4 h-10 rounded-lg font-bold flex items-center justify-center")}
+                  >
+                    {isAdding && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                    Guardar Texto
+                  </button>
+                }
+              />
             </DialogFooter>
           </DialogContent>
         </Dialog>

@@ -174,16 +174,18 @@ export default function AgentesPage() {
               </div>
             </div>
             <DialogFooter>
-              <DialogClose>
-                <Button 
-                  onClick={handleCrearAgente} 
-                  disabled={isAdding || !newAgente.nombre}
-                  className="bg-[var(--accent)] text-[var(--accent-text)]"
-                >
-                  {isAdding && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-                  Crear Agente
-                </Button>
-              </DialogClose>
+              <DialogClose
+                render={
+                  <button 
+                    onClick={handleCrearAgente} 
+                    disabled={isAdding || !newAgente.nombre}
+                    className={cn(buttonVariants(), "bg-[var(--accent)] text-[var(--accent-text)] px-4 h-10 rounded-lg font-bold flex items-center justify-center")}
+                  >
+                    {isAdding && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                    Crear Agente
+                  </button>
+                }
+              />
             </DialogFooter>
           </DialogContent>
         </Dialog>

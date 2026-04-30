@@ -175,12 +175,18 @@ export default function AgenteEtiquetasPage() {
               </div>
             </div>
             <DialogFooter>
-              <DialogClose>
-                <Button onClick={handleCreate} disabled={isAdding || !newEtiqueta.nombre} className="bg-[var(--accent)] text-[var(--accent-text)]">
-                  {isAdding && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-                  Crear Etiqueta
-                </Button>
-              </DialogClose>
+              <DialogClose
+                render={
+                  <button 
+                    onClick={handleCreate} 
+                    disabled={isAdding || !newEtiqueta.nombre} 
+                    className={cn(buttonVariants(), "bg-[var(--accent)] text-[var(--accent-text)] px-4 h-10 rounded-lg font-bold flex items-center justify-center")}
+                  >
+                    {isAdding && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                    Crear Etiqueta
+                  </button>
+                }
+              />
             </DialogFooter>
           </DialogContent>
         </Dialog>

@@ -3,6 +3,7 @@ import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getAnalytics, isSupported, Analytics } from "firebase/analytics";
+import { getFunctions } from "firebase/functions";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -30,4 +31,5 @@ if (typeof window !== "undefined") {
   });
 }
 
-export { app, auth, db, storage };
+const functions = getFunctions(app, "us-central1");
+export { app, auth, db, storage, functions };
