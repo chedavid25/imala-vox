@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { COLLECTIONS } from "@/lib/types/firestore";
-import { procesarMensajeIA } from "@/lib/ai/engine";
+import { procesarMensajeConIA } from "@/lib/ai/engine";
 import { Timestamp } from "firebase-admin/firestore";
 
 export async function OPTIONS() {
@@ -64,9 +64,13 @@ export async function POST(req: NextRequest) {
     });
 
     // 2. PROCESAR CON EL MOTOR DE IA DE IMALÁ VOX
-    // Nota: procesarMensajeIA ya se encarga de llamar a Anthropic/OpenAI, 
-    // buscar en la base de conocimientos y guardar la respuesta del bot.
-    const respuestaIA = await procesarMensajeIA(workspaceId, convId, message, agentId);
+    const respuestaIA = await procesarMensajeConIA({
+      wsId: workspaceId,
+      conversacionId: convId,
+      textoUsuario: message,
+      agenteId: agentId || '',
+      contactoNombre: "Cliente Web"
+    });
 
     return NextResponse.json({ 
       response: respuestaIA,
