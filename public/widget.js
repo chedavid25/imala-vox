@@ -2,20 +2,23 @@
   if (window.ImalaVoxWidget) return;
   window.ImalaVoxWidget = true;
 
+  // 1. DETECTAR EL HOST AUTOMÁTICAMENTE (desde donde se carga este script)
+  const script = document.currentScript;
+  const scriptUrl = new URL(script.src);
+  const host = scriptUrl.origin;
+
   const configParams = window.ImalaVox || {};
   const workspaceId = configParams.workspaceId;
   if (!workspaceId) return;
 
-  // 1. CREAR ESTRUCTURA BÁSICA (Invisible hasta cargar config)
   const container = document.createElement('div');
   container.id = 'imalavox-container';
   container.style.display = 'none';
   document.body.appendChild(container);
 
-  // 2. CARGAR CONFIGURACIÓN DESDE LA API
   async function initWidget() {
     try {
-      const host = window.ImalaVoxHost || ''; // Permitir override del host si es necesario
+      // Usar el host detectado para las llamadas a la API
       const response = await fetch(`${host}/api/widget/config?workspaceId=${workspaceId}`);
       if (!response.ok) throw new Error("Config not found");
       
@@ -24,7 +27,6 @@
       
       if (!cfg) return;
 
-      // 3. INYECTAR ESTILOS DINÁMICOS
       const style = document.createElement('style');
       style.innerHTML = `
         #imalavox-container {
@@ -76,7 +78,6 @@
       `;
       document.head.appendChild(style);
 
-      // 4. CONSTRUIR UI
       container.innerHTML = `
         <div id="imalavox-window">
           <div class="imalavox-header">
@@ -101,7 +102,6 @@
         </div>
       `;
 
-      // 5. EVENTOS
       const btn = document.getElementById('imalavox-button');
       const win = document.getElementById('imalavox-window');
       const msgBox = document.getElementById('imalavox-chat-messages');
@@ -123,29 +123,22 @@
         msgBox.scrollTop = msgBox.scrollHeight;
       };
 
-      // Mensaje de bienvenida
       if (cfg.showWelcomeMessage && cfg.welcomeMessage) {
         setTimeout(() => addMessage(cfg.welcomeMessage), 1000);
       }
 
-      // Apertura automática
       if (cfg.openAutomatically) {
         setTimeout(() => {
           if (!win.classList.contains('open')) toggleChat();
         }, (cfg.autoOpenDelay || 5) * 1000);
       }
 
-      // Manejo de envío (Simulado por ahora)
       const handleSend = () => {
         const text = input.value.trim();
         if (!text) return;
         addMessage(text, false);
         input.value = '';
-        
-        // Simular respuesta
-        setTimeout(() => {
-          addMessage("Gracias por tu mensaje. Un agente te contactará pronto.");
-        }, 1000);
+        setTimeout(() => addMessage("Gracias por tu mensaje. Un agente te contactará pronto."), 1000);
       };
 
       send.onclick = handleSend;
