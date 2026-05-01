@@ -2,7 +2,7 @@ import puppeteer, { Browser, Page } from "puppeteer";
 
 /**
  * Motor de Scraping Inteligente (Versión Cloud Functions)
- * Soporta múltiples plataformas: WooCommerce, Tiendanube, Wix, MercadoLibre, Tokko, Remax.
+ * Optimizado para velocidad con procesamiento paralelo.
  */
 
 interface ScrapeResult {
@@ -15,43 +15,27 @@ interface ScrapeResult {
 // ESTRATEGIA DE PAGINACIÓN MULTI-MODAL
 async function cargarTodoElContenido(page: Page, maxPages: number = 8) {
   let intentosBotones = 0;
-  const maxIntentos = 10;
+  const maxIntentos = 8;
   
   while (intentosBotones < maxIntentos) {
-    // Scroll suave humano
+    // Scroll suave rápido
     await page.evaluate(async () => {
-      await new Promise((resolve) => {
-        let total = 0;
-        const distance = 150;
-        const timer = setInterval(() => {
-          window.scrollBy(0, distance);
-          total += distance;
-          if (total >= document.body.scrollHeight) {
-            clearInterval(timer);
-            resolve(true);
-          }
-        }, 80);
-      });
+      window.scrollBy(0, window.innerHeight * 2);
     });
-    await new Promise(r => setTimeout(r, 2500));
+    await new Promise(r => setTimeout(r, 1500));
 
-    // Buscar botones de carga con múltiples patrones (ES + EN)
     const clickedButton = await page.evaluate(() => {
       const patrones = [
         'ver más', 'ver mas', 'cargar más', 'cargar mas', 
         'mostrar más', 'mostrar mas', 'más resultados',
-        'load more', 'show more', 'ver todas', 'ver todos',
-        'siguiente página', 'next page'
+        'load more', 'show more', 'ver todas', 'ver todos'
       ];
-      
-      const botones = Array.from(document.querySelectorAll('button, a.btn, .btn, [role="button"], .load-more, .ver-mas, .loadmore, .btn-ver-mas'));
-      
+      const botones = Array.from(document.querySelectorAll('button, a.btn, .btn, [role="button"], .load-more, .ver-mas'));
       for (const btn of botones) {
         const texto = btn.textContent?.toLowerCase().trim() || '';
         if (patrones.some(p => texto.includes(p))) {
           const rect = (btn as HTMLElement).getBoundingClientRect();
-          const visible = rect.width > 0 && rect.height > 0;
-          if (visible) {
+          if (rect.width > 0 && rect.height > 0) {
             (btn as HTMLElement).click();
             return true;
           }
@@ -62,38 +46,21 @@ async function cargarTodoElContenido(page: Page, maxPages: number = 8) {
 
     if (!clickedButton) break;
     intentosBotones++;
-    await new Promise(r => setTimeout(r, 3500));
+    await new Promise(r => setTimeout(r, 2000));
   }
 
-  // Detectar paginación por URL para navegar si es necesario
   const currentUrl = page.url();
-  const paginationLinks = await page.evaluate((baseUrl: string) => {
+  return await page.evaluate((baseUrl: string) => {
     const links = Array.from(document.querySelectorAll('a'));
-    const patterns = [
-      /[?&]page=(\d+)/i,
-      /[?&]pag=(\d+)/i, 
-      /[?&]p=(\d+)/i,
-      /\/page\/(\d+)/i,
-      /\/pagina\/(\d+)/i,
-      /\/p\/(\d+)\//i,
-      /_Desde_(\d+)/i, // MercadoLibre
-    ];
-    
+    const patterns = [/[?&]page=(\d+)/i, /[?&]pag=(\d+)/i, /\/page\/(\d+)/i, /_Desde_(\d+)/i];
     const found = new Set<string>();
     for (const link of links) {
       const href = link.href;
       if (!href || href === baseUrl) continue;
-      for (const pattern of patterns) {
-        if (pattern.test(href)) {
-          found.add(href);
-          break;
-        }
-      }
+      if (patterns.some(p => p.test(href))) found.add(href);
     }
-    return Array.from(found).slice(0, 8); // Máximo 8 páginas adicionales
+    return Array.from(found).slice(0, 5);
   }, currentUrl);
-
-  return paginationLinks;
 }
 
 export async function ejecutarScrapingProfundo(url: string, maxProperties: number = 20): Promise<ScrapeResult> {
@@ -102,31 +69,18 @@ export async function ejecutarScrapingProfundo(url: string, maxProperties: numbe
   try {
     browser = await puppeteer.launch({
       headless: true,
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-      args: [
-        "--no-sandbox", 
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--disable-blink-features=AutomationControlled",
-      ]
+      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
     });
 
     const page = await browser.newPage();
     await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36");
-    await page.setExtraHTTPHeaders({
-      'accept-language': 'es-ES,es;q=0.9',
-      'referer': 'https://www.google.com/'
-    });
-
+    
     console.log(`Navegando a: ${url}`);
-    await page.goto(url, { waitUntil: "networkidle2", timeout: 90000 });
-    await new Promise(r => setTimeout(r, 4000));
+    await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
+    await new Promise(r => setTimeout(r, 3000));
 
-    // Ejecutar carga de contenido
     const extraPages = await cargarTodoElContenido(page);
     
-    // Extraer links de la página principal
     const extractLinks = async (p: Page) => {
       return await p.evaluate((currentUrl: string) => {
         const urlObj = new URL(currentUrl);
@@ -137,107 +91,58 @@ export async function ejecutarScrapingProfundo(url: string, maxProperties: numbe
         for (const link of links) {
           const href = (link as HTMLAnchorElement).href;
           if (!href || !href.startsWith('http')) continue;
+          try { if (new URL(href).hostname !== domain && !href.includes('mercadolibre')) continue; } catch { continue; }
           
-          try {
-            const linkDomain = new URL(href).hostname;
-            if (linkDomain !== domain && !linkDomain.includes('mercadolibre')) continue;
-          } catch { continue; }
-          
-          const lower = href.toLowerCase();
           const path = new URL(href).pathname.toLowerCase();
-          
           const esDetalle = 
-            path.includes('/propiedad/') || path.includes('/property/') ||
-            path.includes('/listings/') || path.includes('/ficha/') ||
+            path.includes('/propiedad/') || path.includes('/ficha/') ||
             path.includes('/inmueble/') || path.includes('/departamento/') ||
-            path.includes('/casa/') || path.includes('/terreno/') ||
-            path.includes('/producto/') || path.includes('/product/') ||
-            path.includes('/item/') || path.includes('/articulo/') ||
-            path.includes('/shop/') || path.includes('/tienda/') ||
-            path.includes('/productos/') ||
+            path.includes('/casa/') || path.includes('/producto/') ||
+            path.includes('/product/') || path.includes('/articulo/') ||
             /\/p\/\d+/.test(path) || /\/\d{5,}/.test(path) ||
-            (path.includes('/product') && !path.includes('/product-category')) ||
-            (path.includes('/collections/') && path.includes('/products/')) ||
-            lower.includes('articulo.mercadolibre') || lower.includes('/mla-') ||
-            path.includes('/tokkobroker.com/properties/');
+            href.includes('articulo.mercadolibre') || href.includes('/mla-');
           
-          const esNavegacion = 
-            path.includes('/categoria/') || path.includes('/category/') ||
-            path.includes('/tag/') || path.includes('/page/') ||
-            path.includes('/cart') || path.includes('/checkout') ||
-            path.includes('/login') || path.includes('/register') ||
-            path.includes('/contacto') || path.includes('/contact') ||
-            path === '/' || path === '';
-          
-          if (esDetalle && !esNavegacion) found.add(href);
+          if (esDetalle) found.add(href);
         }
         return Array.from(found);
       }, p.url());
     };
 
     let allItemLinks = await extractLinks(page);
-
-    // Navegar páginas extras si existen y no tenemos suficientes links
-    if (allItemLinks.length < maxProperties && extraPages.length > 0) {
-      for (const extraUrl of extraPages.slice(0, 3)) {
-        try {
-          const extraPage = await browser.newPage();
-          await extraPage.goto(extraUrl, { waitUntil: "networkidle2", timeout: 45000 });
-          const newLinks = await extractLinks(extraPage);
-          allItemLinks = [...new Set([...allItemLinks, ...newLinks])];
-          await extraPage.close();
-          if (allItemLinks.length >= maxProperties) break;
-        } catch (e) {
-          console.error(`Error en página extra ${extraUrl}:`, e);
-        }
-      }
-    }
-
-    let fullText = "";
-    const pageTitle = await page.title();
-    fullText += `ORIGEN: ${url}\nTÍTULO: ${pageTitle}\n\n`;
-
-    // Navegación profunda
     const linksToScrape = allItemLinks.slice(0, maxProperties);
-    console.log(`Scrapeando ${linksToScrape.length} ítems individuales...`);
     
-    for (let i = 0; i < linksToScrape.length; i++) {
-      const link = linksToScrape[i];
-      try {
-        const itemPage = await browser.newPage();
-        await itemPage.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36");
-        
-        await itemPage.goto(link, { waitUntil: "networkidle0", timeout: 45000 });
-        await new Promise(r => setTimeout(r, 2000));
-        
-        const details = await itemPage.evaluate(() => {
-          const selectorsToRemove = ["script", "style", "nav", "footer", "header", "iframe", ".cookie-banner", "#chat-widget", ".whatsapp-btn"];
-          selectorsToRemove.forEach(s => document.querySelectorAll(s).forEach(el => el.remove()));
-          return document.body.innerText.replace(/\s+/g, ' ').trim();
-        });
+    let fullText = `ORIGEN: ${url}\nTÍTULO: ${await page.title()}\n\n`;
 
-        fullText += `\n=== ITEM ${i+1} ===\nURL: ${link}\nCONTENIDO:\n${details}\n========================\n`;
-        await itemPage.close();
-      } catch (err) {
-        console.error(`Error en ítem ${link}:`, err);
-      }
+    // PROCESAMIENTO EN PARALELO (Grupos de 5 para no saturar RAM de la función)
+    const chunkSize = 5;
+    for (let i = 0; i < linksToScrape.length; i += chunkSize) {
+      const chunk = linksToScrape.slice(i, i + chunkSize);
+      console.log(`Scrapeando grupo ${Math.floor(i/chunkSize) + 1}...`);
+      
+      const results = await Promise.all(chunk.map(async (link, idx) => {
+        const itemPage = await browser!.newPage();
+        try {
+          await itemPage.goto(link, { waitUntil: "networkidle0", timeout: 30000 });
+          const content = await itemPage.evaluate(() => {
+            document.querySelectorAll("script, style, nav, footer, header, iframe").forEach(el => el.remove());
+            return document.body.innerText.replace(/\s+/g, ' ').trim();
+          });
+          await itemPage.close();
+          return `\n=== ITEM ${i + idx + 1} ===\nURL: ${link}\nCONTENIDO:\n${content}\n========================\n`;
+        } catch (e) {
+          await itemPage.close();
+          return `\n=== ITEM ${i + idx + 1} ===\nURL: ${link}\nERROR: ${e}\n========================\n`;
+        }
+      }));
+      
+      fullText += results.join("");
     }
 
     await browser.close();
-
-    return {
-      mainText: fullText,
-      propertyCount: linksToScrape.length,
-      success: true
-    };
+    return { mainText: fullText, propertyCount: linksToScrape.length, success: true };
 
   } catch (error: any) {
-    if (browser) await (browser as Browser).close();
-    return {
-      mainText: "",
-      propertyCount: 0,
-      success: false,
-      error: error.message
-    };
+    if (browser) await browser.close();
+    return { mainText: "", propertyCount: 0, success: false, error: error.message };
   }
 }

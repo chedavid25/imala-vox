@@ -402,23 +402,37 @@ export const autoActualizarWebs = functions.pubsub.schedule('0 3 * * *')
  */
 async function realizarScrapingRecursoInternal(wsId: string, recursoId: string, url: string) {
   const { ejecutarScrapingProfundo } = require('./scraper');
-  const result = await ejecutarScrapingProfundo(url);
+  const db = admin.firestore();
+  const docRef = db.doc(`espaciosDeTrabajo/${wsId}/baseConocimiento/${recursoId}`);
 
-  if (!result.success) {
-    throw new Error(result.error);
-  }
+  try {
+    const result = await ejecutarScrapingProfundo(url);
 
-  // Actualizar el documento en Firestore
-  await admin.firestore()
-    .doc(`espaciosDeTrabajo/${wsId}/baseConocimiento/${recursoId}`)
-    .update({
+    if (!result.success) {
+      await docRef.update({ 
+        estado: 'error', 
+        errorInfo: result.error || 'Error desconocido en scraper' 
+      });
+      throw new Error(result.error);
+    }
+
+    // Actualizar el documento en Firestore con éxito
+    await docRef.update({
       contenidoTexto: result.mainText,
       estado: 'activo',
       ultimoScrapeo: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-  return result;
+    return result;
+  } catch (error: any) {
+    await docRef.update({ 
+      estado: 'error', 
+      errorInfo: error.message 
+    });
+    throw error;
+  }
 }
+
 
 /**
  * ejecutarScrapingWeb
