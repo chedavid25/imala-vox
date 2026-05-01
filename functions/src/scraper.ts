@@ -163,7 +163,16 @@ export async function ejecutarScrapingProfundo(url: string, maxProperties: numbe
     const linksToScrape = allItemLinks.slice(0, maxProperties);
     console.log(`Total de links detectados: ${allItemLinks.length}. Procesando: ${linksToScrape.length}`);
     
-    let fullText = `ORIGEN: ${url}\nTÍTULO: ${await page.title()}\n\n`;
+    // Capturar siempre el contenido de la página principal
+    const mainPageContent = await page.evaluate(() => {
+      const ignore = ["script", "style", "nav", "footer", "header", "iframe", ".cookie-banner", ".whatsapp-btn", "#chat-widget"];
+      ignore.forEach(s => document.querySelectorAll(s).forEach(el => el.remove()));
+      const metaDesc = document.querySelector('meta[name="description"]')?.getAttribute('content') || '';
+      const ogTitle = document.querySelector('meta[property="og:title"]')?.getAttribute('content') || '';
+      return `INFO_META: ${ogTitle} - ${metaDesc}\n\n` + document.body.innerText.replace(/\s+/g, ' ').trim();
+    });
+
+    let fullText = `ORIGEN: ${url}\nTÍTULO: ${await page.title()}\n\n=== PÁGINA PRINCIPAL ===\nURL: ${url}\nCONTENIDO:\n${mainPageContent}\n========================\n\n`;
 
     // PROCESAMIENTO EN PARALELO (Grupos de 4 para ser estables con Remax)
     const chunkSize = 4;
