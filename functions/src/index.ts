@@ -423,6 +423,28 @@ async function realizarScrapingRecursoInternal(wsId: string, recursoId: string, 
       ultimoScrapeo: admin.firestore.FieldValue.serverTimestamp(),
     });
 
+    // --- NUEVO: DISPARAR PARSING DE OBJETOS AUTOMÁTICO ---
+    try {
+      console.log(`[Scraper] Iniciando Parsing IA para ${recursoId}...`);
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://imalavox.com';
+      
+      // Llamamos al endpoint de parsing de la App para no duplicar lógica compleja
+      // Usamos fetch nativo (disponible en Node 20)
+      await fetch(`${baseUrl}/api/parse-objects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          rawText: result.mainText, 
+          sourceUrl: url, 
+          wsId, 
+          recursoId 
+        })
+      });
+      console.log(`[Scraper] Parsing IA disparado con éxito para ${recursoId}`);
+    } catch (parseErr) {
+      console.error(`[Scraper] Error disparando Parsing IA:`, parseErr);
+    }
+
     return result;
   } catch (error: any) {
     await docRef.update({ 
@@ -440,7 +462,7 @@ async function realizarScrapingRecursoInternal(wsId: string, recursoId: string, 
  * Responsabilidad: Ejecuta el scraper profundo en un entorno con recursos suficientes (1GB RAM).
  */
 export const procesarScrapingWeb = functions
-  .runWith({ timeoutSeconds: 300, memory: '1GB' })
+  .runWith({ timeoutSeconds: 540, memory: '2GB' })
   .https.onRequest(async (req, res) => {
     // Manejar CORS manualmente para mayor seguridad
     res.set('Access-Control-Allow-Origin', '*');

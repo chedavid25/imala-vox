@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
+/**
+ * Proxy Scraper (Versión Asíncrona)
+ * Evita el timeout de Vercel (10-15s) delegando todo el trabajo pesado a Cloud Functions.
+ */
+
 export async function POST(req: NextRequest) {
   try {
     const { wsId, recursoId, url } = await req.json();
@@ -9,9 +14,13 @@ export async function POST(req: NextRequest) {
     }
 
     const functionUrl = `https://us-central1-imala-vox.cloudfunctions.net/procesarScrapingWeb`;
-    console.log(`[Proxy] Iniciando scraping para: ${url}`);
+    console.log(`[Proxy] Disparando scraping asíncrono para: ${url}`);
 
-    const response = await fetch(functionUrl, {
+    // Llamamos a la Cloud Function pero NO esperamos a que termine el scraping profundo.
+    // Simplemente nos aseguramos de que la petición fue enviada.
+    // Usamos un fetch sin await o con un timeout muy corto para soltar la conexión.
+    
+    fetch(functionUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -20,34 +29,14 @@ export async function POST(req: NextRequest) {
         url,
         secret: 'imala_vox_internal_key'
       })
+    }).catch(err => console.error(`[Proxy] Error en background fetch:`, err));
+
+    // Respondemos inmediatamente al cliente para evitar el 500 de Vercel
+    return NextResponse.json({ 
+      success: true, 
+      message: "Procesamiento iniciado en segundo plano. Los objetos aparecerán en el catálogo en breve.",
+      async: true 
     });
-
-    console.log(`[Proxy] Cloud Function respondió con status: ${response.status}`);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[Proxy] Error de Cloud Function (${response.status}):`, errorText);
-      return NextResponse.json({
-        success: false,
-        error: `Error del motor (${response.status}): ${errorText.substring(0, 100)}`
-      }, { status: 500 });
-    }
-
-    const result = await response.json();
-    const rawText = result.result?.mainText || result.data?.mainText || result.mainText || "";
-
-    // Disparar parsing IA en background (sin await — no bloqueamos al usuario)
-    if (rawText && rawText.length > 100) {
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-      console.log(`[Proxy] Disparando parse-objects para ${url} en ${baseUrl}`);
-      fetch(`${baseUrl}/api/parse-objects`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rawText, sourceUrl: url, wsId, recursoId })
-      }).catch(err => console.error('[Proxy] Error disparando parse-objects:', err));
-    }
-
-    return NextResponse.json({ success: true, ...result.result || result });
 
   } catch (error: any) {
     console.error("[Proxy] Error crítico:", error);
