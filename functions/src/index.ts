@@ -467,7 +467,7 @@ export const procesarScrapingWeb = functions
       }
 
       const result = await realizarScrapingRecursoInternal(wsId, recursoId, url);
-      res.status(200).send({ success: true, propertyCount: result.propertyCount });
+      res.status(200).send({ success: true, ...result });
     } catch (error: any) {
       console.error('Error en procesarScrapingWeb:', error);
       res.status(500).send({ success: false, error: error.message || 'Error desconocido en el scraper.' });
