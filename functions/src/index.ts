@@ -405,17 +405,24 @@ async function realizarScrapingRecursoInternal(wsId: string, recursoId: string, 
   const db = admin.firestore();
   const docRef = db.doc(`espaciosDeTrabajo/${wsId}/baseConocimiento/${recursoId}`);
 
+  const logProgreso = async (msg: string) => {
+    console.log(`[Scraper][${recursoId}] ${msg}`);
+    await docRef.update({ errorInfo: `Progreso: ${msg}` }).catch(() => {});
+  };
+
   try {
+    await logProgreso("Iniciando navegación...");
     const result = await ejecutarScrapingProfundo(url);
 
     if (!result.success) {
       await docRef.update({ 
         estado: 'error', 
-        errorInfo: result.error || 'Error desconocido en scraper' 
+        errorInfo: `Error: ${result.error || 'Desconocido'}` 
       });
       throw new Error(result.error);
     }
 
+    await logProgreso("Scraping finalizado. Guardando texto...");
     // Actualizar el documento en Firestore con éxito
     await docRef.update({
       contenidoTexto: result.mainText,
@@ -425,11 +432,9 @@ async function realizarScrapingRecursoInternal(wsId: string, recursoId: string, 
 
     // --- NUEVO: DISPARAR PARSING DE OBJETOS AUTOMÁTICO ---
     try {
-      console.log(`[Scraper] Iniciando Parsing IA para ${recursoId}...`);
+      await logProgreso("Iniciando extracción con IA (Gemini)...");
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://imalavox.com';
       
-      // Llamamos al endpoint de parsing de la App para no duplicar lógica compleja
-      // Usamos fetch nativo (disponible en Node 20)
       await fetch(`${baseUrl}/api/parse-objects`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -449,12 +454,11 @@ async function realizarScrapingRecursoInternal(wsId: string, recursoId: string, 
   } catch (error: any) {
     await docRef.update({ 
       estado: 'error', 
-      errorInfo: error.message 
+      errorInfo: `Error: ${error.message}` 
     });
     throw error;
   }
 }
-
 
 /**
  * ejecutarScrapingWeb
@@ -586,14 +590,6 @@ export const cronReseteoMensual = functions.pubsub.schedule('0 0 1 * *')
         const exceso = usage - 10000;
         const bloques = Math.ceil(exceso / 100);
         const montoExceso = bloques * 1.80; // $1.80 cada 100 mensajes
-
-        await ws.ref.collection("eventosFacturacion").add({
-          tipo: 'exceso_conversaciones',
-          monto: montoExceso,
-          montoUSD: montoExceso,
-          descripcion: `Cargo por exceso de conversiones: ${exceso} msgs adicionales (${bloques} bloques de 100).`,
-          creadoEl: admin.firestore.Timestamp.now(),
-        });
       }
 
       batch.update(ws.ref, { "uso.convCount": 0 });

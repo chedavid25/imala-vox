@@ -91,8 +91,9 @@ export async function ejecutarScrapingProfundo(url: string, maxProperties: numbe
     });
 
     console.log(`Navegando a: ${url}`);
-    await page.goto(url, { waitUntil: "networkidle2", timeout: 80000 });
-    await new Promise(r => setTimeout(r, 5000));
+    // USAR domcontentloaded PARA REMAX (EVITA BLOQUEOS POR TRACKERS)
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 80000 });
+    await new Promise(r => setTimeout(r, 8000)); // Espera generosa para contenido dinámico
 
     const extraPages = await cargarTodoElContenido(page);
     
@@ -136,7 +137,6 @@ export async function ejecutarScrapingProfundo(url: string, maxProperties: numbe
             path === '/' || path === '';
           
           if (esDetalle && !esNavegacion) {
-            // Para Remax y similares, a veces los links son relativos al dominio principal
             found.add(href);
           }
         }
@@ -152,7 +152,7 @@ export async function ejecutarScrapingProfundo(url: string, maxProperties: numbe
       for (const extraUrl of extraPages.slice(0, 2)) {
         try {
           const extraPage = await browser.newPage();
-          await extraPage.goto(extraUrl, { waitUntil: "networkidle2", timeout: 40000 });
+          await extraPage.goto(extraUrl, { waitUntil: "domcontentloaded", timeout: 40000 });
           const newLinks = await extractLinks(extraPage);
           allItemLinks = [...new Set([...allItemLinks, ...newLinks])];
           await extraPage.close();
@@ -174,8 +174,9 @@ export async function ejecutarScrapingProfundo(url: string, maxProperties: numbe
         const itemPage = await browser!.newPage();
         await itemPage.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
         try {
-          await itemPage.goto(link, { waitUntil: "networkidle2", timeout: 45000 });
-          await new Promise(r => setTimeout(r, 3000)); // Esperar a que carguen precios/fotos
+          // USAR domcontentloaded TAMBIÉN EN EL DETALLE
+          await itemPage.goto(link, { waitUntil: "domcontentloaded", timeout: 45000 });
+          await new Promise(r => setTimeout(r, 4500)); // Esperar a que carguen precios/fotos
           
           const content = await itemPage.evaluate(() => {
             // Remover basura
