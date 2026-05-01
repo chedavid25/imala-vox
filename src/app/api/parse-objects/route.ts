@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { adminDb } from "@/lib/firebase-admin";
 import { COLLECTIONS } from "@/lib/types/firestore";
 import { Timestamp, FieldValue } from "firebase-admin/firestore";
 
-const anthropic = new Anthropic();
+// Configurar Gemini 2.5 Flash (más económico y rápido para extracción)
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 const PARSE_SYSTEM_PROMPT = `Eres un extractor de datos estructurados especializado en sitios web de negocios argentinos.
 A partir de texto scrapeado de un sitio web, debes identificar y extraer dos tipos de información:
@@ -76,33 +77,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Faltan parámetros" }, { status: 400 });
     }
 
-    // Limitar texto para no exceder contexto (Claude puede manejar ~180k tokens, pero limitamos a lo práctico)
-    const textToProcess = rawText.slice(0, 120000);
+    // Gemini 2.5 Flash soporta hasta 1M de tokens, podemos enviar mucho más texto
+    const textToProcess = rawText.slice(0, 500000);
 
-    console.log(`[ParseObjects] Iniciando extracción IA para recurso ${recursoId}, ${textToProcess.length} chars`);
+    console.log(`[ParseObjects] Iniciando extracción con Gemini 2.5 Flash para recurso ${recursoId}`);
 
-    // Llamar a Claude para extraer estructura
-    const response = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20241022",
-      max_tokens: 8000,
-      system: PARSE_SYSTEM_PROMPT,
-      messages: [
-        {
-          role: "user",
-          content: `Sitio web origen: ${sourceUrl}\n\nTexto scrapeado:\n${textToProcess}`
-        }
-      ]
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-2.5-flash", // Usando la versión estable/producción recomendada
+      systemInstruction: PARSE_SYSTEM_PROMPT
     });
 
-    const rawJson = (response.content[0] as any).text;
+    const result = await model.generateContent(`Sitio web origen: ${sourceUrl}\n\nTexto scrapeado:\n${textToProcess}`);
+    const responseText = result.response.text();
     
     let parsed: any;
     try {
-      parsed = JSON.parse(rawJson);
+      // Limpiar posibles bloques de código markdown que Gemini a veces incluye
+      const cleanedJson = responseText.replace(/```json|```/g, "").trim();
+      parsed = JSON.parse(cleanedJson);
     } catch (parseError) {
-      // Intentar limpiar si Claude agregó markdown por error
-      const cleaned = rawJson.replace(/```json|```/g, "").trim();
-      parsed = JSON.parse(cleaned);
+      console.error("[ParseObjects] Error parseando JSON de Gemini:", responseText);
+      throw new Error("La IA no devolvió un JSON válido");
     }
 
     const { info_general, tipo_catalogo, objetos } = parsed;
@@ -130,7 +125,7 @@ export async function POST(req: NextRequest) {
     let objetosCreados = 0;
 
     if (objetos && objetos.length > 0) {
-      // Eliminar objetos anteriores de esta misma fuente para evitar duplicados en re-scrape
+      // Eliminar objetos anteriores de esta misma fuente
       const existentesSnap = await adminDb
         .collection(COLLECTIONS.ESPACIOS).doc(wsId)
         .collection(COLLECTIONS.OBJETOS)
@@ -138,11 +133,8 @@ export async function POST(req: NextRequest) {
         .get();
 
       const batch = adminDb.batch();
-
-      // Borrar anteriores
       existentesSnap.docs.forEach(d => batch.delete(d.ref));
 
-      // Crear nuevos
       for (const obj of objetos.slice(0, 50)) {
         const ref = adminDb
           .collection(COLLECTIONS.ESPACIOS).doc(wsId)
@@ -177,7 +169,7 @@ export async function POST(req: NextRequest) {
         "uso.objectCount": FieldValue.increment(objetosCreados)
       }).catch((e) => console.error("[ParseObjects] Error actualizando uso:", e));
 
-    console.log(`[ParseObjects] Completado: ${objetosCreados} objetos extraídos`);
+    console.log(`[ParseObjects] Completado con Gemini: ${objetosCreados} objetos extraídos`);
 
     return NextResponse.json({ 
       success: true, 
@@ -187,7 +179,7 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error("[ParseObjects] Error:", error);
+    console.error("[ParseObjects] Error crítico:", error);
     return NextResponse.json({ 
       success: false, 
       error: error.message 
