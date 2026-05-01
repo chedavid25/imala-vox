@@ -29,8 +29,11 @@ import {
   CheckCircle2,
   AlertCircle,
   Eye,
-  Link as LinkIcon
+  Link as LinkIcon,
+  LayoutGrid
 } from "lucide-react";
+import Link from "next/link";
+
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -81,14 +84,28 @@ export default function WebsGlobalPage() {
       where("tipo", "==", "web")
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
       const docs = snapshot.docs.map(d => ({ ...d.data(), id: d.id })) as (RecursoConocimiento & { id: string })[];
-      setWebs(docs.map(d => ({ ...d, usageCount: 0 })));
+      
+      // Cargar conteo de objetos por fuente
+      const objetosSnap = await getDocs(
+        query(
+          collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.OBJETOS)
+        )
+      );
+      const conteoPorFuente: Record<string, number> = {};
+      objetosSnap.docs.forEach(d => {
+        const rid = d.data().recursoOrigenId;
+        if (rid) conteoPorFuente[rid] = (conteoPorFuente[rid] || 0) + 1;
+      });
+
+      setWebs(docs.map(d => ({ ...d, usageCount: conteoPorFuente[d.id] || 0 })));
       setLoading(false);
     });
 
     return () => unsubscribe();
   }, [currentWorkspaceId]);
+
 
   const handleCreate = async () => {
     if (!currentWorkspaceId || !newWeb.url) return;
@@ -397,7 +414,23 @@ export default function WebsGlobalPage() {
                       {w.frecuenciaActualizacion || 'Manual'}
                     </span>
                     <span className="opacity-30">•</span>
-                    <span>Agentes: {w.usageCount}</span>
+                    <span>
+                      {w.usageCount > 0 ? (
+                        <Link
+                          href={`/dashboard/cerebro/catalogo?fuente=${w.id}`}
+                          className="flex items-center gap-1 hover:text-[var(--accent-active)] transition-colors"
+                        >
+                          <LayoutGrid className="w-3 h-3" />
+                          {w.usageCount} objetos
+                        </Link>
+                      ) : (
+                        <span className="flex items-center gap-1">
+                          <LayoutGrid className="w-3 h-3" />
+                          0 objetos
+                        </span>
+                      )}
+                    </span>
+
                   </div>
                 </div>
               </div>

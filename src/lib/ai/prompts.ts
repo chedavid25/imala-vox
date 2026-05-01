@@ -70,8 +70,40 @@ export async function construirSystemPrompt(wsId: string, agenteId: string): Pro
     .collection(COLLECTIONS.ESPACIOS).doc(wsId)
     .collection(COLLECTIONS.OBJETOS)
     .where("estado", "==", "disponible")
-    .limit(40)
+    .limit(60)
     .get();
+
+  const objetosFormateados = objetosSnap.docs.map(o => {
+    const d = o.data();
+    const c = d.caracteristicas || {};
+    
+    if (d.tipo === 'propiedad') {
+      const partes = [
+        d.titulo,
+        d.precio > 0 ? `${d.moneda || 'USD'} ${d.precio.toLocaleString('es-AR')}` : null,
+        c.operacion ? c.operacion.toUpperCase() : null,
+        c.ambientes ? `${c.ambientes} amb` : null,
+        c.dormitorios ? `${c.dormitorios} dorm` : null,
+        c.m2 ? `${c.m2}m²` : null,
+        c.barrio || c.localidad || null,
+        c.tipo || null,
+        c.expensas ? `Expensas: ARS ${c.expensas.toLocaleString('es-AR')}` : null,
+        d.urlFuente ? `Ver ficha: ${d.urlFuente}` : null
+      ].filter(Boolean);
+      return `• ${partes.join(' | ')}`;
+    } else {
+      const partes = [
+        d.titulo,
+        d.precio > 0 ? `${d.moneda || 'ARS'} ${d.precio.toLocaleString('es-AR')}` : null,
+        c.marca || null,
+        c.categoria || null,
+        c.stock != null ? `Stock: ${c.stock}` : null,
+        c.sku ? `SKU: ${c.sku}` : null,
+        d.descripcion ? d.descripcion.slice(0, 100) : null
+      ].filter(Boolean);
+      return `• ${partes.join(' | ')}`;
+    }
+  }).join('\n');
 
   // ENSAMBLADO DEL PROMPT FINAL
   return `
@@ -97,13 +129,11 @@ ${multimedia.length > 0
   ? multimedia.map(r => `- "${r.titulo}": Usa el código [${r.archivoNombre}] | Descripción: ${r.descripcion}`).join("\n")
   : "No hay recursos multimedia disponibles para enviar."}
 
-## CATÁLOGO DE OBJETOS/PROPIEDADES DISPONIBLES
+## CATÁLOGO DE PRODUCTOS/PROPIEDADES DISPONIBLES
 ${objetosSnap.docs.length > 0
-  ? objetosSnap.docs.map(o => {
-      const d = o.data();
-      return `- ${d.titulo} | Precio: ${d.precio} | Estado: ${d.estado} | Detalle: ${JSON.stringify(d.caracteristicas)}`;
-    }).join("\n")
-  : "No hay objetos en el catálogo actualmente."}
+  ? `Tenés ${objetosSnap.docs.length} ítem(s) disponibles. Cuando el cliente pregunte por opciones, filtrá según sus criterios y recomendá los más relevantes. Si pregunta por precio de un ítem específico que no está en la lista, decí que vas a consultar.\n\n${objetosFormateados}`
+  : "No hay ítems en el catálogo actualmente. Si el cliente pregunta por productos o propiedades, derivar a un asesor humano."}
+
 
 ## ETIQUETAS QUE PUEDES AUTO-APLICAR
 Si detectas alguna de estas situaciones, indica al final de tu respuesta una línea con el formato [ETIQUETA: Nombre]:

@@ -141,15 +141,24 @@ export interface Contacto {
 }
 
 export interface Objeto {
+  id?: string;
   tipo: 'propiedad' | 'producto';
   titulo: string;
   precio: number;
+  moneda: 'ARS' | 'USD' | 'EUR';
   descripcion: string;
   fotos: string[];
   caracteristicas: Record<string, any>;
-  urlFuente?: string;
-  estado: 'disponible' | 'vendido' | 'reservado';
+  // Para propiedades: { tipo, m2, dormitorios, banios, ambientes, barrio, localidad, operacion: 'venta'|'alquiler'|'alquiler_temporal', orientacion, piso, expensas }
+  // Para productos: { sku, categoria, stock, variantes, marca, peso, dimensiones }
+  urlFuente?: string;           // URL del ítem individual (ej: la ficha de la propiedad)
+  urlOriginWeb?: string;        // URL del sitio padre que se indexó
+  recursoOrigenId?: string;     // ID del doc en baseConocimiento del que se extrajo
+  estado: 'disponible' | 'vendido' | 'reservado' | 'pausado';
+  creadoEl: Timestamp;
+  actualizadoEl: Timestamp;
 }
+
 
 // NUEVOS TIPOS FASE 2
 

@@ -1,16 +1,606 @@
+# Imalá Vox — Instrucciones de implementación: Catálogo Inteligente + Scraping IA
+
+> Documento para Antigravity. Implementar en el orden exacto indicado. No alterar nombres de archivos, rutas ni interfaces salvo que se indique explícitamente. Leer cada sección completa antes de escribir código.
+
+---
+
+## Contexto general
+
+El sistema ya tiene un pipeline de scraping web funcional:
+`webs/page.tsx` → `POST /api/proxy-scraper` → Cloud Function `procesarScrapingWeb` → guarda texto en `baseConocimiento/{recursoId}` → `prompts.ts` inyecta ese texto al agente.
+
+El problema actual: el scraper devuelve texto crudo sin estructura. Eso es aceptable para información general (horarios, FAQ), pero inutilizable para catálogos de productos o propiedades porque la IA no puede identificar con precisión dónde empieza y termina cada ítem.
+
+**Objetivo de esta implementación:**
+1. Mejorar el scraper para manejar paginación y "ver más" en cualquier sitio
+2. Agregar una etapa de parsing con IA (Claude) que convierte el texto crudo en objetos estructurados
+3. Guardar esos objetos en `COLLECTIONS.OBJETOS` (colección ya existente pero vacía)
+4. Construir la UI del catálogo en `/dashboard/cerebro/catalogo/page.tsx`
+5. Mejorar el formato del catálogo en el system prompt de los agentes
+
+El resultado: cuando un usuario indexa `https://suinmobiliaria.com/propiedades`, el sistema extrae automáticamente cada propiedad como un `Objeto` editable, y los agentes pueden consultarlos con precisión.
+
+---
+
+## PASO 1 — Actualizar `src/lib/types/firestore.ts`
+
+**Acción:** Reemplazar la interfaz `Objeto` existente por la versión ampliada. No modificar nada más del archivo.
+
+```typescript
+export interface Objeto {
+  id?: string;
+  tipo: 'propiedad' | 'producto';
+  titulo: string;
+  precio: number;
+  moneda: 'ARS' | 'USD' | 'EUR';
+  descripcion: string;
+  fotos: string[];
+  caracteristicas: Record<string, any>;
+  // Para propiedades: { tipo, m2, dormitorios, banios, ambientes, barrio, localidad, operacion: 'venta'|'alquiler'|'alquiler_temporal', orientacion, piso, expensas }
+  // Para productos: { sku, categoria, stock, variantes, marca, peso, dimensiones }
+  urlFuente?: string;           // URL del ítem individual (ej: la ficha de la propiedad)
+  urlOriginWeb?: string;        // URL del sitio padre que se indexó
+  recursoOrigenId?: string;     // ID del doc en baseConocimiento del que se extrajo
+  estado: 'disponible' | 'vendido' | 'reservado' | 'pausado';
+  creadoEl: Timestamp;
+  actualizadoEl: Timestamp;
+}
+```
+
+---
+
+## PASO 2 — Crear `src/app/api/parse-objects/route.ts`
+
+Este endpoint recibe el texto scrapeado, llama a Claude para extraer estructura, y graba en Firestore.
+
+**Archivo completo a crear:**
+
+```typescript
+import { NextRequest, NextResponse } from "next/server";
+import Anthropic from "@anthropic-ai/sdk";
+import { adminDb } from "@/lib/firebase-admin";
+import { COLLECTIONS } from "@/lib/types/firestore";
+import { Timestamp } from "firebase-admin/firestore";
+
+const anthropic = new Anthropic();
+
+const PARSE_SYSTEM_PROMPT = `Eres un extractor de datos estructurados especializado en sitios web de negocios argentinos.
+A partir de texto scrapeado de un sitio web, debes identificar y extraer dos tipos de información:
+
+1. INFO_GENERAL del negocio: nombre, descripción, horarios, teléfonos, emails, dirección, redes sociales, whatsapp
+2. OBJETOS del catálogo: cada producto o propiedad individual con todos sus datos
+
+REGLAS CRÍTICAS:
+- Responde ÚNICAMENTE con JSON válido. Sin texto antes ni después. Sin bloques de código markdown.
+- Si un campo no está disponible, usa null (no string vacío ni "no especificado")
+- Para precios: solo el número sin símbolos ni separadores de miles. Si dice "USD 150,000" → precio: 150000, moneda: "USD"
+- Para propiedades argentinas: detectar si es venta o alquiler por el contexto
+- Si el sitio NO tiene productos/propiedades claros (ej: es solo una landing informativa), retornar objetos: []
+- Máximo 50 objetos por extracción
+
+Responde con este formato JSON exacto:
+{
+  "info_general": {
+    "nombre_negocio": string | null,
+    "descripcion": string | null,
+    "horarios": string | null,
+    "telefono": string | null,
+    "whatsapp": string | null,
+    "email": string | null,
+    "direccion": string | null,
+    "redes": string | null
+  },
+  "tipo_catalogo": "propiedad" | "producto" | "mixto" | "ninguno",
+  "objetos": [
+    {
+      "titulo": string,
+      "precio": number | null,
+      "moneda": "ARS" | "USD" | "EUR",
+      "descripcion": string,
+      "estado": "disponible" | "vendido" | "reservado",
+      "urlFuente": string | null,
+      "fotos": [],
+      "caracteristicas": {
+        // Para propiedades:
+        // "tipo": "casa" | "departamento" | "local" | "oficina" | "terreno" | "campo" | "otro"
+        // "operacion": "venta" | "alquiler" | "alquiler_temporal"
+        // "m2": number | null
+        // "m2_cubiertos": number | null
+        // "dormitorios": number | null
+        // "banios": number | null
+        // "ambientes": number | null
+        // "cochera": boolean | null
+        // "piso": string | null
+        // "barrio": string | null
+        // "localidad": string | null
+        // "expensas": number | null
+        // "orientacion": string | null
+        
+        // Para productos:
+        // "sku": string | null
+        // "categoria": string | null
+        // "marca": string | null
+        // "stock": number | null
+      }
+    }
+  ]
+}`;
+
+export async function POST(req: NextRequest) {
+  try {
+    const { rawText, sourceUrl, wsId, recursoId } = await req.json();
+
+    if (!rawText || !wsId || !recursoId) {
+      return NextResponse.json({ success: false, error: "Faltan parámetros" }, { status: 400 });
+    }
+
+    // Limitar texto para no exceder contexto (Claude puede manejar ~180k tokens, pero limitamos a lo práctico)
+    const textToProcess = rawText.slice(0, 120000);
+
+    console.log(`[ParseObjects] Iniciando extracción IA para recurso ${recursoId}, ${textToProcess.length} chars`);
+
+    // Llamar a Claude para extraer estructura
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 8000,
+      system: PARSE_SYSTEM_PROMPT,
+      messages: [
+        {
+          role: "user",
+          content: `Sitio web origen: ${sourceUrl}\n\nTexto scrapeado:\n${textToProcess}`
+        }
+      ]
+    });
+
+    const rawJson = (response.content[0] as any).text;
+    
+    let parsed: any;
+    try {
+      parsed = JSON.parse(rawJson);
+    } catch (parseError) {
+      // Intentar limpiar si Claude agregó markdown por error
+      const cleaned = rawJson.replace(/```json|```/g, "").trim();
+      parsed = JSON.parse(cleaned);
+    }
+
+    const { info_general, tipo_catalogo, objetos } = parsed;
+
+    // 1. Actualizar el recurso de conocimiento con info general estructurada
+    if (info_general) {
+      const infoTexto = Object.entries(info_general)
+        .filter(([_, v]) => v !== null)
+        .map(([k, v]) => `${k.replace(/_/g, ' ').toUpperCase()}: ${v}`)
+        .join('\n');
+
+      await adminDb
+        .collection(COLLECTIONS.ESPACIOS).doc(wsId)
+        .collection(COLLECTIONS.CONOCIMIENTO).doc(recursoId)
+        .update({
+          contenidoTexto: infoTexto,
+          tipoCatalogo: tipo_catalogo,
+          estado: 'activo',
+          actualizadoEl: Timestamp.now(),
+          ultimoScrapeo: Timestamp.now()
+        });
+    }
+
+    // 2. Guardar objetos extraídos en COLLECTIONS.OBJETOS
+    let objetosCreados = 0;
+
+    if (objetos && objetos.length > 0) {
+      // Eliminar objetos anteriores de esta misma fuente para evitar duplicados en re-scrape
+      const existentesSnap = await adminDb
+        .collection(COLLECTIONS.ESPACIOS).doc(wsId)
+        .collection(COLLECTIONS.OBJETOS)
+        .where("recursoOrigenId", "==", recursoId)
+        .get();
+
+      const batch = adminDb.batch();
+
+      // Borrar anteriores
+      existentesSnap.docs.forEach(d => batch.delete(d.ref));
+
+      // Crear nuevos
+      for (const obj of objetos.slice(0, 50)) {
+        const ref = adminDb
+          .collection(COLLECTIONS.ESPACIOS).doc(wsId)
+          .collection(COLLECTIONS.OBJETOS)
+          .doc();
+
+        batch.set(ref, {
+          tipo: tipo_catalogo === 'producto' ? 'producto' : 'propiedad',
+          titulo: obj.titulo || 'Sin título',
+          precio: obj.precio || 0,
+          moneda: obj.moneda || 'ARS',
+          descripcion: obj.descripcion || '',
+          fotos: obj.fotos || [],
+          caracteristicas: obj.caracteristicas || {},
+          urlFuente: obj.urlFuente || null,
+          urlOriginWeb: sourceUrl || null,
+          recursoOrigenId: recursoId,
+          estado: obj.estado || 'disponible',
+          creadoEl: Timestamp.now(),
+          actualizadoEl: Timestamp.now()
+        });
+        objetosCreados++;
+      }
+
+      await batch.commit();
+    }
+
+    // 3. Actualizar contador en el workspace
+    await adminDb
+      .collection(COLLECTIONS.ESPACIOS).doc(wsId)
+      .update({
+        "uso.objectCount": adminDb.FieldValue ? 
+          (adminDb as any).FieldValue.increment(objetosCreados) : 
+          objetosCreados
+      }).catch(() => {}); // No crítico si falla
+
+    console.log(`[ParseObjects] Completado: ${objetosCreados} objetos extraídos`);
+
+    return NextResponse.json({ 
+      success: true, 
+      objetosCreados,
+      tipoCatalogo: tipo_catalogo,
+      infoGeneral: info_general
+    });
+
+  } catch (error: any) {
+    console.error("[ParseObjects] Error:", error);
+    return NextResponse.json({ 
+      success: false, 
+      error: error.message 
+    }, { status: 500 });
+  }
+}
+```
+
+---
+
+## PASO 3 — Modificar `src/app/api/proxy-scraper/route.ts`
+
+**Acción:** Después de recibir respuesta exitosa de la Cloud Function, disparar el parsing en paralelo (fire-and-forget). El proxy debe retornar al cliente inmediatamente sin esperar el parsing.
+
+**Reemplazar el archivo completo por:**
+
+```typescript
+import { NextRequest, NextResponse } from "next/server";
+
+export async function POST(req: NextRequest) {
+  try {
+    const { wsId, recursoId, url } = await req.json();
+
+    if (!wsId || !recursoId || !url) {
+      return NextResponse.json({ success: false, error: "Faltan parámetros" }, { status: 400 });
+    }
+
+    const functionUrl = `https://us-central1-imala-vox.cloudfunctions.net/procesarScrapingWeb`;
+    console.log(`[Proxy] Iniciando scraping para: ${url}`);
+
+    const response = await fetch(functionUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        wsId,
+        recursoId,
+        url,
+        secret: 'imala_vox_internal_key'
+      })
+    });
+
+    console.log(`[Proxy] Cloud Function respondió con status: ${response.status}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[Proxy] Error de Cloud Function (${response.status}):`, errorText);
+      return NextResponse.json({
+        success: false,
+        error: `Error del motor (${response.status}): ${errorText.substring(0, 100)}`
+      }, { status: 500 });
+    }
+
+    const result = await response.json();
+    const rawText = result.result?.mainText || result.data?.mainText || result.mainText || "";
+
+    // Disparar parsing IA en background (sin await — no bloqueamos al usuario)
+    if (rawText && rawText.length > 100) {
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      fetch(`${baseUrl}/api/parse-objects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rawText, sourceUrl: url, wsId, recursoId })
+      }).catch(err => console.error('[Proxy] Error disparando parse-objects:', err));
+    }
+
+    return NextResponse.json({ success: true, ...result.result || result });
+
+  } catch (error: any) {
+    console.error("[Proxy] Error crítico:", error);
+    return NextResponse.json({ success: false, error: `Error interno: ${error.message}` }, { status: 500 });
+  }
+}
+```
+
+**Importante:** Agregar `NEXT_PUBLIC_APP_URL=https://tu-dominio.com` al `.env.production` si no existe.
+
+---
+
+## PASO 4 — Mejorar la Cloud Function `procesarScrapingWeb`
+
+> Este paso modifica la lógica de scraping del lado del servidor (Firebase Functions). El archivo relevante es `functions/src/index.ts` o similar — verificar la estructura del repo de Functions si existe separado.
+
+Si la Cloud Function usa el código de `src/lib/scraper.ts` como referencia, actualizar la lógica de extracción de links y paginación con lo siguiente. Si no, aplicar estos cambios directamente en la Cloud Function.
+
+### Problema actual con paginación
+
+El scraper actual solo busca botones con texto "ver más" o "cargar más". Esto falla en:
+- Paginación numérica (`/page/2`, `?page=2`, `?pag=2`)
+- Botones con texto en inglés (`Load more`, `Show more`)
+- Infinite scroll sin botón visible
+- Tienda Nube, WooCommerce, Shopify con paginación por query params
+
+### Lógica de paginación mejorada
+
+Reemplazar el bloque de "CARGAR MÁS" del scraper con esta lógica:
+
+```typescript
+// ESTRATEGIA DE PAGINACIÓN MULTI-MODAL
+async function cargarTodoElContenido(page: any, maxPages: number = 8) {
+  let paginasVisitadas = 0;
+  
+  // Estrategia 1: Scroll infinito + botones "ver más"
+  let intentosBotones = 0;
+  const maxIntentos = 10;
+  
+  while (intentosBotones < maxIntentos) {
+    // Scroll suave humano
+    await page.evaluate(async () => {
+      await new Promise((resolve) => {
+        let total = 0;
+        const distance = 150;
+        const timer = setInterval(() => {
+          window.scrollBy(0, distance);
+          total += distance;
+          if (total >= document.body.scrollHeight) {
+            clearInterval(timer);
+            resolve(true);
+          }
+        }, 80);
+      });
+    });
+    await new Promise(r => setTimeout(r, 2500));
+
+    // Buscar botones de carga con múltiples patrones (ES + EN)
+    const clickedButton = await page.evaluate(() => {
+      const patrones = [
+        'ver más', 'ver mas', 'cargar más', 'cargar mas', 
+        'mostrar más', 'mostrar mas', 'más resultados',
+        'load more', 'show more', 'ver todas', 'ver todos',
+        'siguiente página', 'next page'
+      ];
+      
+      const botones = Array.from(document.querySelectorAll('button, a.btn, .btn, [role="button"], .load-more, .ver-mas, .loadmore'));
+      
+      for (const btn of botones) {
+        const texto = btn.textContent?.toLowerCase().trim() || '';
+        if (patrones.some(p => texto.includes(p))) {
+          const rect = (btn as HTMLElement).getBoundingClientRect();
+          const visible = rect.width > 0 && rect.height > 0;
+          if (visible) {
+            (btn as HTMLElement).click();
+            return true;
+          }
+        }
+      }
+      return false;
+    });
+
+    if (!clickedButton) break;
+    intentosBotones++;
+    await new Promise(r => setTimeout(r, 3500));
+  }
+
+  // Estrategia 2: Detectar paginación por URL
+  const currentUrl = page.url();
+  const paginationLinks = await page.evaluate((baseUrl: string) => {
+    const links = Array.from(document.querySelectorAll('a'));
+    const patterns = [
+      /[?&]page=(\d+)/i,
+      /[?&]pag=(\d+)/i, 
+      /[?&]p=(\d+)/i,
+      /\/page\/(\d+)/i,
+      /\/pagina\/(\d+)/i,
+      /\/p\/(\d+)\//i,
+    ];
+    
+    const found = new Set<string>();
+    for (const link of links) {
+      const href = link.href;
+      if (!href || href === baseUrl) continue;
+      for (const pattern of patterns) {
+        if (pattern.test(href)) {
+          found.add(href);
+          break;
+        }
+      }
+    }
+    return Array.from(found).slice(0, 8); // Máximo 8 páginas adicionales
+  }, currentUrl);
+
+  return paginationLinks;
+}
+```
+
+Integrar llamando a `cargarTodoElContenido(page)` antes de extraer los links de ítems, y navegar las páginas de paginación adicionales detectadas.
+
+### Mejora en extracción de links de ítems
+
+Reemplazar el bloque de `propertyLinks` por esta versión que cubre más plataformas:
+
+```typescript
+const itemLinks = await page.evaluate((currentUrl: string) => {
+  const url = new URL(currentUrl);
+  const domain = url.hostname;
+  
+  const links = Array.from(document.querySelectorAll('a[href]'));
+  const found = new Set<string>();
+  
+  for (const link of links) {
+    const href = (link as HTMLAnchorElement).href;
+    if (!href || !href.startsWith('http')) continue;
+    
+    // Excluir dominios externos
+    try {
+      const linkDomain = new URL(href).hostname;
+      if (linkDomain !== domain) continue;
+    } catch { continue; }
+    
+    const lower = href.toLowerCase();
+    const path = new URL(href).pathname.toLowerCase();
+    
+    // Patrones de páginas de detalle (propiedades + productos)
+    const esDetalle = 
+      // Inmobiliarias
+      path.includes('/propiedad/') || path.includes('/property/') ||
+      path.includes('/listings/') || path.includes('/ficha/') ||
+      path.includes('/inmueble/') || path.includes('/departamento/') ||
+      path.includes('/casa/') || path.includes('/terreno/') ||
+      // Formato numérico (ej: tokko, remax)
+      /\/p\/\d+/.test(path) || /\/\d{5,}/.test(path) ||
+      // E-commerce
+      path.includes('/producto/') || path.includes('/product/') ||
+      path.includes('/item/') || path.includes('/articulo/') ||
+      path.includes('/shop/') || path.includes('/tienda/') ||
+      // WooCommerce
+      (path.includes('/product') && !path.includes('/product-category')) ||
+      // Tienda Nube
+      path.includes('/productos/') ||
+      // Shopify
+      path.includes('/collections/') && path.includes('/products/') ||
+      // MercadoLibre
+      lower.includes('articulo.mercadolibre') || lower.includes('/MLA-') ||
+      // Tokko Broker
+      path.includes('/tokkobroker.com/properties/');
+    
+    // Excluir páginas de navegación
+    const esNavegacion = 
+      path.includes('/categoria/') || path.includes('/category/') ||
+      path.includes('/tag/') || path.includes('/page/') ||
+      path.includes('/cart') || path.includes('/checkout') ||
+      path.includes('/login') || path.includes('/register') ||
+      path.includes('/contacto') || path.includes('/contact') ||
+      path === '/' || path === '';
+    
+    if (esDetalle && !esNavegacion) {
+      found.add(href);
+    }
+  }
+  
+  return Array.from(found);
+}, page.url());
+```
+
+---
+
+## PASO 5 — Actualizar `src/lib/ai/prompts.ts`
+
+**Acción:** Mejorar la sección del catálogo en el system prompt para que la IA use los datos de forma más efectiva.
+
+Localizar el bloque `## CATÁLOGO DE OBJETOS/PROPIEDADES DISPONIBLES` en `construirSystemPrompt` y reemplazarlo:
+
+```typescript
+// 5. Cargar objetos/propiedades activos (limitado para no saturar contexto)
+const objetosSnap = await adminDb
+  .collection(COLLECTIONS.ESPACIOS).doc(wsId)
+  .collection(COLLECTIONS.OBJETOS)
+  .where("estado", "==", "disponible")
+  .limit(60)
+  .get();
+
+const objetosFormateados = objetosSnap.docs.map(o => {
+  const d = o.data();
+  const c = d.caracteristicas || {};
+  
+  if (d.tipo === 'propiedad') {
+    const partes = [
+      d.titulo,
+      d.precio > 0 ? `${d.moneda || 'USD'} ${d.precio.toLocaleString('es-AR')}` : null,
+      c.operacion ? c.operacion.toUpperCase() : null,
+      c.ambientes ? `${c.ambientes} amb` : null,
+      c.dormitorios ? `${c.dormitorios} dorm` : null,
+      c.m2 ? `${c.m2}m²` : null,
+      c.barrio || c.localidad || null,
+      c.tipo || null,
+      c.expensas ? `Expensas: ARS ${c.expensas.toLocaleString('es-AR')}` : null,
+      d.urlFuente ? `Ver ficha: ${d.urlFuente}` : null
+    ].filter(Boolean);
+    return `• ${partes.join(' | ')}`;
+  } else {
+    const partes = [
+      d.titulo,
+      d.precio > 0 ? `${d.moneda || 'ARS'} ${d.precio.toLocaleString('es-AR')}` : null,
+      c.marca || null,
+      c.categoria || null,
+      c.stock != null ? `Stock: ${c.stock}` : null,
+      c.sku ? `SKU: ${c.sku}` : null,
+      d.descripcion ? d.descripcion.slice(0, 100) : null
+    ].filter(Boolean);
+    return `• ${partes.join(' | ')}`;
+  }
+}).join('\n');
+```
+
+Y actualizar el template del prompt:
+
+```typescript
+## CATÁLOGO DE PRODUCTOS/PROPIEDADES DISPONIBLES
+${objetosSnap.docs.length > 0
+  ? `Tenés ${objetosSnap.docs.length} ítem(s) disponibles. Cuando el cliente pregunte por opciones, filtrá según sus criterios y recomendá los más relevantes. Si pregunta por precio de un ítem específico que no está en la lista, decí que vas a consultar.\n\n${objetosFormateados}`
+  : "No hay ítems en el catálogo actualmente. Si el cliente pregunta por productos o propiedades, derivar a un asesor humano."}
+```
+
+---
+
+## PASO 6 — Crear `src/app/dashboard/cerebro/catalogo/page.tsx`
+
+Esta es la UI principal del catálogo. Leer completamente antes de implementar.
+
+### Comportamiento general
+
+- Carga objetos desde `COLLECTIONS.OBJETOS` del workspace actual con `onSnapshot`
+- Permite filtrar por `tipo` (propiedad/producto), `estado` y `recursoOrigenId` (sitio fuente)
+- Cada card muestra datos resumidos + acciones: editar, cambiar estado, eliminar
+- Modal de edición con campos dinámicos según el tipo
+- Badge por sitio de origen con link a la sección de webs
+- Respeta límites del plan (`catalogObjects` de `planLimits.ts`)
+
+### Estructura del componente
+
+```
+CatalogoPage
+├── Header (título + contador + botón "Agregar manual")
+├── BarraFiltros (tipo | estado | sitio origen)
+├── Grid de ObjetoCards (o empty state)
+└── ModalEdicion (Dialog)
+```
+
+### Código completo
+
+```tsx
 "use client";
 
-import React, { useState, useEffect, useMemo, Suspense } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { db } from "@/lib/firebase";
 import {
   collection, onSnapshot, query, deleteDoc, doc,
-  updateDoc, serverTimestamp
+  updateDoc, serverTimestamp, addDoc
 } from "firebase/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { COLLECTIONS, Objeto } from "@/lib/types/firestore";
 import {
-  LayoutGrid, Building2, ShoppingCart, Pencil, Trash2,
-  ExternalLink, Loader2, Globe, Filter, Home,
+  LayoutGrid, Building2, ShoppingCart, Plus, Pencil, Trash2,
+  ExternalLink, Loader2, Globe, Filter, Home, DollarSign,
   Maximize2, BedDouble, Bath, MapPin, Tag, Package,
   CheckCircle2, Clock, XCircle, PauseCircle, Search
 } from "lucide-react";
@@ -19,7 +609,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose
 } from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
@@ -27,7 +617,6 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 
 type ObjetoConId = Objeto & { id: string };
 
@@ -38,9 +627,8 @@ const ESTADO_CONFIG = {
   pausado:    { label: 'Pausado',    icon: PauseCircle,  bg: 'bg-[var(--bg-input)]', border: 'border-[var(--border-light)]', text: 'text-[var(--text-tertiary-light)]', dot: 'bg-[var(--text-tertiary-light)]' },
 };
 
-function CatalogoContent() {
+export default function CatalogoPage() {
   const { currentWorkspaceId } = useWorkspaceStore();
-  const searchParams = useSearchParams();
   const [objetos, setObjetos] = useState<ObjetoConId[]>([]);
   const [loading, setLoading] = useState(true);
   const [busqueda, setBusqueda] = useState("");
@@ -72,12 +660,6 @@ function CatalogoContent() {
 
     return () => unsub();
   }, [currentWorkspaceId]);
-
-  // Manejar query param 'fuente'
-  useEffect(() => {
-    const fuente = searchParams.get('fuente');
-    if (fuente) setFiltroFuente(fuente);
-  }, [searchParams]);
 
   // Fuentes únicas para el filtro
   const fuentesUnicas = useMemo(() => {
@@ -500,14 +1082,6 @@ function CatalogoContent() {
   );
 }
 
-export default function CatalogoPage() {
-  return (
-    <Suspense fallback={<div className="p-8 flex justify-center"><Loader2 className="animate-spin" /></div>}>
-      <CatalogoContent />
-    </Suspense>
-  );
-}
-
 // ─── Componente ObjetoCard ───────────────────────────────────────────────────
 
 function ObjetoCard({
@@ -658,3 +1232,107 @@ function Chip({ icon: Icon, label }: { icon: React.ElementType; label: string | 
     </span>
   );
 }
+```
+
+---
+
+## PASO 7 — Agregar badge de objetos en `src/app/dashboard/cerebro/conocimiento/webs/page.tsx`
+
+**Acción:** En la lista de webs indexadas, mostrar cuántos objetos se extrajeron de cada una. Este es un cambio menor al archivo existente.
+
+En el bloque `useEffect` que carga las webs, agregar una query paralela que cuenta objetos por `recursoOrigenId`:
+
+```typescript
+// Dentro del useEffect de webs, después del onSnapshot:
+// Cargar conteo de objetos por fuente
+const objetosSnap = await getDocs(
+  query(
+    collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.OBJETOS)
+  )
+);
+const conteoPorFuente: Record<string, number> = {};
+objetosSnap.docs.forEach(d => {
+  const rid = d.data().recursoOrigenId;
+  if (rid) conteoPorFuente[rid] = (conteoPorFuente[rid] || 0) + 1;
+});
+// Agregar el conteo a cada web
+setWebs(docs.map(d => ({ ...d, usageCount: conteoPorFuente[d.id] || 0 })));
+```
+
+Y en la UI de cada web, donde actualmente muestra `Agentes: {w.usageCount}`, reemplazar por:
+
+```tsx
+{w.usageCount > 0 ? (
+  <Link
+    href={`/dashboard/cerebro/catalogo?fuente=${w.id}`}
+    className="flex items-center gap-1 hover:text-[var(--accent-active)] transition-colors"
+  >
+    <LayoutGrid className="w-3 h-3" />
+    {w.usageCount} objetos
+  </Link>
+) : (
+  <span className="flex items-center gap-1">
+    <LayoutGrid className="w-3 h-3" />
+    0 objetos
+  </span>
+)}
+```
+
+---
+
+## PASO 8 — Agregar soporte de query param `fuente` en la página del catálogo
+
+En `CatalogoPage`, leer el query param `fuente` de la URL para pre-filtrar por origen:
+
+```typescript
+import { useSearchParams } from "next/navigation";
+
+// Dentro del componente:
+const searchParams = useSearchParams();
+useEffect(() => {
+  const fuente = searchParams.get('fuente');
+  if (fuente) setFiltroFuente(fuente);
+}, [searchParams]);
+```
+
+---
+
+## Notas para Antigravity
+
+### Imports necesarios (verificar que existen)
+- `@anthropic-ai/sdk` — ya está en el proyecto (usado en `src/lib/ai/anthropic.ts`)
+- `firebase-admin` — ya está (usado en `src/lib/firebase-admin.ts`)
+- `firebase/firestore` — cliente, para `webs/page.tsx`
+- Componentes UI: `Dialog`, `Select`, `Input`, `Label`, `Textarea`, `Button`, `Badge` — todos existen en `src/components/ui/`
+
+### Variable de entorno necesaria
+Agregar a `.env.local` y `.env.production`:
+```
+NEXT_PUBLIC_APP_URL=https://imala-vox.web.app
+```
+(o el dominio real del deploy)
+
+### Sobre el FieldValue en Admin SDK
+En el endpoint `parse-objects`, el `FieldValue.increment` se importa así:
+```typescript
+import { FieldValue } from "firebase-admin/firestore";
+// Uso:
+FieldValue.increment(objetosCreados)
+```
+No usar `adminDb.FieldValue` — no existe en la API moderna.
+
+### Reglas de Firestore
+Verificar que `firestore.rules` permite lectura/escritura en `espaciosDeTrabajo/{wsId}/objetos` para usuarios autenticados del workspace. Si hay una regla genérica que cubre todas las subcolecciones del espacio, ya está cubierto.
+
+### No tocar
+- `src/lib/ai/anthropic.ts` — dejar intacto
+- `src/lib/firebase-admin.ts` — dejar intacto  
+- `src/app/dashboard/cerebro/conocimiento/` — solo modificar `webs/page.tsx` con los cambios del PASO 7
+- El sistema de Cloud Function existente — solo agregar la lógica de paginación mejorada indicada en PASO 4; no reescribir todo
+
+### Orden de implementación obligatorio
+1 → 2 → 3 → 5 → 6 → 7 → 8 → 4 (el PASO 4 es el más riesgoso porque toca la Cloud Function; hacerlo último cuando todo lo demás ya funciona y se puede testear el parsing con texto manual)
+
+---
+
+*Fin del documento. Implementar en el orden indicado.*
