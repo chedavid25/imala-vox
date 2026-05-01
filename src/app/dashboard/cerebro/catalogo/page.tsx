@@ -212,7 +212,7 @@ function CatalogoContent() {
           </div>
 
           {/* Filtro tipo */}
-          <Select value={filtroTipo} onValueChange={setFiltroTipo}>
+          <Select value={filtroTipo} onValueChange={(v) => setFiltroTipo(v || "todos")}>
             <SelectTrigger className="w-36 bg-[var(--bg-card)] border-[var(--border-light)] rounded-xl h-9 text-xs font-bold">
               <SelectValue />
             </SelectTrigger>
@@ -224,7 +224,7 @@ function CatalogoContent() {
           </Select>
 
           {/* Filtro estado */}
-          <Select value={filtroEstado} onValueChange={setFiltroEstado}>
+          <Select value={filtroEstado} onValueChange={(v) => setFiltroEstado(v || "todos")}>
             <SelectTrigger className="w-36 bg-[var(--bg-card)] border-[var(--border-light)] rounded-xl h-9 text-xs font-bold">
               <SelectValue />
             </SelectTrigger>
@@ -239,7 +239,7 @@ function CatalogoContent() {
 
           {/* Filtro fuente */}
           {fuentesUnicas.length > 1 && (
-            <Select value={filtroFuente} onValueChange={setFiltroFuente}>
+            <Select value={filtroFuente} onValueChange={(v) => setFiltroFuente(v || "todos")}>
               <SelectTrigger className="w-44 bg-[var(--bg-card)] border-[var(--border-light)] rounded-xl h-9 text-xs font-bold">
                 <SelectValue />
               </SelectTrigger>
@@ -342,7 +342,7 @@ function CatalogoContent() {
 
                 <div className="space-y-1.5">
                   <Label className="text-[11px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest">Moneda</Label>
-                  <Select value={form.moneda || 'USD'} onValueChange={v => setForm(f => ({ ...f, moneda: v as any }))}>
+                  <Select value={form.moneda || 'USD'} onValueChange={v => setForm(f => ({ ...f, moneda: (v as any) || 'USD' }))}>
                     <SelectTrigger className="bg-[var(--bg-input)] border-[var(--border-light)] rounded-xl h-10 text-sm">
                       <SelectValue />
                     </SelectTrigger>
@@ -356,7 +356,7 @@ function CatalogoContent() {
 
                 <div className="space-y-1.5">
                   <Label className="text-[11px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest">Estado</Label>
-                  <Select value={form.estado || 'disponible'} onValueChange={v => setForm(f => ({ ...f, estado: v as any }))}>
+                  <Select value={form.estado || 'disponible'} onValueChange={v => setForm(f => ({ ...f, estado: (v as any) || 'disponible' }))}>
                     <SelectTrigger className="bg-[var(--bg-input)] border-[var(--border-light)] rounded-xl h-10 text-sm">
                       <SelectValue />
                     </SelectTrigger>
@@ -402,7 +402,7 @@ function CatalogoContent() {
                         {campo.tipo === 'select' ? (
                           <Select
                             value={form.caracteristicas?.[campo.key] || ''}
-                            onValueChange={v => setForm(f => ({ ...f, caracteristicas: { ...f.caracteristicas, [campo.key]: v } }))}
+                            onValueChange={v => setForm(f => ({ ...f, caracteristicas: { ...f.caracteristicas, [campo.key]: v || '' } }))}
                           >
                             <SelectTrigger className="bg-[var(--bg-input)] border-[var(--border-light)] rounded-xl h-9 text-sm">
                               <SelectValue placeholder="—" />
@@ -550,7 +550,7 @@ function ObjetoCard({
         </div>
 
         {/* Badge de estado */}
-        <Select value={obj.estado} onValueChange={onCambiarEstado}>
+        <Select value={obj.estado} onValueChange={(v) => onCambiarEstado((v as any) || 'disponible')}>
           <SelectTrigger className={cn(
             "h-7 px-2.5 rounded-full border text-[9px] font-black uppercase tracking-wider w-auto gap-1.5",
             estadoCfg.bg, estadoCfg.border, estadoCfg.text

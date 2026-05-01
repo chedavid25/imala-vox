@@ -310,7 +310,7 @@ export default function WebsGlobalPage() {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label>Frecuencia de actualización</Label>
-                    <Select value={newWeb.frecuencia} onValueChange={v => setNewWeb({...newWeb, frecuencia: v ?? 'manual'})}>
+                    <Select value={newWeb.frecuencia} onValueChange={v => setNewWeb({...newWeb, frecuencia: v || 'manual'})}>
                       <SelectTrigger className="bg-[var(--bg-input)] border-[var(--border-light)]">
                         <SelectValue />
                       </SelectTrigger>
