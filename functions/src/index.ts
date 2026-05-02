@@ -432,10 +432,10 @@ async function realizarScrapingRecursoInternal(wsId: string, recursoId: string, 
 
     // --- NUEVO: DISPARAR PARSING DE OBJETOS AUTOMÁTICO ---
     try {
-      await logProgreso("Iniciando extracción con IA (Gemini)...");
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://imalavox.com';
+      await logProgreso(`Enviando a parsing IA en: ${baseUrl}...`);
       
-      await fetch(`${baseUrl}/api/parse-objects`, {
+      const response = await fetch(`${baseUrl}/api/parse-objects`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -445,9 +445,23 @@ async function realizarScrapingRecursoInternal(wsId: string, recursoId: string, 
           recursoId 
         })
       });
-      console.log(`[Scraper] Parsing IA disparado con éxito para ${recursoId}`);
-    } catch (parseErr) {
-      console.error(`[Scraper] Error disparando Parsing IA:`, parseErr);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Error desconocido' }));
+        console.error(`[Scraper] Error en endpoint de parsing (${response.status}):`, errorData);
+        await docRef.update({ 
+          errorInfo: `Error Parsing IA (${response.status}): ${errorData.error || 'Fallo en el servidor'}` 
+        }).catch(() => {});
+      } else {
+        const parseResult = await response.json();
+        console.log(`[Scraper] Parsing IA completado: ${parseResult.objetosCreados} objetos.`);
+        await logProgreso(`Parsing completado: ${parseResult.objetosCreados} objetos extraídos.`);
+      }
+    } catch (parseErr: any) {
+      console.error(`[Scraper] Excepción disparando Parsing IA:`, parseErr);
+      await docRef.update({ 
+        errorInfo: `Excepción en Parsing: ${parseErr.message}` 
+      }).catch(() => {});
     }
 
     return result;

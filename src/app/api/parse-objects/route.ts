@@ -74,21 +74,31 @@ export async function POST(req: NextRequest) {
     const { rawText, sourceUrl, wsId, recursoId } = await req.json();
 
     if (!rawText || !wsId || !recursoId) {
+      console.warn("[ParseObjects] Faltan parámetros:", { wsId, recursoId, hasText: !!rawText });
       return NextResponse.json({ success: false, error: "Faltan parámetros" }, { status: 400 });
     }
 
     // Gemini 2.5 Flash soporta hasta 1M de tokens, podemos enviar mucho más texto
     const textToProcess = rawText.slice(0, 500000);
 
-    console.log(`[ParseObjects] Iniciando extracción con Gemini 2.5 Flash para recurso ${recursoId}`);
+    console.log(`[ParseObjects] Recibida petición para recurso ${recursoId} (${textToProcess.length} chars)`);
 
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.5-flash", // Usando la versión estable/producción recomendada
+      model: "gemini-2.5-flash", 
       systemInstruction: PARSE_SYSTEM_PROMPT
     });
 
-    const result = await model.generateContent(`Sitio web origen: ${sourceUrl}\n\nTexto scrapeado:\n${textToProcess}`);
-    const responseText = result.response.text();
+    let responseText = "";
+    try {
+      const result = await model.generateContent(`Sitio web origen: ${sourceUrl}\n\nTexto scrapeado:\n${textToProcess}`);
+      responseText = result.response.text();
+    } catch (geminiError: any) {
+      console.error("[ParseObjects] Error en Gemini SDK:", geminiError);
+      return NextResponse.json({ 
+        success: false, 
+        error: `Error de Gemini: ${geminiError.message || 'Error desconocido'}` 
+      }, { status: 502 });
+    }
     
     let parsed: any;
     try {
@@ -96,11 +106,16 @@ export async function POST(req: NextRequest) {
       const cleanedJson = responseText.replace(/```json|```/g, "").trim();
       parsed = JSON.parse(cleanedJson);
     } catch (parseError) {
-      console.error("[ParseObjects] Error parseando JSON de Gemini:", responseText);
-      throw new Error("La IA no devolvió un JSON válido");
+      console.error("[ParseObjects] Error parseando JSON de Gemini. Respuesta raw:", responseText);
+      return NextResponse.json({ 
+        success: false, 
+        error: "La IA no devolvió un JSON válido",
+        rawResponse: responseText.slice(0, 500)
+      }, { status: 500 });
     }
 
     const { info_general, tipo_catalogo, objetos } = parsed;
+    console.log(`[ParseObjects] Extracción exitosa. Tipo: ${tipo_catalogo}, Objetos: ${objetos?.length || 0}`);
 
     // 1. Actualizar el recurso de conocimiento con info general estructurada
     if (info_general) {
