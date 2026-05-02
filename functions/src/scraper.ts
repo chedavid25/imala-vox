@@ -174,8 +174,8 @@ export async function ejecutarScrapingProfundo(url: string, maxProperties: numbe
 
     let fullText = `ORIGEN: ${url}\nTÍTULO: ${await page.title()}\n\n=== PÁGINA PRINCIPAL ===\nURL: ${url}\nCONTENIDO:\n${mainPageContent}\n========================\n\n`;
 
-    // PROCESAMIENTO EN PARALELO (Grupos de 4 para ser estables con Remax)
-    const chunkSize = 4;
+    // PROCESAMIENTO EN PARALELO (Grupos de 2 para ser más estables y evitar timeouts)
+    const chunkSize = 2;
     for (let i = 0; i < linksToScrape.length; i += chunkSize) {
       const chunk = linksToScrape.slice(i, i + chunkSize);
       
@@ -183,9 +183,9 @@ export async function ejecutarScrapingProfundo(url: string, maxProperties: numbe
         const itemPage = await browser!.newPage();
         await itemPage.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
         try {
-          // USAR domcontentloaded TAMBIÉN EN EL DETALLE
-          await itemPage.goto(link, { waitUntil: "domcontentloaded", timeout: 45000 });
-          await new Promise(r => setTimeout(r, 4500)); // Esperar a que carguen precios/fotos
+          // Timeout más corto para los detalles
+          await itemPage.goto(link, { waitUntil: "domcontentloaded", timeout: 25000 });
+          await new Promise(r => setTimeout(r, 3000)); // Esperar un poco a que cargue contenido dinámico
           
           const content = await itemPage.evaluate(() => {
             // Remover basura
