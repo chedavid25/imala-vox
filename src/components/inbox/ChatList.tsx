@@ -18,6 +18,7 @@ import {
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
 import { auth } from "@/lib/firebase";
+import { Avatar } from "@/components/ui/Avatar";
 
 interface ChatListProps {
   conversaciones: any[];
@@ -210,22 +211,16 @@ export function ChatList({ conversaciones, selectedId, onSelect }: ChatListProps
                 )}
               >
                 {/* Avatar */}
-                <div className={cn(
-                  "w-11 h-11 rounded-full flex items-center justify-center shrink-0 shadow-sm relative transition-all duration-300",
-                  selectedId === chat.id
-                    ? "bg-[var(--accent)]/10 border border-[var(--accent)]/30"
-                    : "bg-gradient-to-br from-[var(--bg-input)] to-[var(--bg-main)] border border-[var(--border-light)]"
-                )}>
-                  {contactInfo.foto ? (
-                    <img src={contactInfo.foto} alt="avatar" className="w-full h-full rounded-full object-cover" />
-                  ) : (
-                    <span className={cn(
-                      "text-xs font-black",
-                      selectedId === chat.id ? "text-[var(--accent)]" : "text-[var(--text-primary-light)]"
-                    )}>
-                      {contactInfo.nombre.charAt(0).toUpperCase()}
-                    </span>
-                  )}
+                <div className="relative shrink-0">
+                  <Avatar 
+                    src={contactInfo.foto} 
+                    name={contactInfo.nombre} 
+                    size="lg"
+                    className={cn(
+                      "transition-all duration-300",
+                      selectedId === chat.id && "border-[var(--accent)]/30 ring-2 ring-[var(--accent)]/10"
+                    )}
+                  />
                   <div className="absolute -bottom-1 -right-1 flex items-center justify-center shadow-2xl">
                     <CanalBadge canal={chat.canal || 'whatsapp'} showText={false} className={cn(
                       "border-2 scale-[0.85]",

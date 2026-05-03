@@ -251,21 +251,29 @@ async function procesarLeadMeta(leadData: any, pageId: string) {
  */
 async function fetchMetaProfile(senderId: string, accessToken: string, isInstagram: boolean) {
   try {
-    const fields = isInstagram ? 'username,profile_pic' : 'first_name,last_name,profile_pic';
+    const fields = isInstagram ? 'name,username,profile_pic' : 'first_name,last_name,profile_pic';
     const res = await fetch(`https://graph.facebook.com/v19.0/${senderId}?fields=${fields}&access_token=${accessToken}`);
     
+    const data = await res.json();
+    
     if (!res.ok) {
-      console.warn("No se pudo obtener el perfil de Meta. Usando fallback.");
+      console.warn("⚠️ Error en fetchMetaProfile:", {
+        status: res.status,
+        data,
+        isInstagram,
+        senderId
+      });
       return null;
     }
     
-    const data = await res.json();
+    console.log(`📸 Perfil Meta obtenido (${isInstagram ? 'IG' : 'FB'}):`, JSON.stringify(data));
+    
     return {
-      nombre: isInstagram ? data.username : `${data.first_name || ''} ${data.last_name || ''}`.trim(),
+      nombre: isInstagram ? (data.name || data.username) : `${data.first_name || ''} ${data.last_name || ''}`.trim(),
       foto: data.profile_pic || null
     };
   } catch (error) {
-    console.error("Error en fetchMetaProfile:", error);
+    console.error("❌ Error en fetchMetaProfile:", error);
     return null;
   }
 }
@@ -344,13 +352,17 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
       contactoId = cDoc.id;
       const cData = cDoc.data();
       
-      // Si el nombre sigue siendo el genérico, intentamos actualizarlo
-      if (cData.nombre?.startsWith('Usuario ') && metaAccessToken) {
+      // Si el nombre sigue siendo el genérico O falta el avatar, intentamos actualizarlo
+      if ((!cData.avatarUrl || cData.nombre?.startsWith('Usuario ')) && metaAccessToken) {
         const profile = await fetchMetaProfile(senderId, metaAccessToken, isInstagram);
         if (profile) {
-          contactoNombre = profile.nombre || contactoNombre;
-          avatarUrl = profile.foto || null;
-          await cDoc.ref.update({ nombre: contactoNombre, avatarUrl });
+          contactoNombre = profile.nombre || cData.nombre || contactoNombre;
+          avatarUrl = profile.foto || cData.avatarUrl || null;
+          await cDoc.ref.update({ 
+            nombre: contactoNombre, 
+            avatarUrl,
+            actualizadoEl: Timestamp.now() 
+          });
         } else {
           contactoNombre = cData.nombre;
         }

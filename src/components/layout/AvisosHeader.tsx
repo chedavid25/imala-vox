@@ -66,7 +66,7 @@ export function AvisosHeader() {
         className={cn(
           "relative size-10 rounded-xl flex items-center justify-center transition-all duration-300 border outline-none shadow-sm active:scale-95",
           badgeCount > 0
-            ? "bg-[var(--accent)]/10 border-[var(--accent)]/30 text-[var(--accent-active)] hover:bg-[var(--accent)]/20"
+            ? "bg-[var(--accent)] border-[var(--accent)] text-[var(--accent-text)] hover:shadow-lg hover:shadow-[var(--accent)]/20"
             : "bg-[var(--bg-input)]/50 border-[var(--border-light)] text-[var(--text-tertiary-light)] hover:bg-[var(--bg-input)] hover:text-[var(--text-primary-light)] hover:border-[var(--border-light-strong)]"
         )}
       >
@@ -86,8 +86,8 @@ export function AvisosHeader() {
         <div className="px-6 pt-6 pb-4 border-b border-[var(--border-light)] bg-slate-50/50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="size-8 rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/20 flex items-center justify-center">
-                <Bell className="size-3.5 text-[var(--accent)]" />
+              <div className="size-8 rounded-xl bg-[var(--accent)] flex items-center justify-center shadow-sm">
+                <Bell className="size-3.5 text-black" />
               </div>
               <div>
                 <p className="text-[11px] font-black text-[var(--text-primary-light)] uppercase tracking-widest">Notificaciones</p>

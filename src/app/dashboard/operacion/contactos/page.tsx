@@ -164,10 +164,8 @@ export default function ContactosPage() {
           <CSVImporter onImport={handleBulkImport} />
           
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger>
-              <Button className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-11 px-6 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-[var(--accent)]/20 transition-all hover:scale-[1.02] active:scale-95" onClick={() => setIsDialogOpen(true)}>
-                <Plus className="w-4 h-4 mr-2" /> Nuevo Contacto
-              </Button>
+            <DialogTrigger className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-11 px-6 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-[var(--accent)]/20 transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center">
+              <Plus className="w-4 h-4 mr-2" /> Nuevo Contacto
             </DialogTrigger>
             <DialogContent className="max-w-md bg-white rounded-3xl border-none shadow-2xl overflow-y-auto max-h-[90vh] no-scrollbar">
               <DialogHeader>
@@ -227,11 +225,9 @@ export default function ContactosPage() {
                 <div className="space-y-3">
                   <Label className="text-[10px] font-black uppercase text-slate-400 ml-1">Segmentación (Etiquetas)</Label>
                   <DropdownMenu>
-                    <DropdownMenuTrigger>
-                      <Button variant="outline" className="w-full justify-between h-11 rounded-2xl border-dashed border-2 bg-slate-50/50 hover:bg-slate-50">
-                        <span className="text-xs font-bold text-slate-400">Seleccionar etiquetas...</span>
-                        <Plus className="size-4 opacity-50" />
-                      </Button>
+                    <DropdownMenuTrigger className="w-full justify-between h-11 rounded-2xl border-dashed border-2 bg-slate-50/50 hover:bg-slate-50 flex items-center px-4 transition-all">
+                      <span className="text-xs font-bold text-slate-400">Seleccionar etiquetas...</span>
+                      <Plus className="size-4 opacity-50" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-[300px] bg-white max-h-[300px] overflow-y-auto no-scrollbar border-slate-100 shadow-xl p-2 rounded-2xl">
                       {categories.map(cat => (
@@ -313,11 +309,9 @@ export default function ContactosPage() {
           )}
 
           <DropdownMenu>
-            <DropdownMenuTrigger>
-              <Button variant="outline" className="h-12 rounded-xl border-slate-100 px-5 gap-2 font-semibold text-[var(--text-secondary-light)] text-[11px] uppercase tracking-wider shadow-sm hover:bg-slate-50 transition-all">
-                <Filter className="size-3.5" /> Filtrar Segmentos
-                <ChevronDown className="size-3.5 opacity-40 ml-1" />
-              </Button>
+            <DropdownMenuTrigger className="h-12 rounded-xl border border-slate-100 bg-white px-5 flex items-center gap-2 font-semibold text-[var(--text-secondary-light)] text-[11px] uppercase tracking-wider shadow-sm hover:bg-slate-50 transition-all outline-none">
+              <Filter className="size-3.5" /> Filtrar Segmentos
+              <ChevronDown className="size-3.5 opacity-40 ml-1" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-[300px] p-2 bg-white rounded-2xl shadow-2xl border-slate-100 max-h-[400px] overflow-y-auto no-scrollbar">
               {categories.map(cat => (

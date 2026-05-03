@@ -207,6 +207,17 @@ export interface Agente {
     domingoHoraFin?: string;
     mensajeFueraHorario: string;
   };
+  horarioHumanoActivo: boolean;
+  horarioHumano?: {
+    diasActivos: string[];
+    horaInicio: string;
+    horaFin: string;
+    sabadoHoraInicio?: string;
+    sabadoHoraFin?: string;
+    domingoHoraInicio?: string;
+    domingoHoraFin?: string;
+    mensajeFueraHorario: string;
+  };
   escalada: {
     mensajesSinResolucion: number; // default: 5
     mensajeEscalada: string;

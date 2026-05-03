@@ -34,7 +34,7 @@ const ayudaPorTab: Record<string, {
   },
   webs: {
     titulo: "¿Para qué sirven los Sitios Web?",
-    descripcion: "Agregá URLs de tu sitio web y el sistema las lee automáticamente, extrayendo todo el contenido de texto. A diferencia de los archivos, no necesitás descargar nada: el Lector Web visita la página y guarda la información directamente.",
+    descripcion: "Agregá URLs de tu sitio web y el sistema las lee automáticamente, extrayendo todo el contenido de texto. A diferencia de los archivos, no necesitás descargar nada: el sistema visita la página y guarda la información directamente.",
     recomendacion: "Apuntá a páginas con contenido específico: productos, servicios, precios, FAQ. Evitá la home o páginas con poco texto. Si el sitio se actualiza, usá el botón 'Actualizar' para que la IA aprenda los cambios.",
     ejemplos: [
       { caso: "Página de servicios", detalle: "La IA aprende qué ofrecés, cómo funciona cada servicio y cuánto cuesta." },

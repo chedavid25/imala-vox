@@ -9,14 +9,14 @@ import { useContactos } from "@/hooks/useContactos";
 
 interface MobileTaskListProps {
   tareas: TareaCRM[];
-  onToggleComplete: (task: TareaCRM) => void;
+  onUpdate: (taskId: string, updates: Partial<TareaCRM>) => void;
   onEdit: (task: TareaCRM) => void;
   onNewTask: () => void;
 }
 
 type FilterType = 'hoy' | 'semana' | 'atrasadas' | 'completadas' | 'todas';
 
-export function MobileTaskList({ tareas, onToggleComplete, onEdit, onNewTask }: MobileTaskListProps) {
+export function MobileTaskList({ tareas, onUpdate, onEdit, onNewTask }: MobileTaskListProps) {
   const { contactos } = useContactos();
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterType>("hoy");
@@ -66,7 +66,7 @@ export function MobileTaskList({ tareas, onToggleComplete, onEdit, onNewTask }: 
       >
         {/* Checkbox Circular */}
         <button 
-          onClick={(e) => { e.stopPropagation(); onToggleComplete(task); }}
+          onClick={(e) => { e.stopPropagation(); onUpdate(task.id!, { estado: task.estado === 'completada' ? 'pendiente' : 'completada' }); }}
           className={cn(
             "size-6 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all duration-300",
             task.estado === 'completada' 

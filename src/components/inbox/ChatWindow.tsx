@@ -29,6 +29,7 @@ import { listarPlantillasWA, enviarPlantillaWA, PlantillaWA, enviarMensajeAccion
 import { getDoc } from "firebase/firestore";
 import { Contacto } from "@/lib/types/firestore";
 import { Loader2 } from "lucide-react";
+import { Avatar } from "@/components/ui/Avatar";
 
 interface ChatWindowProps {
   conversacion: any;
@@ -428,14 +429,12 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
       {/* Header */}
       <header className="px-6 py-4 border-b border-[var(--border-light)] flex items-center justify-between bg-[var(--bg-card)] shadow-sm">
         <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-full bg-[var(--bg-input)] border border-[var(--border-light)] flex items-center justify-center font-bold text-sm shadow-sm relative overflow-hidden">
-            {contactFoto ? (
-              <img src={contactFoto} alt="avatar" className="w-full h-full object-cover" />
-            ) : (
-              contactName.charAt(0).toUpperCase()
-            )}
-            <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-green-500 border-2 border-[var(--bg-card)] rounded-full"></div>
-          </div>
+          <Avatar 
+            src={contactFoto} 
+            name={contactName} 
+            size="md"
+            className="shadow-sm"
+          />
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-[15px] font-bold text-[var(--text-primary-light)] tracking-tight">
@@ -486,9 +485,11 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
                   onClick={() => handleReassign(m.uid || m.id, m.nombre)}
                   className="flex items-center gap-2 text-xs font-bold text-[var(--text-primary-light)] hover:bg-[var(--accent)] hover:text-[var(--accent-text)] cursor-pointer rounded-lg m-0.5"
                 >
-                  <div className="w-6 h-6 rounded-full bg-[var(--bg-input)] flex items-center justify-center text-[10px] border border-[var(--border-light)]">
-                    {m.nombre.charAt(0)}
-                  </div>
+                  <Avatar 
+                    name={m.nombre} 
+                    size="sm"
+                    className="w-6 h-6 text-[8px]" 
+                  />
                   {m.nombre}
                 </DropdownMenuItem>
               ))}

@@ -29,7 +29,7 @@ import { cn } from "@/lib/utils";
 interface TaskCardProps {
   task: TareaCRM;
   contactos: Contacto[];
-  onToggleComplete: (task: TareaCRM) => void;
+  onUpdate: (taskId: string, updates: Partial<TareaCRM>) => void;
   onEdit: (task: TareaCRM) => void;
   onDelete: (id: string) => void;
   compact?: boolean;
@@ -43,7 +43,7 @@ interface TaskCardProps {
 export function TaskCard({ 
   task, 
   contactos, 
-  onToggleComplete, 
+  onUpdate, 
   onEdit, 
   onDelete,
   compact = false,
@@ -58,9 +58,9 @@ export function TaskCard({
 
   return (
     <div className={cn(
-      "group flex items-center gap-4 p-4 bg-white rounded-[20px] border transition-all",
-      task.estado === 'completada' ? "opacity-60 grayscale border-slate-100" : "border-transparent shadow-sm hover:shadow-md hover:translate-x-1",
-      isAtrasada && task.estado !== 'completada' ? "border-rose-100 bg-rose-50/20" : "",
+      "group flex items-center gap-4 p-4 bg-[var(--bg-card)] rounded-[24px] border border-[var(--border-light)] transition-all",
+      task.estado === 'completada' ? "opacity-60 grayscale bg-slate-50/50" : "hover:border-[var(--text-tertiary-light)] shadow-sm hover:shadow-lg hover:-translate-y-0.5",
+      isAtrasada && task.estado !== 'completada' ? "border-rose-200 bg-rose-50/40" : "",
       compact ? "p-3 gap-3" : "p-5 gap-6"
     )}>
        {/* Manija de Arrastre DND */}
@@ -75,7 +75,7 @@ export function TaskCard({
          </div>
        )}
 
-       <div onClick={() => onToggleComplete(task)} className="shrink-0 cursor-pointer">
+       <div onClick={() => onUpdate(task.id!, { estado: task.estado === 'completada' ? 'pendiente' : 'completada', completada: task.estado !== 'completada' })} className="shrink-0 cursor-pointer">
          {task.estado === 'completada' 
            ? <CheckCircle2 className="size-5 text-emerald-500" /> 
            : <Circle className={cn("size-5 text-slate-200 group-hover:text-[var(--accent)] transition-colors")} />
@@ -85,52 +85,51 @@ export function TaskCard({
        <div className="flex-1 min-w-0 space-y-1">
           <div className="flex items-center gap-2 flex-wrap">
               <h3 className={cn(
-                "text-[14px] font-bold tracking-tight truncate",
+                "text-[14px] font-semibold tracking-tight break-words flex-1",
                 task.estado === 'completada' ? "line-through text-slate-400" : "text-[var(--text-primary-light)]"
               )}>{task.titulo}</h3>
-                          <span className={cn(
-                "inline-flex items-center px-1.5 py-0.5 rounded-full border text-[8px] font-black uppercase tracking-wider",
-                task.prioridad === 'alta' ? "bg-rose-50 border-rose-200 text-rose-600" :
-                task.prioridad === 'media' ? "bg-amber-50 border-amber-200 text-amber-600" :
-                "bg-[var(--bg-input)] border-[var(--border-light)] text-[var(--text-tertiary-light)]"
-              )}>
-                {task.prioridad}
-              </span>
-
-              {task.estado === 'proceso' && (
-                 <span className="inline-flex items-center px-1.5 py-0.5 rounded-full border bg-blue-50 border-blue-200 text-blue-600 text-[8px] font-black uppercase tracking-wider">
-                   En Proceso
-                 </span>
-              )}
-
-             {/* Selector rápido para móvil/canvas */}
-             <DropdownMenu>
-                <DropdownMenuTrigger 
-                  render={
-                    <Button variant="ghost" size="sm" className="h-4 px-1 text-[8px] font-semibold uppercase text-slate-400 hover:text-[var(--accent)] outline-none">
-                      Cambiar
-                    </Button>
-                  } 
-                />
-                <DropdownMenuContent className="rounded-xl border-none shadow-2xl bg-white p-2 min-w-[150px]">
-                  <div className="px-2 py-1 text-[8px] font-semibold text-slate-400 uppercase tracking-widest">Estado</div>
-                  <DropdownMenuItem onClick={() => onToggleComplete({...task, estado: 'pendiente'})} className="text-[11px] font-medium py-2 rounded-lg">Poner Pendiente</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onToggleComplete({...task, estado: 'proceso'})} className="text-[11px] font-medium py-2 rounded-lg text-blue-500">Poner En Proceso</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onToggleComplete({...task, estado: 'completada'})} className="text-[11px] font-medium py-2 rounded-lg text-emerald-500">Completar</DropdownMenuItem>
-                  <div className="h-px bg-slate-50 my-1" />
-                  <div className="px-2 py-1 text-[8px] font-semibold text-slate-400 uppercase tracking-widest">Prioridad</div>
-                  <DropdownMenuItem onClick={() => onToggleComplete({...task, prioridad: 'alta'})} className="text-[11px] font-medium py-2 rounded-lg text-rose-500">Alta</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onToggleComplete({...task, prioridad: 'media'})} className="text-[11px] font-medium py-2 rounded-lg text-amber-500">Media</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onToggleComplete({...task, prioridad: 'baja'})} className="text-[11px] font-medium py-2 rounded-lg text-slate-400">Baja</DropdownMenuItem>
+              {/* Selector de Prioridad */}
+              <DropdownMenu>
+                <DropdownMenuTrigger className={cn(
+                    "inline-flex items-center px-2 py-0.5 rounded-full border text-[8px] font-black uppercase tracking-wider transition-all hover:scale-105 outline-none",
+                    task.prioridad === 'alta' ? "bg-rose-50 border-rose-200 text-rose-700" :
+                    task.prioridad === 'media' ? "bg-amber-50 border-amber-300 text-amber-700" :
+                    "bg-slate-50 border-slate-200 text-slate-600"
+                  )}>
+                    {task.prioridad}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="rounded-xl border-none shadow-2xl bg-white p-1 z-[60]">
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onUpdate(task.id!, { prioridad: 'alta' }); }} className="text-[11px] font-medium py-2 rounded-lg text-rose-600">Alta</DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onUpdate(task.id!, { prioridad: 'media' }); }} className="text-[11px] font-medium py-2 rounded-lg text-amber-600">Media</DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onUpdate(task.id!, { prioridad: 'baja' }); }} className="text-[11px] font-medium py-2 rounded-lg text-slate-500">Baja</DropdownMenuItem>
                 </DropdownMenuContent>
-             </DropdownMenu>
+              </DropdownMenu>
 
-             {task.recurrencia && task.recurrencia.tipo !== 'ninguna' && (
-               <div className="size-4 rounded-full bg-indigo-50 flex items-center justify-center">
-                 <Repeat className="size-2.5 text-indigo-500" />
-               </div>
-             )}
-             {isAtrasada && <span className="text-[8px] font-semibold uppercase text-rose-500 animate-pulse">Atrasado</span>}
+              {/* Selector de Estado */}
+              <DropdownMenu>
+                <DropdownMenuTrigger className={cn(
+                    "inline-flex items-center px-2 py-0.5 rounded-full border text-[8px] font-black uppercase tracking-wider transition-all hover:scale-105 outline-none",
+                    task.estado === 'proceso' ? "bg-blue-50 border-blue-200 text-blue-600" + (isAtrasada ? " animate-pulse" : "") :
+                    isAtrasada ? "bg-rose-50 border-rose-200 text-rose-600 animate-pulse" :
+                    task.estado === 'completada' ? "bg-emerald-50 border-emerald-200 text-emerald-600" :
+                    "bg-slate-100 border-slate-200 text-slate-500"
+                  )}>
+                    {task.estado === 'completada' ? 'Completada' : 
+                     task.estado === 'proceso' ? 'En Proceso' : 
+                     isAtrasada ? 'Atrasado' : 'Pendiente'}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="rounded-xl border-none shadow-2xl bg-white p-1 z-[60]">
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onUpdate(task.id!, { estado: 'pendiente', completada: false }); }} className="text-[11px] font-medium py-2 rounded-lg">Pendiente</DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onUpdate(task.id!, { estado: 'proceso', completada: false }); }} className="text-[11px] font-medium py-2 rounded-lg text-blue-600">En Proceso</DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onUpdate(task.id!, { estado: 'completada', completada: true }); }} className="text-[11px] font-medium py-2 rounded-lg text-emerald-600">Completada</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {task.recurrencia && task.recurrencia.tipo !== 'ninguna' && (
+                <div className="size-4 rounded-full bg-indigo-50 flex items-center justify-center">
+                  <Repeat className="size-2.5 text-indigo-500" />
+                </div>
+              )}
           </div>
 
           {!compact && (
@@ -156,23 +155,18 @@ export function TaskCard({
        </div>
 
        <div className="flex items-center gap-1 pr-1 opacity-100 transition-opacity">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="size-8 rounded-full hover:bg-slate-100"
-            onClick={() => onEdit(task)}
-          >
-             <Pencil className="size-3.5 text-slate-400" />
-          </Button>
           <DropdownMenu>
-             <DropdownMenuTrigger 
-               render={
-                <Button variant="ghost" size="icon" className="size-8 rounded-full hover:bg-rose-50 outline-none">
-                  <MoreVertical className="size-3.5 text-slate-400" />
-                </Button>
-               } 
-             />
-             <DropdownMenuContent align="end" className="rounded-xl border-none shadow-2xl bg-white p-1">
+             <DropdownMenuTrigger className="size-8 rounded-full hover:bg-slate-100 flex items-center justify-center outline-none focus-visible:ring-0 transition-colors">
+                <MoreVertical className="size-3.5 text-slate-400" />
+             </DropdownMenuTrigger>
+             <DropdownMenuContent align="end" className="rounded-xl border-none shadow-2xl bg-white p-1 min-w-[140px]">
+                <DropdownMenuItem 
+                 onClick={() => onEdit(task)}
+                 className="flex items-center gap-2 text-slate-600 font-medium text-xs py-2.5 px-3 rounded-lg focus:bg-slate-50"
+                >
+                  <Pencil className="size-3.5" /> Editar Tarea
+                </DropdownMenuItem>
+                <div className="h-px bg-slate-50 my-1" />
                 <DropdownMenuItem 
                  onClick={() => onDelete(task.id!)}
                  className="flex items-center gap-2 text-rose-500 font-medium text-xs py-2.5 px-3 rounded-lg focus:bg-rose-50"

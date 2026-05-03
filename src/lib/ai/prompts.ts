@@ -153,11 +153,21 @@ ${agente.strictMode
 ${agente.horarioActivo && agente.horario
   ? (() => {
       const h = agente.horario!;
-      let horarioDesc = `Horario Lun-Vie: ${h.horaInicio}-${h.horaFin}`;
+      let horarioDesc = `Horario IA Lun-Vie: ${h.horaInicio}-${h.horaFin}`;
       if (h.sabadoHoraInicio) horarioDesc += ` | Sáb: ${h.sabadoHoraInicio}-${h.sabadoHoraFin}`;
       if (h.domingoHoraInicio) horarioDesc += ` | Dom: ${h.domingoHoraInicio}-${h.domingoHoraFin}`;
-      horarioDesc += `. Mensaje fuera: '${h.mensajeFueraHorario}'`;
-      return `- HORARIO DE ATENCIÓN: ${horarioDesc}`;
+      horarioDesc += `. Mensaje si está fuera: '${h.mensajeFueraHorario}'`;
+      return `- DISPONIBILIDAD DE LA IA: ${horarioDesc}`;
+    })()
+  : ""}
+${agente.horarioHumanoActivo && agente.horarioHumano
+  ? (() => {
+      const h = agente.horarioHumano!;
+      let horarioDesc = `Horario Atención Humana Lun-Vie: ${h.horaInicio}-${h.horaFin}`;
+      if (h.sabadoHoraInicio) horarioDesc += ` | Sáb: ${h.sabadoHoraInicio}-${h.sabadoHoraFin}`;
+      if (h.domingoHoraInicio) horarioDesc += ` | Dom: ${h.domingoHoraInicio}-${h.domingoHoraFin}`;
+      horarioDesc += `. Mensaje de ausencia: '${h.mensajeFueraHorario}'`;
+      return `- ATENCIÓN HUMANA (Operadores): Este es el horario en que hay humanos disponibles para atender derivaciones. Úsalo para informar al cliente si pide hablar con alguien fuera de hora: ${horarioDesc}`;
     })()
   : ""}
 `.trim();

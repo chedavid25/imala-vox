@@ -54,6 +54,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { deleteDoc } from "firebase/firestore";
+import { Avatar } from "@/components/ui/Avatar";
+import { ModalNuevaTarea } from "@/components/crm/tasks/ModalNuevaTarea";
 
 export function ContextPanel({ onSendMessage }: { onSendMessage?: (text: string) => void }) {
   const router = useRouter();
@@ -79,6 +81,7 @@ export function ContextPanel({ onSendMessage }: { onSendMessage?: (text: string)
   const [editedName, setEditedName] = useState("");
   const [editedPhone, setEditedPhone] = useState("");
   const [editedEmail, setEditedEmail] = useState("");
+  const [isAddingTask, setIsAddingTask] = useState(false);
 
   const [editingInteraction, setEditingInteraction] = useState<InteraccionCRM | null>(null);
   const { mensajes } = useMensajes(selectedChatId);
@@ -312,13 +315,12 @@ export function ContextPanel({ onSendMessage }: { onSendMessage?: (text: string)
       {/* Header Perfil */}
       <div className="p-6 border-b border-[var(--border-light)]">
         <div className="flex flex-col items-center text-center space-y-3">
-          <div className="w-16 h-16 rounded-2xl bg-[var(--bg-input)] border-2 border-[var(--accent)]/10 flex items-center justify-center shadow-sm overflow-hidden">
-            {selectedContact?.avatarUrl ? (
-              <img src={selectedContact.avatarUrl} alt="avatar" className="w-full h-full object-cover" />
-            ) : (
-              <User className="w-8 h-8 text-[var(--text-tertiary-light)] opacity-30" />
-            )}
-          </div>
+          <Avatar 
+            src={selectedContact?.avatarUrl} 
+            name={selectedContact?.nombre || "Prospecto"} 
+            size="xl"
+            className="rounded-2xl border-2 border-[var(--accent)]/10"
+          />
           <div className="group relative flex items-center justify-center gap-2">
             {isEditingName ? (
               <div className="flex items-center gap-2 w-full max-w-[200px]">
@@ -435,7 +437,7 @@ export function ContextPanel({ onSendMessage }: { onSendMessage?: (text: string)
                         </button>
                       </div>
                     ) : (
-                      <p className="text-[13px] font-bold">{selectedContact?.telefono || "No disponible"}</p>
+                      <p className="text-[13px] font-semibold">{selectedContact?.telefono || "No disponible"}</p>
                     )}
                   </div>
 
@@ -464,7 +466,7 @@ export function ContextPanel({ onSendMessage }: { onSendMessage?: (text: string)
                         </button>
                       </div>
                     ) : (
-                      <p className="text-[13px] font-bold">{selectedContact?.email || "Sin correo"}</p>
+                      <p className="text-[13px] font-semibold">{selectedContact?.email || "Sin correo"}</p>
                     )}
                   </div>
                   <div className="bg-[var(--bg-input)]/50 p-3 rounded-xl border border-[var(--border-light)] group relative overflow-hidden">
@@ -473,28 +475,30 @@ export function ContextPanel({ onSendMessage }: { onSendMessage?: (text: string)
                       type="date" 
                       value={selectedContact?.fechaNacimiento || ""} 
                       onChange={(e) => handleUpdateField("fechaNacimiento", e.target.value)}
-                      className="text-[13px] font-bold bg-transparent border-none outline-none w-full"
+                      className="text-[13px] font-semibold bg-transparent border-none outline-none w-full"
                     />
                   </div>
                </div>
                <div className="space-y-3">
                   <Label className="text-[10px] font-bold text-[var(--text-tertiary-light)] uppercase tracking-widest px-1">Próximo Seguimiento</Label>
                   <Button 
-                    onClick={() => router.push("/dashboard/operacion/tareas")}
+                    onClick={() => setIsAddingTask(true)}
                     variant="outline"
-                    className="w-full border-[var(--accent)]/20 bg-[var(--accent)]/5 text-[var(--text-primary-light)] hover:bg-[var(--accent)]/10 h-12 rounded-xl text-xs font-bold gap-2 p-4 justify-between"
+                    className="w-full border-[var(--border-light)] bg-white text-[var(--text-primary-light)] hover:bg-[var(--bg-input)] h-14 rounded-2xl text-xs font-semibold gap-3 p-4 justify-between transition-all group shadow-sm"
                   >
-                    <div className="flex items-center gap-2">
-                      <Clock className="size-4 text-[var(--accent)]" />
-                      Programar Tarea de CRM
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-[var(--accent)] flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition-transform">
+                        <Clock className="size-4 text-[var(--accent-text)]" />
+                      </div>
+                      <span className="tracking-tight">Programar Tarea de CRM</span>
                     </div>
-                    <ChevronRight className="size-3 opacity-30" />
+                    <ChevronRight className="size-3.5 text-[var(--text-tertiary-light)]" />
                   </Button>
                </div>
                <Button 
                 onClick={() => handleAddInteraction(true)}
                 variant="outline"
-                className="w-full border-slate-100 bg-slate-50 text-slate-500 hover:bg-slate-100 h-11 rounded-xl text-xs font-bold gap-2"
+                className="w-full border-slate-100 bg-slate-50 text-slate-500 hover:bg-slate-100 h-11 rounded-xl text-xs font-semibold gap-2"
                >
                  <TimerReset className="size-4" />
                  Resetear Salud (Interacción Rápida)
@@ -507,8 +511,8 @@ export function ContextPanel({ onSendMessage }: { onSendMessage?: (text: string)
                   <Label className="text-[10px] font-bold text-[var(--text-tertiary-light)] uppercase tracking-widest">Segmentación</Label>
                   <DropdownMenu>
                     <DropdownMenuTrigger render={
-                      <Button variant="ghost" size="icon" className="size-6 rounded-full hover:bg-[var(--bg-input)]">
-                        <Plus className="size-4 text-[var(--accent)]" />
+                      <Button variant="ghost" size="icon" className="size-7 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] shadow-sm">
+                        <Plus className="size-4" />
                       </Button>
                     } />
                     <DropdownMenuContent align="end" className="w-[240px] bg-white border-[var(--border-light)] max-h-[400px] overflow-y-auto no-scrollbar">
@@ -776,6 +780,11 @@ export function ContextPanel({ onSendMessage }: { onSendMessage?: (text: string)
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ModalNuevaTarea 
+        open={isAddingTask}
+        onOpenChange={setIsAddingTask}
+        initialContactId={selectedContact?.id}
+      />
     </aside>
   );
 }

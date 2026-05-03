@@ -37,7 +37,7 @@ interface ColumnProps {
   title: string;
   tasks: TareaCRM[];
   contactos: Contacto[];
-  onToggleComplete: (task: TareaCRM) => void;
+  onUpdate: (taskId: string, updates: Partial<TareaCRM>) => void;
   onEdit: (task: TareaCRM) => void;
   onDelete: (id: string) => void;
   color: string;
@@ -71,7 +71,7 @@ function SortableTaskCard(props: any) {
   );
 }
 
-function KanbanColumn({ id, title, tasks, contactos, onToggleComplete, onEdit, onDelete, color }: ColumnProps) {
+function KanbanColumn({ id, title, tasks, contactos, onUpdate, onEdit, onDelete, color }: ColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id });
 
   return (
@@ -99,7 +99,7 @@ function KanbanColumn({ id, title, tasks, contactos, onToggleComplete, onEdit, o
               key={task.id} 
               task={task} 
               contactos={contactos} 
-              onToggleComplete={onToggleComplete}
+              onUpdate={onUpdate}
               onEdit={onEdit}
               onDelete={onDelete}
             />
@@ -225,17 +225,17 @@ export function TaskCanvasView({
       <div className="flex-1 overflow-x-auto no-scrollbar p-8 pt-0">
         <div className="flex gap-6 h-full min-h-[600px]">
           {columns.map(col => (
-            <KanbanColumn 
-              key={col.id}
-              id={col.id}
-              title={col.title}
-              color={col.color}
-              tasks={getColumnTasks(col.id)}
-              contactos={contactos}
-              onToggleComplete={(t) => onTaskUpdate(t.id!, { estado: t.estado, prioridad: t.prioridad })}
-              onEdit={onEdit}
-              onDelete={onDelete}
-            />
+              <KanbanColumn 
+                key={col.id}
+                id={col.id}
+                title={col.title}
+                color={col.color}
+                tasks={getColumnTasks(col.id)}
+                contactos={contactos}
+                onUpdate={onTaskUpdate}
+                onEdit={onEdit}
+                onDelete={onDelete}
+              />
           ))}
         </div>
       </div>
@@ -250,7 +250,7 @@ export function TaskCanvasView({
             <TaskCard 
               task={tareas.find(t => t.id === activeId)!} 
               contactos={contactos} 
-              onToggleComplete={() => {}} 
+              onUpdate={() => {}} 
               onEdit={() => {}} 
               onDelete={() => {}} 
               compact 

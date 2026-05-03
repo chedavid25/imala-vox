@@ -211,7 +211,9 @@ export function Sidebar() {
         <div className="space-y-1">
           {!sidebarCollapsed ? (
             <div className="flex items-center gap-2 px-3 py-2 animate-in fade-in duration-300">
-              <Brain className="w-3.5 h-3.5 text-[var(--accent)]" />
+              <div className="size-6 rounded-lg bg-[var(--accent)] flex items-center justify-center shrink-0 shadow-sm">
+                <Brain className="w-3.5 h-3.5 text-black" />
+              </div>
               <div className="text-[11px] font-bold text-[var(--text-tertiary-dark)] uppercase tracking-wider">
                 Cerebro
               </div>
@@ -221,13 +223,14 @@ export function Sidebar() {
           )}
           <NavItem label="Catálogo" href="/dashboard/cerebro/catalogo" icon={LayoutGrid} active={pathname.startsWith("/dashboard/cerebro/catalogo")} collapsed={sidebarCollapsed} />
           <NavItem label="Base de conocimiento" href="/dashboard/cerebro/conocimiento" icon={BookOpen} active={pathname.startsWith("/dashboard/cerebro/conocimiento")} collapsed={sidebarCollapsed} />
-          <NavItem label="Lector Web" href="/dashboard/cerebro/scraper" icon={Globe} active={pathname.startsWith("/dashboard/cerebro/scraper")} collapsed={sidebarCollapsed} />
         </div>
 
         <div className="space-y-1">
           {!sidebarCollapsed ? (
             <div className="flex items-center gap-2 px-3 py-2 animate-in fade-in duration-300">
-              <Settings2 className="w-3.5 h-3.5 text-[var(--accent)]" />
+              <div className="size-6 rounded-lg bg-[var(--accent)] flex items-center justify-center shrink-0 shadow-sm">
+                <Settings2 className="w-3.5 h-3.5 text-black" />
+              </div>
               <div className="text-[11px] font-bold text-[var(--text-tertiary-dark)] uppercase tracking-wider">
                 Ajustes
               </div>

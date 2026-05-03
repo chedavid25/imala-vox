@@ -106,7 +106,7 @@ export function TaskCalendarView({
               size="sm"
               className={cn(
                 "h-8 px-4 rounded-lg text-[10px] font-semibold uppercase transition-all",
-                viewMode === mode ? "bg-[var(--accent)] text-white shadow-md shadow-[var(--accent)]/20" : "text-slate-400"
+                viewMode === mode ? "bg-[var(--accent)] text-[var(--accent-text)] shadow-md shadow-[var(--accent)]/20" : "text-slate-400"
               )}
               onClick={() => onViewModeChange(mode)}
             >
@@ -142,7 +142,7 @@ export function TaskCalendarView({
                   <div className="flex items-center justify-between mb-2">
                     <span className={cn(
                       "size-7 flex items-center justify-center text-[12px] font-semibold rounded-full transition-all",
-                      isTodayDay ? "bg-[var(--accent)] text-white shadow-lg shadow-[var(--accent)]/20" : 
+                      isTodayDay ? "bg-[var(--accent)] text-[var(--accent-text)] shadow-lg shadow-[var(--accent)]/20" : 
                       !isCurrentMonth ? "text-slate-300" : "text-slate-600"
                     )}>
                       {format(day, 'd')}
@@ -203,7 +203,12 @@ export function TaskCalendarView({
                   )}>
                     <div className="h-12 border-b border-slate-50 flex flex-col items-center justify-center sticky top-0 bg-white/80 backdrop-blur-sm z-10">
                       <span className="text-[10px] font-semibold uppercase text-slate-400">{format(day, 'EEE', { locale: es })}</span>
-                      <span className={cn("text-xs font-semibold", isTodayDay ? "text-[var(--accent)]" : "text-slate-700")}>{format(day, 'd')}</span>
+                      <span className={cn(
+                        "size-7 flex items-center justify-center text-[12px] font-semibold rounded-full transition-all mt-1", 
+                        isTodayDay ? "bg-[var(--accent)] text-[var(--accent-text)] shadow-sm" : "text-slate-700"
+                      )}>
+                        {format(day, 'd')}
+                      </span>
                     </div>
 
                     <div className="relative h-[1200px] group">
@@ -232,15 +237,19 @@ export function TaskCalendarView({
                             onClick={() => onEditTask(task)}
                             style={{ top: `${top}px` }}
                             className={cn(
-                              "absolute left-1 right-1 p-2 rounded-xl border-2 shadow-sm cursor-pointer transition-all hover:scale-[1.02] z-20 min-h-[40px]",
+                              "absolute left-1 right-1 p-2 rounded-xl border shadow-sm cursor-pointer transition-all hover:scale-[1.02] z-20 min-h-[40px] border-l-4",
                               task.estado === 'completada' ? "bg-white border-slate-100 text-slate-400 line-through opacity-60" :
-                              task.prioridad === 'alta' ? "bg-rose-50 border-rose-100 text-rose-600" :
-                              task.prioridad === 'media' ? "bg-amber-50 border-amber-100 text-amber-600" :
-                              "bg-indigo-50 border-indigo-100 text-indigo-600"
+                              task.prioridad === 'alta' ? "bg-rose-50 border-rose-200 text-rose-700 border-l-rose-500" :
+                              task.prioridad === 'media' ? "bg-amber-50 border-amber-200 text-amber-700 border-l-amber-500" :
+                              "bg-slate-50 border-slate-200 text-slate-700 border-l-slate-400"
                             )}
                           >
                              <div className="flex items-center justify-between mb-1">
-                               <span className="text-[9px] font-semibold uppercase">{task.hora || '9:00'}HS</span>
+                               <span className={cn(
+                                 "text-[9px] font-black uppercase",
+                                 task.prioridad === 'alta' ? "text-rose-600" : 
+                                 task.prioridad === 'media' ? "text-amber-600" : "text-slate-500"
+                               )}>{task.hora || '9:00'}HS</span>
                                <Clock className="size-2.5 opacity-40" />
                              </div>
                              <p className="text-[11px] font-semibold leading-tight truncate">{task.titulo}</p>
