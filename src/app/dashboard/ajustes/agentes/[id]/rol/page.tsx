@@ -25,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useParams } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -40,6 +40,15 @@ export default function RolPublicoAgente() {
     rolAgente: "",
     personalidadId: "",
     nombrePublico: ""
+  });
+  const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
+  const [customPersona, setCustomPersona] = useState<Agente['personalidadCustom']>({
+    nombre: "",
+    bio: "",
+    avatarUrl: "",
+    tono: "Profesional",
+    estilo: "Amistoso",
+    rasgos: []
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -74,6 +83,9 @@ export default function RolPublicoAgente() {
             personalidadId: agente.personalidadId || "",
             nombrePublico: agente.nombrePublico || ""
           });
+          if (agente.personalidadCustom) {
+            setCustomPersona(agente.personalidadCustom);
+          }
           // Sincronizar con el sidebar
           setCurrentAgentName(agente.nombrePublico || agente.nombre || "Agente");
         }
@@ -96,6 +108,7 @@ export default function RolPublicoAgente() {
         rolAgente: data.rolAgente,
         personalidadId: data.personalidadId,
         nombrePublico: data.nombrePublico,
+        personalidadCustom: customPersona,
         configuracionVersion: increment(1),
         actualizadoEl: serverTimestamp()
       });
@@ -113,6 +126,15 @@ export default function RolPublicoAgente() {
     setData({ ...data, personalidadId: persona.id });
     setIsPersonaModalOpen(false);
     toast.success(`Personalidad cambiada a ${persona.nombre}`);
+  };
+
+  const { workspace } = useWorkspaceStore();
+  const isPro = workspace?.plan === 'pro' || workspace?.plan === 'agencia';
+
+  const handleSaveCustomPersona = async () => {
+    setData({ ...data, personalidadId: "" }); // Desactivar la predefinida
+    setIsCustomModalOpen(false);
+    toast.success("Identidad propia configurada. No olvides Guardar Cambios para activar.");
   };
 
   if (loading) {
@@ -403,12 +425,84 @@ export default function RolPublicoAgente() {
             </p>
 
             <div className="pt-2">
-               <Button className="bg-[var(--accent)] hover:bg-white text-black h-14 px-10 rounded-[22px] font-bold text-sm uppercase tracking-widest shadow-[0_0_40px_-12px_rgba(204,255,0,0.4)] transition-all hover:scale-[1.05] active:scale-95">
+               <Button 
+                onClick={() => {
+                  if (isPro) {
+                    setIsCustomModalOpen(true);
+                  } else {
+                    toast.error("Esta función requiere el plan PRO o Agencia.");
+                  }
+                }}
+                className="bg-[var(--accent)] hover:bg-white text-black h-14 px-10 rounded-[22px] font-bold text-sm uppercase tracking-widest shadow-[0_0_40px_-12px_rgba(204,255,0,0.4)] transition-all hover:scale-[1.05] active:scale-95"
+               >
                  Configurar Identidad Propia
                </Button>
             </div>
          </div>
       </div>
+
+      {/* MODAL DE IDENTIDAD CUSTOM */}
+      <Dialog open={isCustomModalOpen} onOpenChange={setIsCustomModalOpen}>
+        <DialogContent className="max-w-2xl bg-white rounded-[40px] p-10 border-none">
+          <DialogHeader className="space-y-3">
+            <DialogTitle className="text-3xl font-bold tracking-tighter text-black">Crea tu Identidad Propia</DialogTitle>
+            <DialogDescription className="text-slate-500 font-medium">
+              Define los rasgos psicológicos y el estilo de comunicación único para tu marca.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-6 py-6">
+            <div className="space-y-2">
+              <Label className="text-sm font-bold uppercase tracking-widest text-slate-400">Nombre de la Identidad</Label>
+              <Input 
+                value={customPersona?.nombre}
+                onChange={e => setCustomPersona({...customPersona!, nombre: e.target.value})}
+                placeholder="Ej: Sofia de Atencion al Cliente"
+                className="h-12 bg-slate-50 border-none rounded-xl font-bold"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-bold uppercase tracking-widest text-slate-400">Bio / Historia</Label>
+              <Textarea 
+                value={customPersona?.bio}
+                onChange={e => setCustomPersona({...customPersona!, bio: e.target.value})}
+                placeholder="Describe quién es, qué edad tiene y qué lo motiva..."
+                className="min-h-[100px] bg-slate-50 border-none rounded-xl font-medium"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-bold uppercase tracking-widest text-slate-400">Tono de Voz</Label>
+                <Input 
+                  value={customPersona?.tono}
+                  onChange={e => setCustomPersona({...customPersona!, tono: e.target.value})}
+                  placeholder="Ej: Empático, Directo, Formal"
+                  className="h-12 bg-slate-50 border-none rounded-xl font-bold"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-bold uppercase tracking-widest text-slate-400">Estilo de Respuesta</Label>
+                <Input 
+                  value={customPersona?.estilo}
+                  onChange={e => setCustomPersona({...customPersona!, estilo: e.target.value})}
+                  placeholder="Ej: Conciso, Explicativo"
+                  className="h-12 bg-slate-50 border-none rounded-xl font-bold"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="pt-4 gap-4">
+            <Button variant="ghost" onClick={() => setIsCustomModalOpen(false)} className="rounded-xl font-bold">Cancelar</Button>
+            <Button 
+              onClick={handleSaveCustomPersona}
+              className="bg-black text-[var(--accent)] hover:bg-slate-900 rounded-xl px-10 font-bold"
+            >
+              Confirmar Identidad
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
