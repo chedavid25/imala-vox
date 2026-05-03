@@ -147,55 +147,47 @@ export default function RolPublicoAgente() {
 
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
-      <div className="flex justify-between items-center bg-white p-6 rounded-[30px] shadow-sm border border-slate-100">
-        <div className="flex items-center gap-4">
-          <div className="size-12 rounded-2xl bg-black flex items-center justify-center text-[var(--accent)] shadow-xl">
-            <ShieldCheck className="size-6" />
+      {/* HEADER UNIFICADO (Título + Nombre + Botón) */}
+      <div className="bg-white p-6 rounded-[35px] shadow-sm border border-slate-100 flex items-center gap-10">
+        {/* Columna 1: Título */}
+        <div className="shrink-0 space-y-0.5">
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold text-black tracking-tighter">Personalidad e Identidad</h1>
+            <Button variant="ghost" size="icon" className="size-5 rounded-full text-slate-300 hover:text-black">
+              <HelpCircle className="size-4" />
+            </Button>
           </div>
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-black tracking-tighter">Personalidad e Identidad</h1>
-              <Button variant="ghost" size="icon" className="size-6 rounded-full text-slate-300 hover:text-black">
-                <HelpCircle className="size-4" />
-              </Button>
-            </div>
-            <p className="text-xs text-slate-400 font-medium">
-              Define quién es el agente, cómo habla y con quién interactúa.
-            </p>
-          </div>
+          <p className="text-[10px] text-slate-400 font-medium max-w-[200px]">
+            Define quién es el agente y cómo se presenta.
+          </p>
         </div>
-        <Button 
-          onClick={handleSave} 
-          disabled={saving}
-          className="bg-black hover:bg-slate-900 text-[var(--accent)] h-12 px-8 rounded-xl font-bold text-xs uppercase tracking-widest shadow-xl transition-all active:scale-95 flex items-center gap-2"
-        >
-          {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-          Guardar Cambios
-        </Button>
-      </div>
 
-      {/* SECCIÓN DE IDENTIDAD BÁSICA */}
-      <div className="bg-white border border-slate-100 p-6 rounded-[35px] shadow-sm flex items-center gap-6 group hover:shadow-md transition-all">
-        <div className="size-14 rounded-2xl bg-black flex items-center justify-center text-[var(--accent)] shrink-0 shadow-lg rotate-3 group-hover:rotate-0 transition-all">
-           <User className="size-7" />
-        </div>
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-          <div className="space-y-1">
-            <Label htmlFor="nombrePublico" className="text-xl font-bold text-black tracking-tighter">Nombre de la IA</Label>
-            <p className="text-[10px] text-slate-400 font-medium italic">¿Cómo quieres que se presente ante tus clientes?</p>
-          </div>
+        {/* Columna 2: Nombre de la IA (Input) */}
+        <div className="flex-1">
           <div className="relative group/input">
             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within/input:text-[var(--accent)] transition-colors">
               <Pencil className="size-4" />
             </div>
             <Input 
               id="nombrePublico"
-              placeholder="Ej: Sofía, Roberto, Soporte Imalá..."
+              placeholder="Nombre de la IA (Ej: Sofía)"
               value={data.nombrePublico}
               onChange={e => setData({...data, nombrePublico: e.target.value})}
-              className="bg-slate-50 border-2 border-slate-50 h-12 rounded-xl pl-12 pr-5 text-base font-bold text-black focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:border-[var(--accent)] focus-visible:bg-white transition-all shadow-inner"
+              className="bg-slate-50 border-2 border-slate-50 h-12 rounded-xl pl-12 pr-5 text-sm font-bold text-black focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:border-[var(--accent)] focus-visible:bg-white transition-all shadow-inner"
             />
           </div>
+        </div>
+
+        {/* Columna 3: Acción */}
+        <div className="shrink-0">
+          <Button 
+            onClick={handleSave} 
+            disabled={saving}
+            className="bg-black hover:bg-slate-900 text-[var(--accent)] h-12 px-8 rounded-xl font-bold text-xs uppercase tracking-widest shadow-xl transition-all active:scale-95 flex items-center gap-2"
+          >
+            {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+            Guardar Cambios
+          </Button>
         </div>
       </div>
 
