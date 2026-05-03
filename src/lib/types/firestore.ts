@@ -184,6 +184,7 @@ export interface RecursoConocimiento {
 export interface Agente {
   id?: string;
   nombre: string;
+  nombrePublico?: string;         // Nombre que usará la IA (sobrescribe el de la personalidad)
   avatar: string | null;
   activo: boolean;
 
@@ -191,6 +192,17 @@ export interface Agente {
   instrucciones: string;           // System prompt libre (máx 8000)
   rolPublico: string;              // Quién es el cliente
   rolAgente: string;               // Cuál es el rol del agente
+
+  // PERSONALIDAD
+  personalidadId?: string;         // ID de personalidad predefinida (tincho, clau, etc.)
+  personalidadCustom?: {           // Configuración para el plan Pro
+    nombre: string;
+    bio: string;
+    avatarUrl: string;
+    tono: string;
+    estilo: string;
+    rasgos: string[];
+  };
 
   // COMPORTAMIENTO
   modoDefault: 'auto' | 'copiloto';

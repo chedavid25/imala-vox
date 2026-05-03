@@ -5,6 +5,7 @@
  */
 import { adminDb } from "@/lib/firebase-admin";
 import { COLLECTIONS, Agente, RecursoConocimiento } from "@/lib/types/firestore";
+import { PERSONALIDADES } from "@/lib/constants/personalidades";
 
 /**
  * Construye el System Prompt dinámico para el agente, integrando:
@@ -105,14 +106,55 @@ export async function construirSystemPrompt(wsId: string, agenteId: string): Pro
     }
   }).join('\n');
 
+  // 6. Determinar Personalidad
+  let personalidadPrompt = "";
+  if (agente.personalidadId) {
+    const persona = PERSONALIDADES.find(p => p.id === agente.personalidadId);
+    if (persona) {
+      let promptFinal = persona.prompt;
+      
+      // Si el usuario definió un nombre propio, lo inyectamos con prioridad absoluta
+      if (agente.nombrePublico && agente.nombrePublico.trim() !== "") {
+        const nombreCustom = agente.nombrePublico.trim();
+        
+        // 1. Reemplazo por regex (sensible a acentos y variaciones comunes)
+        // Intentamos limpiar cualquier mención del nombre original (con y sin acento)
+        const nombreLimpio = persona.nombre.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const regexNombre = new RegExp(`(${persona.nombre}|${nombreLimpio})`, 'gi');
+        promptFinal = promptFinal.replace(regexNombre, nombreCustom);
+
+        // 2. Inyección de instrucción de prioridad absoluta (System Override)
+        promptFinal = `## IDENTIDAD CRÍTICA
+TU NOMBRE ÚNICO Y OFICIAL ES: ${nombreCustom}. 
+Ignorarás cualquier otro nombre mencionado en las instrucciones de personalidad. Te presentarás siempre como ${nombreCustom}.
+
+${promptFinal}`;
+      }
+
+      personalidadPrompt = `## TU IDENTIDAD (PERSONALIDAD)
+${promptFinal}
+Biografía: ${persona.bio}
+Tono de voz: ${persona.tono}
+Estilo de respuesta: ${persona.tipoRespuestas}`;
+    }
+  } else if (agente.personalidadCustom) {
+    const c = agente.personalidadCustom;
+    personalidadPrompt = `## TU IDENTIDAD (PERSONALIDAD)
+Tu nombre es ${c.nombre}.
+${c.bio}
+Tono: ${c.tono} | Estilo: ${c.estilo}
+Rasgos: ${c.rasgos.join(", ")}`;
+  }
+
   // ENSAMBLADO DEL PROMPT FINAL
   return `
-## IDENTIDAD Y ROL
-Tú eres el agente inteligente de atención de este negocio.
-Tu rol: ${agente.rolAgente}
-Tu público: ${agente.rolPublico}
+${personalidadPrompt}
 
-## INSTRUCCIONES ESPECÍFICAS
+## ROL Y CONTEXTO
+Tu rol en este negocio: ${agente.rolAgente}
+Tu público objetivo: ${agente.rolPublico}
+
+## INSTRUCCIONES ESPECÍFICAS DE OPERACIÓN
 ${agente.instrucciones}
 
 ## BASE DE CONOCIMIENTO (INFORMACIÓN PARA RESPONDER)

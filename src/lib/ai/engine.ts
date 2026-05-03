@@ -1,4 +1,4 @@
-import { anthropic, MODELOS } from "./anthropic";
+import { genAI, MODELOS, getGeminiModel } from "./gemini";
 import { construirSystemPrompt } from "./prompts";
 import { adminDb } from "@/lib/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
@@ -15,7 +15,7 @@ interface MensajeProcesar {
 }
 
 /**
- * Motor central de procesamiento de mensajes de Imalá Vox
+ * Motor central de procesamiento de mensajes de Imalá Vox con Gemini 3 Flash
  */
 export async function procesarMensajeConIA({
   wsId,
@@ -27,46 +27,32 @@ export async function procesarMensajeConIA({
   contactoNombre = "Desconocido"
 }: MensajeProcesar) {
   try {
-    // 1. Clasificación de Intención (Modelo Haiku 4.5 - Rápido y barato)
-    const clasificacion = await anthropic.messages.create({
-      model: MODELOS.CLASIFICADOR,
-      max_tokens: 100,
-      system: "Eres un clasificador de intenciones para un CRM. Responde solo con una palabra que describa la intención (EJ: CONSULTA, QUEJA, AGENDAMIENTO, SPAM, OTRO) y un nivel de urgencia del 1 al 5.",
-      messages: [{ role: "user", content: textoUsuario }]
-    });
+    // 1. Clasificación de Intención (Modelo Gemini 2.5 Flash-Lite - Ultra eficiente)
+    const clasificador = getGeminiModel(MODELOS.CLASIFICADOR);
+    const resClasif = await clasificador.generateContent(
+      `Eres un clasificador de intenciones para un CRM. Responde solo con una palabra que describa la intención (EJ: CONSULTA, QUEJA, AGENDAMIENTO, SPAM, OTRO) y un nivel de urgencia del 1 al 5.\n\nMensaje del cliente: "${textoUsuario}"`
+    );
+    const clasificacionTexto = resClasif.response.text().trim();
+    console.log("Clasificación IA (Gemini):", clasificacionTexto);
 
-    console.log("Clasificación IA:", (clasificacion.content[0] as any).text);
-
-    // 2. Construir System Prompt Dinámico (RAG)
+    // 2. Construir System Prompt Dinámico (RAG + Personalidad)
     const systemPrompt = await construirSystemPrompt(wsId, agenteId);
 
-    // 3. Generar Respuesta (Modelo Sonnet 4.6 - Inteligente y preciso)
-    // Implementamos PROMPT CACHING para reducir costos en el system prompt voluminoso
-    const response = await anthropic.messages.create({
-      model: MODELOS.AGENTE,
-      max_tokens: 1024,
-      system: [
-        {
-          type: "text",
-          text: systemPrompt,
-          // @ts-ignore - Cache control es una feature avanzada del SDK de abril 2026
-          cache_control: { type: "ephemeral" }
-        },
-        {
-          type: "text",
-          text: `\n\n--- INFORMACIÓN EN TIEMPO REAL ---\nEl cliente con el que estás hablando en este momento se llama: ${contactoNombre}. Dirígete por su nombre si es apropiado.`
-        }
-      ],
-      messages: [
-        ...historial.map(m => ({
-          role: (m.from === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
-          content: m.text as string
-        })),
-        { role: "user", content: textoUsuario }
-      ]
+    // 3. Generar Respuesta (Modelo Gemini 3 Flash - Rápido y Contexto Masivo)
+    const model = getGeminiModel(
+      MODELOS.AGENTE,
+      systemPrompt + `\n\n--- INFORMACIÓN EN TIEMPO REAL ---\nEl cliente con el que estás hablando en este momento se llama: ${contactoNombre}. Dirígete por su nombre si es apropiado.`
+    );
+
+    const chat = model.startChat({
+      history: historial.map(m => ({
+        role: (m.from === 'user' ? 'user' : 'model') as 'user' | 'model',
+        parts: [{ text: m.text as string }]
+      }))
     });
 
-    let respuestaTexto = (response.content[0] as any).text;
+    const result = await chat.sendMessage(textoUsuario);
+    let respuestaTexto = result.response.text();
 
     // Extraer y ocultar etiquetas [ETIQUETA: Nombre]
     const etiquetasAplicadas: string[] = [];
@@ -106,7 +92,7 @@ export async function procesarMensajeConIA({
         visto: false,
         metadata: {
           model: MODELOS.AGENTE,
-          intent: (clasificacion.content[0] as any).text,
+          intent: clasificacionTexto,
           etiquetasIA: etiquetasAplicadas
         }
       });
@@ -164,14 +150,12 @@ export async function procesarMensajeConIA({
     // 5. Manejar Escalada (Handoff a humano)
     if (requiereEscalada) {
       try {
-        const resumenResponse = await anthropic.messages.create({
-          model: MODELOS.CLASIFICADOR,
-          max_tokens: 150,
-          system: "Eres un asistente interno. El cliente acaba de ser derivado a un operador humano. Resume en 1 o 2 líneas el estado de la situación o el pedido del cliente para que el operador humano sepa de qué trata al tomar el chat. Si el cliente dio horarios de contacto o teléfono, inclúyelos.",
-          messages: [{ role: "user", content: `Consulta del cliente: "${textoUsuario}"\nRespuesta de derivación de la IA: "${respuestaTexto}"\n\nExtrae el resumen corto:` }]
-        });
+        const extractor = getGeminiModel(MODELOS.EXTRACTOR);
+        const resResumen = await extractor.generateContent(
+          `Eres un asistente interno. El cliente acaba de ser derivado a un operador humano. Resume en 1 o 2 líneas el estado de la situación o el pedido del cliente para que el operador humano sepa de qué trata al tomar el chat. Si el cliente dio horarios de contacto o teléfono, inclúyelos.\n\nConsulta del cliente: "${textoUsuario}"\nRespuesta de derivación de la IA: "${respuestaTexto}"`
+        );
         
-        const resumenTexto = (resumenResponse.content[0] as any).text;
+        const resumenTexto = resResumen.response.text().trim();
 
         const mensajesRef = adminDb
           .collection(COLLECTIONS.ESPACIOS).doc(wsId)

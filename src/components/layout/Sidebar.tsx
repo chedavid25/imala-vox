@@ -34,7 +34,7 @@ import {
 } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import { signOut, onAuthStateChanged, User } from "firebase/auth";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, doc, getDoc } from "firebase/firestore";
 import { COLLECTIONS } from "@/lib/types/firestore";
 import { 
   DropdownMenu, 
@@ -58,8 +58,27 @@ export function Sidebar() {
   const isAgentSubRoute = pathname.includes("/dashboard/ajustes/agentes/") && 
                           pathname.split("/").length > 4;
   
-  const { currentAgentName, currentWorkspaceId } = useWorkspaceStore();
+  const { currentAgentName, currentWorkspaceId, setCurrentAgentName } = useWorkspaceStore();
   const agentId = isAgentSubRoute ? pathname.split("/")[4] : null;
+
+  // Cargar nombre del agente si no existe en el store
+  useEffect(() => {
+    async function fetchAgentName() {
+      if (!currentWorkspaceId || !agentId || currentAgentName) return;
+      try {
+        const docRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.AGENTES, agentId);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          const data = snap.data();
+          // Priorizamos nombrePublico si existe, sino el nombre interno
+          setCurrentAgentName(data.nombrePublico || data.nombre || "Agente");
+        }
+      } catch (e) {
+        console.error("Error fetching agent name for sidebar:", e);
+      }
+    }
+    fetchAgentName();
+  }, [currentWorkspaceId, agentId, currentAgentName, setCurrentAgentName]);
 
   useEffect(() => {
     if (!currentWorkspaceId) return;
@@ -89,14 +108,17 @@ export function Sidebar() {
         <div className="p-4 border-b border-[var(--border-dark)] h-[var(--header-height)] flex items-center justify-between gap-2 overflow-hidden">
           <div className="flex items-center gap-2 min-w-0">
             <button 
-              onClick={() => router.push("/dashboard/ajustes/agentes")}
+              onClick={() => {
+                setCurrentAgentName(null); // Limpiar al salir
+                router.push("/dashboard/ajustes/agentes");
+              }}
               className="p-1 hover:bg-[var(--bg-sidebar-hover)] rounded-md transition-colors text-[var(--text-tertiary-dark)] shrink-0"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
             {!sidebarCollapsed && (
               <h2 className="text-[var(--text-primary-dark)] font-bold text-sm tracking-tight truncate animate-in fade-in duration-300">
-                Agente: {currentAgentName || (agentId ? `${agentId.slice(0, 8)}...` : "Agente")}
+                {currentAgentName || (agentId ? `${agentId.slice(0, 8)}...` : "Agente")}
               </h2>
             )}
           </div>
