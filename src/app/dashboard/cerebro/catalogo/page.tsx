@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, Suspense } from "react";
 import { db } from "@/lib/firebase";
 import {
   collection, onSnapshot, query, deleteDoc, doc,
-  updateDoc, serverTimestamp
+  updateDoc, serverTimestamp, writeBatch, increment
 } from "firebase/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { COLLECTIONS, Objeto } from "@/lib/types/firestore";
@@ -12,7 +12,7 @@ import {
   LayoutGrid, Building2, ShoppingCart, Pencil, Trash2,
   ExternalLink, Loader2, Globe, Filter, Home,
   Maximize2, BedDouble, Bath, MapPin, Tag, Package,
-  CheckCircle2, Clock, XCircle, PauseCircle, Search
+  CheckCircle2, Clock, XCircle, PauseCircle, Search, FileText
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { ImportadorCSV } from "@/components/dashboard/ImportadorCSV";
 
 type ObjetoConId = Objeto & { id: string };
 
@@ -50,6 +51,8 @@ function CatalogoContent() {
   const [editando, setEditando] = useState<ObjetoConId | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [form, setForm] = useState<Partial<Objeto>>({});
+  const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
+  const [eliminandoLote, setEliminandoLote] = useState(false);
 
   useEffect(() => {
     if (!currentWorkspaceId) return;
@@ -156,6 +159,76 @@ function CatalogoContent() {
     }
   };
 
+  const toggleSeleccion = (id: string) => {
+    setSeleccionados(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const seleccionarTodos = () => {
+    if (seleccionados.size === objetosFiltrados.length) {
+      setSeleccionados(new Set());
+    } else {
+      setSeleccionados(new Set(objetosFiltrados.map(o => o.id)));
+    }
+  };
+
+  const eliminarLote = async () => {
+    if (!currentWorkspaceId || seleccionados.size === 0) return;
+    if (!confirm(`¿Eliminar ${seleccionados.size} objetos seleccionados?`)) return;
+    
+    setEliminandoLote(true);
+    try {
+      const batch = writeBatch(db);
+      seleccionados.forEach(id => {
+        batch.delete(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.OBJETOS, id));
+      });
+      await batch.commit();
+      
+      // Actualizar contador del workspace
+      await updateDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId), {
+        "uso.objectCount": increment(-seleccionados.size)
+      });
+
+      toast.success(`${seleccionados.size} objetos eliminados`);
+      setSeleccionados(new Set());
+    } catch (err) {
+      toast.error("Error al eliminar lote");
+    } finally {
+      setEliminandoLote(false);
+    }
+  };
+
+  const vaciarCatalogo = async () => {
+    if (!currentWorkspaceId || objetos.length === 0) return;
+    if (!confirm("¿ESTÁS SEGURO? Se borrará TODO el catálogo de este espacio de trabajo. Esta acción no se puede deshacer.")) return;
+    
+    setEliminandoLote(true);
+    try {
+      // Como Firestore no permite borrar colecciones enteras desde el cliente, 
+      // borramos de a 500 (límite de batch)
+      const batch = writeBatch(db);
+      objetos.forEach(o => {
+        batch.delete(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.OBJETOS, o.id));
+      });
+      await batch.commit();
+
+      await updateDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId), {
+        "uso.objectCount": 0
+      });
+
+      toast.success("Catálogo vaciado");
+      setSeleccionados(new Set());
+    } catch (err) {
+      toast.error("Error al vaciar catálogo");
+    } finally {
+      setEliminandoLote(false);
+    }
+  };
+
   const disponibles = objetos.filter(o => o.estado === 'disponible').length;
   const propiedades = objetos.filter(o => o.tipo === 'propiedad').length;
   const productos = objetos.filter(o => o.tipo === 'producto').length;
@@ -172,6 +245,25 @@ function CatalogoContent() {
           <p className="text-sm text-[var(--text-tertiary-light)]">
             Productos y propiedades extraídos automáticamente de tus sitios indexados.
           </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {currentWorkspaceId && (
+            <ImportadorCSV 
+              workspaceId={currentWorkspaceId} 
+              onSuccess={() => {
+                // El onSnapshot ya se encargará de actualizar la lista
+                toast.success("Catálogo actualizado con éxito");
+              }}
+            />
+          )}
+          <Link
+            href="/dashboard/cerebro/conocimiento/webs"
+            className={cn(buttonVariants({ variant: 'outline' }), "border-[var(--border-light)] hover:bg-[var(--bg-card)] text-[var(--text-secondary-light)] h-9 px-4 font-bold text-xs rounded-xl flex items-center gap-2")}
+          >
+            <Globe className="w-4 h-4" />
+            Configurar Scraping
+          </Link>
         </div>
       </div>
 
@@ -197,69 +289,110 @@ function CatalogoContent() {
         </div>
       )}
 
-      {/* Barra de filtros */}
+      {/* Barra de filtros y Acciones en Lote */}
       {objetos.length > 0 && (
-        <div className="flex flex-wrap gap-3 items-center">
-          {/* Búsqueda */}
-          <div className="relative flex-1 min-w-[200px] max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-tertiary-light)]" />
-            <Input
-              placeholder="Buscar..."
-              value={busqueda}
-              onChange={e => setBusqueda(e.target.value)}
-              className="pl-10 bg-[var(--bg-input)] border-[var(--border-light)] rounded-xl h-9 text-sm"
-            />
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-3 items-center justify-between">
+            <div className="flex flex-wrap gap-3 items-center">
+              {/* Búsqueda */}
+              <div className="relative flex-1 min-w-[200px] max-w-xs">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-tertiary-light)]" />
+                <Input
+                  placeholder="Buscar..."
+                  value={busqueda}
+                  onChange={e => setBusqueda(e.target.value)}
+                  className="pl-10 bg-[var(--bg-input)] border-[var(--border-light)] rounded-xl h-9 text-sm"
+                />
+              </div>
+
+              {/* Filtro tipo */}
+              <Select value={filtroTipo} onValueChange={(v) => setFiltroTipo(v || "todos")}>
+                <SelectTrigger className="w-36 bg-[var(--bg-card)] border-[var(--border-light)] rounded-xl h-9 text-xs font-bold">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos los tipos</SelectItem>
+                  <SelectItem value="propiedad">Propiedades</SelectItem>
+                  <SelectItem value="producto">Productos</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Filtro estado */}
+              <Select value={filtroEstado} onValueChange={(v) => setFiltroEstado(v || "todos")}>
+                <SelectTrigger className="w-36 bg-[var(--bg-card)] border-[var(--border-light)] rounded-xl h-9 text-xs font-bold">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos los estados</SelectItem>
+                  <SelectItem value="disponible">Disponible</SelectItem>
+                  <SelectItem value="reservado">Reservado</SelectItem>
+                  <SelectItem value="vendido">Vendido</SelectItem>
+                  <SelectItem value="pausado">Pausado</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {(filtroTipo !== 'todos' || filtroEstado !== 'todos' || filtroFuente !== 'todos' || busqueda) && (
+                <button
+                  onClick={() => { setFiltroTipo('todos'); setFiltroEstado('todos'); setFiltroFuente('todos'); setBusqueda(''); }}
+                  className="text-xs font-bold text-[var(--text-tertiary-light)] hover:text-[var(--text-primary-light)] transition-colors px-2 py-1.5 rounded-lg hover:bg-[var(--bg-input)]"
+                >
+                  Limpiar filtros
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {objetos.length > 0 && (
+                <Button
+                  variant="ghost"
+                  onClick={vaciarCatalogo}
+                  className="h-9 px-3 text-[10px] font-black uppercase tracking-widest text-red-500 hover:text-red-600 hover:bg-red-50 rounded-xl"
+                >
+                  Vaciar Catálogo
+                </Button>
+              )}
+            </div>
           </div>
 
-          {/* Filtro tipo */}
-          <Select value={filtroTipo} onValueChange={(v) => setFiltroTipo(v || "todos")}>
-            <SelectTrigger className="w-36 bg-[var(--bg-card)] border-[var(--border-light)] rounded-xl h-9 text-xs font-bold">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos los tipos</SelectItem>
-              <SelectItem value="propiedad">Propiedades</SelectItem>
-              <SelectItem value="producto">Productos</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Filtro estado */}
-          <Select value={filtroEstado} onValueChange={(v) => setFiltroEstado(v || "todos")}>
-            <SelectTrigger className="w-36 bg-[var(--bg-card)] border-[var(--border-light)] rounded-xl h-9 text-xs font-bold">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos los estados</SelectItem>
-              <SelectItem value="disponible">Disponible</SelectItem>
-              <SelectItem value="reservado">Reservado</SelectItem>
-              <SelectItem value="vendido">Vendido</SelectItem>
-              <SelectItem value="pausado">Pausado</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Filtro fuente */}
-          {fuentesUnicas.length > 1 && (
-            <Select value={filtroFuente} onValueChange={(v) => setFiltroFuente(v || "todos")}>
-              <SelectTrigger className="w-44 bg-[var(--bg-card)] border-[var(--border-light)] rounded-xl h-9 text-xs font-bold">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todas las fuentes</SelectItem>
-                {fuentesUnicas.map(([id, hostname]) => (
-                  <SelectItem key={id} value={id}>{hostname}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
-          {(filtroTipo !== 'todos' || filtroEstado !== 'todos' || filtroFuente !== 'todos' || busqueda) && (
-            <button
-              onClick={() => { setFiltroTipo('todos'); setFiltroEstado('todos'); setFiltroFuente('todos'); setBusqueda(''); }}
-              className="text-xs font-bold text-[var(--text-tertiary-light)] hover:text-[var(--text-primary-light)] transition-colors px-2 py-1.5 rounded-lg hover:bg-[var(--bg-input)]"
-            >
-              Limpiar filtros
-            </button>
-          )}
+          {/* Acciones de selección */}
+          <div className="flex items-center justify-between bg-[var(--bg-input)]/50 border border-[var(--border-light)] rounded-2xl px-4 py-2.5">
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <div 
+                  onClick={seleccionarTodos}
+                  className={cn(
+                    "w-4 h-4 rounded border transition-all flex items-center justify-center",
+                    seleccionados.size === objetosFiltrados.length && objetosFiltrados.length > 0
+                      ? "bg-[var(--accent)] border-[var(--accent)] text-white"
+                      : "bg-white border-[var(--border-light)] group-hover:border-[var(--accent)]"
+                  )}
+                >
+                  {seleccionados.size === objetosFiltrados.length && objetosFiltrados.length > 0 && (
+                    <CheckCircle2 className="w-3 h-3" />
+                  )}
+                </div>
+                <span className="text-xs font-bold text-[var(--text-secondary-light)]">Seleccionar todos</span>
+              </label>
+              
+              {seleccionados.size > 0 && (
+                <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-2">
+                  <div className="h-4 w-[1px] bg-[var(--border-light)] mx-1" />
+                  <span className="text-xs font-bold text-[var(--accent)]">
+                    {seleccionados.size} seleccionados
+                  </span>
+                  <Button
+                    size="sm"
+                    onClick={eliminarLote}
+                    disabled={eliminandoLote}
+                    className="h-7 bg-red-500 hover:bg-red-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg px-3"
+                  >
+                    {eliminandoLote ? <Loader2 className="w-3 h-3 animate-spin mr-1.5" /> : <Trash2 className="w-3 h-3 mr-1.5" />}
+                    Eliminar seleccionados
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -269,7 +402,7 @@ function CatalogoContent() {
           <Loader2 className="w-6 h-6 animate-spin text-[var(--text-tertiary-light)]" />
         </div>
       ) : objetos.length === 0 ? (
-        // Empty state — sin objetos en absoluto
+        // Empty state
         <div className="flex flex-col items-center justify-center py-24 space-y-4">
           <div className="w-16 h-16 rounded-2xl bg-[var(--bg-input)] border border-[var(--border-light)] flex items-center justify-center">
             <LayoutGrid className="w-8 h-8 text-[var(--text-tertiary-light)]" />
@@ -277,15 +410,18 @@ function CatalogoContent() {
           <div className="text-center space-y-2">
             <p className="text-sm font-bold text-[var(--text-secondary-light)]">El catálogo está vacío</p>
             <p className="text-xs text-[var(--text-tertiary-light)] max-w-xs">
-              Indexá un sitio web con productos o propiedades y el sistema los extraerá automáticamente.
+              Indexá un sitio web o importá un archivo CSV para cargar tus productos.
             </p>
           </div>
-          <Link
-            href="/dashboard/cerebro/conocimiento/webs"
-            className={cn(buttonVariants(), "bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-9 px-5 font-black text-[10px] uppercase tracking-widest rounded-xl mt-2")}
-          >
-            Ir a Sitios Web
-          </Link>
+          <div className="flex gap-3">
+            {currentWorkspaceId && <ImportadorCSV workspaceId={currentWorkspaceId} />}
+            <Link
+              href="/dashboard/cerebro/conocimiento/webs"
+              className={cn(buttonVariants(), "bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-9 px-5 font-black text-[10px] uppercase tracking-widest rounded-xl mt-2")}
+            >
+              Ir a Sitios Web
+            </Link>
+          </div>
         </div>
       ) : objetosFiltrados.length === 0 ? (
         // Empty state — filtros sin resultados
@@ -303,6 +439,8 @@ function CatalogoContent() {
               onEditar={() => abrirEdicion(obj)}
               onEliminar={() => eliminar(obj)}
               onCambiarEstado={(estado) => cambiarEstado(obj, estado)}
+              seleccionado={seleccionados.has(obj.id)}
+              onToggleSeleccion={() => toggleSeleccion(obj.id)}
             />
           ))}
         </div>
@@ -515,11 +653,15 @@ function ObjetoCard({
   onEditar,
   onEliminar,
   onCambiarEstado,
+  seleccionado,
+  onToggleSeleccion,
 }: {
   obj: ObjetoConId;
   onEditar: () => void;
   onEliminar: () => void;
   onCambiarEstado: (estado: Objeto['estado']) => void;
+  seleccionado: boolean;
+  onToggleSeleccion: () => void;
 }) {
   const estadoCfg = ESTADO_CONFIG[obj.estado] || ESTADO_CONFIG.disponible;
   const c = obj.caracteristicas || {};
@@ -530,10 +672,47 @@ function ObjetoCard({
     : 'Consultar precio';
 
   return (
-    <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-2xl p-5 hover:border-[var(--border-light-strong)] transition-all flex flex-col gap-4 group">
+    <div className={cn(
+      "bg-[var(--bg-card)] border rounded-2xl p-5 hover:border-[var(--border-light-strong)] transition-all flex flex-col gap-4 group relative",
+      seleccionado ? "border-[var(--accent)] ring-1 ring-[var(--accent)]" : "border-[var(--border-light)]"
+    )}>
+      
+      {/* Imagen del producto/propiedad */}
+      <div className="relative aspect-video -mx-5 -mt-5 mb-2 overflow-hidden rounded-t-2xl bg-slate-100 group-hover:opacity-90 transition-opacity">
+        {obj.fotos && obj.fotos.length > 0 ? (
+          <img 
+            src={obj.fotos[0]} 
+            alt={obj.titulo}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center text-slate-300">
+            <LayoutGrid className="w-8 h-8 mb-2 opacity-20" />
+            <span className="text-[10px] font-bold uppercase tracking-wider opacity-40">Sin Imagen</span>
+          </div>
+        )}
+        
+        {/* Badge de Tipo */}
+        <div className="absolute top-3 left-3 px-2 py-1 rounded-lg bg-black/50 backdrop-blur-md text-[9px] font-black text-white uppercase tracking-widest border border-white/10">
+          {obj.tipo === 'propiedad' ? 'Inmueble' : 'Producto'}
+        </div>
+      </div>
+
+      {/* Checkbox de selección */}
+      <div 
+        onClick={onToggleSeleccion}
+        className={cn(
+          "absolute top-5 right-5 w-4 h-4 rounded border transition-all flex items-center justify-center cursor-pointer z-10",
+          seleccionado 
+            ? "bg-[var(--accent)] border-[var(--accent)] text-white" 
+            : "bg-white border-[var(--border-light)] opacity-0 group-hover:opacity-100"
+        )}
+      >
+        {seleccionado && <CheckCircle2 className="w-3 h-3" />}
+      </div>
       
       {/* Header de la card */}
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-3 pr-6">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-[var(--bg-input)] border border-[var(--border-light)] flex items-center justify-center shrink-0">
             {esPropiedad
@@ -613,6 +792,11 @@ function ObjetoCard({
             <span className="truncate max-w-[120px]">
               {new URL(obj.urlOriginWeb).hostname}
             </span>
+          </div>
+        ) : c.importado ? (
+          <div className="flex items-center gap-1.5 text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">
+            <FileText className="w-3 h-3" />
+            CSV WooCommerce
           </div>
         ) : (
           <span className="text-[10px] text-[var(--text-tertiary-light)]">Manual</span>

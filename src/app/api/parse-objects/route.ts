@@ -17,9 +17,10 @@ REGLAS CRÍTICAS:
 - Responde ÚNICAMENTE con JSON válido. Sin texto antes ni después. Sin bloques de código markdown.
 - Si un campo no está disponible, usa null (no string vacío ni "no especificado")
 - Para precios: solo el número sin símbolos ni separadores de miles. Si dice "USD 150,000" → precio: 150000, moneda: "USD"
-- Para propiedades argentinas: detectar si es venta o alquiler por el contexto
+- Para propiedades argentinas: detectar si es venta o alquiler por el contexto. Si es RE/MAX, busca el ID de propiedad (MLS) y sumalo a características.
 - Si el sitio NO tiene productos/propiedades claros (ej: es solo una landing informativa), retornar objetos: []
-- Máximo 50 objetos por extracción
+- Máximo 100 objetos por extracción
+- Para fotos: Las imágenes relevantes están marcadas en el texto como [IMG: URL]. Extrae esas URLs y ponlas en el campo "fotos" de cada objeto.
 
 Responde con este formato JSON exacto:
 {
@@ -45,25 +46,26 @@ Responde con este formato JSON exacto:
       "fotos": [],
       "caracteristicas": {
         // Para propiedades:
-        // "tipo": "casa" | "departamento" | "local" | "oficina" | "terreno" | "campo" | "otro"
-        // "operacion": "venta" | "alquiler" | "alquiler_temporal"
-        // "m2": number | null
-        // "m2_cubiertos": number | null
-        // "dormitorios": number | null
-        // "banios": number | null
-        // "ambientes": number | null
-        // "cochera": boolean | null
-        // "piso": string | null
-        // "barrio": string | null
-        // "localidad": string | null
-        // "expensas": number | null
-        // "orientacion": string | null
+        "mls_id": string | null,
+        "tipo": "casa" | "departamento" | "local" | "oficina" | "terreno" | "campo" | "otro",
+        "operacion": "venta" | "alquiler" | "alquiler_temporal",
+        "m2": number | null,
+        "m2_cubiertos": number | null,
+        "dormitorios": number | null,
+        "banios": number | null,
+        "ambientes": number | null,
+        "cochera": boolean | null,
+        "piso": string | null,
+        "barrio": string | null,
+        "localidad": string | null,
+        "expensas": number | null,
+        "orientacion": string | null,
         
         // Para productos:
-        // "sku": string | null
-        // "categoria": string | null
-        // "marca": string | null
-        // "stock": number | null
+        "sku": string | null,
+        "categoria": string | null,
+        "marca": string | null,
+        "stock": number | null
       }
     }
   ]
@@ -84,7 +86,7 @@ export async function POST(req: NextRequest) {
     console.log(`[ParseObjects] Recibida petición para recurso ${recursoId} (${textToProcess.length} chars)`);
 
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.5-flash", 
+      model: "gemini-1.5-flash", 
       systemInstruction: PARSE_SYSTEM_PROMPT
     });
 
@@ -92,6 +94,7 @@ export async function POST(req: NextRequest) {
     try {
       const result = await model.generateContent(`Sitio web origen: ${sourceUrl}\n\nTexto scrapeado:\n${textToProcess}`);
       responseText = result.response.text();
+      console.log(`[ParseObjects] Respuesta de Gemini recibida (${responseText.length} chars)`);
     } catch (geminiError: any) {
       console.error("[ParseObjects] Error en Gemini SDK:", geminiError);
       return NextResponse.json({ 
@@ -150,7 +153,7 @@ export async function POST(req: NextRequest) {
       const batch = adminDb.batch();
       existentesSnap.docs.forEach(d => batch.delete(d.ref));
 
-      for (const obj of objetos.slice(0, 50)) {
+      for (const obj of objetos.slice(0, 40)) {
         const ref = adminDb
           .collection(COLLECTIONS.ESPACIOS).doc(wsId)
           .collection(COLLECTIONS.OBJETOS)

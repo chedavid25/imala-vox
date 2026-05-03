@@ -383,6 +383,31 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
     }
   };
 
+  const renderMessage = (text: string) => {
+    if (!text) return null;
+    
+    // Convertir saltos de línea a <br/>
+    const lines = text.split('\n');
+    
+    return lines.map((line, i) => {
+      // Procesar formato WhatsApp (*bold*, _italic_)
+      let processed = line;
+      
+      // Bold: *texto* -> <strong>texto</strong>
+      processed = processed.replace(/\*(.*?)\*/g, '<strong>$1</strong>');
+      
+      // Italic: _texto_ -> <em>texto</em>
+      processed = processed.replace(/_(.*?)_/g, '<em>$1</em>');
+
+      return (
+        <span key={i}>
+          <span dangerouslySetInnerHTML={{ __html: processed }} />
+          {i < lines.length - 1 && <br />}
+        </span>
+      );
+    });
+  };
+
   if (!conversacion) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center py-20 px-12 space-y-3 opacity-60 bg-[var(--bg-main)]/30">
@@ -539,7 +564,7 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
                       ? "bg-[var(--accent)] text-[var(--accent-text)] font-semibold rounded-2xl rounded-tr-none" 
                       : "bg-[var(--bg-card)] border border-[var(--border-light)] text-[var(--text-primary-light)] rounded-2xl rounded-tl-none"
                 )}>
-                  {msg.text}
+                  {renderMessage(msg.text)}
                 </div>
                 <div className="flex items-center gap-2 px-1 text-[10px] font-semibold text-[var(--text-tertiary-light)] tabular-nums uppercase tracking-wider">
                   {isNote ? "NOTA INTERNA" : isMe ? "AGENTE IMALÁ" : "CLIENTE"}

@@ -213,7 +213,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   };
 
   const breadcrumbs = getBreadcrumbs();
-  const showContextPanel = pathname.includes('/inbox') || pathname.includes('/contactos');
+  const showContextPanel = pathname.includes('/contactos');
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-[var(--bg-main)]">

@@ -44,11 +44,11 @@ export async function construirSystemPromptAdmin(wsId: string, agenteId: string)
     .where("activa", "==", true)
     .get();
 
-  // 5. Catálogo de objetos
+  // 5. Catálogo de objetos (aumentamos un poco el límite y sumamos descripción)
   const objetosSnap = await db
     .collection(`espaciosDeTrabajo/${wsId}/objetos`)
     .where("estado", "==", "disponible")
-    .limit(40)
+    .limit(50)
     .get();
 
   return `
@@ -74,7 +74,12 @@ ${multimedia.length > 0
 ${objetosSnap.docs.length > 0
   ? objetosSnap.docs.map(o => {
       const d = o.data();
-      return `- ${d.titulo} | Precio: ${d.precio} | Estado: ${d.estado}`;
+      const c = d.caracteristicas || {};
+      const specs = d.tipo === 'propiedad' 
+        ? `${c.tipo || ''} ${c.operacion || ''} en ${c.barrio || c.localidad || ''}. ${c.dormitorios || 0} dorm, ${c.m2 || 0}m2.`
+        : `${c.marca || ''} ${c.categoria || ''}`;
+      
+      return `- ${d.titulo} | ${specs} | Precio: ${d.moneda || 'ARS'} ${d.precio} | Link: ${d.urlFuente || 'N/A'} | Descripción: ${d.descripcion || 'Sin descripción'}`;
     }).join("\n")
   : "No hay objetos en el catálogo actualmente."}
 
@@ -88,7 +93,7 @@ ${etiquetasSnap.docs.length > 0
 - Responde siempre en el mismo idioma que el cliente.
 - Sé breve, profesional y directo.
 - NO uses negritas (**) ni asteriscos en tus respuestas. Solo texto plano.
-- Si no tienes la información exacta, NO LA INVENTES. Especialmente precios o disponibilidad.
+- Si no tienes la información exacta, NO LA INVENTES. Si el usuario pregunta por disponibilidad, precios o busca algo específico, utiliza SIEMPRE los datos del catálogo de abajo. Sé flexible con los términos (si busca una "casa" y tenés un "departamento", menciónalo como opción). No digas que no tenés algo sin antes revisar exhaustivamente esta lista.
 ${agente.strictMode
   ? "- MODO ESTRICTO: Solo usa información de la BASE DE CONOCIMIENTO. Si no está allí, dice que consultarás con un asesor."
   : "- Si la info no está en el conocimiento, usa el sentido común pero aclara que es una respuesta general."}

@@ -33,6 +33,7 @@ import {
   LayoutGrid
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,6 +62,7 @@ import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
 export default function WebsGlobalPage() {
+  const router = useRouter();
   const { currentWorkspaceId } = useWorkspaceStore();
   const [webs, setWebs] = useState<(RecursoConocimiento & { id: string, usageCount: number })[]>([]);
   const [loading, setLoading] = useState(true);
@@ -153,7 +155,19 @@ export default function WebsGlobalPage() {
       const data = await response.json();
 
       if (data.success) {
-        toast.success("¡Indexación completada con éxito!");
+        if (data.async) {
+          toast.success("¡Procesamiento iniciado!", {
+            description: "El robot está leyendo la web. Las propiedades aparecerán en el catálogo en unos minutos.",
+          });
+        } else {
+          const count = data.objetosCreados || 0;
+          toast.success(`¡Indexación completada! Se encontraron ${count} propiedades.`, {
+            action: {
+              label: "Ver Catálogo",
+              onClick: () => router.push(`/dashboard/cerebro/catalogo?fuente=${docRef.id}`)
+            }
+          });
+        }
       } else {
         console.error("Error devuelto por la función:", data);
         toast.error("Error en lectura: " + (data.error || "Desconocido"));

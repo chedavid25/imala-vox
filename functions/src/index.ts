@@ -430,38 +430,25 @@ async function realizarScrapingRecursoInternal(wsId: string, recursoId: string, 
       ultimoScrapeo: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    // --- NUEVO: DISPARAR PARSING DE OBJETOS AUTOMÁTICO ---
+    await logProgreso(`Scraping finalizado. Texto capturado: ${Math.round(result.mainText.length / 1024)} KB. Iniciando Parsing...`);
+
+    // --- NUEVO: PARSING DE OBJETOS LOCAL (Evita timeouts de Vercel) ---
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://imalavox.com';
-      await logProgreso(`Enviando a parsing IA en: ${baseUrl}...`);
+      const { ejecutarParsingObjetos } = require('./parser');
+      await logProgreso(`Iniciando Parsing IA localmente...`);
       
-      const response = await fetch(`${baseUrl}/api/parse-objects`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          rawText: result.mainText, 
-          sourceUrl: url, 
-          wsId, 
-          recursoId 
-        })
+      const parseResult = await ejecutarParsingObjetos({
+        rawText: result.mainText,
+        sourceUrl: url,
+        wsId,
+        recursoId
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Error desconocido' }));
-        console.error(`[Scraper] Error en endpoint de parsing (${response.status}):`, errorData);
-        await docRef.update({ 
-          errorInfo: `Error Parsing IA (${response.status}): ${errorData.error || 'Fallo en el servidor'}` 
-        }).catch(() => {});
-      } else {
-        const parseResult = await response.json();
-        console.log(`[Scraper] Parsing IA completado: ${parseResult.objetosCreados} objetos.`);
-        await logProgreso(`Parsing completado: ${parseResult.objetosCreados} objetos extraídos.`);
-      }
+      console.log(`[Scraper] Parsing IA completado: ${parseResult.objetosCreados} objetos.`);
+      await logProgreso(`Finalizado: ${parseResult.objetosCreados} objetos extraídos exitosamente.`);
     } catch (parseErr: any) {
-      console.error(`[Scraper] Excepción disparando Parsing IA:`, parseErr);
-      await docRef.update({ 
-        errorInfo: `Excepción en Parsing: ${parseErr.message}` 
-      }).catch(() => {});
+      console.error(`[Scraper] Error en Parsing IA local:`, parseErr);
+      await logProgreso(`Error en Parsing: ${parseErr.message}`);
     }
 
     return result;
@@ -513,6 +500,37 @@ export const procesarScrapingWeb = functions
       res.status(500).send({ success: false, error: error.message || 'Error desconocido en el scraper.' });
     }
   });
+/**
+ * onObjetoCambiado
+ * Disparador: Cuando se crea, modifica o elimina un objeto del catálogo
+ * Responsabilidad: Incrementar configuracionVersion en todos los agentes
+ * para que refresquen la información del catálogo en su system prompt.
+ */
+export const onObjetoCambiado = functions.firestore
+  .document('espaciosDeTrabajo/{wsId}/objetos/{objId}')
+  .onWrite(async (change, context) => {
+    const { wsId } = context.params;
+    try {
+      const agentesSnap = await admin.firestore()
+        .collection(`espaciosDeTrabajo/${wsId}/agentes`)
+        .get();
+
+      if (agentesSnap.empty) return;
+
+      const batch = admin.firestore().batch();
+      agentesSnap.docs.forEach(agenteDoc => {
+        batch.update(agenteDoc.ref, {
+          configuracionVersion: admin.firestore.FieldValue.increment(1),
+          actualizadoEl: admin.firestore.FieldValue.serverTimestamp()
+        });
+      });
+      await batch.commit();
+      console.log(`Caché invalidado para agentes en ws ${wsId} por cambio en catálogo.`);
+    } catch (error) {
+      console.error('Error en onObjetoCambiado:', error);
+    }
+  });
+
 /**
  * onConocimientoCambiado
  * Disparador: Cuando se crea, modifica o elimina un recurso de baseConocimiento

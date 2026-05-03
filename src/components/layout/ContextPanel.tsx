@@ -26,8 +26,8 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { CanalBadge } from "@/components/ui/CanalBadge";
 import { 
-  User, Mail, Phone, Calendar, Info, Package, History, Settings, 
-  ExternalLink, FileText, Plus, X, Bot, ShieldAlert, Check, 
+  User, Mail, Phone, Calendar, Info, Package, History, Settings, Search,
+  ExternalLink, FileText, Plus, X, Bot, ShieldAlert, Check, Image as ImageIcon,
   MoreVertical, Clock, MessageSquare, PhoneCall, Users, ChevronDown, ChevronRight,
   TimerReset, Loader2, Pencil, Trash2
 } from "lucide-react";
@@ -55,7 +55,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { deleteDoc } from "firebase/firestore";
 
-export function ContextPanel() {
+export function ContextPanel({ onSendMessage }: { onSendMessage?: (text: string) => void }) {
   const router = useRouter();
   const { selectedContactId, currentWorkspaceId, selectedChatId } = useWorkspaceStore();
   const { contactos } = useContactos();
@@ -65,6 +65,10 @@ export function ContextPanel() {
   const [masterTags, setMasterTags] = useState<EtiquetaCRM[]>([]);
   const [interacciones, setInteracciones] = useState<InteraccionCRM[]>([]);
   
+  const [objetos, setObjetos] = useState<any[]>([]);
+  const [busquedaObjetos, setBusquedaObjetos] = useState("");
+  const [loadingObjetos, setLoadingObjetos] = useState(false);
+
   const [newInteraction, setNewInteraction] = useState("");
   const [interactionType, setInteractionType] = useState<InteraccionCRM['tipo']>('nota');
   const [isSavingInteraction, setIsSavingInteraction] = useState(false);
@@ -126,6 +130,38 @@ export function ContextPanel() {
     
     return () => { unsubCats(); unsubTags(); };
   }, [currentWorkspaceId]);
+
+  // Cargar Catálogo (Objetos)
+  useEffect(() => {
+    if (!currentWorkspaceId || activeTab !== "objetos") return;
+    setLoadingObjetos(true);
+    const q = query(collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.OBJETOS), orderBy("titulo", "asc"));
+    return onSnapshot(q, snap => {
+      setObjetos(snap.docs.map(d => ({ ...d.data(), id: d.id })));
+      setLoadingObjetos(false);
+    });
+  }, [currentWorkspaceId, activeTab]);
+
+  const objetosFiltrados = useMemo(() => {
+    if (!busquedaObjetos) return objetos;
+    const q = busquedaObjetos.toLowerCase();
+    return objetos.filter(o => 
+      o.titulo.toLowerCase().includes(q) || 
+      o.descripcion.toLowerCase().includes(q) ||
+      (o.caracteristicas?.marca && o.caracteristicas.marca.toLowerCase().includes(q))
+    );
+  }, [objetos, busquedaObjetos]);
+
+  const handleEnviarObjeto = (obj: any) => {
+    if (!onSendMessage) {
+      toast.error("No se puede enviar mensajes desde este panel");
+      return;
+    }
+    const precioStr = obj.precio > 0 ? `💰 *Precio:* ${obj.moneda || 'USD'} ${obj.precio.toLocaleString('es-AR')}` : '💰 *Precio:* Consultar';
+    const text = `🙌 *¡Hola! Te comparto la información de este inmueble:*\n\n🏠 *${obj.titulo}*\n${precioStr}\n\n📝 ${obj.descripcion}\n\n${obj.urlFuente ? `🔗 *Ver ficha completa:* ${obj.urlFuente}` : ''}`;
+    onSendMessage(text);
+    toast.success("Información enviada al chat");
+  };
 
   // Cargar Interacciones
   useEffect(() => {
@@ -641,10 +677,60 @@ export function ContextPanel() {
              </div>
           </TabsContent>
 
-          <TabsContent value="objetos" className="p-6 m-0 animate-in fade-in">
-             <div className="py-20 text-center space-y-4 opacity-30">
-                <Package className="size-10 mx-auto" />
-                <p className="text-[12px] font-bold uppercase tracking-widest">Catálogo Próximamente</p>
+          <TabsContent value="objetos" className="p-4 m-0 flex flex-col h-full overflow-hidden animate-in fade-in">
+             <div className="space-y-4 flex flex-col h-full">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-slate-400" />
+                  <input 
+                    type="text"
+                    placeholder="Buscar producto..."
+                    value={busquedaObjetos}
+                    onChange={e => setBusquedaObjetos(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-100 rounded-xl pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-[var(--accent)]/50 transition-all"
+                  />
+                </div>
+
+                <div className="flex-1 overflow-y-auto no-scrollbar space-y-3">
+                   {loadingObjetos ? (
+                     <div className="py-10 flex justify-center">
+                        <Loader2 className="size-5 animate-spin text-slate-300" />
+                     </div>
+                   ) : objetosFiltrados.length === 0 ? (
+                     <div className="py-20 text-center space-y-4 opacity-30">
+                        <Package className="size-10 mx-auto" />
+                        <p className="text-[12px] font-bold uppercase tracking-widest">No se encontraron productos</p>
+                     </div>
+                   ) : (
+                     objetosFiltrados.map(obj => (
+                       <div key={obj.id} className="bg-white border border-slate-100 rounded-2xl p-3 space-y-3 hover:border-[var(--accent)]/30 transition-all group shadow-sm">
+                          <div className="flex gap-3">
+                             {obj.fotos?.[0] ? (
+                               <div className="size-12 rounded-lg overflow-hidden shrink-0 border border-slate-50">
+                                 <img src={obj.fotos[0]} alt="p" className="w-full h-full object-cover" />
+                               </div>
+                             ) : (
+                               <div className="size-12 rounded-lg bg-slate-50 flex items-center justify-center shrink-0 border border-slate-50">
+                                 <ImageIcon className="size-5 text-slate-300" />
+                               </div>
+                             )}
+                             <div className="min-w-0 flex-1">
+                                <p className="text-xs font-bold text-slate-700 truncate">{obj.titulo}</p>
+                                <p className="text-[11px] font-black text-[var(--accent)] mt-0.5">
+                                   {obj.precio > 0 ? `${obj.moneda || 'USD'} ${obj.precio.toLocaleString('es-AR')}` : 'Consultar'}
+                                </p>
+                             </div>
+                          </div>
+                          
+                          <Button 
+                            onClick={() => handleEnviarObjeto(obj)}
+                            className="w-full h-8 bg-slate-50 hover:bg-[var(--accent)] text-slate-600 hover:text-black border border-slate-100 hover:border-transparent text-[10px] font-black uppercase tracking-widest rounded-lg transition-all"
+                          >
+                            Enviar al Chat
+                          </Button>
+                       </div>
+                     ))
+                   )}
+                </div>
              </div>
           </TabsContent>
         </div>

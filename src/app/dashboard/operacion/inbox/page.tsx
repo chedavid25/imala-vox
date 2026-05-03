@@ -253,6 +253,9 @@ function InboxContent() {
           onSendMessage={handleSendMessage}
         />
       </div>
+      
+      {/* Columna 3: Panel de Contexto (CRM) */}
+      <ContextPanel onSendMessage={handleSendMessage} />
     </div>
   );
 }
