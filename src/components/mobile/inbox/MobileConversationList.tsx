@@ -8,6 +8,7 @@ import { formatDistanceToNow, isToday, format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Search, MessageSquare, Bot, Check, CheckCheck, MoreVertical, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Avatar } from "@/components/ui/Avatar";
 
 interface MobileConversationListProps {
   conversaciones: any[];
@@ -125,20 +126,21 @@ export function MobileConversationList({ conversaciones, onSelect }: MobileConve
                 onClick={() => onSelect(chat.id)}
                 className="w-full px-5 py-4 flex items-center gap-4 active:bg-slate-50 transition-colors border-b border-slate-50 group relative"
               >
-                {/* Avatar Premium */}
+                {/* Avatar Unificado (Igual que escritorio) */}
                 <div className="relative shrink-0">
-                  <div className="size-14 rounded-[22px] bg-gradient-to-br from-slate-100 to-slate-200 border border-slate-100 flex items-center justify-center overflow-hidden shadow-sm transition-transform group-active:scale-95">
-                    {info.foto ? (
-                      <img src={info.foto} alt={info.nombre} className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-xl font-bold text-slate-400">
-                        {info.nombre.charAt(0).toUpperCase()}
-                      </span>
-                    )}
-                  </div>
+                  <Avatar 
+                    src={info.foto} 
+                    name={info.nombre} 
+                    size="lg"
+                    className="transition-all duration-300"
+                  />
                   {/* Badge Canal */}
-                  <div className="absolute -bottom-1 -right-1">
-                    <CanalBadge canal={chat.canal || 'whatsapp'} showText={false} className="border-[3px] border-white scale-90 shadow-sm" />
+                  <div className="absolute -bottom-1 -right-1 flex items-center justify-center shadow-2xl">
+                    <CanalBadge 
+                      canal={chat.canal || 'whatsapp'} 
+                      showText={false} 
+                      className="border-2 scale-[0.85] border-white" 
+                    />
                   </div>
                 </div>
 
@@ -177,7 +179,7 @@ export function MobileConversationList({ conversaciones, onSelect }: MobileConve
                     </div>
                     
                     {hasUnread && (
-                      <div className="size-5 bg-emerald-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/20 animate-in zoom-in">
+                      <div className="bg-[var(--accent)] text-[var(--accent-text)] text-[9px] font-extrabold px-1.5 py-0.5 rounded-full shadow-lg shadow-[var(--accent)]/20 animate-in zoom-in shrink-0">
                         {chat.unreadCount}
                       </div>
                     )}

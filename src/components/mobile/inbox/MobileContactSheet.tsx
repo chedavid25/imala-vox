@@ -1,14 +1,25 @@
 import React, { useState } from "react";
 import { BottomSheet } from "@/components/mobile/shared/BottomSheet";
 import { useContactos } from "@/hooks/useContactos";
-import { Phone, Mail, Calendar, Tag, ShieldAlert, MessageCircle, Edit2, Check, X, User } from "lucide-react";
-import { COLLECTIONS, EtiquetaCRM, Contacto } from "@/lib/types/firestore";
+import { Phone, Mail, Calendar, Tag, ShieldAlert, MessageCircle, Edit2, Check, X, User, Plus } from "lucide-react";
+import { COLLECTIONS, EtiquetaCRM, Contacto, CategoriaCRM } from "@/lib/types/firestore";
 import { db } from "@/lib/firebase";
-import { collection, query, onSnapshot, doc, updateDoc, Timestamp } from "firebase/firestore";
+import { collection, query, onSnapshot, doc, updateDoc, Timestamp, arrayRemove, orderBy } from "firebase/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+  DropdownMenuGroup
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 interface MobileContactSheetProps {
   open: boolean;
@@ -19,7 +30,9 @@ interface MobileContactSheetProps {
 export function MobileContactSheet({ open, onClose, contactoId }: MobileContactSheetProps) {
   const { contactos } = useContactos();
   const [allTags, setAllTags] = useState<EtiquetaCRM[]>([]);
+  const [categories, setCategories] = useState<CategoriaCRM[]>([]);
   const { currentWorkspaceId } = useWorkspaceStore();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   
   const contact = contactos.find(c => c.id === contactoId);
 
@@ -28,15 +41,47 @@ export function MobileContactSheet({ open, onClose, contactoId }: MobileContactS
   const [editForm, setEditForm] = useState<Partial<Contacto>>({});
   const [isSaving, setIsSaving] = useState(false);
 
-  // Cargar etiquetas para resolver nombres
+  // Cargar configuración de etiquetas y categorías
   React.useEffect(() => {
     if (!currentWorkspaceId || !open) return;
+    
+    const qCats = query(collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CATEGORIAS_CRM), orderBy("orden", "asc"));
     const qTags = query(collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.ETIQUETAS_CRM));
-    const unsubscribe = onSnapshot(qTags, (snap) => {
-      setAllTags(snap.docs.map(d => ({ ...d.data(), id: d.id } as EtiquetaCRM)));
-    });
-    return () => unsubscribe();
+    
+    const unsubCats = onSnapshot(qCats, snap => setCategories(snap.docs.map(d => ({...d.data(), id: d.id} as CategoriaCRM))));
+    const unsubTags = onSnapshot(qTags, snap => setAllTags(snap.docs.map(d => ({...d.data(), id: d.id} as EtiquetaCRM))));
+    
+    return () => { unsubCats(); unsubTags(); };
   }, [currentWorkspaceId, open]);
+
+  const handleAddTag = async (tag: EtiquetaCRM) => {
+    if (!currentWorkspaceId || !contactoId || !contact) return;
+    const contactRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS, contactoId);
+    
+    try {
+      const cat = categories.find(c => c.id === tag.categoriaId);
+      let newTags = [...(contact.etiquetas || [])];
+
+      if (cat?.tipo === 'exclusiva') {
+        const otherTagsInCat = allTags.filter(t => t.categoriaId === cat.id && t.id !== tag.id).map(t => t.id);
+        newTags = newTags.filter(tId => !otherTagsInCat.includes(tId));
+      }
+
+      if (!newTags.includes(tag.id!)) {
+        newTags.push(tag.id!);
+      }
+
+      await updateDoc(contactRef, { etiquetas: newTags });
+      toast.success(`Etiqueta ${tag.nombre} añadida`);
+    } catch (e) { toast.error("Error al añadir etiqueta"); }
+  };
+
+  const handleRemoveTag = async (tagId: string) => {
+    if (!currentWorkspaceId || !contactoId) return;
+    await updateDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS, contactoId), {
+      etiquetas: arrayRemove(tagId)
+    });
+  };
 
   // Inicializar form al editar
   const handleStartEdit = () => {
@@ -45,7 +90,6 @@ export function MobileContactSheet({ open, onClose, contactoId }: MobileContactS
       nombre: contact.nombre || "",
       email: contact.email || "",
       fechaNacimiento: contact.fechaNacimiento || "",
-      relacionTag: contact.relacionTag || "Prospecto",
       telefono: contact.telefono || ""
     });
     setIsEditing(true);
@@ -78,7 +122,7 @@ export function MobileContactSheet({ open, onClose, contactoId }: MobileContactS
 
   if (!contact) return null;
 
-  const relacionTags = ["Lead", "Laboral", "Personal"];
+
 
   return (
     <BottomSheet 
@@ -116,28 +160,12 @@ export function MobileContactSheet({ open, onClose, contactoId }: MobileContactS
                   placeholder="Nombre completo"
                 />
                 <div className="flex flex-wrap justify-center gap-2">
-                   {relacionTags.map(tag => (
-                     <button
-                       key={tag}
-                       onClick={() => setEditForm({ ...editForm, relacionTag: tag as any })}
-                       className={cn(
-                         "px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all border",
-                         editForm.relacionTag === tag 
-                          ? "bg-[var(--accent)] border-[var(--accent)] text-slate-900 shadow-sm" 
-                          : "bg-white border-slate-100 text-slate-400"
-                       )}
-                     >
-                       {tag}
-                     </button>
-                   ))}
+
                 </div>
               </div>
             ) : (
               <>
                 <h2 className="text-xl font-bold text-slate-900">{contact.nombre}</h2>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                  {contact.relacionTag || "Prospecto"}
-                </p>
               </>
             )}
           </div>
@@ -257,30 +285,70 @@ export function MobileContactSheet({ open, onClose, contactoId }: MobileContactS
           </button>
         )}
 
-        {/* Etiquetas / Tags (Solo en modo vista para simplificar) */}
-        {!isEditing && (
-          <div className="space-y-3 pb-6">
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest pl-1">Etiquetas de Segmentación</p>
-            <div className="flex flex-wrap gap-2">
-              {contact.etiquetas && contact.etiquetas.length > 0 ? (
-                contact.etiquetas.map((tagId: string) => {
-                  const tag = allTags.find(t => t.id === tagId);
-                  return (
-                    <span 
-                      key={tagId} 
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-slate-600 text-[11px] font-semibold rounded-lg border border-slate-200 shadow-sm"
-                    >
-                      <div className="size-1.5 rounded-full" style={{ backgroundColor: tag?.colorBg || '#cbd5e1' }} />
-                      {tag?.nombre || '...'}
-                    </span>
-                  );
-                })
-              ) : (
-                <p className="text-xs text-slate-400 italic pl-1">Sin etiquetas</p>
+        {/* Segmentación (Igual que escritorio) */}
+        <div className="space-y-4 pt-4 border-t border-slate-50">
+           <div className="flex items-center justify-between px-1">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Segmentación</p>
+              <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+                <DropdownMenuTrigger 
+                  render={
+                    <button 
+                      type="button"
+                      onClick={() => setIsMenuOpen(true)}
+                      className="size-8 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] shadow-sm flex items-center justify-center active:scale-95 transition-all outline-none"
+                    />
+                  }
+                >
+                  <Plus className="size-4" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-[240px] bg-white border-slate-100 max-h-[400px] overflow-y-auto no-scrollbar z-[250]">
+                   <DropdownMenuGroup>
+                     <DropdownMenuLabel className="text-[9px] font-bold uppercase text-slate-400 px-2 py-1">Opciones</DropdownMenuLabel>
+                     <DropdownMenuItem className="text-[12px] font-bold py-2" onClick={() => toast.info("Menu abierto")}>
+                       <Check className="size-3 mr-2 text-emerald-500" />
+                       Probar Menú
+                     </DropdownMenuItem>
+                   </DropdownMenuGroup>
+                   <DropdownMenuSeparator className="bg-slate-50" />
+                   {categories.map(cat => (
+                     <div key={cat.id}>
+                        <DropdownMenuGroup>
+                          <DropdownMenuLabel className="text-[9px] font-bold uppercase tracking-tighter text-slate-400 bg-slate-50 py-1">{cat.nombre}</DropdownMenuLabel>
+                          {allTags.filter(t => t.categoriaId === cat.id).map(tag => (
+                            <DropdownMenuItem key={tag.id} onClick={() => handleAddTag(tag)} className="text-[12px] font-bold gap-2 py-2">
+                              <div className="size-2 rounded-full" style={{ backgroundColor: tag.colorBg }} />
+                              {tag.nombre}
+                              {(contact.etiquetas || []).includes(tag.id!) && <Check className="size-3 ml-auto text-emerald-500" />}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuGroup>
+                        <DropdownMenuSeparator className="bg-slate-50" />
+                     </div>
+                   ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+           </div>
+
+           <div className="flex flex-wrap gap-2">
+              {(contact.etiquetas || []).map(tId => {
+                const tag = allTags.find(t => t.id === tId);
+                if (!tag) return null;
+                return (
+                  <Badge 
+                    key={tId} 
+                    className="bg-slate-50 text-slate-600 border-slate-100 font-bold text-[10px] px-2 py-1 gap-1.5 rounded-lg group"
+                  >
+                    <div className="size-1.5 rounded-full" style={{ backgroundColor: tag.colorBg }} />
+                    {tag.nombre}
+                    <button onClick={() => handleRemoveTag(tId)} className="ml-1"><X className="size-2.5 text-rose-500" /></button>
+                  </Badge>
+                );
+              })}
+              {(!contact.etiquetas || contact.etiquetas.length === 0) && (
+                <p className="text-[11px] text-slate-400 italic px-1">Sin etiquetas personalizadas</p>
               )}
-            </div>
-          </div>
-        )}
+           </div>
+        </div>
 
         {/* Acciones de Seguridad */}
         {!isEditing && (

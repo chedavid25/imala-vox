@@ -87,32 +87,49 @@ export function MobileTaskList({ tareas, onUpdate, onEdit, onNewTask }: MobileTa
             </h4>
           </div>
           
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+             {/* Tag de Prioridad (Igual que escritorio) */}
              <div className={cn(
-               "flex items-center gap-1 text-[10px] font-medium uppercase tracking-widest",
+               "px-2 py-0.5 rounded-full border text-[8px] font-black uppercase tracking-wider",
+               task.prioridad === 'alta' ? "bg-rose-50 border-rose-200 text-rose-700" :
+               task.prioridad === 'media' ? "bg-amber-50 border-amber-300 text-amber-700" :
+               "bg-slate-50 border-slate-200 text-slate-600"
+             )}>
+               {task.prioridad}
+             </div>
+
+             {/* Tag de Estado (Igual que escritorio) */}
+             <div className={cn(
+               "px-2 py-0.5 rounded-full border text-[8px] font-black uppercase tracking-wider",
+               task.estado === 'proceso' ? "bg-blue-50 border-blue-200 text-blue-600" + (isOverdue ? " animate-pulse" : "") :
+               isOverdue ? "bg-rose-50 border-rose-200 text-rose-600 animate-pulse" :
+               task.estado === 'completada' ? "bg-emerald-50 border-emerald-200 text-emerald-600" :
+               "bg-slate-100 border-slate-200 text-slate-500"
+             )}>
+                {task.estado === 'completada' ? 'Completada' : 
+                 task.estado === 'proceso' ? 'En Proceso' : 
+                 isOverdue ? 'Atrasado' : 'Pendiente'}
+             </div>
+
+             {/* Info de tiempo */}
+             <div className={cn(
+               "flex items-center gap-1 text-[10px] font-bold uppercase tracking-tighter ml-auto",
                isOverdue ? "text-rose-500" : "text-slate-400"
              )}>
-               <Calendar size={12} strokeWidth={2} />
+               <Clock size={12} strokeWidth={2.5} />
                {isToday(parseISO(task.fecha)) ? "Hoy" : format(parseISO(task.fecha), "d MMM", { locale: es })}
                {task.hora && ` • ${task.hora}`}
              </div>
-
-             {task.prioridad !== 'media' && (
-               <div className={cn(
-                 "px-2 py-0.5 rounded-lg text-[9px] font-semibold uppercase tracking-widest",
-                 task.prioridad === 'alta' ? "bg-rose-50 text-rose-500" : "bg-slate-100 text-slate-400"
-               )}>
-                 {task.prioridad === 'alta' ? "Urgente" : "Baja"}
-               </div>
-             )}
-
-             {associatedContact && (
-               <div className="flex items-center gap-1 text-[10px] font-semibold text-blue-500/80 bg-blue-50/50 px-2 py-0.5 rounded-lg max-w-[120px]">
-                 <User size={10} className="shrink-0" />
-                 <span className="truncate">{associatedContact.nombre}</span>
-               </div>
-             )}
           </div>
+
+          {associatedContact && (
+            <div className="flex items-center gap-2 pt-1 border-t border-slate-50 mt-1">
+              <div className="flex items-center gap-1.5 text-[10px] font-bold text-indigo-600 bg-indigo-50/50 px-2 py-1 rounded-lg">
+                <User size={12} className="shrink-0" />
+                <span className="truncate">{associatedContact.nombre}</span>
+              </div>
+            </div>
+          )}
         </div>
 
         <button className="p-1 text-slate-300 mt-0.5">
@@ -190,9 +207,9 @@ export function MobileTaskList({ tareas, onUpdate, onEdit, onNewTask }: MobileTa
       {/* FAB Premium */}
       <button 
         onClick={onNewTask}
-        className="fixed bottom-24 right-6 size-14 bg-slate-900 text-white rounded-2xl shadow-2xl shadow-slate-900/40 flex items-center justify-center active:scale-90 transition-all z-30"
+        className="fixed bottom-24 right-6 size-14 bg-[var(--accent)] text-[var(--accent-text)] rounded-2xl shadow-2xl shadow-[var(--accent)]/40 flex items-center justify-center active:scale-90 transition-all z-30"
       >
-        <Plus size={28} strokeWidth={2} />
+        <Plus size={28} strokeWidth={2.5} />
       </button>
     </div>
   );

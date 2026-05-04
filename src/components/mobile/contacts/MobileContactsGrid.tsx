@@ -15,7 +15,7 @@ interface MobileContactsGridProps {
 
 export function MobileContactsGrid({ contactos, tags, categories, onSelect }: MobileContactsGridProps) {
   return (
-    <div className="grid grid-cols-2 gap-3 pb-20">
+    <div className="flex flex-col gap-3 pb-24">
       {contactos.map((contact) => (
         <ContactCard 
           key={contact.id} 
@@ -35,24 +35,19 @@ function ContactCard({ contact, tags, categories, onClick }: {
   categories: CategoriaCRM[],
   onClick: () => void 
 }) {
-  // Lógica de Salud Relacional
   const getContactHealth = (contacto: Contacto) => {
     if (!contacto.ultimaInteraccion) return { status: 'none', days: 0 };
-    
     const lastDate = contacto.ultimaInteraccion.toDate();
     const daysSince = differenceInDays(new Date(), lastDate);
     
-    let minThreshold = 30; // Default
+    let minThreshold = 30;
     (contacto.etiquetas || []).forEach(tId => {
       const tag = tags.find(t => t.id === tId);
       if (tag) {
-        if (tag.alertaDias) {
-          minThreshold = Math.min(minThreshold, tag.alertaDias);
-        } else {
+        if (tag.alertaDias) minThreshold = Math.min(minThreshold, tag.alertaDias);
+        else {
           const cat = categories.find(c => c.id === tag.categoriaId);
-          if (cat?.alertaDiasDefault) {
-            minThreshold = Math.min(minThreshold, cat.alertaDiasDefault);
-          }
+          if (cat?.alertaDiasDefault) minThreshold = Math.min(minThreshold, cat.alertaDiasDefault);
         }
       }
     });
@@ -63,80 +58,78 @@ function ContactCard({ contact, tags, categories, onClick }: {
   };
 
   const health = getContactHealth(contact);
-
-  // Colores pastel para los avatares por inicial
-  const colors = [
-    "bg-blue-50 text-blue-500",
-    "bg-rose-50 text-rose-500",
-    "bg-amber-50 text-amber-500",
-    "bg-emerald-50 text-emerald-500",
-    "bg-indigo-50 text-indigo-500",
-    "bg-purple-50 text-purple-500",
-  ];
+  const colors = ["bg-blue-50 text-blue-500", "bg-rose-50 text-rose-500", "bg-amber-50 text-amber-500", "bg-emerald-50 text-emerald-500", "bg-indigo-50 text-indigo-500", "bg-purple-50 text-purple-500"];
   const colorIndex = (contact.nombre?.charCodeAt(0) || 0) % colors.length;
   const avatarStyle = colors[colorIndex];
 
   return (
     <div 
       onClick={onClick}
-      className="bg-white p-4 rounded-[28px] border border-slate-100 shadow-sm flex flex-col items-center text-center gap-3 active:scale-[0.97] transition-all relative overflow-hidden group"
+      className="bg-white p-3 rounded-[24px] border border-slate-100 shadow-sm flex items-center gap-4 active:scale-[0.98] transition-all relative overflow-hidden group"
     >
-      {/* Indicador de Salud Relacional (Esquina) */}
+      {/* Salud Relacional (Borde lateral) */}
       <div className={cn(
-        "absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-full text-[9px] font-bold uppercase tracking-tighter",
-        health.status === 'verde' ? "bg-emerald-50 text-emerald-600" :
-        health.status === 'amarillo' ? "bg-amber-50 text-amber-600 animate-pulse" :
-        health.status === 'rojo' ? "bg-rose-50 text-rose-600" : "bg-slate-50 text-slate-400"
-      )}>
-        <div className={cn(
-          "size-1.5 rounded-full",
-          health.status === 'verde' ? "bg-emerald-500" :
-          health.status === 'amarillo' ? "bg-amber-500" :
-          health.status === 'rojo' ? "bg-rose-500" : "bg-slate-300"
-        )} />
-        {health.days}d
-      </div>
+        "absolute left-0 top-0 bottom-0 w-1",
+        health.status === 'verde' ? "bg-emerald-500" :
+        health.status === 'amarillo' ? "bg-amber-500" :
+        health.status === 'rojo' ? "bg-rose-500" : "bg-slate-100"
+      )} />
 
-      <div className={cn("size-16 rounded-full flex items-center justify-center font-black text-2xl shadow-inner mt-2", avatarStyle)}>
+      {/* Avatar */}
+      <div className={cn("size-14 rounded-2xl flex items-center justify-center font-black text-xl shrink-0 shadow-inner", avatarStyle)}>
         {contact.avatarUrl ? (
-          <img src={contact.avatarUrl} alt={contact.nombre} className="w-full h-full object-cover rounded-full" />
+          <img src={contact.avatarUrl} alt={contact.nombre} className="w-full h-full object-cover rounded-2xl" />
         ) : (
           contact.nombre?.charAt(0).toUpperCase()
         )}
       </div>
 
-      <div className="space-y-1 w-full overflow-hidden">
-        <h3 className="font-bold text-slate-900 text-[13px] leading-tight truncate px-1">
+      {/* Info Principal */}
+      <div className="flex-1 min-w-0 space-y-0.5">
+        <h3 className="font-bold text-slate-900 text-[14px] leading-tight truncate">
           {contact.nombre}
         </h3>
-        {contact.telefono && (
-          <p className="text-[10px] font-medium text-slate-400 truncate px-1">
-            {contact.telefono}
-          </p>
-        )}
-        <div className="flex items-center justify-center gap-1.5">
-           {contact.relacionTag === "Lead" && (
-             <Badge className="bg-orange-50 text-orange-600 border-orange-100 text-[9px] font-black px-2 py-0 h-4 uppercase">Lead</Badge>
-           )}
-           {contact.relacionTag === "Laboral" && (
-             <Badge className="bg-blue-50 text-blue-600 border-blue-100 text-[9px] font-black px-2 py-0 h-4 uppercase">Work</Badge>
-           )}
-           {contact.relacionTag === "Personal" && (
-             <Badge className="bg-emerald-50 text-emerald-600 border-emerald-100 text-[9px] font-black px-2 py-0 h-4 uppercase">Pers</Badge>
-           )}
+        <p className="text-[11px] font-medium text-slate-400 truncate">
+          {contact.telefono || "Sin teléfono"}
+        </p>
+        
+        {/* Etiquetas (Vista rápida de las primeras 2) */}
+        <div className="flex flex-wrap gap-1 mt-1">
+          {(contact.etiquetas || []).slice(0, 2).map(tId => {
+            const tag = tags.find(t => t.id === tId);
+            if (!tag) return null;
+            return (
+              <div key={tId} className="flex items-center gap-1 px-1.5 py-0.5 bg-slate-50 border border-slate-100 rounded-md">
+                <div className="size-1 rounded-full" style={{ backgroundColor: tag.colorBg }} />
+                <span className="text-[8px] font-black uppercase text-slate-500">{tag.nombre}</span>
+              </div>
+            );
+          })}
+          {(contact.etiquetas?.length || 0) > 2 && (
+            <span className="text-[8px] font-black text-slate-300 py-0.5">+{contact.etiquetas!.length - 2}</span>
+          )}
         </div>
       </div>
 
-      <div className="mt-auto w-full flex items-center justify-center gap-3 pt-2 border-t border-slate-50">
-        <div className="flex flex-col items-center gap-1">
-          <div className="size-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400">
-             <MessageCircle size={14} />
-          </div>
+      {/* Indicador de Tiempo y Salud */}
+      <div className="flex flex-col items-end gap-1.5 shrink-0 pr-1">
+        <div className={cn(
+          "flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter",
+          health.status === 'verde' ? "bg-emerald-50 text-emerald-600" :
+          health.status === 'amarillo' ? "bg-amber-50 text-amber-600 animate-pulse" :
+          health.status === 'rojo' ? "bg-rose-50 text-rose-600" : "bg-slate-50 text-slate-400"
+        )}>
+           <Clock className="size-2.5" />
+           {health.days}d
         </div>
-        <div className="flex flex-col items-center gap-1">
-          <div className="size-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400">
-             <Phone size={14} />
-          </div>
+        
+        <div className="flex gap-1.5">
+           <div className="size-7 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400">
+              <MessageCircle size={14} />
+           </div>
+           <div className="size-7 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400">
+              <Phone size={14} />
+           </div>
         </div>
       </div>
     </div>

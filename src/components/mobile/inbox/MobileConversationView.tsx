@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { Send, Sparkles, ChevronLeft, Info, Plus, Paperclip, Smile, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Avatar } from "@/components/ui/Avatar";
 import { MobileContactSheet } from "./MobileContactSheet";
 
 interface MobileConversationViewProps {
@@ -66,17 +67,23 @@ export function MobileConversationView({
         </button>
         
         <div className="flex flex-1 items-center gap-3 overflow-hidden" onClick={() => setIsSheetOpen(true)}>
-          <div className="size-10 rounded-full bg-slate-700 flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden border border-white/10">
-            {contactFoto ? (
-              <img src={contactFoto} alt="avatar" className="w-full h-full object-cover" />
-            ) : (
-              contactName.charAt(0).toUpperCase()
-            )}
-          </div>
+          <Avatar 
+            src={contactFoto} 
+            name={contactName} 
+            size="md"
+            className="border border-white/10"
+          />
           <div className="min-w-0 flex-1">
-            <h3 className="text-[15px] font-bold truncate leading-tight tracking-tight">
-              {contactName}
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-[15px] font-bold truncate leading-tight tracking-tight">
+                {contactName}
+              </h3>
+              <CanalBadge 
+                canal={conversacion.canal || 'whatsapp'} 
+                showIcon={false} 
+                className="scale-[0.7] origin-left border border-white/20" 
+              />
+            </div>
             <p className="text-[10px] font-semibold text-white/50 uppercase tracking-widest flex items-center gap-1.5 mt-0.5">
               <span className="size-1.5 bg-emerald-500 rounded-full animate-pulse" />
               En línea

@@ -238,7 +238,6 @@ export function ContextPanel({ onSendMessage }: { onSendMessage?: (text: string)
       const contactRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS, selectedContact.id);
       
       if (!resetingOnly) {
-        // 1. Guardar en interacciones del contacto
         await addDoc(collection(contactRef, "interacciones"), {
           tipo: interactionType,
           contenido: newInteraction.trim(),
@@ -246,7 +245,6 @@ export function ContextPanel({ onSendMessage }: { onSendMessage?: (text: string)
           creadoPor: "Operador"
         });
 
-        // 2. Si hay un chat activo y es una nota, inyectar en el chat
         if (selectedChatId && interactionType === 'nota') {
           const messagesRef = collection(
             db, 
@@ -286,7 +284,7 @@ export function ContextPanel({ onSendMessage }: { onSendMessage?: (text: string)
       toast.success("Interacción actualizada");
       setEditingInteraction(null);
     } catch (e) { toast.error("Error al actualizar"); }
-    finally { setIsUpdating(true); }
+    finally { setIsUpdating(false); }
   };
 
   const handleDeleteInteraction = async (id: string) => {
@@ -350,13 +348,6 @@ export function ContextPanel({ onSendMessage }: { onSendMessage?: (text: string)
               </>
             )}
           </div>
-          <div className="flex items-center justify-center gap-2 mt-1">
-            <Badge className="text-[10px] font-bold bg-[var(--bg-sidebar)] text-[var(--accent)] border-none px-2.5 h-5 rounded-full shadow-sm">
-              {selectedContact?.relacionTag || "LEAD"}
-            </Badge>
-            <div className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[10px] text-[var(--text-tertiary-light)] font-bold uppercase tracking-widest">Activo</span>
-          </div>
         </div>
       </div>
 
@@ -372,7 +363,6 @@ export function ContextPanel({ onSendMessage }: { onSendMessage?: (text: string)
         <div className="flex-1 overflow-y-auto no-scrollbar">
           
           <TabsContent value="perfil" className="p-6 m-0 space-y-8 animate-in fade-in">
-            {/* Información Básica */}
             <div className="space-y-4">
                <div className="flex items-center justify-between px-1">
                   <Label className="text-[10px] font-bold text-[var(--text-tertiary-light)] uppercase tracking-widest">Información Directa</Label>
@@ -510,11 +500,9 @@ export function ContextPanel({ onSendMessage }: { onSendMessage?: (text: string)
                <div className="flex items-center justify-between px-1">
                   <Label className="text-[10px] font-bold text-[var(--text-tertiary-light)] uppercase tracking-widest">Segmentación</Label>
                   <DropdownMenu>
-                    <DropdownMenuTrigger render={
-                      <Button variant="ghost" size="icon" className="size-7 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] shadow-sm">
-                        <Plus className="size-4" />
-                      </Button>
-                    } />
+                    <DropdownMenuTrigger className="size-7 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] shadow-sm flex items-center justify-center outline-none transition-all active:scale-95">
+                      <Plus className="size-4" />
+                    </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-[240px] bg-white border-[var(--border-light)] max-h-[400px] overflow-y-auto no-scrollbar">
                        {categories.map(cat => (
                          <div key={cat.id}>
@@ -648,11 +636,11 @@ export function ContextPanel({ onSendMessage }: { onSendMessage?: (text: string)
                                         {format(log.creadoEl.toDate(), "HH:mm", { locale: es })}
                                       </span>
                                       <DropdownMenu>
-                                        <DropdownMenuTrigger render={
+                                        <DropdownMenuTrigger asChild>
                                           <button className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-slate-100 rounded transition-all">
                                             <MoreVertical className="size-3 text-slate-400" />
                                           </button>
-                                        } />
+                                        </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
                                           <DropdownMenuItem onClick={() => setEditingInteraction(log)} className="text-xs font-bold gap-2">
                                             <Pencil className="size-3" /> Editar

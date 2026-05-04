@@ -8,9 +8,18 @@ import { collection, addDoc, Timestamp, query, orderBy, onSnapshot } from "fireb
 import { COLLECTIONS, CategoriaCRM, EtiquetaCRM } from "@/lib/types/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { toast } from "sonner";
-import { Loader2, User, Phone, Mail, Tag, X, Check } from "lucide-react";
+import { Loader2, User, Phone, Mail, Tag, X, Check, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+  DropdownMenuGroup
+} from "@/components/ui/dropdown-menu";
 
 interface MobileAddContactSheetProps {
   open: boolean;
@@ -20,7 +29,7 @@ interface MobileAddContactSheetProps {
 export function MobileAddContactSheet({ open, onClose }: MobileAddContactSheetProps) {
   const { currentWorkspaceId } = useWorkspaceStore();
   const [loading, setLoading] = useState(false);
-  
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [categories, setCategories] = useState<CategoriaCRM[]>([]);
   const [tags, setTags] = useState<EtiquetaCRM[]>([]);
   
@@ -28,7 +37,6 @@ export function MobileAddContactSheet({ open, onClose }: MobileAddContactSheetPr
     nombre: "",
     telefono: "",
     email: "",
-    relacionTag: "Lead" as "Personal" | "Laboral" | "Lead",
     etiquetas: [] as string[],
   });
 
@@ -69,7 +77,7 @@ export function MobileAddContactSheet({ open, onClose }: MobileAddContactSheetPr
         ultimaInteraccion: Timestamp.now(),
       });
       toast.success("Contacto guardado");
-      setNewContact({ nombre: "", telefono: "", email: "", relacionTag: "Lead", etiquetas: [] });
+      setNewContact({ nombre: "", telefono: "", email: "", etiquetas: [] });
       onClose();
     } catch (error) {
       console.error("Error adding contact:", error);
@@ -79,20 +87,32 @@ export function MobileAddContactSheet({ open, onClose }: MobileAddContactSheetPr
     }
   };
 
-  const toggleTag = (tagId: string) => {
+  const toggleTag = (tag: EtiquetaCRM) => {
+    const cat = categories.find(c => c.id === tag.categoriaId);
+    let newTags = [...newContact.etiquetas];
+
+    if (cat?.tipo === 'exclusiva') {
+      const otherTagsInCat = tags.filter(t => t.categoriaId === cat.id && t.id !== tag.id).map(t => t.id);
+      newTags = newTags.filter(tId => !otherTagsInCat.includes(tId));
+    }
+
+    if (newTags.includes(tag.id!)) {
+      newTags = newTags.filter(id => id !== tag.id);
+    } else {
+      newTags.push(tag.id!);
+    }
+
+    setNewContact(prev => ({ ...prev, etiquetas: newTags }));
+  };
+
+  const removeTag = (tagId: string) => {
     setNewContact(prev => ({
       ...prev,
-      etiquetas: prev.etiquetas.includes(tagId)
-        ? prev.etiquetas.filter(id => id !== tagId)
-        : [...prev.etiquetas, tagId]
+      etiquetas: prev.etiquetas.filter(id => id !== tagId)
     }));
   };
 
-  const RELACIONES = [
-    { value: "Lead", label: "Lead 🔥" },
-    { value: "Laboral", label: "Laboral 👔" },
-    { value: "Personal", label: "Personal ⭐" },
-  ];
+
 
   return (
     <BottomSheet open={open} onClose={onClose} title="Nuevo Contacto">
@@ -138,64 +158,74 @@ export function MobileAddContactSheet({ open, onClose }: MobileAddContactSheetPr
             </div>
           </div>
 
-          {/* Perfil de Relación (Chips) */}
-          <div className="space-y-2">
-            <Label className="text-[10px] font-black uppercase text-slate-400 ml-1">Perfil de Relación</Label>
-            <div className="flex gap-2">
-              {RELACIONES.map((rel) => (
-                <button
-                  key={rel.value}
-                  onClick={() => setNewContact({...newContact, relacionTag: rel.value as any})}
-                  className={cn(
-                    "flex-1 py-3 rounded-2xl text-xs font-bold border-2 transition-all",
-                    newContact.relacionTag === rel.value
-                      ? "bg-[var(--accent)] border-[var(--accent)] text-[var(--accent-text)] shadow-md"
-                      : "bg-slate-50 border-transparent text-slate-500 hover:bg-slate-100"
-                  )}
-                >
-                  {rel.label}
-                </button>
-              ))}
-            </div>
-          </div>
 
-          {/* Etiquetas / Segmentación */}
+
+          {/* Etiquetas / Segmentación (Estilo Escritorio) */}
           <div className="space-y-3 pt-2">
             <div className="flex items-center justify-between px-1">
               <Label className="text-[10px] font-black uppercase text-slate-400">Segmentación</Label>
-              <Tag size={12} className="text-slate-300" />
+              <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+                <DropdownMenuTrigger 
+                  render={
+                    <button 
+                      type="button"
+                      onClick={() => setIsMenuOpen(true)}
+                      className="size-8 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] shadow-sm flex items-center justify-center active:scale-95 transition-all outline-none"
+                    />
+                  }
+                >
+                  <Plus className="size-4" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-[240px] bg-white border-slate-100 max-h-[400px] overflow-y-auto no-scrollbar z-[250]">
+                   <DropdownMenuGroup>
+                     <DropdownMenuLabel className="text-[9px] font-black uppercase text-slate-400 px-2 py-1">Opciones</DropdownMenuLabel>
+                     <DropdownMenuItem className="text-[12px] font-bold py-2" onClick={() => toast.info("Menu abierto")}>
+                       <Check className="size-3 mr-2 text-emerald-500" />
+                       Probar Menú
+                     </DropdownMenuItem>
+                   </DropdownMenuGroup>
+                   <DropdownMenuSeparator className="bg-slate-50" />
+                   {categories.map(cat => (
+                     <div key={cat.id}>
+                        <DropdownMenuGroup>
+                          <DropdownMenuLabel className="text-[9px] font-black uppercase tracking-tighter text-slate-400 bg-slate-50 py-1">{cat.nombre}</DropdownMenuLabel>
+                          {tags.filter(t => t.categoriaId === cat.id).map(tag => (
+                            <DropdownMenuItem key={tag.id} onClick={() => toggleTag(tag)} className="text-[12px] font-bold gap-2 py-2">
+                              <div className="size-2 rounded-full" style={{ backgroundColor: tag.colorBg }} />
+                              {tag.nombre}
+                              {newContact.etiquetas.includes(tag.id!) && <Check className="size-3 ml-auto text-emerald-500" />}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuGroup>
+                        <DropdownMenuSeparator className="bg-slate-50" />
+                     </div>
+                   ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             
-            <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
-              {categories.map(cat => (
-                <div key={cat.id} className="space-y-2">
-                  <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest bg-slate-50/50 py-1 px-2 rounded-md w-fit">
-                    {cat.nombre}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {tags.filter(t => t.categoriaId === cat.id).map(tag => {
-                      const isSelected = newContact.etiquetas.includes(tag.id!);
-                      return (
-                        <Badge
-                          key={tag.id}
-                          onClick={() => toggleTag(tag.id!)}
-                          className={cn(
-                            "cursor-pointer px-3 py-1.5 rounded-xl border-2 transition-all gap-1.5",
-                            isSelected
-                              ? "bg-slate-900 text-white border-slate-900"
-                              : "bg-white text-slate-500 border-slate-100 shadow-sm"
-                          )}
-                          variant="outline"
-                        >
-                          <div className="size-1.5 rounded-full" style={{ backgroundColor: tag.colorBg }} />
-                          {tag.nombre}
-                          {isSelected && <Check size={12} className="ml-0.5" />}
-                        </Badge>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
+            <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-2xl min-h-[60px]">
+              {newContact.etiquetas.length > 0 ? (
+                newContact.etiquetas.map(tId => {
+                  const tag = tags.find(t => t.id === tId);
+                  if (!tag) return null;
+                  return (
+                    <Badge 
+                      key={tId} 
+                      className="bg-white border-slate-100 text-slate-600 text-[10px] font-bold px-2 py-1 rounded-lg gap-1.5 shadow-sm"
+                    >
+                      <div className="size-1.5 rounded-full" style={{ backgroundColor: tag.colorBg }} />
+                      {tag.nombre}
+                      <X 
+                        className="size-3 text-slate-300 hover:text-rose-500 cursor-pointer ml-1" 
+                        onClick={() => removeTag(tId)} 
+                      />
+                    </Badge>
+                  );
+                })
+              ) : (
+                <p className="text-[11px] text-slate-400 italic w-full text-center py-2">Sin etiquetas seleccionadas</p>
+              )}
             </div>
           </div>
         </div>
