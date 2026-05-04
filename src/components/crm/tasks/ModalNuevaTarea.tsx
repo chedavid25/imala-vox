@@ -172,7 +172,7 @@ export function ModalNuevaTarea({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[650px] bg-white border-none shadow-2xl rounded-[32px] overflow-hidden p-0">
         <DialogHeader className="bg-slate-50/50 p-8 pb-4">
-          <DialogTitle className="text-2xl font-black tracking-tight flex items-center gap-3">
+          <DialogTitle className="text-2xl font-bold tracking-tight flex items-center gap-3">
             <div className="size-10 rounded-2xl bg-[var(--accent)] flex items-center justify-center text-[var(--accent-text)]">
               {editingTask ? <Pencil className="size-5" /> : <Plus className="size-5" />}
             </div>
@@ -182,10 +182,10 @@ export function ModalNuevaTarea({
 
         <div className="p-8 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
           <div className="space-y-2">
-            <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 ml-1">¿Qué hay que hacer?</Label>
+            <Label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 ml-1">¿Qué hay que hacer?</Label>
             <Input 
               placeholder="Ej: Llamar para cerrar contrato..." 
-              className="h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-[15px] font-bold focus:bg-white transition-all shadow-sm"
+              className="h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-[15px] font-semibold focus:bg-white transition-all shadow-sm"
               value={taskForm.titulo}
               onChange={e => setTaskForm({...taskForm, titulo: e.target.value})}
             />
@@ -193,19 +193,19 @@ export function ModalNuevaTarea({
           
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-2">
-                <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 ml-1">Fecha</Label>
+                <Label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 ml-1">Fecha</Label>
                 <Input 
                   type="date"
-                  className="h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-[15px] font-bold focus:bg-white transition-all shadow-sm"
+                  className="h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-[15px] font-semibold focus:bg-white transition-all shadow-sm"
                   value={taskForm.fecha}
                   onChange={e => setTaskForm({...taskForm, fecha: e.target.value})}
                 />
             </div>
             <div className="space-y-2">
-                <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 ml-1">Hora</Label>
+                <Label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 ml-1">Hora</Label>
                 <Input 
                   type="time"
-                  className="h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-[15px] font-bold focus:bg-white transition-all shadow-sm"
+                  className="h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-[15px] font-semibold focus:bg-white transition-all shadow-sm"
                   value={taskForm.hora}
                   onChange={e => setTaskForm({...taskForm, hora: e.target.value})}
                 />
@@ -214,12 +214,12 @@ export function ModalNuevaTarea({
 
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-2">
-                <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 ml-1">Prioridad</Label>
+                <Label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 ml-1">Prioridad</Label>
                 <Select 
                   value={taskForm.prioridad} 
                   onValueChange={(v:any) => setTaskForm({...taskForm, prioridad: v})}
                 >
-                  <SelectTrigger className="h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-[15px] font-bold focus:bg-white transition-all shadow-sm">
+                  <SelectTrigger className="h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-[15px] font-semibold focus:bg-white transition-all shadow-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="rounded-2xl border-none shadow-2xl bg-white p-2">
@@ -230,9 +230,9 @@ export function ModalNuevaTarea({
                 </Select>
             </div>
             <div className="space-y-2">
-                <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 ml-1">Vincular Contacto</Label>
+                <Label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 ml-1">Vincular Contacto</Label>
                 <DropdownMenu>
-                  <DropdownMenuTrigger className="w-full h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-[15px] font-bold flex items-center justify-between px-4 outline-none border transition-all hover:border-slate-200">
+                  <DropdownMenuTrigger className="w-full h-12 rounded-2xl bg-slate-50/50 border-slate-100 text-[15px] font-semibold flex items-center justify-between px-4 outline-none border transition-all hover:border-slate-200">
                     {taskForm.contactoId ? (
                       <span className="text-slate-800 truncate pr-2">
                         {contactos.find(c => (c.id === taskForm.contactoId))?.nombre || "Contacto seleccionado"}
@@ -275,7 +275,7 @@ export function ModalNuevaTarea({
           </div>
 
           <div className="space-y-3 p-4 bg-slate-50/50 rounded-3xl border border-slate-100">
-            <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 ml-1">Recurrencia Automática</Label>
+            <Label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 ml-1">Recurrencia Automática</Label>
             <div className="flex flex-wrap gap-2">
               {(['ninguna', 'diaria', 'semanal', 'intervalo'] as const).map(tipo => (
                 <Button
@@ -284,7 +284,7 @@ export function ModalNuevaTarea({
                   variant={taskForm.recurrencia.tipo === tipo ? 'default' : 'outline'}
                   size="sm"
                   className={cn(
-                    "rounded-full px-4 h-9 font-bold text-[11px] capitalize transition-all",
+                    "rounded-full px-4 h-9 font-semibold text-[11px] capitalize transition-all",
                     taskForm.recurrencia.tipo === tipo 
                       ? "bg-indigo-500 text-white shadow-lg shadow-indigo-200 hover:bg-indigo-600" 
                       : "bg-white text-slate-500 border-slate-100 hover:bg-slate-50"
@@ -301,7 +301,7 @@ export function ModalNuevaTarea({
 
             {taskForm.recurrencia.tipo === 'intervalo' && (
               <div className="pt-2 animate-in slide-in-from-top-2">
-                <Label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase ml-1">¿Cada cuántos días?</Label>
+                <Label className="text-[10px] font-semibold text-slate-400 mb-1 block uppercase ml-1">¿Cada cuántos días?</Label>
                 <div className="flex items-center gap-3">
                   <Input 
                     type="number"
@@ -323,7 +323,7 @@ export function ModalNuevaTarea({
             
             {taskForm.recurrencia.tipo === 'semanal' && (
               <div className="pt-2 animate-in slide-in-from-top-2">
-                <Label className="text-[10px] font-bold text-slate-400 mb-2 block uppercase ml-1">Días de la semana</Label>
+                <Label className="text-[10px] font-semibold text-slate-400 mb-2 block uppercase ml-1">Días de la semana</Label>
                 <div className="flex gap-2">
                   {['D','L','M','X','J','V','S'].map((dia, idx) => (
                     <button
@@ -357,14 +357,14 @@ export function ModalNuevaTarea({
             variant="ghost" 
             type="button"
             onClick={() => onOpenChange(false)}
-            className="h-12 px-8 rounded-2xl font-bold text-slate-400 hover:text-slate-600"
+            className="h-12 px-8 rounded-2xl font-semibold text-slate-400 hover:text-slate-600"
             disabled={isSaving}
           >
             Cancelar
           </Button>
           <Button 
             onClick={handleSaveTask}
-            className="h-12 px-10 rounded-2xl font-bold bg-[var(--accent)] text-[var(--accent-text)] shadow-xl shadow-[var(--accent)]/30 hover:scale-105 active:scale-95 transition-all"
+            className="h-12 px-10 rounded-2xl font-semibold bg-[var(--accent)] text-[var(--accent-text)] shadow-xl shadow-[var(--accent)]/30 hover:scale-105 active:scale-95 transition-all"
             disabled={isSaving}
           >
             {isSaving ? <Loader2 className="size-5 animate-spin" /> : (editingTask ? "Guardar Cambios" : "Agendar Ahora")}

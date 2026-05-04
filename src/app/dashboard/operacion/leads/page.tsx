@@ -794,11 +794,7 @@ export default function LeadsPage() {
             </div>
 
             <DialogFooter className="pt-4">
-              <DialogClose>
-                <Button type="button" variant="ghost" className="rounded-xl">
-                  Cancelar
-                </Button>
-              </DialogClose>
+              <DialogClose render={<Button type="button" variant="ghost" className="rounded-xl">Cancelar</Button>} />
               <Button 
                 type="submit" 
                 disabled={isSavingStage || !newStageName}
@@ -845,11 +841,7 @@ export default function LeadsPage() {
             </div>
 
             <DialogFooter className="pt-4">
-              <DialogClose>
-                <Button type="button" variant="ghost" className="rounded-xl">
-                  Cancelar
-                </Button>
-              </DialogClose>
+              <DialogClose render={<Button type="button" variant="ghost" className="rounded-xl">Cancelar</Button>} />
               <Button 
                 type="submit" 
                 disabled={isSavingStage || !newStageName}
@@ -966,11 +958,7 @@ export default function LeadsPage() {
             </div>
 
             <DialogFooter className="pt-4">
-              <DialogClose>
-                <Button type="button" variant="ghost" className="h-9 px-4 text-xs font-bold text-[var(--text-secondary-light)] hover:bg-[var(--bg-input)] hover:text-[var(--text-primary-light)] rounded-xl transition-colors">
-                  Cancelar
-                </Button>
-              </DialogClose>
+              <DialogClose render={<Button type="button" variant="ghost" className="h-9 px-4 text-xs font-bold text-[var(--text-secondary-light)] hover:bg-[var(--bg-input)] hover:text-[var(--text-primary-light)] rounded-xl transition-colors">Cancelar</Button>} />
               <Button 
                 type="submit" 
                 disabled={isSavingLead || !newLeadData.nombre}

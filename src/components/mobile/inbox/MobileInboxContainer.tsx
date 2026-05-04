@@ -25,12 +25,14 @@ export function MobileInboxContainer({
   isRequestingSuggestion
 }: MobileInboxContainerProps) {
   const { mensajes } = useMensajes(selectedChatId);
-  const selectedChat = conversaciones.find(c => c.id === selectedChatId);
+  const selectedChat = conversaciones.find(c => c.id === selectedChatId) || 
+                   conversaciones.find(c => c.contactoId === selectedChatId); // Caso donde pasamos el contactoId
 
-  if (selectedChatId && selectedChat) {
+  if (selectedChatId && (selectedChat || (selectedChatId.length > 10))) { 
+    // Si tenemos un ID y o es un chat existente o parece un ID de contacto (UID de Firebase suele ser largo)
     return (
       <MobileConversationView 
-        conversacion={selectedChat}
+        conversacion={selectedChat || { contactoId: selectedChatId, nuevo: true }}
         mensajes={mensajes}
         onSendMessage={onSendMessage}
         onBack={() => onSelectChat(null)}

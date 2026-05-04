@@ -9,6 +9,7 @@ import { es } from "date-fns/locale";
 import { Search, MessageSquare, Bot, Check, CheckCheck, MoreVertical, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar } from "@/components/ui/Avatar";
+import { MobileNewChatSheet } from "./MobileNewChatSheet";
 
 interface MobileConversationListProps {
   conversaciones: any[];
@@ -19,6 +20,7 @@ export function MobileConversationList({ conversaciones, onSelect }: MobileConve
   const { contactos } = useContactos();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<'all' | 'unread' | 'escalated'>('all');
+  const [isNewChatOpen, setIsNewChatOpen] = useState(false);
 
   const getContactInfo = (contactoId: string, defaultNombre: string) => {
     const contact = contactos.find(c => c.id === contactoId);
@@ -63,7 +65,10 @@ export function MobileConversationList({ conversaciones, onSelect }: MobileConve
               <button className="size-10 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 active:bg-[var(--accent)] active:text-black transition-colors">
                 <Search size={20} />
               </button>
-              <button className="size-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform">
+              <button 
+                onClick={() => setIsNewChatOpen(true)}
+                className="size-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform"
+              >
                 <Plus size={20} strokeWidth={2} />
               </button>
            </div>
@@ -193,6 +198,28 @@ export function MobileConversationList({ conversaciones, onSelect }: MobileConve
           })
         )}
       </div>
+      
+      <MobileNewChatSheet 
+        open={isNewChatOpen}
+        onClose={() => setIsNewChatOpen(false)}
+        onSelectContact={(contactoId) => {
+          // Buscamos si ya existe una conversación con este contacto
+          const existingConv = conversaciones.find(c => c.contactoId === contactoId);
+          if (existingConv) {
+            onSelect(existingConv.id);
+          } else {
+            // Si no existe, podemos redirigir con el contactoId para que el contenedor lo maneje
+            // o simplemente pasar el contactoId si onSelect lo soporta.
+            // Por ahora, como onSelect espera un chatId, si no hay chat, no hacemos nada 
+            // o avisamos que no hay conversación previa.
+            // Pero lo ideal es que onSelect pueda recibir un contactoId prefijado.
+            // Sin embargo, para no romper la lógica actual, asumimos que si no hay chat,
+            // el usuario debería escribirle primero desde la sección contactos
+            // O mejor: simplemente pasamos el ID y que el backend lo resuelva si es necesario.
+            onSelect(contactoId); // Intentamos pasar el ID directamente
+          }
+        }}
+      />
     </div>
   );
 }

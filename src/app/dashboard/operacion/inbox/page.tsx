@@ -8,7 +8,7 @@ import { useConversaciones } from "@/hooks/useConversaciones";
 import { useMensajes } from "@/hooks/useMensajes";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, updateDoc, doc, Timestamp } from "firebase/firestore";
+import { collection, addDoc, updateDoc, doc, Timestamp, getDocs, limit, query as firestoreQuery } from "firebase/firestore";
 import { COLLECTIONS, Contacto } from "@/lib/types/firestore";
 import { enviarMensajeAccion } from "@/app/actions/channels";
 import { getDoc } from "firebase/firestore";
@@ -105,22 +105,69 @@ function InboxContent() {
   };
 
   const handleSendMessage = async (text: string, isInternal: boolean = false) => {
-    if (!currentWorkspaceId || !selectedChatId || !selectedChat) return;
+    if (!currentWorkspaceId || !selectedChatId) return;
 
-    const messagesRef = collection(
-      db, 
-      COLLECTIONS.ESPACIOS, currentWorkspaceId, 
-      COLLECTIONS.CONVERSACIONES, selectedChatId, 
-      COLLECTIONS.MENSAJES
-    );
-
-    const convRef = doc(
-      db, 
-      COLLECTIONS.ESPACIOS, currentWorkspaceId, 
-      COLLECTIONS.CONVERSACIONES, selectedChatId
-    );
+    // Si el chat no existe en la lista, es un chat nuevo con un contacto
+    let chatActual = selectedChat;
+    let actualChatId = selectedChatId;
 
     try {
+      if (!chatActual) {
+        // Para notas internas, necesitamos el chatId si ya existe
+        // Si no existe y es nota interna, tal vez deberíamos crearla igual o manejar el error
+        if (isInternal) {
+           // Si es interna y no hay chat, no podemos guardarla en un chat que no existe
+           // Podríamos crear el chat primero, pero las notas suelen ser para chats existentes.
+           // Por ahora, asumimos que si es interna debe existir el chat.
+           if (!actualChatId) throw new Error("No se puede guardar una nota en una conversación inexistente");
+        } else {
+          // Buscar el primer canal disponible para iniciar el chat
+          const channelsRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CANALES);
+          const channelsSnap = await getDocs(firestoreQuery(channelsRef, limit(1)));
+          
+          if (channelsSnap.empty) throw new Error("No hay canales configurados para enviar mensajes");
+          
+          const canalDoc = channelsSnap.docs[0];
+          const canalData = canalDoc.data();
+
+          // Crear la conversación en Firestore
+          const convsRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES);
+          const newConvDoc = await addDoc(convsRef, {
+            contactoId: selectedChatId,
+            canal: canalData.tipo || 'whatsapp',
+            canalId: canalDoc.id,
+            estado: 'abierto',
+            ultimaActividad: Timestamp.now(),
+            ultimoMensaje: text,
+            unreadCount: 0,
+            creadoEl: Timestamp.now()
+          });
+
+          actualChatId = newConvDoc.id;
+          setSelectedChatId(actualChatId);
+          
+          // Creamos un objeto virtual para que el resto de la lógica funcione
+          chatActual = {
+            id: actualChatId,
+            contactoId: selectedChatId,
+            canal: canalData.tipo || 'whatsapp',
+            canalId: canalDoc.id
+          };
+        }
+      }
+
+      const messagesRef = collection(
+        db, 
+        COLLECTIONS.ESPACIOS, currentWorkspaceId, 
+        COLLECTIONS.CONVERSACIONES, actualChatId, 
+        COLLECTIONS.MENSAJES
+      );
+
+      const convRef = doc(
+        db, 
+        COLLECTIONS.ESPACIOS, currentWorkspaceId, 
+        COLLECTIONS.CONVERSACIONES, actualChatId
+      );
       if (isInternal) {
         // 1. Guardar nota interna en la conversación (timeline del chat)
         await addDoc(messagesRef, {
@@ -134,7 +181,7 @@ function InboxContent() {
         const interactionsRef = collection(
           db, 
           COLLECTIONS.ESPACIOS, currentWorkspaceId, 
-          COLLECTIONS.CONTACTOS, selectedChat.contactoId, 
+          COLLECTIONS.CONTACTOS, chatActual.contactoId, 
           "interacciones"
         );
         
@@ -142,7 +189,7 @@ function InboxContent() {
           tipo: 'nota',
           contenido: text,
           fuente: 'chat',
-          conversacionId: selectedChatId,
+          conversacionId: actualChatId,
           creadoPor: "Operador",
           creadoEl: Timestamp.now()
         });
@@ -151,14 +198,14 @@ function InboxContent() {
         const contactNotesRef = collection(
           db, 
           COLLECTIONS.ESPACIOS, currentWorkspaceId, 
-          COLLECTIONS.CONTACTOS, selectedChat.contactoId, 
+          COLLECTIONS.CONTACTOS, chatActual.contactoId, 
           "notas_internas"
         );
         
         await addDoc(contactNotesRef, {
           text,
-          fuente: selectedChat.canal || 'desconocido',
-          conversacionId: selectedChatId,
+          fuente: chatActual.canal || 'desconocido',
+          conversacionId: actualChatId,
           creadoEl: Timestamp.now()
         });
 
@@ -167,8 +214,8 @@ function InboxContent() {
       }
 
       // Verificar ventana de 24hs para WhatsApp
-      if (selectedChat.canal === 'whatsapp') {
-        const ultimoMensajeCliente = selectedChat.ultimoMensajeCliente?.toDate?.();
+      if (chatActual.canal === 'whatsapp') {
+        const ultimoMensajeCliente = chatActual.ultimoMensajeCliente?.toDate?.();
         const windowExpired = !ultimoMensajeCliente || Date.now() - ultimoMensajeCliente.getTime() > 24 * 60 * 60 * 1000;
         if (windowExpired) {
           toast.error("La ventana de 24hs expiró. El cliente debe escribirte primero para poder responder.");
@@ -177,7 +224,7 @@ function InboxContent() {
       }
 
       // Proceso de envío real para mensajes públicos
-      const contactSnap = await getDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS, selectedChat.contactoId));
+      const contactSnap = await getDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS, chatActual.contactoId));
       if (!contactSnap.exists()) throw new Error("Contacto no encontrado");
       
       const contactData = contactSnap.data() as Contacto;
@@ -185,7 +232,7 @@ function InboxContent() {
 
       if (!destinatario) throw new Error("No se pudo determinar el destinatario");
 
-      const res = await enviarMensajeAccion(currentWorkspaceId, selectedChat.canalId, destinatario, text);
+      const res = await enviarMensajeAccion(currentWorkspaceId, chatActual.canalId, destinatario, text);
       
       if (!res.success) {
         toast.error(`Error de envío: ${res.error}`);
