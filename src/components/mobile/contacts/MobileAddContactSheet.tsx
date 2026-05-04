@@ -18,7 +18,8 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
   DropdownMenuLabel,
-  DropdownMenuGroup
+  DropdownMenuGroup,
+  DropdownMenuPortal
 } from "@/components/ui/dropdown-menu";
 
 interface MobileAddContactSheetProps {
@@ -170,23 +171,24 @@ export function MobileAddContactSheet({ open, onClose }: MobileAddContactSheetPr
                     <button 
                       type="button"
                       onClick={() => setIsMenuOpen(true)}
-                      className="size-8 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] shadow-sm flex items-center justify-center active:scale-95 transition-all outline-none"
+                      className="size-10 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] shadow-sm flex items-center justify-center active:scale-95 transition-all outline-none"
                     />
                   }
                 >
-                  <Plus className="size-4" />
+                  <Plus className="size-5" />
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-[240px] bg-white border-slate-100 max-h-[400px] overflow-y-auto no-scrollbar z-[250]">
-                   <DropdownMenuGroup>
-                     <DropdownMenuLabel className="text-[9px] font-black uppercase text-slate-400 px-2 py-1">Opciones</DropdownMenuLabel>
-                     <DropdownMenuItem className="text-[12px] font-bold py-2" onClick={() => toast.info("Menu abierto")}>
-                       <Check className="size-3 mr-2 text-emerald-500" />
-                       Probar Menú
-                     </DropdownMenuItem>
-                   </DropdownMenuGroup>
-                   <DropdownMenuSeparator className="bg-slate-50" />
-                   {categories.map(cat => (
-                     <div key={cat.id}>
+                <DropdownMenuPortal>
+                  <DropdownMenuContent align="end" className="w-[240px] bg-white border-slate-100 max-h-[400px] overflow-y-auto no-scrollbar z-[300]">
+                    <DropdownMenuGroup>
+                      <DropdownMenuLabel className="text-[9px] font-black uppercase text-slate-400 px-2 py-1">Opciones</DropdownMenuLabel>
+                      <DropdownMenuItem className="text-[12px] font-bold py-2" onClick={() => toast.info("Menu abierto")}>
+                        <Check className="size-3 mr-2 text-emerald-500" />
+                        Probar Menú
+                      </DropdownMenuItem>
+                    </DropdownMenuGroup>
+                    <DropdownMenuSeparator className="bg-slate-50" />
+                    {categories.map(cat => (
+                      <div key={cat.id}>
                         <DropdownMenuGroup>
                           <DropdownMenuLabel className="text-[9px] font-black uppercase tracking-tighter text-slate-400 bg-slate-50 py-1">{cat.nombre}</DropdownMenuLabel>
                           {tags.filter(t => t.categoriaId === cat.id).map(tag => (
@@ -198,9 +200,10 @@ export function MobileAddContactSheet({ open, onClose }: MobileAddContactSheetPr
                           ))}
                         </DropdownMenuGroup>
                         <DropdownMenuSeparator className="bg-slate-50" />
-                     </div>
-                   ))}
-                </DropdownMenuContent>
+                      </div>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenuPortal>
               </DropdownMenu>
             </div>
             

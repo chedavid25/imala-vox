@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { BottomSheet } from "@/components/mobile/shared/BottomSheet";
 import { useContactos } from "@/hooks/useContactos";
-import { Phone, Mail, Calendar, Tag, ShieldAlert, MessageCircle, Edit2, Check, X, User, Plus } from "lucide-react";
+import { Phone, Mail, Calendar, Tag, ShieldAlert, MessageCircle, Edit2, Check, X, User, Plus, Trash2, Loader2 } from "lucide-react";
 import { COLLECTIONS, EtiquetaCRM, Contacto, CategoriaCRM } from "@/lib/types/firestore";
 import { db } from "@/lib/firebase";
-import { collection, query, onSnapshot, doc, updateDoc, Timestamp, arrayRemove, orderBy } from "firebase/firestore";
+import { collection, query, onSnapshot, doc, updateDoc, Timestamp, arrayRemove, orderBy, deleteDoc } from "firebase/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -16,7 +16,8 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
   DropdownMenuLabel,
-  DropdownMenuGroup
+  DropdownMenuGroup,
+  DropdownMenuPortal
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +35,7 @@ export function MobileContactSheet({ open, onClose, contactoId }: MobileContactS
   const { currentWorkspaceId } = useWorkspaceStore();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
+  const [imgError, setImgError] = useState(false);
   const contact = contactos.find(c => c.id === contactoId);
 
   // Estados de edición
@@ -133,16 +135,60 @@ export function MobileContactSheet({ open, onClose, contactoId }: MobileContactS
       <div className="space-y-6 pb-10">
         {/* Header con Avatar y Botón Editar */}
         <div className="relative flex flex-col items-center gap-3 py-4">
-          <button 
-            onClick={isEditing ? () => setIsEditing(false) : handleStartEdit}
-            className="absolute top-0 right-2 p-2 rounded-full bg-slate-100 text-slate-500 active:scale-90 transition-all"
-          >
-            {isEditing ? <X size={20} /> : <Edit2 size={20} />}
-          </button>
+          <div className="absolute top-0 right-0 flex items-center gap-1">
+            {isEditing ? (
+              <>
+                <button 
+                  onClick={() => setIsEditing(false)}
+                  className="p-2.5 rounded-full bg-slate-100 text-slate-500 active:scale-90 transition-all"
+                >
+                  <X size={20} />
+                </button>
+                <button 
+                  onClick={handleSave}
+                  className="p-2.5 rounded-full bg-emerald-500 text-white active:scale-90 transition-all shadow-md shadow-emerald-200"
+                >
+                  {isSaving ? <Loader2 className="size-5 animate-spin" /> : <Check size={20} />}
+                </button>
+              </>
+            ) : (
+              <>
+                <button 
+                  onClick={async () => {
+                    if (window.confirm("¿Estás seguro de que deseas eliminar este contacto?")) {
+                      try {
+                        if (!currentWorkspaceId || !contactoId) return;
+                        await deleteDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS, contactoId));
+                        toast.success("Contacto eliminado");
+                        onClose();
+                      } catch (e) {
+                        console.error(e);
+                        toast.error("Error al eliminar");
+                      }
+                    }
+                  }}
+                  className="p-2.5 rounded-full bg-rose-50 text-rose-500 active:scale-90 transition-all"
+                >
+                  <Trash2 size={20} />
+                </button>
+                <button 
+                  onClick={handleStartEdit}
+                  className="p-2.5 rounded-full bg-slate-100 text-slate-500 active:scale-90 transition-all"
+                >
+                  <Edit2 size={20} />
+                </button>
+              </>
+            )}
+          </div>
 
           <div className="size-24 rounded-full bg-slate-100 border-4 border-slate-50 flex items-center justify-center overflow-hidden shadow-md">
-            {contact.avatarUrl ? (
-              <img src={contact.avatarUrl} alt={contact.nombre} className="w-full h-full object-cover" />
+            {contact.avatarUrl && !imgError ? (
+              <img 
+                src={contact.avatarUrl} 
+                alt={contact.nombre} 
+                className="w-full h-full object-cover" 
+                onError={() => setImgError(true)}
+              />
             ) : (
               <span className="text-3xl font-bold text-slate-300">
                 {contact.nombre?.charAt(0).toUpperCase()}
@@ -301,17 +347,18 @@ export function MobileContactSheet({ open, onClose, contactoId }: MobileContactS
                 >
                   <Plus className="size-4" />
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-[240px] bg-white border-slate-100 max-h-[400px] overflow-y-auto no-scrollbar z-[250]">
-                   <DropdownMenuGroup>
-                     <DropdownMenuLabel className="text-[9px] font-bold uppercase text-slate-400 px-2 py-1">Opciones</DropdownMenuLabel>
-                     <DropdownMenuItem className="text-[12px] font-bold py-2" onClick={() => toast.info("Menu abierto")}>
-                       <Check className="size-3 mr-2 text-emerald-500" />
-                       Probar Menú
-                     </DropdownMenuItem>
-                   </DropdownMenuGroup>
-                   <DropdownMenuSeparator className="bg-slate-50" />
-                   {categories.map(cat => (
-                     <div key={cat.id}>
+                <DropdownMenuPortal>
+                  <DropdownMenuContent align="end" className="w-[240px] bg-white border-slate-100 max-h-[400px] overflow-y-auto no-scrollbar z-[300]">
+                    <DropdownMenuGroup>
+                      <DropdownMenuLabel className="text-[9px] font-bold uppercase text-slate-400 px-2 py-1">Opciones</DropdownMenuLabel>
+                      <DropdownMenuItem className="text-[12px] font-bold py-2" onClick={() => toast.info("Menu abierto")}>
+                        <Check className="size-3 mr-2 text-emerald-500" />
+                        Probar Menú
+                      </DropdownMenuItem>
+                    </DropdownMenuGroup>
+                    <DropdownMenuSeparator className="bg-slate-50" />
+                    {categories.map(cat => (
+                      <div key={cat.id}>
                         <DropdownMenuGroup>
                           <DropdownMenuLabel className="text-[9px] font-bold uppercase tracking-tighter text-slate-400 bg-slate-50 py-1">{cat.nombre}</DropdownMenuLabel>
                           {allTags.filter(t => t.categoriaId === cat.id).map(tag => (
@@ -323,9 +370,10 @@ export function MobileContactSheet({ open, onClose, contactoId }: MobileContactS
                           ))}
                         </DropdownMenuGroup>
                         <DropdownMenuSeparator className="bg-slate-50" />
-                     </div>
-                   ))}
-                </DropdownMenuContent>
+                      </div>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenuPortal>
               </DropdownMenu>
            </div>
 

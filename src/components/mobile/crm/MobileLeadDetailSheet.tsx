@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import { BottomSheet } from "../shared/BottomSheet";
-import { User, Mail, Phone, Flame, Calendar, MessageCircle, ArrowRightLeft, Trash2, Hash, FileText, Edit2, Check, X } from "lucide-react";
+import { User, Mail, Phone, Flame, Calendar, MessageCircle, ArrowRightLeft, Trash2, Hash, FileText, Edit2, Check, X, StickyNote, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { db } from "@/lib/firebase";
-import { doc, updateDoc, Timestamp } from "firebase/firestore";
+import { doc, updateDoc, Timestamp, collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from "firebase/firestore";
 import { COLLECTIONS } from "@/lib/types/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { toast } from "sonner";
@@ -26,7 +26,38 @@ export function MobileLeadDetailSheet({ lead, open, onClose, onConvert, onWhatsA
   const [editForm, setEditForm] = useState<any>({});
   const [isSaving, setIsSaving] = useState(false);
 
+  // Historial de notas
+  const [notasHistorial, setNotasHistorial] = useState<any[]>([]);
+  const [nuevaNota, setNuevaNota] = useState("");
+  const [guardandoNota, setGuardandoNota] = useState(false);
+
+  // Cargar historial de notas
+  React.useEffect(() => {
+    if (!currentWorkspaceId || !lead?.id || !open) return;
+    const notasRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.LEADS, lead.id, "notasLead");
+    const q = query(notasRef, orderBy("creadoEl", "desc")); // Descendente para móvil (más reciente arriba)
+    const unsub = onSnapshot(q, (snap) => {
+      setNotasHistorial(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, [currentWorkspaceId, lead?.id, open]);
+
   if (!lead) return null;
+
+  const handleAddNota = async () => {
+    if (!currentWorkspaceId || !nuevaNota.trim() || !lead?.id) return;
+    setGuardandoNota(true);
+    try {
+      const notasRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.LEADS, lead.id, "notasLead");
+      await addDoc(notasRef, { texto: nuevaNota.trim(), creadoEl: serverTimestamp() });
+      setNuevaNota("");
+      toast.success("Nota añadida");
+    } catch {
+      toast.error("Error al guardar la nota");
+    } finally {
+      setGuardandoNota(false);
+    }
+  };
 
   const etapa = etapas.find(e => e.id === lead.etapaId);
 
@@ -230,24 +261,69 @@ export function MobileLeadDetailSheet({ lead, open, onClose, onConvert, onWhatsA
           </div>
         )}
 
-        {/* Notas */}
+        {/* Notas — Historial y Nueva */}
         <div className="space-y-4">
-          <p className="text-[11px] font-semibold text-slate-300 uppercase tracking-[0.2em] px-1">Notas internas</p>
-          {isEditing ? (
-            <textarea 
-              value={editForm.notas}
-              onChange={e => setEditForm({ ...editForm, notas: e.target.value })}
-              className="w-full min-h-[100px] bg-amber-50/30 rounded-[28px] p-5 border border-amber-100/50 text-sm font-medium text-amber-900/70 focus:ring-0"
-              placeholder="Escribe notas internas aquí..."
-            />
-          ) : lead.notas && (
-            <div className="bg-amber-50/30 rounded-[28px] p-5 border border-amber-100/50 relative overflow-hidden">
-               <div className="absolute top-0 left-0 w-1 h-full bg-amber-400/20" />
-               <p className="text-sm font-medium text-amber-900/70 italic leading-relaxed pl-2">
-                 "{lead.notas}"
-               </p>
+          <div className="flex items-center justify-between px-1">
+            <p className="text-[11px] font-semibold text-slate-300 uppercase tracking-[0.2em]">Notas de seguimiento</p>
+            <Badge className="bg-slate-100 text-slate-500 border-none font-bold text-[9px] px-2">{notasHistorial.length + (lead.notas ? 1 : 0)}</Badge>
+          </div>
+          
+          {/* Campo para nueva nota (Solo Vista) */}
+          {!isEditing && (
+            <div className="space-y-2">
+              <textarea 
+                value={nuevaNota}
+                onChange={e => setNuevaNota(e.target.value)}
+                placeholder="Añadir una nota de seguimiento..."
+                className="w-full min-h-[80px] bg-white rounded-2xl p-4 border border-slate-100 text-sm focus:ring-1 focus:ring-[var(--accent)] outline-none resize-none shadow-sm transition-all"
+              />
+              <button 
+                onClick={handleAddNota}
+                disabled={!nuevaNota.trim() || guardandoNota}
+                className="w-full h-11 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-50"
+              >
+                {guardandoNota ? <Loader2 className="size-4 animate-spin" /> : <StickyNote size={16} />}
+                Añadir Nota
+              </button>
             </div>
           )}
+
+          <div className="space-y-3">
+            {/* Nota legacy */}
+            {lead.notas && (
+              <div className="bg-amber-50/50 rounded-2xl p-4 border border-amber-100/50 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-1 h-full bg-amber-400/20" />
+                <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest mb-1 flex items-center gap-1">
+                  <StickyNote size={10} /> Nota Inicial
+                </p>
+                <p className="text-sm font-medium text-amber-900/70 italic leading-relaxed">
+                  "{lead.notas}"
+                </p>
+              </div>
+            )}
+
+            {/* Historial dinámico */}
+            {notasHistorial.map((nota, i) => (
+              <div key={nota.id} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm space-y-2">
+                <div className="flex justify-between items-center">
+                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                     {nota.creadoEl?.toDate ? new Intl.DateTimeFormat('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(nota.creadoEl.toDate()) : "Recién"}
+                   </p>
+                   <Badge className="bg-slate-50 text-slate-300 border-none text-[8px] font-bold">#{notasHistorial.length - i}</Badge>
+                </div>
+                <p className="text-sm font-medium text-slate-600 leading-relaxed">
+                  {nota.texto}
+                </p>
+              </div>
+            ))}
+
+            {!lead.notas && notasHistorial.length === 0 && (
+              <div className="py-8 text-center bg-slate-50/50 rounded-3xl border border-dashed border-slate-200">
+                <StickyNote className="size-8 text-slate-200 mx-auto mb-2" />
+                <p className="text-[11px] text-slate-400 font-medium italic">Sin notas de seguimiento todavía</p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Acciones Críticas */}

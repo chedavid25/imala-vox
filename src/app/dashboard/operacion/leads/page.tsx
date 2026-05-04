@@ -1036,11 +1036,13 @@ function KanbanColumn({ etapa, leads, onSelected, onEdit, onDelete }: { etapa: E
         </div>
         
         <DropdownMenu>
-          <DropdownMenuTrigger>
-            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg">
-              <MoreVertical className="w-3.5 h-3.5 text-[var(--text-tertiary-light)]" />
-            </Button>
-          </DropdownMenuTrigger>
+          <DropdownMenuTrigger 
+            render={
+              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg">
+                <MoreVertical className="w-3.5 h-3.5 text-[var(--text-tertiary-light)]" />
+              </Button>
+            }
+          />
           <DropdownMenuContent>
             <DropdownMenuItem onClick={() => onEdit(etapa)}>
               Editar Etapa

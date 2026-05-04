@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useState } from "react";
 import { Contacto, EtiquetaCRM, CategoriaCRM } from "@/lib/types/firestore";
 import { Badge } from "@/components/ui/badge";
 import { MessageCircle, Phone, Clock, AlertCircle } from "lucide-react";
@@ -57,6 +58,7 @@ function ContactCard({ contact, tags, categories, onClick }: {
     return { status: 'verde', days: daysSince };
   };
 
+  const [imgError, setImgError] = useState(false);
   const health = getContactHealth(contact);
   const colors = ["bg-blue-50 text-blue-500", "bg-rose-50 text-rose-500", "bg-amber-50 text-amber-500", "bg-emerald-50 text-emerald-500", "bg-indigo-50 text-indigo-500", "bg-purple-50 text-purple-500"];
   const colorIndex = (contact.nombre?.charCodeAt(0) || 0) % colors.length;
@@ -77,8 +79,13 @@ function ContactCard({ contact, tags, categories, onClick }: {
 
       {/* Avatar */}
       <div className={cn("size-14 rounded-2xl flex items-center justify-center font-black text-xl shrink-0 shadow-inner", avatarStyle)}>
-        {contact.avatarUrl ? (
-          <img src={contact.avatarUrl} alt={contact.nombre} className="w-full h-full object-cover rounded-2xl" />
+        {contact.avatarUrl && !imgError ? (
+          <img 
+            src={contact.avatarUrl} 
+            alt={contact.nombre} 
+            className="w-full h-full object-cover rounded-2xl" 
+            onError={() => setImgError(true)}
+          />
         ) : (
           contact.nombre?.charAt(0).toUpperCase()
         )}

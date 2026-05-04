@@ -21,7 +21,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuGroup,
   DropdownMenuRadioGroup,
-  DropdownMenuRadioItem
+  DropdownMenuRadioItem,
+  DropdownMenuPortal
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -152,57 +153,59 @@ export function MobileContactsContainer() {
                 <Filter className={cn("size-5", (selectedTagIds.length > 0 || selectedHealth !== 'all') && "text-[var(--accent)]")} />
               </div>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-[280px] p-2 bg-white rounded-2xl shadow-2xl border-slate-100 max-h-[450px] overflow-y-auto no-scrollbar z-[200]">
-              <DropdownMenuGroup>
-                <DropdownMenuLabel className="text-[10px] font-black uppercase text-slate-400 px-2 py-2">Salud Relacional</DropdownMenuLabel>
-                <DropdownMenuRadioGroup value={selectedHealth} onValueChange={setSelectedHealth}>
-                  <DropdownMenuRadioItem value="all" className="rounded-xl py-2 font-bold text-xs">Todos los estados</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="rojo" className="rounded-xl py-2 font-bold text-xs text-rose-500">Atrasados (Rojo)</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="amarillo" className="rounded-xl py-2 font-bold text-xs text-amber-500">Por vencer (Amarillo)</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="verde" className="rounded-xl py-2 font-bold text-xs text-emerald-500">Al día (Verde)</DropdownMenuRadioItem>
-                </DropdownMenuRadioGroup>
-              </DropdownMenuGroup>
-              
-              <DropdownMenuSeparator className="bg-slate-50 mx-2 my-2" />
-              
-              {categories.map(cat => (
-                <DropdownMenuGroup key={cat.id}>
-                  <DropdownMenuLabel className="text-[10px] font-black uppercase text-slate-400 bg-slate-50/50 px-2 py-1.5 rounded-lg mb-1">{cat.nombre}</DropdownMenuLabel>
-                  <DropdownMenuGroup>
-                  {tags.filter(t => t.categoriaId === cat.id).map(tag => (
-                    <DropdownMenuCheckboxItem
-                      key={tag.id}
-                      checked={selectedTagIds.includes(tag.id!)}
-                      onCheckedChange={() => {
-                        setSelectedTagIds(prev => 
-                          prev.includes(tag.id!) ? prev.filter(id => id !== tag.id) : [...prev, tag.id!]
-                        );
-                      }}
-                      className="rounded-xl py-2.5 font-bold text-xs"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="size-1.5 rounded-full" style={{ backgroundColor: tag.colorBg }} />
-                        {tag.nombre}
-                      </div>
-                    </DropdownMenuCheckboxItem>
-                  ))}
-                  </DropdownMenuGroup>
+            <DropdownMenuPortal>
+              <DropdownMenuContent align="end" className="w-[280px] p-2 bg-white rounded-2xl shadow-2xl border-slate-100 max-h-[450px] overflow-y-auto no-scrollbar z-[300]">
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className="text-[10px] font-black uppercase text-slate-400 px-2 py-2">Salud Relacional</DropdownMenuLabel>
+                  <DropdownMenuRadioGroup value={selectedHealth} onValueChange={setSelectedHealth}>
+                    <DropdownMenuRadioItem value="all" className="rounded-xl py-2 font-bold text-xs">Todos los estados</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="rojo" className="rounded-xl py-2 font-bold text-xs text-rose-500">Atrasados (Rojo)</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="amarillo" className="rounded-xl py-2 font-bold text-xs text-amber-500">Por vencer (Amarillo)</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="verde" className="rounded-xl py-2 font-bold text-xs text-emerald-500">Al día (Verde)</DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
                 </DropdownMenuGroup>
-              ))}
+                
+                <DropdownMenuSeparator className="bg-slate-50 mx-2 my-2" />
+                
+                {categories.map(cat => (
+                  <DropdownMenuGroup key={cat.id}>
+                    <DropdownMenuLabel className="text-[10px] font-black uppercase text-slate-400 bg-slate-50/50 px-2 py-1.5 rounded-lg mb-1">{cat.nombre}</DropdownMenuLabel>
+                    <DropdownMenuGroup>
+                    {tags.filter(t => t.categoriaId === cat.id).map(tag => (
+                      <DropdownMenuCheckboxItem
+                        key={tag.id}
+                        checked={selectedTagIds.includes(tag.id!)}
+                        onCheckedChange={() => {
+                          setSelectedTagIds(prev => 
+                            prev.includes(tag.id!) ? prev.filter(id => id !== tag.id) : [...prev, tag.id!]
+                          );
+                        }}
+                        className="rounded-xl py-2.5 font-bold text-xs"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="size-1.5 rounded-full" style={{ backgroundColor: tag.colorBg }} />
+                          {tag.nombre}
+                        </div>
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                    </DropdownMenuGroup>
+                  </DropdownMenuGroup>
+                ))}
 
-              {(selectedTagIds.length > 0 || selectedHealth !== 'all') && (
-                <>
-                  <DropdownMenuSeparator className="bg-slate-50 mx-2 my-2" />
-                  <Button 
-                    variant="ghost" 
-                    className="w-full text-rose-500 font-black uppercase text-[10px] h-10 rounded-xl"
-                    onClick={() => { setSelectedTagIds([]); setSelectedHealth('all'); }}
-                  >
-                    Limpiar Filtros
-                  </Button>
-                </>
-              )}
-            </DropdownMenuContent>
+                {(selectedTagIds.length > 0 || selectedHealth !== 'all') && (
+                  <>
+                    <DropdownMenuSeparator className="bg-slate-50 mx-2 my-2" />
+                    <Button 
+                      variant="ghost" 
+                      className="w-full text-rose-500 font-black uppercase text-[10px] h-10 rounded-xl"
+                      onClick={() => { setSelectedTagIds([]); setSelectedHealth('all'); }}
+                    >
+                      Limpiar Filtros
+                    </Button>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenuPortal>
           </DropdownMenu>
         </div>
 

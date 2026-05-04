@@ -13,6 +13,7 @@ export function SplashScreen() {
             src="/icons/logo transparente vox.png"
             alt="Imalá Vox Logo"
             fill
+            sizes="(max-width: 768px) 192px, 256px"
             className="object-contain animate-pulse duration-[3000ms]"
             priority
           />
