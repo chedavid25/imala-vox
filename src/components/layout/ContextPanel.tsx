@@ -636,10 +636,12 @@ export function ContextPanel({ onSendMessage }: { onSendMessage?: (text: string)
                                         {format(log.creadoEl.toDate(), "HH:mm", { locale: es })}
                                       </span>
                                       <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                          <button className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-slate-100 rounded transition-all">
-                                            <MoreVertical className="size-3 text-slate-400" />
-                                          </button>
+                                        <DropdownMenuTrigger 
+                                          render={
+                                            <button className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-slate-100 rounded transition-all" />
+                                          }
+                                        >
+                                          <MoreVertical className="size-3 text-slate-400" />
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
                                           <DropdownMenuItem onClick={() => setEditingInteraction(log)} className="text-xs font-bold gap-2">
