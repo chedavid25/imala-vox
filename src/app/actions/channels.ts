@@ -592,3 +592,44 @@ export async function enviarPlantillaWA(
     return { success: false, error: error.message };
   }
 }
+
+/**
+ * Valida y actualiza el Access Token de un canal existente (WhatsApp, Instagram o Facebook).
+ */
+export async function actualizarTokenAcceso(wsId: string, canalId: string, nuevoToken: string) {
+  try {
+    if (!wsId || !canalId || !nuevoToken) throw new Error("Parámetros insuficientes");
+
+    // 1. Verificar que el token es válido consultando Meta Graph API
+    const verificacion = await fetch(
+      `https://graph.facebook.com/v19.0/me?access_token=${nuevoToken}`
+    );
+
+    if (!verificacion.ok) {
+      const errData = await verificacion.json().catch(() => ({}));
+      return { 
+        success: false, 
+        error: `El nuevo token no es válido. Meta respondió: ${errData.error?.message || 'Token inválido o expirado'}` 
+      };
+    }
+
+    // 2. Guardar el nuevo token en la subcolección privada
+    await guardarTokenCanal(wsId, canalId, nuevoToken);
+
+    // 3. Asegurarse de que el canal esté marcado como conectado
+    await adminDb
+      .collection(COLLECTIONS.ESPACIOS).doc(wsId)
+      .collection(COLLECTIONS.CANALES).doc(canalId)
+      .update({
+        status: 'connected',
+        actualizadoEl: Timestamp.now(),
+      });
+
+    revalidatePath('/dashboard/ajustes/canales');
+    return { success: true };
+
+  } catch (error: any) {
+    console.error('Error actualizando token:', error);
+    return { success: false, error: error.message || "Error interno al actualizar token" };
+  }
+}

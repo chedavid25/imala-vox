@@ -57,7 +57,8 @@ import {
   sincronizarWebhooks, 
   sincronizarWebhooksWhatsApp,
   configurarCanalIA,
-  conectarCanalManual
+  conectarCanalManual,
+  actualizarTokenAcceso
 } from "@/app/actions/channels";
 
 const CANALES_CONFIG = [
@@ -106,6 +107,11 @@ export default function CanalesPage() {
   const [isConnectingWA, setIsConnectingWA] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+
+  // Estados para actualización de token
+  const [isUpdatingToken, setIsUpdatingToken] = useState(false);
+  const [newToken, setNewToken] = useState('');
+  const [showTokenInput, setShowTokenInput] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
@@ -275,6 +281,25 @@ export default function CanalesPage() {
       toast.error("Error de red");
     } finally {
       setIsSavingConfig(false);
+    }
+  };
+
+  const handleUpdateToken = async () => {
+    if (!currentWorkspaceId || !selectedCanal || !newToken.trim()) return;
+    setIsUpdatingToken(true);
+    try {
+      const res = await actualizarTokenAcceso(currentWorkspaceId, selectedCanal.id, newToken.trim());
+      if (res.success) {
+        toast.success("Token de acceso actualizado correctamente");
+        setShowTokenInput(false);
+        setNewToken('');
+      } else {
+        toast.error(res.error || "No se pudo actualizar el token");
+      }
+    } catch (error) {
+      toast.error("Error de red");
+    } finally {
+      setIsUpdatingToken(false);
     }
   };
 
@@ -642,6 +667,52 @@ export default function CanalesPage() {
                     )}
                   </Button>
                 </div>
+
+                {selectedCanal.tipo !== 'web' && (
+                  <div className="pt-2 border-t border-[var(--border-light)] mt-4">
+                    {!showTokenInput ? (
+                      <button 
+                        onClick={() => setShowTokenInput(true)}
+                        className="text-[10px] font-black uppercase tracking-widest text-[var(--text-tertiary-light)] hover:text-[var(--accent)] transition-colors flex items-center gap-1.5"
+                      >
+                        <Zap className="w-3 h-3" />
+                        ¿Token expirado? Actualizar Token
+                      </button>
+                    ) : (
+                      <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="space-y-1.5">
+                          <Label className="text-[10px] uppercase font-black text-[var(--text-tertiary-light)] ml-1">Nuevo Access Token</Label>
+                          <Input
+                            type="password"
+                            placeholder="Pegá el nuevo token de Meta..."
+                            value={newToken}
+                            onChange={(e) => setNewToken(e.target.value)}
+                            className="h-10 rounded-xl bg-slate-50 border-none px-4 text-xs font-semibold"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button 
+                            onClick={handleUpdateToken}
+                            disabled={isUpdatingToken || !newToken.trim()}
+                            className="flex-1 h-10 rounded-xl bg-[var(--text-primary-light)] text-white text-[10px] font-black uppercase tracking-widest"
+                          >
+                            {isUpdatingToken ? <Loader2 className="animate-spin w-4 h-4" /> : "Guardar Token"}
+                          </Button>
+                          <Button 
+                            variant="ghost"
+                            onClick={() => {
+                              setShowTokenInput(false);
+                              setNewToken('');
+                            }}
+                            className="h-10 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest"
+                          >
+                            Cancelar
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
