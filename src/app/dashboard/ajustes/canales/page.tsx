@@ -13,15 +13,15 @@ import {
   AlertCircle,
   Copy,
   Zap,
-  UserCheck,
   Trash2,
   HelpCircle,
   ChevronDown,
   Lightbulb,
-  Globe
+  Globe,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { 
   Dialog, 
   DialogContent, 
@@ -111,7 +111,7 @@ export default function CanalesPage() {
   // Estados para actualización de token
   const [isUpdatingToken, setIsUpdatingToken] = useState(false);
   const [newToken, setNewToken] = useState('');
-  const [showTokenInput, setShowTokenInput] = useState(false);
+  const [showTokenInput, setShowTokenInput] = useState<boolean | 'visible'>(false);
 
   useEffect(() => {
     setIsMounted(true);
@@ -638,9 +638,7 @@ export default function CanalesPage() {
                     onValueChange={(val) => handleUpdateAIConfig(!!selectedCanal.aiEnabled, val)}
                   >
                     <SelectTrigger className="h-12 rounded-2xl bg-slate-50 border-none px-4 font-semibold">
-                      <SelectValue placeholder="Seleccionar un agente...">
-                        {selectedCanal.agenteId ? agentes.find(a => a.id === selectedCanal.agenteId)?.nombre : undefined}
-                      </SelectValue>
+                      <SelectValue placeholder="Seleccionar un agente..." />
                     </SelectTrigger>
                     <SelectContent className="rounded-2xl border-slate-100 shadow-2xl bg-white">
                       {agentes.map(a => (
@@ -659,8 +657,7 @@ export default function CanalesPage() {
                   <Button 
                     onClick={handleSyncWebhooks}
                     disabled={isSyncing}
-                    variant="outline"
-                    className="w-full h-12 rounded-2xl font-black text-[11px] uppercase tracking-widest border-[var(--accent)] text-[var(--accent)] hover:bg-[var(--accent)]/5 shadow-lg shadow-[var(--accent)]/5 transition-all"
+                    className="w-full h-12 rounded-2xl font-black text-[11px] uppercase tracking-widest bg-[var(--accent)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)] shadow-lg shadow-[var(--accent)]/10 transition-all active:scale-95"
                   >
                     {isSyncing ? <Loader2 className="animate-spin w-5 h-5" /> : (
                       selectedCanal.tipo === 'whatsapp' ? "Verificar número de WhatsApp" : "Sincronizar Webhooks en Meta"
@@ -673,22 +670,42 @@ export default function CanalesPage() {
                     {!showTokenInput ? (
                       <button 
                         onClick={() => setShowTokenInput(true)}
-                        className="text-[10px] font-black uppercase tracking-widest text-[var(--text-tertiary-light)] hover:text-[var(--accent)] transition-colors flex items-center gap-1.5"
+                        className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary-light)] hover:text-[var(--text-primary-light)] transition-colors flex items-center gap-1.5"
                       >
-                        <Zap className="w-3 h-3" />
+                        <Zap className="w-3 h-3 text-amber-500" />
                         ¿Token expirado? Actualizar Token
                       </button>
                     ) : (
                       <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
                         <div className="space-y-1.5">
                           <Label className="text-[10px] uppercase font-black text-[var(--text-tertiary-light)] ml-1">Nuevo Access Token</Label>
-                          <Input
-                            type="password"
-                            placeholder="Pegá el nuevo token de Meta..."
-                            value={newToken}
-                            onChange={(e) => setNewToken(e.target.value)}
-                            className="h-10 rounded-xl bg-slate-50 border-none px-4 text-xs font-semibold"
-                          />
+                          <div className="relative group/input">
+                            <Input
+                              type={showTokenInput === 'visible' ? "text" : "password"}
+                              placeholder="Pegá el nuevo token de Meta..."
+                              value={newToken}
+                              onChange={(e) => setNewToken(e.target.value)}
+                              className="h-10 rounded-xl bg-slate-50 border-none px-4 pr-20 text-[11px] font-bold"
+                            />
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                              <button 
+                                onClick={() => {
+                                  navigator.clipboard.writeText(newToken);
+                                  toast.success("Token copiado");
+                                }}
+                                disabled={!newToken}
+                                className="p-1.5 hover:bg-white rounded-lg text-[var(--text-tertiary-light)] transition-colors"
+                              >
+                                <Copy className="w-3.5 h-3.5" />
+                              </button>
+                              <button 
+                                onClick={() => setShowTokenInput(showTokenInput === 'visible' ? true : 'visible')}
+                                className="p-1.5 hover:bg-white rounded-lg text-[var(--text-tertiary-light)] transition-colors"
+                              >
+                                {showTokenInput === 'visible' ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
+                          </div>
                         </div>
                         <div className="flex gap-2">
                           <Button 
