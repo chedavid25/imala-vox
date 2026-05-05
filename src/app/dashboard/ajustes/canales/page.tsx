@@ -58,7 +58,8 @@ import {
   sincronizarWebhooksWhatsApp,
   configurarCanalIA,
   conectarCanalManual,
-  actualizarTokenAcceso
+  actualizarTokenAcceso,
+  obtenerTokenCanal
 } from "@/app/actions/channels";
 
 const CANALES_CONFIG = [
@@ -300,6 +301,18 @@ export default function CanalesPage() {
       toast.error("Error de red");
     } finally {
       setIsUpdatingToken(false);
+    }
+  };
+
+  const handleLoadCurrentToken = async () => {
+    if (!currentWorkspaceId || !selectedCanal) return;
+    try {
+      const res = await obtenerTokenCanal(currentWorkspaceId, selectedCanal.id);
+      if (res.success && res.token) {
+        setNewToken(res.token);
+      }
+    } catch (e) {
+      console.error("No se pudo cargar el token actual");
     }
   };
 
@@ -638,7 +651,9 @@ export default function CanalesPage() {
                     onValueChange={(val) => handleUpdateAIConfig(!!selectedCanal.aiEnabled, val)}
                   >
                     <SelectTrigger className="h-12 rounded-2xl bg-slate-50 border-none px-4 font-semibold">
-                      <SelectValue placeholder="Seleccionar un agente..." />
+                      <SelectValue placeholder="Seleccionar un agente...">
+                         {selectedCanal.agenteId ? agentes.find(a => a.id === selectedCanal.agenteId)?.nombre : "Seleccionar un agente..."}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent className="rounded-2xl border-slate-100 shadow-2xl bg-white">
                       {agentes.map(a => (
@@ -669,7 +684,10 @@ export default function CanalesPage() {
                   <div className="pt-2 border-t border-[var(--border-light)] mt-4">
                     {!showTokenInput ? (
                       <button 
-                        onClick={() => setShowTokenInput(true)}
+                        onClick={() => {
+                          setShowTokenInput(true);
+                          handleLoadCurrentToken();
+                        }}
                         className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary-light)] hover:text-[var(--text-primary-light)] transition-colors flex items-center gap-1.5"
                       >
                         <Zap className="w-3 h-3 text-amber-500" />

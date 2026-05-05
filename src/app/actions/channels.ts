@@ -633,3 +633,22 @@ export async function actualizarTokenAcceso(wsId: string, canalId: string, nuevo
     return { success: false, error: error.message || "Error interno al actualizar token" };
   }
 }
+
+/**
+ * Obtiene el token de acceso actual (solo bajo demanda del cliente).
+ * Se recomienda precaución al usar esto en el frontend.
+ */
+export async function obtenerTokenCanal(wsId: string, canalId: string) {
+  try {
+    const secretPath = `${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CANALES}/${canalId}/secrets/config`;
+    const secretSnap = await adminDb.doc(secretPath).get();
+    
+    if (!secretSnap.exists) return { success: false, error: "No se encontraron secretos" };
+    
+    const { metaAccessToken } = secretSnap.data() as any;
+    return { success: true, token: metaAccessToken };
+  } catch (error: any) {
+    console.error("Error obteniendo token:", error);
+    return { success: false, error: error.message };
+  }
+}
