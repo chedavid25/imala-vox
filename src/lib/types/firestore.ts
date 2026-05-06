@@ -61,6 +61,8 @@ export const COLLECTIONS = {
   ETAPAS_EMBUDO: 'etapasEmbudo',
   CATEGORIAS_CRM: 'categoriasCRM',
   ETIQUETAS_CRM: 'etiquetasCRM',
+  PLANTILLAS_META: 'plantillasMeta',
+  AUTODISPARADORES: 'autoDisparadores',
 };
 
 export interface CategoriaCRM {
@@ -409,4 +411,55 @@ export interface SuperAdminMetrics {
   workspacesCancelados: number;
   churnEsteMes: number;
   nuevosEsteMes: number;
+}
+
+// MÓDULO DE DIFUSIÓN Y AUTOMATIZACIÓN
+
+export interface PlantillaMeta {
+  id?: string;
+  nombre: string;
+  categoria: 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
+  idioma: string;
+  estado: 'PENDING' | 'APPROVED' | 'REJECTED' | 'PAUSED' | 'DELETED';
+  componentes: any[]; // Estructura oficial Meta: HEADER, BODY, FOOTER, BUTTONS
+  variables: string[];
+  metaTemplateId: string;
+  creadoEl: Timestamp;
+  actualizadoEl: Timestamp;
+}
+
+export interface CampañaDifusion {
+  id?: string;
+  nombre: string;
+  plantillaId: string;
+  filtroEtiquetas: string[];
+  estado: 'programada' | 'en_progreso' | 'completada' | 'pausada' | 'error';
+  estadisticas: {
+    total: number;
+    enviados: number;
+    entregados: number;
+    leidos: number;
+    respondidos: number;
+    fallidos: number;
+  };
+  programadaPara: Timestamp;
+  creadoEl: Timestamp;
+  actualizadoEl: Timestamp;
+}
+
+export interface DisparadorAuto {
+  id?: string;
+  tipo: 'instagram_comment' | 'whatsapp_keyword';
+  nombre: string;
+  activo: boolean;
+  config: {
+    palabraClave: string;
+    aplicarATodosPosts?: boolean;
+    postIds?: string[];
+    respuestaPublica?: string;
+    respuestaDM: string;
+    mediaUrl?: string;
+  };
+  creadoEl: Timestamp;
+  actualizadoEl: Timestamp;
 }
