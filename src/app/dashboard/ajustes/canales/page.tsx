@@ -212,7 +212,14 @@ export default function CanalesPage() {
     } else if (activeTab === 'whatsapp') {
       specificScopes = ['whatsapp_business_management', 'whatsapp_business_messaging'];
     } else if (activeTab === 'leads') {
-      specificScopes = ['leads_retrieval', 'ads_read', 'ads_management'];
+      specificScopes = [
+        'leads_retrieval', 
+        'ads_read', 
+        'ads_management', 
+        'pages_show_list', 
+        'pages_manage_metadata', 
+        'pages_read_engagement'
+      ];
     } else {
       // Por si acaso, si no hay pestaña específica (o 'all'), pedimos los básicos de mensajería
       specificScopes = ['pages_messaging', 'instagram_manage_messages'];
