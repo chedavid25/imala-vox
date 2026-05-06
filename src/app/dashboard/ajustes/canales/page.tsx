@@ -523,14 +523,22 @@ export default function CanalesPage() {
                   </p>
                 </div>
 
-                <div className="mt-6">
+                <div className="mt-6 flex flex-col gap-3">
                   {activeTab === 'whatsapp' ? (
-                    <Button 
-                      onClick={() => setIsWAModalOpen(true)} 
-                      className="w-full rounded-xl bg-[#25D366] hover:bg-[#22c55e] text-white font-black text-[11px] uppercase tracking-widest h-12 shadow-xl shadow-[#25D366]/20 transition-all active:scale-95"
-                    >
-                      <Plus className="w-4 h-4 mr-2" /> Iniciar Conexión WhatsApp
-                    </Button>
+                    <>
+                      <Button 
+                        onClick={handleOAuthConnect} 
+                        className="w-full rounded-xl bg-[#25D366] hover:bg-[#22c55e] text-white font-black text-[11px] uppercase tracking-widest h-12 shadow-xl shadow-[#25D366]/20 transition-all active:scale-95 flex items-center justify-center gap-2"
+                      >
+                        <MetaIcon className="w-4 h-4 fill-white" /> Vincular WhatsApp con Meta
+                      </Button>
+                      <button 
+                        onClick={() => setIsWAModalOpen(true)}
+                        className="text-[9px] font-bold text-[var(--text-tertiary-light)] hover:text-white transition-colors text-center uppercase tracking-widest"
+                      >
+                        ¿Configuración manual avanzada?
+                      </button>
+                    </>
                   ) : activeTab === 'web' ? (
                     <Button 
                       onClick={() => router.push('/dashboard/ajustes/canales/web')} 
