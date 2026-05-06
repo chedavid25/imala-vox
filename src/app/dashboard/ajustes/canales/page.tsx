@@ -62,12 +62,30 @@ import {
   obtenerTokenCanal
 } from "@/app/actions/channels";
 
+const WhatsAppIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="currentColor">
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.72.937 3.659 1.435 5.63 1.436h.008c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+  </svg>
+);
+
+const MessengerIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="currentColor">
+    <path d="M12 2C6.36 2 2 6.13 2 11.7c0 2.9 1.15 5.51 3.03 7.42V22l2.76-1.52c1.3.36 2.7.55 4.21.55 5.64 0 10-4.13 10-9.7S17.64 2 12 2zm1.2 12.3l-2.4-2.5-4.6 2.5 5.1-5.4 2.4 2.5 4.6-2.5-5.1 5.4z"/>
+  </svg>
+);
+
+const MetaIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="currentColor">
+    <path d="M16.63 7.82c-1.35 0-2.43.61-3.1 1.63-.67-1.02-1.75-1.63-3.1-1.63-2.14 0-3.87 1.83-3.87 4.08s1.73 4.08 3.87 4.08c1.35 0 2.43-.61 3.1-1.63.67 1.02 1.75 1.63 3.1 1.63 2.14 0 3.87-1.83 3.87-4.08s-1.73-4.08-3.87-4.08zm-6.2 6.56c-1.33 0-2.42-1.11-2.42-2.48s1.09-2.48 2.42-2.48 2.42 1.11 2.42 2.48-1.09 2.48-2.42 2.48zm6.2 0c-1.33 0-2.42-1.11-2.42-2.48s1.09-2.48 2.42-2.48 2.42 1.11 2.42 2.48-1.09 2.48-2.42 2.48z"/>
+  </svg>
+);
+
 const CANALES_CONFIG = [
   {
     tipo: 'whatsapp' as const,
     nombre: 'WhatsApp Business',
     color: '#25D366',
-    icon: MessageSquare,
+    icon: WhatsAppIcon,
   },
   {
     tipo: 'instagram' as const,
@@ -79,12 +97,12 @@ const CANALES_CONFIG = [
     tipo: 'facebook' as const,
     nombre: 'Facebook Messenger',
     color: '#1877F2',
-    icon: MessageCircle,
+    icon: MessengerIcon,
   },
   {
     tipo: 'web' as const,
     nombre: 'Chat Web (Widget)',
-    color: '#C8FF00',
+    color: '#3B82F6',
     icon: Globe,
   },
 ];
@@ -108,6 +126,9 @@ export default function CanalesPage() {
   const [isConnectingWA, setIsConnectingWA] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+
+  // Estado para la pestaña activa
+  const [activeTab, setActiveTab] = useState<'whatsapp' | 'instagram' | 'facebook' | 'leads' | 'web'>('whatsapp');
 
   // Estados para actualización de token
   const [isUpdatingToken, setIsUpdatingToken] = useState(false);
@@ -316,59 +337,69 @@ export default function CanalesPage() {
     }
   };
 
+  // Filtrar canales según la pestaña activa
+  const canalesFiltrados = canales.filter(c => {
+    if (activeTab === 'leads') return c.tipo === 'facebook'; // Leads vive dentro de la página de FB
+    return c.tipo === activeTab;
+  });
+
   if (!isMounted || !currentWorkspaceId) return null;
 
   return (
     <div className="p-8 max-w-5xl mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 mb-1">
-            <MessageSquare className="w-4 h-4 text-[var(--text-tertiary-light)]" />
-            <span className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest">Ajustes del Sistema</span>
+      <div className="flex flex-col gap-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 mb-1">
+              <MessageSquare className="w-4 h-4 text-[var(--text-tertiary-light)]" />
+              <span className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest">Ajustes del Sistema</span>
+            </div>
+            <h1 className="text-2xl font-bold text-[var(--text-primary-light)] tracking-tight">Canales de Atención</h1>
+            <p className="text-sm text-[var(--text-tertiary-light)] font-medium">Administra tus conexiones con Facebook, Instagram y WhatsApp.</p>
           </div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary-light)] tracking-tight">Canales de Atención</h1>
-          <p className="text-sm text-[var(--text-tertiary-light)] font-medium">Administra tus conexiones con Facebook, Instagram y WhatsApp.</p>
-        </div>
 
-        <div className="flex items-center gap-3">
           <button
             onClick={() => setShowHelp(v => !v)}
             className={cn(
-              "flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-bold transition-all shrink-0 h-11",
+              "flex items-center gap-2 px-4 py-2 rounded-xl border text-[11px] font-black uppercase tracking-widest transition-all shrink-0 h-11",
               showHelp
                 ? "bg-[var(--bg-sidebar)] border-[var(--border-dark)] text-[var(--accent)]"
-                : "bg-white border-[var(--border-light)] text-[var(--text-secondary-light)] hover:bg-[var(--bg-input)] hover:text-[var(--text-primary-light)]"
+                : "bg-white border-[var(--border-light)] text-[var(--text-secondary-light)] hover:bg-[var(--bg-input)] hover:text-[var(--text-primary-light)] shadow-sm"
             )}
           >
             <HelpCircle className="w-4 h-4" />
             ¿Cómo conectar?
             <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", showHelp && "rotate-180")} />
           </button>
+        </div>
 
-          <Button
-            onClick={() => setIsWAModalOpen(true)}
-            variant="outline"
-            className="rounded-2xl font-black text-[10px] uppercase tracking-widest px-5 h-11 border-[#25D366] text-[#25D366] hover:bg-[#25D366]/5 transition-all shadow-lg shadow-[#25D366]/10"
-          >
-            <MessageSquare className="w-4 h-4 mr-2" />
-            WhatsApp
-          </Button>
-          <Button 
-            onClick={handleOAuthConnect}
-            className="rounded-2xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-black text-[10px] uppercase tracking-widest px-6 h-11 shadow-xl shadow-[var(--accent)]/20 transition-all hover:scale-[1.02] active:scale-95"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Conectar Meta
-          </Button>
-
-          <Button
-            onClick={() => router.push('/dashboard/ajustes/canales/web')}
-            className="rounded-2xl bg-white border border-[var(--border-light)] text-[var(--text-primary-light)] font-black text-[10px] uppercase tracking-widest px-6 h-11 hover:bg-[var(--bg-input)] transition-all shadow-sm active:scale-95"
-          >
-            <Globe className="w-4 h-4 mr-2 text-[var(--accent-active)]" />
-            Chat Web
-          </Button>
+        {/* Sistema de Tabs */}
+        <div className="flex items-center gap-1.5 p-1.5 bg-[var(--bg-input)] rounded-2xl border border-[var(--border-light)]/50 shadow-inner">
+          {[
+            { id: 'whatsapp', label: 'WhatsApp', icon: WhatsAppIcon, color: '#25D366' },
+            { id: 'instagram', label: 'Instagram', icon: Instagram, color: '#E1306C' },
+            { id: 'facebook', label: 'Messenger', icon: MessengerIcon, color: '#1877F2' },
+            { id: 'leads', label: 'Meta Ads', icon: MetaIcon, color: '#0668E1' },
+            { id: 'web', label: 'Chat Web', icon: Globe, color: '#3B82F6' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-2.5 py-3 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all duration-300",
+                activeTab === tab.id 
+                  ? "bg-white text-[var(--text-primary-light)] shadow-lg shadow-black/5 scale-[1.02] z-10" 
+                  : "text-[var(--text-secondary-light)] hover:bg-white/50 hover:text-[var(--text-primary-light)]"
+              )}
+            >
+              <tab.icon className="w-4 h-4" style={{ color: activeTab === tab.id ? tab.color : 'currentColor' }} />
+              {tab.label}
+              {canales.filter(c => tab.id === 'leads' ? c.tipo === 'facebook' : c.tipo === tab.id).length > 0 && (
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              )}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -416,22 +447,62 @@ export default function CanalesPage() {
           <Loader2 className="w-8 h-8 animate-spin text-[var(--accent)]" />
         </div>
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-8 animate-in fade-in slide-in-from-top-2 duration-500">
+          {/* Botones de acción específicos de la pestaña */}
+          <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-[var(--border-light)] shadow-sm">
+            <div className="space-y-1">
+              <h3 className="text-sm font-bold text-[var(--text-primary-light)]">
+                {activeTab === 'whatsapp' ? 'Configuración de WhatsApp API' :
+                 activeTab === 'instagram' ? 'Conexión con Instagram Direct' :
+                 activeTab === 'facebook' ? 'Facebook Messenger' :
+                 activeTab === 'leads' ? 'Captura de Leads (Meta Ads)' : 'Chat Widget para Web'}
+              </h3>
+              <p className="text-xs text-[var(--text-tertiary-light)]">
+                {activeTab === 'leads' 
+                  ? "Recibí los prospectos de tus formularios de anuncios automáticamente." 
+                  : "Conectá tu cuenta para que el agente responda mensajes."}
+              </p>
+            </div>
+            
+            {activeTab === 'whatsapp' ? (
+              <Button 
+                onClick={() => setIsWAModalOpen(true)} 
+                className="rounded-xl bg-[#25D366] hover:bg-[#22c55e] text-white font-black text-[10px] uppercase tracking-widest h-10 px-8 shadow-xl shadow-[#25D366]/20 transition-all active:scale-95"
+              >
+                <Plus className="w-4 h-4 mr-2" /> Conectar Número
+              </Button>
+            ) : activeTab === 'web' ? (
+              <Button 
+                onClick={() => router.push('/dashboard/ajustes/canales/web')} 
+                className="rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-black text-[10px] uppercase tracking-widest h-10 px-8 shadow-xl shadow-[var(--accent)]/20 transition-all active:scale-95"
+              >
+                Configurar Widget
+              </Button>
+            ) : (
+              <Button 
+                onClick={handleOAuthConnect} 
+                className="rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-black text-[10px] uppercase tracking-widest h-10 px-8 shadow-xl shadow-[var(--accent)]/20 transition-all active:scale-95"
+              >
+                <Plus className="w-4 h-4 mr-2" /> Conectar con Meta
+              </Button>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {canales.length === 0 ? (
+            {canalesFiltrados.length === 0 ? (
               <div className="col-span-full p-20 text-center border-2 border-dashed border-[var(--border-light)] rounded-3xl space-y-4 bg-white/50">
-                <p className="text-sm text-[var(--text-tertiary-light)] font-medium">No hay canales conectados aún.</p>
-                <div className="flex items-center justify-center gap-3 flex-wrap">
-                  <Button onClick={() => setIsWAModalOpen(true)} variant="outline" className="rounded-xl border-[#25D366] text-[#25D366] font-bold">
-                    Conectar WhatsApp
-                  </Button>
-                  <Button onClick={handleOAuthConnect} variant="outline" className="rounded-xl border-[var(--accent)] text-[var(--accent)] font-bold">
-                    Conectar Facebook / Instagram
-                  </Button>
+                <div className="w-16 h-16 rounded-full bg-[var(--bg-input)] flex items-center justify-center mx-auto mb-4 border border-[var(--border-light)]">
+                   {activeTab === 'whatsapp' ? <WhatsAppIcon className="w-8 h-8 text-slate-300" /> :
+                    activeTab === 'instagram' ? <Instagram className="w-8 h-8 text-slate-300" /> :
+                    activeTab === 'leads' ? <MetaIcon className="w-8 h-8 text-slate-300" /> :
+                    activeTab === 'facebook' ? <MessengerIcon className="w-8 h-8 text-slate-300" /> :
+                    <Globe className="w-8 h-8 text-slate-300" />}
                 </div>
+                <p className="text-sm font-bold text-[var(--text-secondary-light)]">No hay conexiones en esta pestaña.</p>
+                <p className="text-[10px] text-[var(--text-tertiary-light)] uppercase tracking-widest font-black">Hace clic arriba para conectar un nuevo canal.</p>
               </div>
             ) : (
-              canales.map((canal) => {
+              canalesFiltrados.map((canal) => {
                 const config = CANALES_CONFIG.find(c => c.tipo === canal.tipo) || CANALES_CONFIG[0];
                 const isConnected = canal.status === 'connected';
 
@@ -441,16 +512,20 @@ export default function CanalesPage() {
                     className={cn(
                       "group relative flex flex-col p-7 rounded-[32px] border transition-all duration-300",
                       isConnected 
-                        ? "bg-white border-[var(--border-light)] shadow-sm hover:shadow-xl hover:shadow-[var(--accent)]/5" 
+                        ? "bg-white border-[var(--border-light)] shadow-sm hover:shadow-xl hover:shadow-black/5" 
                         : "bg-[var(--bg-card)]/50 border-[var(--border-light)] grayscale opacity-80 hover:grayscale-0 hover:opacity-100 hover:bg-white"
                     )}
                   >
                     <div className="flex justify-between items-start mb-6">
                       <div 
                         className="p-3.5 rounded-2xl shadow-sm border border-white"
-                        style={{ backgroundColor: isConnected ? `${config.color}10` : '#f3f4f6' }}
+                        style={{ backgroundColor: isConnected ? (activeTab === 'leads' ? '#0668E110' : `${config.color}10`) : '#f3f4f6' }}
                       >
-                        <config.icon className="w-6 h-6" style={{ color: isConnected ? config.color : '#9ca3af' }} />
+                        {activeTab === 'leads' ? (
+                          <MetaIcon className="w-6 h-6 text-[#0668E1]" />
+                        ) : (
+                          <config.icon className="w-6 h-6" style={{ color: isConnected ? config.color : '#9ca3af' }} />
+                        )}
                       </div>
                       {isConnected ? (
                         <div className="px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-600 text-[10px] font-black uppercase tracking-widest">
@@ -464,7 +539,9 @@ export default function CanalesPage() {
                     </div>
 
                     <div className="flex-1 space-y-2 mb-8">
-                      <h3 className="font-bold text-[16px] text-[var(--text-primary-light)] tracking-tight">{canal.nombre || config.nombre}</h3>
+                      <h3 className="font-bold text-[16px] text-[var(--text-primary-light)] tracking-tight">
+                        {activeTab === 'leads' ? `Leads: ${canal.nombre}` : (canal.nombre || config.nombre)}
+                      </h3>
                       <div className="space-y-1.5">
                         <p className="text-[11px] text-[var(--text-tertiary-light)] font-bold uppercase tracking-widest truncate opacity-70">
                            {canal.cuenta || (canal.tipo === 'facebook' ? 'Página de Facebook' : 'Cuenta vinculada')}
@@ -474,7 +551,7 @@ export default function CanalesPage() {
                           <span className="text-[9px] font-black text-[var(--text-tertiary-light)] uppercase tracking-wider">
                              {canal.webhookVerified ? "Webhooks OK" : "Sincro Pendiente"}
                           </span>
-                          {canal.aiEnabled && (
+                          {canal.aiEnabled && activeTab !== 'leads' && (
                             <div className="ml-auto bg-[var(--accent)] text-[var(--accent-text)] px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-tighter">
                               IA ON
                             </div>
@@ -490,7 +567,7 @@ export default function CanalesPage() {
                           setSelectedCanal(canal);
                           setIsConfigModalOpen(true);
                         }}
-                        className="flex-1 h-10 text-[11px] font-black uppercase tracking-wider rounded-xl border-[var(--border-light)] bg-white hover:bg-[var(--bg-input)] transition-all"
+                        className="flex-1 h-10 text-[11px] font-black uppercase tracking-wider rounded-xl border-[var(--border-light)] bg-white hover:bg-[var(--bg-input)] hover:border-[var(--border-light-strong)] transition-all"
                       >
                         Configurar
                       </Button>
