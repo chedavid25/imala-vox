@@ -209,6 +209,8 @@ export default function CanalesPage() {
       specificScopes = ['instagram_basic', 'instagram_manage_messages'];
     } else if (activeTab === 'facebook') {
       specificScopes = ['pages_messaging', 'pages_manage_metadata'];
+    } else if (activeTab === 'whatsapp') {
+      specificScopes = ['whatsapp_business_management', 'whatsapp_business_messaging'];
     } else if (activeTab === 'leads') {
       specificScopes = ['leads_retrieval', 'ads_read', 'ads_management'];
     } else {

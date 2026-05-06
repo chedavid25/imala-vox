@@ -138,9 +138,73 @@ export async function GET(req: NextRequest) {
           igCanalId = igRef.id;
         }
         
-        // Compartir el mismo token de la página para Instagram
-        await guardarTokenCanal(wsId, igCanalId, pageAccessToken);
+      // Compartir el mismo token de la página para Instagram
+      await guardarTokenCanal(wsId, igCanalId, pageAccessToken);
+    }
+  }
+
+  // --- DETECTION DE WHATSAPP BUSINESS ---
+    try {
+      const wabaRes = await fetch(
+        `https://graph.facebook.com/v19.0/me/whatsapp_business_accounts?access_token=${longLivedUserToken}`
+      );
+      const wabaData = await wabaRes.json();
+
+      if (wabaRes.ok && wabaData.data) {
+        for (const waba of wabaData.data) {
+          const wabaId = waba.id;
+          
+          // Obtener los números de teléfono de esta cuenta de WhatsApp
+          const phoneRes = await fetch(
+            `https://graph.facebook.com/v19.0/${wabaId}/phone_numbers?access_token=${longLivedUserToken}`
+          );
+          const phoneData = await phoneRes.json();
+
+          if (phoneRes.ok && phoneData.data) {
+            for (const phone of phoneData.data) {
+              const { id: phoneId, display_phone_number: phoneNumber, verified_name: verifiedName } = phone;
+
+              // Buscar si ya existe este canal de WhatsApp
+              const waSnap = await workspaceRef
+                .collection(COLLECTIONS.CANALES)
+                .where('tipo', '==', 'whatsapp')
+                .where('metaPhoneNumberId', '==', phoneId)
+                .limit(1)
+                .get();
+
+              const waData = {
+                tipo: 'whatsapp',
+                nombre: verifiedName || `WhatsApp - ${phoneNumber}`,
+                cuenta: phoneNumber,
+                metaPhoneNumberId: phoneId,
+                wabaId: wabaId,
+                status: 'connected' as const,
+                webhookVerified: false, // Requiere verificación de número
+                actualizadoEl: Timestamp.now(),
+              };
+
+              let waCanalId: string;
+              if (!waSnap.empty) {
+                waCanalId = waSnap.docs[0].id;
+                await workspaceRef.collection(COLLECTIONS.CANALES).doc(waCanalId).update(waData);
+              } else {
+                const waRef = await workspaceRef.collection(COLLECTIONS.CANALES).add({
+                  ...waData,
+                  creadoEl: Timestamp.now(),
+                });
+                waCanalId = waRef.id;
+              }
+
+              // Guardar el token de usuario (que tiene permiso para WA) para este canal
+              // Meta permite usar el User Token para gestionar WABAs si se tienen los scopes adecuados
+              await guardarTokenCanal(wsId, waCanalId, longLivedUserToken);
+            }
+          }
+        }
       }
+    } catch (waError) {
+      console.error('Error detectando WhatsApp accounts:', waError);
+      // No lanzamos error para no bloquear la sincronización de FB/IG si falla solo WA
     }
 
     // 5. Actualizar canalesPageIds en el workspace
