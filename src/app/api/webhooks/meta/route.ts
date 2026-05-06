@@ -234,9 +234,11 @@ async function procesarLeadMeta(leadData: any, pageId: string) {
     }
 
     // 6. Mapeo de nombre robusto (Meta usa varios nombres de campos)
-    const first_name = campos.first_name || '';
-    const last_name = campos.last_name || '';
-    const full_name = campos.full_name || campos.nombre || campos.name || '';
+    // Nota: Como normalizamos las llaves a MAYÚSCULAS en el paso 4, buscamos en mayúsculas
+    const first_name = campos['FIRST NAME'] || campos['FIRST_NAME'] || '';
+    const last_name = campos['LAST NAME'] || campos['LAST_NAME'] || '';
+    const full_name = campos['FULL NAME'] || campos['FULL_NAME'] || campos['NOMBRE'] || campos['NAME'] || '';
+    
     const nombreFinal = (first_name || last_name)
       ? `${first_name} ${last_name}`.trim()
       : (full_name || 'Nuevo Cliente Potencial');
@@ -252,8 +254,8 @@ async function procesarLeadMeta(leadData: any, pageId: string) {
         etapaId: defaultStageId,
         temperatura: 'frio',
         nombre: nombreFinal,
-        email: campos.email || campos.email_address || null,
-        telefono: campos.phone_number || campos.telefono || campos.phone || null,
+        email: campos['EMAIL'] || campos['EMAIL_ADDRESS'] || campos['CORREO'] || null,
+        telefono: campos['PHONE NUMBER'] || campos['PHONE_NUMBER'] || campos['TELEFONO'] || campos['PHONE'] || null,
         camposFormulario: campos,
         metaLeadId: leadId,
         metaFormId: formId || metaLead.form_id || null,
