@@ -180,7 +180,32 @@ async function procesarLeadMeta(leadData: any, pageId: string) {
 
     console.log(`📋 [LEAD ${leadId}] Datos recibidos de Meta:`, JSON.stringify(metaLead));
 
-    const campaignName = metaLead.ad_name || metaLead.campaign_name || 'Campaña de Meta Ads';
+    // --- ENRIQUECIMIENTO DE DATOS (Nombres de Formulario y Campaña) ---
+    let campaignName = metaLead.ad_name || metaLead.campaign_name || 'Campaña de Meta Ads';
+    let formName = 'Formulario sin nombre';
+
+    try {
+      // 3.1 Obtener nombre real del formulario
+      const fId = formId || metaLead.form_id;
+      if (fId) {
+        const formRes = await fetch(`https://graph.facebook.com/v19.0/${fId}?fields=name&access_token=${clienteToken}`);
+        if (formRes.ok) {
+          const formData = await formRes.json();
+          formName = formData.name || formName;
+        }
+      }
+
+      // 3.2 Si la campaña sigue siendo genérica, intentar buscarla por Ad ID
+      if (campaignName === 'Campaña de Meta Ads' && metaLead.ad_id) {
+        const adRes = await fetch(`https://graph.facebook.com/v19.0/${metaLead.ad_id}?fields=campaign{name}&access_token=${clienteToken}`);
+        if (adRes.ok) {
+          const adData = await adRes.json();
+          campaignName = adData.campaign?.name || campaignName;
+        }
+      }
+    } catch (enrichErr) {
+      console.warn(`⚠️ [LEAD ${leadId}] Error al enriquecer nombres, se usarán IDs.`, enrichErr);
+    }
 
     // 4. Mapear campos del formulario
     const campos: Record<string, string> = {};
@@ -234,7 +259,7 @@ async function procesarLeadMeta(leadData: any, pageId: string) {
         metaFormId: formId || metaLead.form_id || null,
         metaPageId: pageId,
         campana: campaignName,
-        formulario: leadData.form_name || metaLead.form_name || 'Formulario sin nombre',
+        formulario: formName,
         notas: '',
         convertidoAContacto: false,
         contactoId: null,
