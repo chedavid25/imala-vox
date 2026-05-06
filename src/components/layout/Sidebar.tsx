@@ -30,7 +30,8 @@ import {
   Target,
   CreditCard,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  BarChart3
 } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import { signOut, onAuthStateChanged, User } from "firebase/auth";
@@ -228,6 +229,7 @@ export function Sidebar() {
           <NavItem label="Tareas" href="/dashboard/operacion/tareas" icon={Clock} active={pathname.startsWith("/dashboard/operacion/tareas")} collapsed={sidebarCollapsed} />
           <NavItem label="Contactos" href="/dashboard/operacion/contactos" icon={Users} active={pathname.startsWith("/dashboard/operacion/contactos")} collapsed={sidebarCollapsed} />
           <NavItem label="Difusión" href="/dashboard/operacion/difusion" icon={Megaphone} active={pathname.startsWith("/dashboard/operacion/difusion")} collapsed={sidebarCollapsed} />
+          <NavItem label="Estadísticas" href="/dashboard/operacion/estadisticas" icon={BarChart3} active={pathname.startsWith("/dashboard/operacion/estadisticas")} collapsed={sidebarCollapsed} />
         </div>
         
         <div className="space-y-1">
