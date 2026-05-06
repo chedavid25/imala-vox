@@ -347,6 +347,7 @@ export interface Lead {
   notas: string;
   convertidoAContacto: boolean;
   contactoId: string | null;   // referencia al contacto CRM si fue convertido
+  etiquetas?: string[];        // IDs de etiquetas CRM asociadas
   creadoEl: Timestamp;
   actualizadoEl: Timestamp;
 }

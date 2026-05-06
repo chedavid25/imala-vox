@@ -185,7 +185,9 @@ async function procesarLeadMeta(leadData: any, pageId: string) {
     // 4. Mapear campos del formulario
     const campos: Record<string, string> = {};
     for (const field of metaLead.field_data || []) {
-      campos[field.name] = field.values?.[0] || '';
+      // Limpiamos el nombre del campo: guiones por espacios y mayúsculas
+      const cleanName = field.name.replace(/_/g, ' ').toUpperCase();
+      campos[cleanName] = field.values?.[0] || '';
     }
 
     // 5. Resolver Etapa del Embudo (dinámica para evitar IDs fantasmas)

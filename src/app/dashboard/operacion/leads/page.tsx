@@ -21,7 +21,9 @@ import {
   Pencil,
   Check,
   X,
-  StickyNote
+  StickyNote,
+  Trash2,
+  Tag
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -113,6 +115,28 @@ export default function LeadsPage() {
   const [filtroOrigen, setFiltroOrigen] = useState<'todos' | 'meta_ads' | 'organico' | 'manual'>('todos');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  
+  // Estados para Tags y Categorías
+  const [categorias, setCategorias] = useState<any[]>([]);
+  const [todasEtiquetas, setTodasEtiquetas] = useState<any[]>([]);
+
+  // Escuchar Categorías y Etiquetas del CRM
+  useEffect(() => {
+    if (!currentWorkspaceId) return;
+
+    const unsubCats = onSnapshot(
+      collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CATEGORIAS_CRM),
+      (snap) => setCategorias(snap.docs.map(d => ({ id: d.id, ...d.data() }) as any).sort((a: any, b: any) => a.orden - b.orden))
+    );
+
+    const unsubTags = onSnapshot(
+      collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.ETIQUETAS_CRM),
+      (snap) => setTodasEtiquetas(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    );
+
+    return () => { unsubCats(); unsubTags(); };
+  }, [currentWorkspaceId]);
+
   const isMobile = useMobileLayout();
   
   // Lead seleccionado derivado (para reactividad total)
@@ -456,6 +480,18 @@ export default function LeadsPage() {
     }
   };
 
+  const handleDeleteLead = async (leadId: string) => {
+    if (!currentWorkspaceId || !confirm("¿Estás seguro de que deseas eliminar este lead? Esta acción no se puede deshacer.")) return;
+    
+    try {
+      await deleteDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.LEADS, leadId));
+      toast.success("Lead eliminado correctamente");
+      setSelectedLeadId(null);
+    } catch (err) {
+      toast.error("Error al eliminar el lead");
+    }
+  };
+
   const handleStartWhatsApp = (lead: Lead) => {
     if (!lead.telefono) {
       toast.error("Este lead no tiene número de teléfono");
@@ -748,10 +784,13 @@ export default function LeadsPage() {
               <LeadDetailContent 
                 lead={selectedLead} 
                 etapas={etapas} 
+                categorias={categorias}
+                todasEtiquetas={todasEtiquetas}
                 onClose={() => setSelectedLeadId(null)}
                 onConvert={() => handleConvertLead(selectedLead)}
                 onWhatsApp={() => handleStartWhatsApp(selectedLead)}
-                onUpdateField={(field: string, val: any) => handleUpdateLeadField(selectedLead.id, field, val)}
+                onUpdateField={(field: string, val: any) => selectedLead && handleUpdateLeadField(selectedLead.id, field, val)}
+                onDelete={() => selectedLead && handleDeleteLead(selectedLead.id)}
                 converting={converting}
               />
             )}
@@ -1129,7 +1168,18 @@ function LeadCard({ lead, onClick }: { lead: Lead & { id: string }, onClick: () 
   );
 }
 
-function LeadDetailContent({ lead, etapas, onClose, onConvert, onWhatsApp, onUpdateField, converting }: any) {
+function LeadDetailContent({ 
+  lead, 
+  etapas, 
+  categorias, 
+  todasEtiquetas, 
+  onClose, 
+  onConvert, 
+  onWhatsApp, 
+  onUpdateField, 
+  onDelete, 
+  converting 
+}: any) {
   const router = useRouter();
   const { currentWorkspaceId } = useWorkspaceStore();
 
@@ -1185,6 +1235,17 @@ function LeadDetailContent({ lead, etapas, onClose, onConvert, onWhatsApp, onUpd
     }
   };
 
+  const toggleTag = (tagId: string) => {
+    const currentTags = lead.etiquetas || [];
+    let newTags;
+    if (currentTags.includes(tagId)) {
+      newTags = currentTags.filter((id: string) => id !== tagId);
+    } else {
+      newTags = [...currentTags, tagId];
+    }
+    onUpdateField('etiquetas', newTags);
+  };
+
   const etapaActual = etapas.find((e: any) => e.id === lead.etapaId);
 
   return (
@@ -1226,9 +1287,19 @@ function LeadDetailContent({ lead, etapas, onClose, onConvert, onWhatsApp, onUpd
               </Select>
             </div>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full">
-            <Plus className="w-5 h-5 rotate-45 text-[var(--text-tertiary-light)]" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={onDelete}
+              className="rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full">
+              <Plus className="w-5 h-5 rotate-45 text-[var(--text-tertiary-light)]" />
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3 mt-6">
@@ -1313,6 +1384,49 @@ function LeadDetailContent({ lead, etapas, onClose, onConvert, onWhatsApp, onUpd
           </div>
         </Section>
 
+        {/* Tags / Categorías */}
+        <Section title="Etiquetas y Clasificación">
+          <div className="space-y-4">
+            {categorias?.map((cat: any) => (
+              <div key={cat.id} className="space-y-2">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <Tag className="w-3 h-3" />
+                  {cat.nombre}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {todasEtiquetas?.filter((t: any) => t.categoriaId === cat.id).map((tag: any) => {
+                    const isActive = lead.etiquetas?.includes(tag.id);
+                    return (
+                      <button
+                        key={tag.id}
+                        onClick={() => toggleTag(tag.id)}
+                        className={cn(
+                          "px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all border",
+                          isActive 
+                            ? "border-transparent shadow-sm scale-105" 
+                            : "bg-white border-slate-100 text-slate-400 hover:border-slate-200"
+                        )}
+                        style={isActive ? { 
+                          backgroundColor: tag.colorBg, 
+                          color: tag.colorText 
+                        } : {}}
+                      >
+                        {tag.nombre}
+                      </button>
+                    );
+                  })}
+                  {(todasEtiquetas?.filter((t: any) => t.categoriaId === cat.id).length === 0) && (
+                    <span className="text-[10px] italic text-slate-400">Sin etiquetas en esta categoría</span>
+                  )}
+                </div>
+              </div>
+            ))}
+            {(categorias?.length === 0) && (
+              <p className="text-xs text-slate-400 italic">No hay categorías configuradas en el CRM</p>
+            )}
+          </div>
+        </Section>
+
         {/* Origen */}
         <Section title="Origen de la Campaña">
           <div className="space-y-4">
@@ -1328,7 +1442,7 @@ function LeadDetailContent({ lead, etapas, onClose, onConvert, onWhatsApp, onUpd
             {Object.entries(lead.camposFormulario || {}).length > 0 ? (
               Object.entries(lead.camposFormulario).map(([key, val]: any) => (
                 <div key={key} className="space-y-1">
-                  <p className="text-[10px] font-bold text-[var(--text-tertiary-light)] uppercase tracking-wider">{key.replace('_', ' ')}</p>
+                  <p className="text-[10px] font-bold text-[var(--text-tertiary-light)] uppercase tracking-wider">{key.replace(/_/g, ' ')}</p>
                   <p className="text-sm font-medium text-[var(--text-secondary-light)]">{val}</p>
                 </div>
               ))
