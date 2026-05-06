@@ -19,7 +19,9 @@ import {
   Lightbulb,
   Globe,
   Eye,
-  EyeOff
+  EyeOff,
+  Info,
+  Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -196,18 +198,25 @@ export default function CanalesPage() {
   const handleOAuthConnect = () => {
     const appId = process.env.NEXT_PUBLIC_META_APP_ID;
     const redirectUri = `${window.location.origin}/api/auth/meta/callback`;
-    const scope = [
-      'pages_show_list',
-      'pages_read_engagement',
-      'pages_manage_metadata',
-      'pages_messaging',
-      'leads_retrieval',
-      'ads_management',
-      'business_management',
-      'instagram_basic',
-      'instagram_manage_messages',
-      'ads_read'
-    ].join(',');
+    
+    // Scopes base necesarios para identificar páginas
+    const baseScopes = ['pages_show_list', 'pages_read_engagement'];
+    
+    // Scopes específicos según la pestaña activa
+    let specificScopes: string[] = [];
+    
+    if (activeTab === 'instagram') {
+      specificScopes = ['instagram_basic', 'instagram_manage_messages'];
+    } else if (activeTab === 'facebook') {
+      specificScopes = ['pages_messaging', 'pages_manage_metadata'];
+    } else if (activeTab === 'leads') {
+      specificScopes = ['leads_retrieval', 'ads_read', 'ads_management'];
+    } else {
+      // Por si acaso, si no hay pestaña específica (o 'all'), pedimos los básicos de mensajería
+      specificScopes = ['pages_messaging', 'instagram_manage_messages'];
+    }
+
+    const scope = [...new Set([...baseScopes, ...specificScopes])].join(',');
 
     const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&state=${currentWorkspaceId}`;
     window.location.href = authUrl;
@@ -447,46 +456,105 @@ export default function CanalesPage() {
           <Loader2 className="w-8 h-8 animate-spin text-[var(--accent)]" />
         </div>
       ) : (
-        <div className="space-y-8 animate-in fade-in slide-in-from-top-2 duration-500">
-          {/* Botones de acción específicos de la pestaña */}
-          <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-[var(--border-light)] shadow-sm">
-            <div className="space-y-1">
-              <h3 className="text-sm font-bold text-[var(--text-primary-light)]">
-                {activeTab === 'whatsapp' ? 'Configuración de WhatsApp API' :
-                 activeTab === 'instagram' ? 'Conexión con Instagram Direct' :
-                 activeTab === 'facebook' ? 'Facebook Messenger' :
-                 activeTab === 'leads' ? 'Captura de Leads (Meta Ads)' : 'Chat Widget para Web'}
-              </h3>
-              <p className="text-xs text-[var(--text-tertiary-light)]">
-                {activeTab === 'leads' 
-                  ? "Recibí los prospectos de tus formularios de anuncios automáticamente." 
-                  : "Conectá tu cuenta para que el agente responda mensajes."}
-              </p>
+        <div className="space-y-12 animate-in fade-in slide-in-from-top-2 duration-500">
+          {/* Guía de Requisitos Dinámica */}
+          <div className="bg-white rounded-[32px] border border-[var(--border-light)] shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-[var(--border-light)] bg-[var(--bg-input)]/30 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-white border border-[var(--border-light)] flex items-center justify-center shadow-sm">
+                  <Info className="w-4 h-4 text-[var(--accent-active)]" />
+                </div>
+                <h3 className="text-xs font-black uppercase tracking-widest text-[var(--text-primary-light)]">Requisitos de Conexión</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="px-2 py-1 rounded-md bg-white border border-[var(--border-light)] text-[9px] font-bold text-[var(--text-tertiary-light)] uppercase">Paso 1 de 2</div>
+              </div>
             </div>
             
-            {activeTab === 'whatsapp' ? (
-              <Button 
-                onClick={() => setIsWAModalOpen(true)} 
-                className="rounded-xl bg-[#25D366] hover:bg-[#22c55e] text-white font-black text-[10px] uppercase tracking-widest h-10 px-8 shadow-xl shadow-[#25D366]/20 transition-all active:scale-95"
-              >
-                <Plus className="w-4 h-4 mr-2" /> Conectar Número
-              </Button>
-            ) : activeTab === 'web' ? (
-              <Button 
-                onClick={() => router.push('/dashboard/ajustes/canales/web')} 
-                className="rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-black text-[10px] uppercase tracking-widest h-10 px-8 shadow-xl shadow-[var(--accent)]/20 transition-all active:scale-95"
-              >
-                Configurar Widget
-              </Button>
-            ) : (
-              <Button 
-                onClick={handleOAuthConnect} 
-                className="rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-black text-[10px] uppercase tracking-widest h-10 px-8 shadow-xl shadow-[var(--accent)]/20 transition-all active:scale-95"
-              >
-                <Plus className="w-4 h-4 mr-2" /> Conectar con Meta
-              </Button>
-            )}
+            <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-4">
+                <h4 className="text-sm font-bold text-[var(--text-primary-light)]">Antes de conectar, verifica lo siguiente:</h4>
+                <ul className="space-y-3">
+                  {(activeTab === 'whatsapp' ? [
+                    "Tener una cuenta en Meta for Developers.",
+                    "Haber configurado el producto WhatsApp Business API.",
+                    "Contar con el Phone Number ID del número a conectar.",
+                    "IMPORTANTE: Usar un 'System User Access Token' permanente."
+                  ] : activeTab === 'instagram' ? [
+                    "La cuenta de Instagram DEBE ser de tipo Empresa o Creador.",
+                    "DEBE estar vinculada a una Página de Facebook.",
+                    "En los ajustes de IG, 'Permitir acceso a mensajes' debe estar ON.",
+                    "Debes ser administrador de la Página de Facebook vinculada."
+                  ] : activeTab === 'facebook' ? [
+                    "Debes tener acceso de Administrador a la Página de Facebook.",
+                    "La página debe ser pública y visible.",
+                    "Los permisos de 'Messenger' deben estar habilitados en Meta."
+                  ] : activeTab === 'leads' ? [
+                    "Debes tener formularios de clientes potenciales creados.",
+                    "Tener permisos de 'Leads Retrieval' en tu cuenta de Meta.",
+                    "La página de Facebook debe estar vinculada a tu cuenta comercial."
+                  ] : [
+                    "Tener acceso al código fuente de tu sitio web.",
+                    "Configurar los dominios permitidos para el widget.",
+                    "Elegir un agente para que atienda a las visitas."
+                  ]).map((req, i) => (
+                    <li key={i} className="flex items-start gap-3">
+                      <div className="w-5 h-5 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0 mt-0.5">
+                        <Check className="w-3 h-3 text-emerald-600" />
+                      </div>
+                      <span className="text-[13px] text-[var(--text-secondary-light)] font-medium leading-relaxed">{req}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="bg-[var(--bg-sidebar)] rounded-2xl p-6 flex flex-col justify-between border border-[var(--accent)]/10">
+                <div className="space-y-3">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-[var(--accent)] opacity-70">¿Todo listo?</p>
+                  <h4 className="text-lg font-bold text-white tracking-tight leading-tight">
+                    {activeTab === 'leads' ? 'Empieza a recibir prospectos hoy mismo.' : 
+                     activeTab === 'web' ? 'Instala el widget en tu web en segundos.' :
+                     'Dale vida a tu atención al cliente con IA.'}
+                  </h4>
+                  <p className="text-sm text-[var(--text-tertiary-light)] font-medium">
+                    Una vez conectado, podrás asignar un agente de IA para que responda automáticamente 24/7.
+                  </p>
+                </div>
+
+                <div className="mt-6">
+                  {activeTab === 'whatsapp' ? (
+                    <Button 
+                      onClick={() => setIsWAModalOpen(true)} 
+                      className="w-full rounded-xl bg-[#25D366] hover:bg-[#22c55e] text-white font-black text-[11px] uppercase tracking-widest h-12 shadow-xl shadow-[#25D366]/20 transition-all active:scale-95"
+                    >
+                      <Plus className="w-4 h-4 mr-2" /> Iniciar Conexión WhatsApp
+                    </Button>
+                  ) : activeTab === 'web' ? (
+                    <Button 
+                      onClick={() => router.push('/dashboard/ajustes/canales/web')} 
+                      className="w-full rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-black text-[11px] uppercase tracking-widest h-12 shadow-xl shadow-[var(--accent)]/20 transition-all active:scale-95"
+                    >
+                      Configurar Widget Ahora
+                    </Button>
+                  ) : (
+                    <Button 
+                      onClick={handleOAuthConnect} 
+                      className="w-full rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-black text-[11px] uppercase tracking-widest h-12 shadow-xl shadow-[var(--accent)]/20 transition-all active:scale-95"
+                    >
+                      <Plus className="w-4 h-4 mr-2" /> Vincular con Meta
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
+
+          {/* Listado de canales */}
+          <div className="space-y-6">
+            <div className="flex items-center gap-3">
+              <div className="w-1.5 h-6 bg-[var(--accent)] rounded-full" />
+              <h3 className="text-sm font-bold text-[var(--text-primary-light)] uppercase tracking-tight">Conexiones Activas</h3>
+            </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {canalesFiltrados.length === 0 ? (
@@ -593,7 +661,8 @@ export default function CanalesPage() {
             )}
           </div>
         </div>
-      )}
+      </div>
+    )}
 
       {/* Modal conexión WhatsApp */}
       <Dialog open={isWAModalOpen} onOpenChange={setIsWAModalOpen}>
