@@ -476,27 +476,27 @@ export default function CanalesPage() {
                 <h4 className="text-sm font-bold text-[var(--text-primary-light)]">Antes de conectar, verifica lo siguiente:</h4>
                 <ul className="space-y-3">
                   {(activeTab === 'whatsapp' ? [
-                    "Tener una cuenta en Meta for Developers.",
-                    "Haber configurado el producto WhatsApp Business API.",
-                    "Contar con el Phone Number ID del número a conectar.",
-                    "IMPORTANTE: Usar un 'System User Access Token' permanente."
+                    "Tener acceso al Administrador comercial de WhatsApp.",
+                    "Contar con el ID del número de teléfono (Phone ID).",
+                    "Generar un Token de Acceso Permanente (para evitar desconexiones).",
+                    "Asegúrate de que el número no esté en uso en una App de WhatsApp personal."
                   ] : activeTab === 'instagram' ? [
-                    "La cuenta de Instagram DEBE ser de tipo Empresa o Creador.",
-                    "DEBE estar vinculada a una Página de Facebook.",
-                    "En los ajustes de IG, 'Permitir acceso a mensajes' debe estar ON.",
-                    "Debes ser administrador de la Página de Facebook vinculada."
+                    "Usar una cuenta de Instagram de tipo Empresa o Creador.",
+                    "Tener la cuenta vinculada a una Página de Facebook.",
+                    "Activar 'Permitir acceso a mensajes' en los ajustes de Instagram.",
+                    "Ser Administrador de la página de Facebook vinculada."
                   ] : activeTab === 'facebook' ? [
-                    "Debes tener acceso de Administrador a la Página de Facebook.",
-                    "La página debe ser pública y visible.",
-                    "Los permisos de 'Messenger' deben estar habilitados en Meta."
+                    "Ser Administrador de la Página de Facebook.",
+                    "La página debe estar publicada y ser visible para todos.",
+                    "Tener la mensajería activada en la configuración de la página."
                   ] : activeTab === 'leads' ? [
-                    "Debes tener formularios de clientes potenciales creados.",
-                    "Tener permisos de 'Leads Retrieval' en tu cuenta de Meta.",
-                    "La página de Facebook debe estar vinculada a tu cuenta comercial."
+                    "Debes tener formularios de clientes potenciales activos.",
+                    "Ser Administrador de la cuenta comercial (Business Manager).",
+                    "Tu página de Facebook debe estar vinculada a dicha cuenta."
                   ] : [
-                    "Tener acceso al código fuente de tu sitio web.",
-                    "Configurar los dominios permitidos para el widget.",
-                    "Elegir un agente para que atienda a las visitas."
+                    "Tener acceso para insertar código en tu sitio web.",
+                    "Configurar los dominios autorizados para el chat.",
+                    "Asignar un agente de IA para atender a las visitas."
                   ]).map((req, i) => (
                     <li key={i} className="flex items-start gap-3">
                       <div className="w-5 h-5 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0 mt-0.5">
