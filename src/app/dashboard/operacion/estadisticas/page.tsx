@@ -19,7 +19,14 @@ import {
   CheckCircle2,
   AlertCircle,
   BarChart3,
-  MoreVertical
+  MoreVertical,
+  Bot,
+  Award,
+  Trophy,
+  PieChart as PieChartIcon,
+  Download,
+  FileSpreadsheet,
+  FileText
 } from 'lucide-react';
 import { 
   AreaChart, 
@@ -45,12 +52,13 @@ import {
   where 
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { COLLECTIONS, Lead, EtapaEmbudo, TareaCRM, Contacto, Conversacion } from "@/lib/types/firestore";
+import { COLLECTIONS, Lead, EtapaEmbudo, TareaCRM, Contacto, Conversacion, Agente } from "@/lib/types/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
-import { subDays, format, isAfter, startOfDay, endOfDay } from "date-fns";
+import { subDays, format, isAfter, startOfDay, endOfDay, isBefore } from "date-fns";
 import { es } from "date-fns/locale";
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
 
 export default function EstadisticasPage() {
   const { currentWorkspaceId } = useWorkspaceStore();
@@ -64,6 +72,7 @@ export default function EstadisticasPage() {
   const [conversaciones, setConversaciones] = useState<(Conversacion & { id: string })[]>([]);
   const [tareas, setTareas] = useState<(TareaCRM & { id: string })[]>([]);
   const [contactos, setContactos] = useState<(Contacto & { id: string })[]>([]);
+  const [agentes, setAgentes] = useState<(Agente & { id: string })[]>([]);
 
   // 1. Suscripciones a Firestore
   useEffect(() => {
@@ -83,7 +92,7 @@ export default function EstadisticasPage() {
     );
 
     const unsubConv = onSnapshot(
-      query(collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES), orderBy("ultimaActividad", "desc"), limit(1000)),
+      query(collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES), orderBy("ultimaActividad", "desc"), limit(2000)),
       (snap) => setConversaciones(snap.docs.map(d => ({ ...d.data(), id: d.id })) as any)
     );
 
@@ -93,8 +102,13 @@ export default function EstadisticasPage() {
     );
 
     const unsubCont = onSnapshot(
-      query(collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS), orderBy("creadoEl", "desc"), limit(1000)),
+      query(collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS), orderBy("creadoEl", "desc"), limit(2000)),
       (snap) => setContactos(snap.docs.map(d => ({ ...d.data(), id: d.id })) as any)
+    );
+
+    const unsubAgentes = onSnapshot(
+      query(collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.AGENTES)),
+      (snap) => setAgentes(snap.docs.map(d => ({ ...d.data(), id: d.id })) as any)
     );
 
     return () => {
@@ -103,6 +117,7 @@ export default function EstadisticasPage() {
       unsubConv();
       unsubTareas();
       unsubCont();
+      unsubAgentes();
     };
   }, [currentWorkspaceId]);
 
@@ -122,17 +137,31 @@ export default function EstadisticasPage() {
       fechaInicio = new Date(hoy.getFullYear(), 0, 1); 
       diasAtras = Math.floor((hoy.getTime() - fechaInicio.getTime()) / (1000 * 60 * 60 * 24));
     }
-    else if (dateRange === 'Hist') { fechaInicio = new Date(2020, 0, 1); diasAtras = 365 * 5; }
+    else if (dateRange === 'Hist') { fechaInicio = new Date(2020, 0, 1); diasAtras = 365 * 10; }
+
+    const fechaPreviaInicio = subDays(fechaInicio, diasAtras);
     
-    // Filtros por rango
-    const leadsFiltrados = dateRange === 'Hist' ? leads : leads.filter(l => l.creadoEl?.toDate() >= fechaInicio);
-    const contFiltrados = dateRange === 'Hist' ? contactos : contactos.filter(c => c.creadoEl?.toDate() >= fechaInicio);
+    // Filtros por rango Actual vs Previo
+    const leadsAct = leads.filter(l => l.creadoEl?.toDate() >= fechaInicio);
+    const leadsPrev = leads.filter(l => l.creadoEl?.toDate() >= fechaPreviaInicio && l.creadoEl?.toDate() < fechaInicio);
     
+    const contAct = contactos.filter(c => c.creadoEl?.toDate() >= fechaInicio);
+    const contPrev = contactos.filter(c => c.creadoEl?.toDate() >= fechaPreviaInicio && c.creadoEl?.toDate() < fechaInicio);
+
+    const convAct = conversaciones.filter(c => c.ultimaActividad?.toDate() >= fechaInicio);
+    const convPrev = conversaciones.filter(c => c.ultimaActividad?.toDate() >= fechaPreviaInicio && c.ultimaActividad?.toDate() < fechaInicio);
+
+    // Función para calcular cambio %
+    const calcChange = (act: number, prev: number) => {
+      if (prev === 0) return act > 0 ? `+${act}` : "0";
+      const change = ((act - prev) / prev) * 100;
+      return `${change >= 0 ? '+' : ''}${Math.round(change)}%`;
+    };
+
     // A. Evolución (Leads & Contactos)
     const evolutionMap: Record<string, any> = {};
     const iteracionesLabel = diasAtras > 30 ? (diasAtras > 365 ? 'MM/yy' : 'MMM') : 'EEE';
     
-    // Si es histórico o año, agrupamos por meses para que no sature
     if (diasAtras > 60) {
       for (let i = 11; i >= 0; i--) {
         const d = subDays(hoy, i * 30);
@@ -147,18 +176,18 @@ export default function EstadisticasPage() {
       }
     }
 
-    leadsFiltrados.forEach(l => {
+    leadsAct.forEach(l => {
       const label = format(l.creadoEl.toDate(), diasAtras > 60 ? 'MMM' : iteracionesLabel, { locale: es });
       if (evolutionMap[label]) evolutionMap[label].leads++;
     });
-    contFiltrados.forEach(c => {
+    contAct.forEach(c => {
       const label = format(c.creadoEl.toDate(), diasAtras > 60 ? 'MMM' : iteracionesLabel, { locale: es });
       if (evolutionMap[label]) evolutionMap[label].contactos++;
     });
 
     // B. Chats Stats
-    const convAI = conversaciones.filter(c => c.modoIA === 'auto').length;
-    const convManual = conversaciones.length - convAI;
+    const convAI = convAct.filter(c => c.modoIA === 'auto').length;
+    const convManual = convAct.length - convAI;
     const chatSourceData = [
       { name: 'IA Auto', value: convAI, color: 'var(--accent-active)' },
       { name: 'Manual', value: convManual, color: '#94a3b8' }
@@ -173,22 +202,48 @@ export default function EstadisticasPage() {
       { name: 'Baja', value: tareas.filter(t => t.prioridad === 'baja' && !t.completada && t.estado !== 'completada').length, color: '#3b82f6' },
     ];
 
-    // D. Leads Source
+    // D. Leads Source & Campañas & Formularios
     const sourceMap: Record<string, number> = {};
-    leadsFiltrados.forEach(l => { sourceMap[l.origen || 'otros'] = (sourceMap[l.origen || 'otros'] || 0) + 1; });
+    const campaignMap: Record<string, number> = {};
+    const formMap: Record<string, number> = {};
+    
+    leadsAct.forEach(l => { 
+      sourceMap[l.origen || 'otros'] = (sourceMap[l.origen || 'otros'] || 0) + 1;
+      if (l.campana) campaignMap[l.campana] = (campaignMap[l.campana] || 0) + 1;
+      if (l.formulario) formMap[l.formulario] = (formMap[l.formulario] || 0) + 1;
+    });
+
     const leadSourceData = Object.entries(sourceMap).map(([name, value]) => ({ 
       name: name.replace('_', ' ').toUpperCase(), 
       value,
       color: name === 'whatsapp' ? '#25D366' : name === 'meta_ads' ? '#0668E1' : '#94a3b8'
     }));
 
+    const topCampaigns = Object.entries(campaignMap).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => ({ name, count }));
+    const topForms = Object.entries(formMap).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => ({ name, count }));
+
+    // E. Agent Stats
+    const agentStats = agentes.map(a => {
+      const convs = convAct.filter(c => c.agenteId === a.id);
+      const auto = convs.filter(c => c.modoIA === 'auto').length;
+      return {
+        id: a.id,
+        nombre: a.nombre,
+        total: convs.length,
+        auto,
+        manual: convs.length - auto,
+        efficiency: convs.length > 0 ? Math.round((auto / convs.length) * 100) : 0
+      };
+    }).sort((a, b) => b.total - a.total);
+
     return {
       overview: {
-        totalLeads: leads.length,
-        activeChats: conversaciones.length,
-        pendingTasks: tareasPendientes,
-        totalContacts: contactos.length,
+        leads: { val: leadsAct.length, change: calcChange(leadsAct.length, leadsPrev.length), trend: leadsAct.length >= leadsPrev.length ? 'up' : 'down' },
+        chats: { val: convAct.length, change: calcChange(convAct.length, convPrev.length), trend: convAct.length >= convPrev.length ? 'up' : 'down' },
+        tasks: { val: tareasPendientes, change: calcChange(tareasPendientes, tareas.length - tareas.filter(t => t.completada).length), trend: 'up' },
+        contacts: { val: contAct.length, change: calcChange(contAct.length, contPrev.length), trend: contAct.length >= contPrev.length ? 'up' : 'down' },
       },
+      totalLeads: leadsAct.length,
       convAI,
       evolutionData: Object.values(evolutionMap),
       chatSourceData,
@@ -198,13 +253,36 @@ export default function EstadisticasPage() {
       ],
       tareasPriorityData,
       leadSourceData,
+      topCampaigns,
+      topForms,
+      agentStats,
       funnelData: etapas.map(e => ({
         stage: e.nombre,
-        count: leads.filter(l => l.etapaId === e.id).length,
-        color: e.color || 'bg-blue-500'
+        count: leadsAct.filter(l => l.etapaId === e.id).length,
+        color: e.color || '#3b82f6'
       }))
     };
-  }, [leads, etapas, conversaciones, tareas, contactos, loading, dateRange]);
+  }, [leads, etapas, conversaciones, tareas, contactos, agentes, loading, dateRange]);
+
+  const handleExportCSV = () => {
+    if (!metrics) return;
+    try {
+      const headers = ["Periodo", "Total Leads", "Conversaciones IA", "Tareas Pendientes", "Nuevos Contactos"];
+      const row = [dateRange, metrics.overview.leads.val, metrics.convAI, metrics.overview.tasks.val, metrics.overview.contacts.val];
+      
+      const csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n" + row.join(",");
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `reporte_imala_vox_${dateRange}_${format(new Date(), 'yyyyMMdd')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Reporte generado correctamente");
+    } catch (e) {
+      toast.error("Error al generar el reporte");
+    }
+  };
 
   if (loading) {
     return (
@@ -226,6 +304,15 @@ export default function EstadisticasPage() {
         </div>
         
         <div className="flex items-center gap-4">
+          <Button 
+            onClick={handleExportCSV}
+            variant="outline" 
+            className="rounded-2xl h-11 border-[var(--border-light)] bg-white text-[10px] font-black uppercase tracking-widest px-6 shadow-sm hover:bg-[var(--bg-input)] transition-all flex items-center gap-2"
+          >
+            <Download className="w-4 h-4" />
+            Descargar Reporte
+          </Button>
+
           <div className="flex items-center gap-1.5 bg-[var(--bg-input)] p-1.5 rounded-2xl border border-[var(--border-light)] overflow-x-auto no-scrollbar">
             {['24h', '7d', '30d', '90d', '12m', 'Año', 'Hist'].map((range) => (
               <button
@@ -248,6 +335,7 @@ export default function EstadisticasPage() {
         <TabsList className="bg-[var(--bg-input)] p-1 rounded-2xl border border-[var(--border-light)] w-full md:w-auto overflow-x-auto no-scrollbar">
           <TabsTrigger value="resumen" className="rounded-xl px-6 py-2.5 text-[11px] font-black uppercase tracking-widest data-[state=active]:bg-[var(--accent)] data-[state=active]:text-[var(--accent-text)] transition-all">Resumen</TabsTrigger>
           <TabsTrigger value="chats" className="rounded-xl px-6 py-2.5 text-[11px] font-black uppercase tracking-widest data-[state=active]:bg-[var(--accent)] data-[state=active]:text-[var(--accent-text)] transition-all">Bandeja</TabsTrigger>
+          <TabsTrigger value="agentes" className="rounded-xl px-6 py-2.5 text-[11px] font-black uppercase tracking-widest data-[state=active]:bg-[var(--accent)] data-[state=active]:text-[var(--accent-text)] transition-all">Agentes IA</TabsTrigger>
           <TabsTrigger value="leads" className="rounded-xl px-6 py-2.5 text-[11px] font-black uppercase tracking-widest data-[state=active]:bg-[var(--accent)] data-[state=active]:text-[var(--accent-text)] transition-all">Leads</TabsTrigger>
           <TabsTrigger value="tareas" className="rounded-xl px-6 py-2.5 text-[11px] font-black uppercase tracking-widest data-[state=active]:bg-[var(--accent)] data-[state=active]:text-[var(--accent-text)] transition-all">Tareas</TabsTrigger>
           <TabsTrigger value="contactos" className="rounded-xl px-6 py-2.5 text-[11px] font-black uppercase tracking-widest data-[state=active]:bg-[var(--accent)] data-[state=active]:text-[var(--accent-text)] transition-all">Contactos</TabsTrigger>
@@ -257,10 +345,10 @@ export default function EstadisticasPage() {
 
         <TabsContent value="resumen" className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <StatsCard title="Leads Totales" value={data.overview.totalLeads.toString()} change="+12%" trend="up" icon={<Target className="w-5 h-5" />} color="blue" />
-            <StatsCard title="Chats Activos" value={data.overview.activeChats.toString()} change="+8%" trend="up" icon={<Inbox className="w-5 h-5" />} color="emerald" />
-            <StatsCard title="Tareas Pendientes" value={data.overview.pendingTasks.toString()} change="-2" trend="down" icon={<Clock className="w-5 h-5" />} color="amber" />
-            <StatsCard title="Contactos CRM" value={data.overview.totalContacts.toString()} change="+45" trend="up" icon={<Users className="w-5 h-5" />} color="purple" />
+            <StatsCard title="Leads Totales" value={data.overview.leads.val.toString()} change={data.overview.leads.change} trend={data.overview.leads.trend} icon={<Target className="w-5 h-5" />} color="blue" />
+            <StatsCard title="Chats Activos" value={data.overview.chats.val.toString()} change={data.overview.chats.change} trend={data.overview.chats.trend} icon={<Inbox className="w-5 h-5" />} color="emerald" />
+            <StatsCard title="Tareas Pendientes" value={data.overview.tasks.val.toString()} change={data.overview.tasks.change} trend="up" icon={<Clock className="w-5 h-5" />} color="amber" />
+            <StatsCard title="Contactos CRM" value={data.overview.contacts.val.toString()} change={data.overview.contacts.change} trend={data.overview.contacts.trend} icon={<Users className="w-5 h-5" />} color="purple" />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -279,7 +367,8 @@ export default function EstadisticasPage() {
               </AreaChart>
             </ChartContainer>
 
-            <div className="bg-[var(--bg-sidebar)] rounded-[32px] p-8 shadow-2xl relative overflow-hidden flex flex-col justify-between">
+            <div className="bg-[var(--bg-sidebar)] rounded-[32px] p-8 shadow-2xl relative overflow-hidden flex flex-col justify-between group">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-[var(--accent)]/10 rounded-full -mr-32 -mt-32 blur-3xl group-hover:scale-110 transition-transform duration-1000" />
               <div className="relative z-10">
                 <div className="w-12 h-12 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center mb-6 backdrop-blur-md">
                   <Zap className="text-[var(--accent)] w-6 h-6" />
@@ -303,7 +392,14 @@ export default function EstadisticasPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <ChartContainer title="Segmentación de Respuestas" subtitle="IA vs Humano">
               <PieChart>
-                <Pie data={data.chatSourceData} innerRadius={80} outerRadius={110} paddingAngle={8} dataKey="value">
+                <Pie 
+                  data={data.chatSourceData} 
+                  innerRadius={80} 
+                  outerRadius={110} 
+                  paddingAngle={8} 
+                  dataKey="value"
+                  label={({name, value, percent}: any) => `${name}: ${value} (${Math.round(percent * 100)}%)`}
+                >
                   {data.chatSourceData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                 </Pie>
                 <Tooltip />
@@ -322,6 +418,48 @@ export default function EstadisticasPage() {
                 </Bar>
               </BarChart>
             </ChartContainer>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="agentes" className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {data.agentStats.map((agent, idx) => (
+              <div key={agent.id} className="bg-[var(--bg-card)] rounded-[32px] p-8 border border-[var(--border-light)] shadow-sm hover:border-[var(--accent-active)] transition-all group">
+                <div className="flex items-start justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-[var(--bg-input)] rounded-2xl flex items-center justify-center border border-[var(--border-light)] group-hover:bg-[var(--accent)] group-hover:text-black transition-all">
+                      {idx === 0 ? <Trophy className="w-6 h-6" /> : <Bot className="w-6 h-6" />}
+                    </div>
+                    <div>
+                      <h4 className="text-base font-bold text-[var(--text-primary-light)]">{agent.nombre}</h4>
+                      <p className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest">IA Agent Performance</p>
+                    </div>
+                  </div>
+                  <div className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black border border-emerald-100">
+                    {agent.efficiency}% AUTO
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex justify-between items-end">
+                    <div>
+                      <span className="block text-2xl font-black text-[var(--text-primary-light)]">{agent.total}</span>
+                      <span className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest">Conversaciones</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="block text-xl font-black text-[var(--text-secondary-light)]">{agent.auto}</span>
+                      <span className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest">Resueltas IA</span>
+                    </div>
+                  </div>
+                  <div className="h-2 bg-[var(--bg-input)] rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-[var(--accent-active)] rounded-full transition-all duration-1000" 
+                      style={{ width: `${agent.efficiency}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </TabsContent>
 
@@ -346,7 +484,7 @@ export default function EstadisticasPage() {
             <ChartContainer title="Embudo Comercial" subtitle="Leads por etapa" className="lg:col-span-2">
               <div className="space-y-8 pt-4">
                 {data.funnelData.map((stage, idx) => {
-                  const percentage = data.overview.totalLeads > 0 ? (stage.count / data.overview.totalLeads) * 100 : 0;
+                  const percentage = data.totalLeads > 0 ? (stage.count / data.totalLeads) * 100 : 0;
                   return (
                     <div key={idx} className="relative group">
                       <div className="flex items-center justify-between mb-3">
@@ -374,6 +512,44 @@ export default function EstadisticasPage() {
                 })}
               </div>
             </ChartContainer>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="bg-[var(--bg-card)] rounded-[32px] p-8 border border-[var(--border-light)] shadow-sm">
+              <div className="flex items-center justify-between mb-8">
+                <div>
+                  <h3 className="text-lg font-bold text-[var(--text-primary-light)] tracking-tight">Top Campañas</h3>
+                  <p className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest mt-1">Ranking de Meta Ads</p>
+                </div>
+                <Award className="text-[var(--accent-active)] w-6 h-6 opacity-50" />
+              </div>
+              <div className="space-y-4">
+                {data.topCampaigns.length > 0 ? data.topCampaigns.map((camp, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-4 bg-[var(--bg-input)]/50 rounded-2xl border border-transparent hover:border-[var(--accent-active)] transition-all">
+                    <span className="text-sm font-bold text-[var(--text-primary-light)] truncate max-w-[70%]">{camp.name}</span>
+                    <span className="text-lg font-black text-[var(--accent-active)]">{camp.count}</span>
+                  </div>
+                )) : <p className="text-center py-8 text-[10px] font-black uppercase text-[var(--text-tertiary-light)]">Sin datos</p>}
+              </div>
+            </div>
+
+            <div className="bg-[var(--bg-card)] rounded-[32px] p-8 border border-[var(--border-light)] shadow-sm">
+              <div className="flex items-center justify-between mb-8">
+                <div>
+                  <h3 className="text-lg font-bold text-[var(--text-primary-light)] tracking-tight">Top Formularios</h3>
+                  <p className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest mt-1">Conversión de Meta Leads</p>
+                </div>
+                <FileText className="text-[var(--accent-active)] w-6 h-6 opacity-50" />
+              </div>
+              <div className="space-y-4">
+                {data.topForms.length > 0 ? data.topForms.map((form, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-4 bg-[var(--bg-input)]/50 rounded-2xl border border-transparent hover:border-[var(--accent-active)] transition-all">
+                    <span className="text-sm font-bold text-[var(--text-primary-light)] truncate max-w-[70%]">{form.name}</span>
+                    <span className="text-lg font-black text-[var(--accent-active)]">{form.count}</span>
+                  </div>
+                )) : <p className="text-center py-8 text-[10px] font-black uppercase text-[var(--text-tertiary-light)]">Sin datos</p>}
+              </div>
+            </div>
           </div>
         </TabsContent>
 
