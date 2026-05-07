@@ -142,8 +142,11 @@ export async function GET(req: NextRequest) {
         
       // Compartir el mismo token de la página para Instagram
       await guardarTokenCanal(wsId, igCanalId, pageAccessToken);
-     // --- DETECTION DE WHATSAPP BUSINESS (Búsqueda Profunda) ---
-    try {
+    }
+  }
+
+  // --- DETECTION DE WHATSAPP BUSINESS (Búsqueda Profunda) ---
+  try {
       console.log(`[DEBUG-WA] Iniciando búsqueda profunda de WABAs...`);
       
       // 1. Intentar obtener WABAs directas del usuario
