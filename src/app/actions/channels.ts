@@ -356,14 +356,12 @@ export async function enviarMensajeAccion(
         destinatarioLimpio = `549${destinatarioLimpio}`;
       }
 
-      // Argentina móvil: 549XXXXXXXXXX (13 dígitos) → 54AREA15LOCAL (14 dígitos)
-      // Buenos Aires usa código de área 2 dígitos (11), el resto usa 3 dígitos
-      if (destinatarioLimpio.startsWith('549') && destinatarioLimpio.length === 13) {
-        const rest = destinatarioLimpio.substring(3); // ej: "3513376865"
-        const areaLen = rest.startsWith('11') ? 2 : 3;
-        destinatarioLimpio = `54${rest.substring(0, areaLen)}15${rest.substring(areaLen)}`;
-        // ej: "54" + "351" + "15" + "3376865" = "54351153376865"
+      // Argentina móvil: Asegurar que tenga el prefijo 549 si es un número local de 10 dígitos
+      if (destinatarioLimpio.length === 10) {
+        destinatarioLimpio = `549${destinatarioLimpio}`;
       }
+      // Nota: Eliminamos la inserción del "15" legacy ya que la Cloud API v19+ 
+      // prefiere el formato E.164 directo (549...) para evitar errores de envío.
 
       console.log(`[WA-SEND] Enviando a: ${destinatarioLimpio} (original: ${destinatario})`);
       

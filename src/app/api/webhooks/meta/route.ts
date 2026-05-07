@@ -554,14 +554,16 @@ async function procesarMensajeWhatsapp(value: any, wabaId: string) {
       .get();
 
     if (wsQuery.empty) {
-      console.warn(`❌ Mensaje de WA ${senderId} ignorado: Canal no encontrado para phone_number_id ${value.metadata.phone_number_id}`);
+      console.warn(`❌ Mensaje de WA ${senderId} ignorado: Canal no encontrado para phone_number_id ${value.metadata.phone_number_id}. Asegúrate que el 'Phone Number ID' coincida en los ajustes del canal.`);
       return;
     }
-
+    
     const canalDoc = wsQuery.docs[0];
     const canalId = canalDoc.id;
     const wsId = canalDoc.ref.parent.parent!.id;
     const canalData = canalDoc.data() as any;
+
+    console.log(`✅ Canal WA encontrado: ${canalId} en workspace: ${wsId}. IA Habilitada: ${canalData.aiEnabled}`);
 
     // 2. Obtener o crear contacto
     const contactosRef = adminDb.collection(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CONTACTOS}`);

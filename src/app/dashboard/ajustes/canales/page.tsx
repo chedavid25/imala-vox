@@ -732,7 +732,7 @@ export default function CanalesPage() {
               <p className="text-[11px] font-black text-amber-800 uppercase tracking-wider">Configuración en Meta:</p>
               <ol className="list-decimal list-inside space-y-1 text-[11px] text-amber-700 font-medium">
                 <li>Webhook URL: <code className="font-mono bg-amber-100 px-1.5 py-0.5 rounded">/api/webhooks/meta</code></li>
-                <li>Verify Token: <code className="font-mono bg-amber-100 px-1.5 py-0.5 rounded">imala-vox-webhook-2026</code></li>
+                <li>Verify Token: <code className="font-mono bg-amber-100 px-1.5 py-0.5 rounded">imala_vox_2024</code></li>
                 <li>Suscribirse al campo <code className="font-mono bg-amber-100 px-1.5 py-0.5 rounded font-black">messages</code></li>
               </ol>
             </div>

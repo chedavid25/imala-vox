@@ -125,7 +125,7 @@ export const recibirMensajeWhatsApp = functions.https.onRequest(async (req: func
           // ── Buscar workspace por phoneNumberId ──
           const canalSnap = await admin.firestore()
             .collectionGroup('canales')
-            .where('phoneNumberId', '==', phoneNumberId)
+            .where('metaPhoneNumberId', '==', phoneNumberId)
             .where('tipo', '==', 'whatsapp')
             .limit(1).get();
 
