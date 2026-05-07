@@ -237,6 +237,8 @@ export async function GET(req: NextRequest) {
           }
         }
       } else {
+        const debugToken = await fetch(`https://graph.facebook.com/debug_token?input_token=${longLivedUserToken}&access_token=${appId}|${appSecret}`);
+        const debugData = await debugToken.json();
         console.warn(`[DEBUG-WA] No se encontraron WABAs. Debug del Token:`, JSON.stringify(debugData.data?.scopes || []));
       }
     } catch (waError) {
