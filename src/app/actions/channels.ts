@@ -169,14 +169,27 @@ export async function sincronizarWebhooks(wsId: string, canalId: string) {
     // 🔧 FIX: subscribed_fields debe ir como QUERY STRING separado por comas,
     // NO como JSON body. Meta Graph API ignora silenciosamente los campos
     // cuando se envían en el body JSON en este endpoint.
-    const subscribedFields = [
+    // Obtener los permisos del token para saber qué campos podemos suscribir
+    const appId = process.env.NEXT_PUBLIC_META_APP_ID;
+    const appSecret = process.env.META_APP_SECRET;
+    const debugTokenRes = await fetch(`https://graph.facebook.com/debug_token?input_token=${metaAccessToken}&access_token=${appId}|${appSecret}`);
+    const debugToken = await debugTokenRes.json();
+    const currentScopes = debugToken.data?.scopes || [];
+
+    const fields = [
       "messages",
       "messaging_postbacks",
       "messaging_optins",
       "message_deliveries",
-      "message_reads",
-      "leadgen"
-    ].join(",");
+      "message_reads"
+    ];
+
+    // Solo suscribir leadgen si tenemos permiso expreso, para evitar errores #200 en Instagram
+    if (currentScopes.includes('leads_retrieval')) {
+      fields.push("leadgen");
+    }
+
+    const subscribedFields = fields.join(",");
 
     const url = new URL(`https://graph.facebook.com/v19.0/${metaPageId}/subscribed_apps`);
     url.searchParams.set("subscribed_fields", subscribedFields);
