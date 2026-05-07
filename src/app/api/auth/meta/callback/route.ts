@@ -9,6 +9,8 @@ export async function GET(req: NextRequest) {
   const code = searchParams.get('code');
   const wsId = searchParams.get('state'); // wsId pasado en el state
 
+  console.log(`[DEBUG-OAUTH] Callback recibido - Code: ${code ? 'SÍ' : 'NO'}, State (wsId): ${wsId}`);
+
   if (!code || !wsId) {
     return NextResponse.redirect(new URL('/dashboard/ajustes/canales?error=missing_params', req.url));
   }
