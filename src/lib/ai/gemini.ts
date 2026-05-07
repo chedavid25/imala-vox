@@ -4,9 +4,9 @@ const apiKey = process.env.GEMINI_API_KEY || "";
 export const genAI = new GoogleGenerativeAI(apiKey);
 
 export const MODELOS = {
-  CLASIFICADOR: "gemini-2.5-flash-lite", // Ultra económico para tareas simples
-  AGENTE: "gemini-3-flash",              // El más rápido y capaz de nueva generación
-  EXTRACTOR: "gemini-2.5-flash",         // Balanceado para RAG y extracción
+  CLASIFICADOR: "gemini-3-flash-preview", 
+  AGENTE: "gemini-3-flash-preview",       
+  EXTRACTOR: "gemini-3-flash-preview",    
 };
 
 /**
