@@ -844,7 +844,7 @@ export default function CanalesPage() {
                          {selectedCanal.agenteId ? agentes.find(a => a.id === selectedCanal.agenteId)?.nombre : "Seleccionar un agente..."}
                       </SelectValue>
                     </SelectTrigger>
-                    <SelectContent className="rounded-2xl border-slate-100 shadow-2xl bg-white">
+                    <SelectContent position="popper" sideOffset={4} className="rounded-2xl border-slate-100 shadow-2xl bg-white w-[var(--radix-select-trigger-width)]">
                       {agentes.map(a => (
                         <SelectItem key={a.id} value={a.id} className="rounded-xl py-2.5">
                           <div className="flex flex-col items-start">
