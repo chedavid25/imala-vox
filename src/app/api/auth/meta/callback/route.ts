@@ -100,8 +100,16 @@ export async function GET(req: NextRequest) {
       // Guardar el Page Access Token (que no expira) en secretos
       await guardarTokenCanal(wsId, canalId, pageAccessToken);
       
-      // Sincronizar automáticamente los webhooks de esta página (incluye leadgen)
-      await sincronizarWebhooks(wsId, canalId);
+      // Solo intentar sincronizar webhooks si tenemos los permisos necesarios para páginas
+      const tokenDebugRes = await fetch(`https://graph.facebook.com/debug_token?input_token=${pageAccessToken}&access_token=${appId}|${appSecret}`);
+      const tokenDebug = await tokenDebugRes.json();
+      const hasPagePerms = tokenDebug.data?.scopes?.includes('pages_messaging');
+      
+      if (hasPagePerms) {
+        await sincronizarWebhooks(wsId, canalId);
+      } else {
+        console.log(`[INFO] Omitiendo sincronización de webhooks para ${pageName} (falta pages_messaging)`);
+      }
       
       newPageIds.push(metaPageId);
 

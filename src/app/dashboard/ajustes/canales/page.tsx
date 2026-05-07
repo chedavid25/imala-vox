@@ -210,7 +210,13 @@ export default function CanalesPage() {
     } else if (activeTab === 'facebook') {
       specificScopes = ['pages_messaging', 'pages_manage_metadata'];
     } else if (activeTab === 'whatsapp') {
-      specificScopes = ['whatsapp_business_management', 'whatsapp_business_messaging', 'business_management'];
+      specificScopes = [
+        'whatsapp_business_management', 
+        'whatsapp_business_messaging', 
+        'business_management',
+        'pages_show_list',
+        'pages_read_engagement'
+      ];
     } else if (activeTab === 'leads') {
       specificScopes = [
         'leads_retrieval', 
