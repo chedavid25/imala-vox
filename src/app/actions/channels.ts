@@ -213,6 +213,15 @@ export async function sincronizarWebhooks(wsId: string, canalId: string) {
       };
     }
 
+    // 🔧 Verificar qué campos quedaron realmente activos
+    const verifyRes = await fetch(
+      `https://graph.facebook.com/v19.0/${metaPageId}/subscribed_apps?access_token=${encodeURIComponent(metaAccessToken)}`
+    );
+    const verifyData = await verifyRes.json();
+    const appSubscribed = verifyData.data?.[0];
+    const subscribedFieldsList: string[] = (appSubscribed?.subscribed_fields || [])
+      .map((f: any) => typeof f === "string" ? f : f.name);
+
     const hasMessages = subscribedFieldsList.includes("messages");
 
     if (hasMessages) {
@@ -227,14 +236,6 @@ export async function sincronizarWebhooks(wsId: string, canalId: string) {
       success: false, 
       error: "No se pudo activar la mensajería. Asegúrate de haber concedido el permiso 'pages_messaging' durante la conexión." 
     };
-
-    await adminDb.doc(canalPath).update({
-      webhookVerified: true,
-      subscribedFields: subscribedFieldsList,
-      actualizadoEl: Timestamp.now()
-    });
-
-    return { success: true, subscribedFields: subscribedFieldsList };
   } catch (error: any) {
     console.error("Error en sincronizarWebhooks:", error);
     return { success: false, error: error.message };
