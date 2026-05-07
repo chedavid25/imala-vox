@@ -207,7 +207,13 @@ export default function CanalesPage() {
     let specificScopes: string[] = [];
     
     if (activeTab === 'instagram') {
-      specificScopes = ['instagram_basic', 'instagram_manage_messages', 'pages_messaging'];
+      specificScopes = [
+        'instagram_basic', 
+        'instagram_manage_messages', 
+        'instagram_manage_insights',
+        'pages_messaging',
+        'pages_manage_metadata'
+      ];
     } else if (activeTab === 'facebook') {
       specificScopes = ['pages_messaging', 'pages_manage_metadata'];
     } else if (activeTab === 'whatsapp') {

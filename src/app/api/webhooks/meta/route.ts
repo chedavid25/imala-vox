@@ -324,13 +324,26 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
 
     // 1. Identificar Workspace y Canal
     let canalType: 'whatsapp' | 'instagram' | 'facebook' = isInstagram ? 'instagram' : 'facebook';
-    const wsQuery = await adminDb
+    
+    // Búsqueda robusta: Si es Instagram, intentamos por metaInstagramId, si no lo encontramos, probamos por metaPageId
+    let wsQuery = await adminDb
       .collectionGroup(COLLECTIONS.CANALES)
       .where(isInstagram ? 'metaInstagramId' : 'metaPageId', '==', pageId)
       .where('tipo', '==', canalType)
       .where('status', '==', 'connected')
       .limit(1)
       .get();
+
+    // Fallback para Instagram: A veces los mensajes de IG llegan con el Page ID en lugar del IG ID
+    if (wsQuery.empty && isInstagram) {
+      wsQuery = await adminDb
+        .collectionGroup(COLLECTIONS.CANALES)
+        .where('metaPageId', '==', pageId)
+        .where('tipo', '==', 'instagram')
+        .where('status', '==', 'connected')
+        .limit(1)
+        .get();
+    }
 
     if (wsQuery.empty) {
       console.warn(`❌ Mensaje de ${senderId} ignorado: Canal ${canalType} para pageId ${pageId} no encontrado en Firestore.`);
