@@ -166,30 +166,26 @@ export async function GET(req: NextRequest) {
       let allWabas = [...(wabaData.data || [])];
       console.log(`[DEBUG-WA] WABAs directas encontradas: ${allWabas.length}`);
 
-      // 2. Intentar obtener Business Managers y sus WABAs (Fallback)
-      const bizRes = await fetch(
-        `https://graph.facebook.com/v19.0/me/businesses?access_token=${longLivedUserToken}`
-      );
-      const bizData = await bizRes.json();
-      
-      if (bizRes.ok && bizData.data) {
-        console.log(`[DEBUG-WA] Business Managers encontrados: ${bizData.data.length}`);
-        for (const biz of bizData.data) {
-          const bizWabaRes = await fetch(
-            `https://graph.facebook.com/v19.0/${biz.id}/whatsapp_business_accounts?access_token=${longLivedUserToken}`
+      // 3. Intentar obtener WABAs a través de las PÁGINAS (Nuevo Fallback)
+      if (pages.length > 0) {
+        console.log(`[DEBUG-WA] Buscando WABAs en ${pages.length} páginas...`);
+        for (const page of pages) {
+          const pageWabaRes = await fetch(
+            `https://graph.facebook.com/v19.0/${page.id}/whatsapp_business_accounts?access_token=${page.access_token}`
           );
-          const bizWabaData = await bizWabaRes.json();
-          if (bizWabaRes.ok && bizWabaData.data) {
-            for (const bw of bizWabaData.data) {
-              if (!allWabas.find(x => x.id === bw.id)) {
-                allWabas.push(bw);
+          const pageWabaData = await pageWabaRes.json();
+          if (pageWabaRes.ok && pageWabaData.data) {
+            for (const pw of pageWabaData.data) {
+              if (!allWabas.find(x => x.id === pw.id)) {
+                console.log(`[DEBUG-WA] WABA encontrada a través de página ${page.name}: ${pw.id}`);
+                allWabas.push(pw);
               }
             }
           }
         }
       }
 
-      console.log(`[DEBUG-WA] Total de WABAs tras búsqueda profunda: ${allWabas.length}`);
+      console.log(`[DEBUG-WA] Total de WABAs tras búsqueda exhaustiva: ${allWabas.length}`);
 
       if (allWabas.length > 0) {
         for (const waba of allWabas) {
@@ -238,20 +234,15 @@ export async function GET(req: NextRequest) {
               }
               await guardarTokenCanal(wsId, waCanalId, longLivedUserToken);
             }
-          } else if (!phoneRes.ok) {
-            console.error(`[DEBUG-WA] Error al obtener números de WABA ${wabaId}:`, phoneData.error);
           }
         }
       } else {
-        console.warn(`[DEBUG-WA] No se encontraron WABAs en ninguna cuenta comercial.`);
-        // Log de depuración para ver qué permisos tiene el token realmente
-        const debugToken = await fetch(`https://graph.facebook.com/debug_token?input_token=${longLivedUserToken}&access_token=${appId}|${appSecret}`);
-        const debugData = await debugToken.json();
-        console.log(`[DEBUG-WA] Debug del Token:`, JSON.stringify(debugData.data?.scopes || []));
+        console.warn(`[DEBUG-WA] No se encontraron WABAs. Debug del Token:`, JSON.stringify(debugData.data?.scopes || []));
       }
     } catch (waError) {
       console.error('Error detectando WhatsApp accounts:', waError);
     }
+    console.log(`[EXITO-FINAL] Proceso de sincronización terminado para wsId: ${wsId}`);
 
     // 5. Actualizar canalesPageIds en el workspace
     if (newPageIds.length > 0) {
