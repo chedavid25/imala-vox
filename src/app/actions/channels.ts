@@ -213,31 +213,20 @@ export async function sincronizarWebhooks(wsId: string, canalId: string) {
       };
     }
 
-    // 🔧 FIX: Verificar DESPUÉS de suscribir que el campo leadgen quedó activo.
-    // Esto detecta casos donde Meta devuelve success:true parcial.
-    const verifyRes = await fetch(
-      `https://graph.facebook.com/v19.0/${metaPageId}/subscribed_apps?access_token=${encodeURIComponent(metaAccessToken)}`
-    );
-    const verifyData = await verifyRes.json();
+    const hasMessages = subscribedFieldsList.includes("messages");
 
-    const appSubscribed = verifyData.data?.[0];
-    const subscribedFieldsList: string[] = (appSubscribed?.subscribed_fields || [])
-      .map((f: any) => typeof f === "string" ? f : f.name);
-
-    const hasLeadgen = subscribedFieldsList.includes("leadgen");
-
-    console.log(`[sincronizarWebhooks] Verificación página ${metaPageId}:`, {
-      appSubscribed: !!appSubscribed,
-      subscribedFields: subscribedFieldsList,
-      hasLeadgen
-    });
-
-    if (!hasLeadgen) {
-      return {
-        success: false,
-        error: "La página quedó suscrita pero el campo 'leadgen' no se activó. Verificá que el Page Access Token tenga el permiso 'leads_retrieval' y que la app tenga el producto Webhooks → Page → 'leadgen' habilitado en el panel de Meta."
-      };
+    if (hasMessages) {
+      await adminDb.doc(canalPath).update({
+        webhookVerified: true,
+        actualizadoEl: Timestamp.now()
+      });
+      return { success: true };
     }
+
+    return { 
+      success: false, 
+      error: "No se pudo activar la mensajería. Asegúrate de haber concedido el permiso 'pages_messaging' durante la conexión." 
+    };
 
     await adminDb.doc(canalPath).update({
       webhookVerified: true,
