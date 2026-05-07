@@ -142,23 +142,49 @@ export async function GET(req: NextRequest) {
         
       // Compartir el mismo token de la página para Instagram
       await guardarTokenCanal(wsId, igCanalId, pageAccessToken);
-    }
-  }
-
-  // --- DETECTION DE WHATSAPP BUSINESS ---
+     // --- DETECTION DE WHATSAPP BUSINESS (Búsqueda Profunda) ---
     try {
+      console.log(`[DEBUG-WA] Iniciando búsqueda profunda de WABAs...`);
+      
+      // 1. Intentar obtener WABAs directas del usuario
       const wabaRes = await fetch(
         `https://graph.facebook.com/v19.0/me/whatsapp_business_accounts?access_token=${longLivedUserToken}`
       );
       const wabaData = await wabaRes.json();
-      console.log(`[DEBUG-WA] WABAs encontradas:`, wabaData.data?.length || 0);
+      
+      let allWabas = [...(wabaData.data || [])];
+      console.log(`[DEBUG-WA] WABAs directas encontradas: ${allWabas.length}`);
 
-      if (wabaRes.ok && wabaData.data) {
-        for (const waba of wabaData.data) {
+      // 2. Intentar obtener Business Managers y sus WABAs (Fallback)
+      const bizRes = await fetch(
+        `https://graph.facebook.com/v19.0/me/businesses?access_token=${longLivedUserToken}`
+      );
+      const bizData = await bizRes.json();
+      
+      if (bizRes.ok && bizData.data) {
+        console.log(`[DEBUG-WA] Business Managers encontrados: ${bizData.data.length}`);
+        for (const biz of bizData.data) {
+          const bizWabaRes = await fetch(
+            `https://graph.facebook.com/v19.0/${biz.id}/whatsapp_business_accounts?access_token=${longLivedUserToken}`
+          );
+          const bizWabaData = await bizWabaRes.json();
+          if (bizWabaRes.ok && bizWabaData.data) {
+            for (const bw of bizWabaData.data) {
+              if (!allWabas.find(x => x.id === bw.id)) {
+                allWabas.push(bw);
+              }
+            }
+          }
+        }
+      }
+
+      console.log(`[DEBUG-WA] Total de WABAs tras búsqueda profunda: ${allWabas.length}`);
+
+      if (allWabas.length > 0) {
+        for (const waba of allWabas) {
           const wabaId = waba.id;
-          console.log(`[DEBUG-WA] Revisando WABA: ${wabaId} (${waba.name})`);
+          console.log(`[DEBUG-WA] Revisando WABA: ${wabaId} (${waba.name || 'Sin nombre'})`);
           
-          // Obtener los números de teléfono de esta cuenta de WhatsApp
           const phoneRes = await fetch(
             `https://graph.facebook.com/v19.0/${wabaId}/phone_numbers?access_token=${longLivedUserToken}`
           );
@@ -170,7 +196,6 @@ export async function GET(req: NextRequest) {
               const { id: phoneId, display_phone_number: phoneNumber, verified_name: verifiedName } = phone;
               console.log(`[DEBUG-WA] Procesando número: ${phoneNumber} (ID: ${phoneId})`);
 
-              // Buscar si ya existe este canal de WhatsApp
               const waSnap = await workspaceRef
                 .collection(COLLECTIONS.CANALES)
                 .where('tipo', '==', 'whatsapp')
@@ -185,7 +210,7 @@ export async function GET(req: NextRequest) {
                 metaPhoneNumberId: phoneId,
                 wabaId: wabaId,
                 status: 'connected' as const,
-                webhookVerified: false, // Requiere verificación de número
+                webhookVerified: false,
                 actualizadoEl: Timestamp.now(),
               };
 
@@ -200,17 +225,21 @@ export async function GET(req: NextRequest) {
                 });
                 waCanalId = waRef.id;
               }
-
-              // Guardar el token de usuario (que tiene permiso para WA) para este canal
-              // Meta permite usar el User Token para gestionar WABAs si se tienen los scopes adecuados
               await guardarTokenCanal(wsId, waCanalId, longLivedUserToken);
             }
+          } else if (!phoneRes.ok) {
+            console.error(`[DEBUG-WA] Error al obtener números de WABA ${wabaId}:`, phoneData.error);
           }
         }
+      } else {
+        console.warn(`[DEBUG-WA] No se encontraron WABAs en ninguna cuenta comercial.`);
+        // Log de depuración para ver qué permisos tiene el token realmente
+        const debugToken = await fetch(`https://graph.facebook.com/debug_token?input_token=${longLivedUserToken}&access_token=${appId}|${appSecret}`);
+        const debugData = await debugToken.json();
+        console.log(`[DEBUG-WA] Debug del Token:`, JSON.stringify(debugData.data?.scopes || []));
       }
     } catch (waError) {
       console.error('Error detectando WhatsApp accounts:', waError);
-      // No lanzamos error para no bloquear la sincronización de FB/IG si falla solo WA
     }
 
     // 5. Actualizar canalesPageIds en el workspace
