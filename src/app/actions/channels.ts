@@ -30,6 +30,7 @@ export async function conectarCanalManual(wsId: string, datos: {
   metaPageId?: string;
   metaPhoneNumberId?: string;
   metaInstagramId?: string;
+  metaWABAId?: string;
   accessToken: string;
 }) {
   try {
@@ -66,6 +67,7 @@ export async function conectarCanalManual(wsId: string, datos: {
       metaPageId: datos.metaPageId || null,
       metaPhoneNumberId: datos.metaPhoneNumberId || null,
       metaInstagramId: datos.metaInstagramId || null,
+      metaWABAId: datos.metaWABAId || null,
       status: 'connected' as const,
       webhookVerified: false,
       actualizadoEl: Timestamp.now(),
@@ -283,9 +285,9 @@ export async function sincronizarWebhooksWhatsApp(wsId: string, canalId: string)
     }
 
     // Verificar que el token tiene acceso al Phone Number ID en Meta
-    // whatsapp_business_account nos da el WABA ID necesario para listar plantillas
+    // Nota: whatsapp_business_account puede fallar en números de prueba, por eso lo hacemos opcional
     const verifyRes = await fetch(
-      `https://graph.facebook.com/v19.0/${phoneNumberId}?fields=display_phone_number,verified_name,whatsapp_business_account&access_token=${metaAccessToken}`
+      `https://graph.facebook.com/v19.0/${phoneNumberId}?fields=display_phone_number,verified_name&access_token=${metaAccessToken}`
     );
     const verifyData = await verifyRes.json();
 
@@ -296,7 +298,15 @@ export async function sincronizarWebhooksWhatsApp(wsId: string, canalId: string)
       };
     }
 
-    const wabaId = verifyData.whatsapp_business_account?.id || null;
+    // Intentar obtener el WABA ID solo si no lo tenemos, pero no bloquear si falla
+    let wabaId = canalData.metaWABAId || null;
+    if (!wabaId) {
+      const wabaRes = await fetch(
+        `https://graph.facebook.com/v19.0/${phoneNumberId}?fields=whatsapp_business_account&access_token=${metaAccessToken}`
+      );
+      const wabaData = await wabaRes.json();
+      wabaId = wabaData.whatsapp_business_account?.id || null;
+    }
 
     await adminDb.doc(canalPath).update({
       webhookVerified: true,

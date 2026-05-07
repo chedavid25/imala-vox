@@ -125,6 +125,7 @@ export default function CanalesPage() {
   const [waPhoneNumberId, setWaPhoneNumberId] = useState('');
   const [waAccessToken, setWaAccessToken] = useState('');
   const [waDisplayName, setWaDisplayName] = useState('');
+  const [waWabaId, setWaWabaId] = useState('');
   const [isConnectingWA, setIsConnectingWA] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -251,6 +252,7 @@ export default function CanalesPage() {
         nombre: waDisplayName.trim() || 'WhatsApp Business',
         cuenta: waPhoneNumberId.trim(),
         metaPhoneNumberId: waPhoneNumberId.trim(),
+        metaWABAId: waWabaId.trim(),
         accessToken: waAccessToken.trim(),
       });
 
@@ -260,6 +262,7 @@ export default function CanalesPage() {
         setWaPhoneNumberId('');
         setWaAccessToken('');
         setWaDisplayName('');
+        setWaWabaId('');
       } else {
         toast.error(res.error || "No se pudo conectar el canal");
       }
@@ -722,6 +725,17 @@ export default function CanalesPage() {
                 className="h-12 rounded-2xl bg-slate-50 border-none px-4 text-sm font-semibold"
               />
               <p className="text-[9px] text-[var(--text-tertiary-light)] px-1 font-medium">Generá un System User Token en Meta Business Suite → Configuración del negocio</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-[10px] uppercase font-black text-[var(--text-tertiary-light)] ml-1">WhatsApp Business Account (WABA) ID</Label>
+              <Input
+                placeholder="Ej: 1588419892267089"
+                value={waWabaId}
+                onChange={(e) => setWaWabaId(e.target.value)}
+                className="h-12 rounded-2xl bg-slate-50 border-none px-4 text-sm font-semibold"
+              />
+              <p className="text-[9px] text-[var(--text-tertiary-light)] px-1 font-medium">Opcional para números reales, pero RECOMENDADO para números de prueba.</p>
             </div>
 
             <div className="space-y-2">
