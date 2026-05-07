@@ -847,10 +847,7 @@ export default function CanalesPage() {
                     <SelectContent position="popper" sideOffset={4} className="rounded-2xl border-slate-100 shadow-2xl bg-white w-[var(--radix-select-trigger-width)]">
                       {agentes.map(a => (
                         <SelectItem key={a.id} value={a.id} className="rounded-xl py-2.5">
-                          <div className="flex flex-col items-start">
-                            <span className="font-bold text-[13px]">{a.nombre}</span>
-                            <span className="text-[10px] text-[var(--text-tertiary-light)] font-medium uppercase tracking-tight">{a.rolAgente}</span>
-                          </div>
+                          <span className="font-bold text-[13px]">{a.nombre}</span>
                         </SelectItem>
                       ))}
                     </SelectContent>
