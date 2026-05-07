@@ -149,20 +149,24 @@ export async function GET(req: NextRequest) {
         `https://graph.facebook.com/v19.0/me/whatsapp_business_accounts?access_token=${longLivedUserToken}`
       );
       const wabaData = await wabaRes.json();
+      console.log(`[DEBUG-WA] WABAs encontradas:`, wabaData.data?.length || 0);
 
       if (wabaRes.ok && wabaData.data) {
         for (const waba of wabaData.data) {
           const wabaId = waba.id;
+          console.log(`[DEBUG-WA] Revisando WABA: ${wabaId} (${waba.name})`);
           
           // Obtener los números de teléfono de esta cuenta de WhatsApp
           const phoneRes = await fetch(
             `https://graph.facebook.com/v19.0/${wabaId}/phone_numbers?access_token=${longLivedUserToken}`
           );
           const phoneData = await phoneRes.json();
+          console.log(`[DEBUG-WA] Números en WABA ${wabaId}:`, phoneData.data?.length || 0);
 
           if (phoneRes.ok && phoneData.data) {
             for (const phone of phoneData.data) {
               const { id: phoneId, display_phone_number: phoneNumber, verified_name: verifiedName } = phone;
+              console.log(`[DEBUG-WA] Procesando número: ${phoneNumber} (ID: ${phoneId})`);
 
               // Buscar si ya existe este canal de WhatsApp
               const waSnap = await workspaceRef
