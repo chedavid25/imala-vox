@@ -52,6 +52,7 @@ import { COLLECTIONS, Canal, Agente } from "@/lib/types/firestore";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { PlanGate } from "@/components/layout/PlanGate";
 
 interface WebConfig {
   dominios: string[];
@@ -228,6 +229,11 @@ export default function WebChannelPage() {
   if (!isMounted || loading) return null;
 
   return (
+    <PlanGate
+      requiredPlan="agencia"
+      featureName="Chat en vivo para tu sitio web"
+      featureDescription="Insertá un widget de chat en tu sitio web que conecta directamente con tu agente IA. Tus visitantes pueden consultar desde la web y el agente los atiende como en WhatsApp."
+    >
     <div className="min-h-screen bg-[var(--bg-main)] p-8">
       <div className="max-w-6xl mx-auto space-y-8">
         
@@ -685,5 +691,6 @@ export default function WebChannelPage() {
 
       </div>
     </div>
+    </PlanGate>
   );
 }

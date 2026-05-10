@@ -76,6 +76,7 @@ import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
+import { PlanGate } from "@/components/layout/PlanGate";
 
 export default function DifusionPage() {
   const { currentWorkspaceId } = useWorkspaceStore();
@@ -314,6 +315,11 @@ export default function DifusionPage() {
   };
 
   return (
+    <PlanGate
+      requiredPlan="pro"
+      featureName="Difusión Masiva"
+      featureDescription="Enviá campañas de WhatsApp a tu base de contactos segmentada por etiquetas. Ofertas, novedades, recordatorios — con respuestas gestionadas automáticamente por tu agente IA."
+    >
     <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
@@ -858,6 +864,7 @@ export default function DifusionPage() {
         </TabsContent>
       </Tabs>
     </div>
+    </PlanGate>
   );
 }
 

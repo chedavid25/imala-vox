@@ -34,6 +34,10 @@ service cloud.firestore {
       match /canales/{canalId}/secrets/{secretId} {
         allow read, write: if false;
       }
+
+      match /sesionesIA/{docId} {
+        allow read, write: if false; // Solo accesible desde Admin SDK (backend)
+      }
     }
 
     // Reglas para consultas globales (Collection Groups)

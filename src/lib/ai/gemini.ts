@@ -4,9 +4,9 @@ const apiKey = process.env.GEMINI_API_KEY || "";
 export const genAI = new GoogleGenerativeAI(apiKey);
 
 export const MODELOS = {
-  CLASIFICADOR: "gemini-3-flash-preview", 
-  AGENTE: "gemini-3-flash-preview",       
-  EXTRACTOR: "gemini-3-flash-preview",    
+  CLASIFICADOR: "gemini-2.5-flash-lite",   // Clasificación de intención — tarea simple, alto volumen
+  AGENTE: "gemini-3-flash-preview",         // Respuesta del agente — tarea principal, necesita calidad
+  EXTRACTOR: "gemini-2.5-flash-lite",       // Resumen de escalada — tarea simple
 };
 
 /**

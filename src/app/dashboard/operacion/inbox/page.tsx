@@ -14,6 +14,7 @@ import { enviarMensajeAccion } from "@/app/actions/channels";
 import { getDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { ConvLimitBanner } from "@/components/layout/ConvLimitBanner";
 
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
@@ -271,7 +272,9 @@ function InboxContent() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] w-full overflow-hidden bg-[var(--bg-main)]">
+    <div className="flex flex-col h-[calc(100vh-4rem)] w-full overflow-hidden bg-[var(--bg-main)]">
+      <ConvLimitBanner />
+    <div className="flex flex-1 w-full overflow-hidden">
       {/* Columna 1: Listado de Chats */}
       <div className="w-1/4 min-w-[320px] max-w-[400px] border-r border-[var(--border-light)] flex flex-col h-full overflow-hidden">
         <ChatList 
@@ -303,6 +306,7 @@ function InboxContent() {
       
       {/* Columna 3: Panel de Contexto (CRM) */}
       <ContextPanel onSendMessage={handleSendMessage} />
+    </div>
     </div>
   );
 }

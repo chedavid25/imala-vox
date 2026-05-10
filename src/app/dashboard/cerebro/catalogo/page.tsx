@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ImportadorCSV } from "@/components/dashboard/ImportadorCSV";
+import { PlanGate } from "@/components/layout/PlanGate";
 
 type ObjetoConId = Objeto & { id: string };
 
@@ -640,9 +641,15 @@ function CatalogoContent() {
 
 export default function CatalogoPage() {
   return (
-    <Suspense fallback={<div className="p-8 flex justify-center"><Loader2 className="animate-spin" /></div>}>
-      <CatalogoContent />
-    </Suspense>
+    <PlanGate
+      requiredPlan="pro"
+      featureName="Catálogo Inteligente"
+      featureDescription="Importá automáticamente tus productos o propiedades desde tu sitio web. El agente los detecta y los ofrece en las conversaciones sin que tengas que cargar nada manualmente."
+    >
+      <Suspense fallback={<div className="p-8 flex justify-center"><Loader2 className="animate-spin" /></div>}>
+        <CatalogoContent />
+      </Suspense>
+    </PlanGate>
   );
 }
 

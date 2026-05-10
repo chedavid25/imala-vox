@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { PlanGate } from "@/components/layout/PlanGate";
 
 const WORKFLOWS = [
   { 
@@ -46,6 +47,11 @@ const WORKFLOWS = [
 
 export default function WorkflowsPage() {
   return (
+    <PlanGate
+      requiredPlan="agencia"
+      featureName="Workflows automatizados"
+      featureDescription="Creá secuencias automáticas de mensajes, recordatorios de vencimiento, seguimiento de leads y cualquier flujo de trabajo repetitivo. Tu negocio sigue funcionando sin que estés presente."
+    >
     <div className="flex flex-col items-center justify-center h-full min-h-[600px] p-12 text-center space-y-6 animate-in fade-in duration-700">  
       <div className="w-20 h-20 rounded-3xl bg-[var(--bg-input)] border border-[var(--border-light)] flex items-center justify-center shadow-inner">  
         <GitBranch className="w-10 h-10 text-[var(--text-tertiary-light)]" />  
@@ -110,5 +116,6 @@ export default function WorkflowsPage() {
       </div>
       */}
     </div>
+    </PlanGate>
   );
 }

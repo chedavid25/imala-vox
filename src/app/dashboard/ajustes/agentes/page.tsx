@@ -33,9 +33,10 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { PLAN_LIMITS } from "@/lib/planLimits";
 
 export default function AgentesPage() {
-  const { currentWorkspaceId } = useWorkspaceStore();
+  const { currentWorkspaceId, workspace } = useWorkspaceStore();
   const [agentes, setAgentes] = useState<(Agente & { id: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
@@ -76,6 +77,17 @@ export default function AgentesPage() {
 
   const handleCrearAgente = async () => {
     if (!currentWorkspaceId || !newAgente.nombre) return;
+
+    const plan = (workspace?.plan as "starter" | "pro" | "agencia") || "starter";
+    const limiteAgentes = PLAN_LIMITS[plan].agentsIA;
+    if (agentes.length >= limiteAgentes) {
+      toast.error(
+        `Tu plan ${plan.charAt(0).toUpperCase() + plan.slice(1)} incluye hasta ${limiteAgentes} agente${limiteAgentes > 1 ? "s" : ""}. Actualizá tu plan para crear más.`
+      );
+      router.push("/dashboard/ajustes/facturacion");
+      return;
+    }
+
     setIsAdding(true);
 
     try {

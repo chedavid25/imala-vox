@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { Timestamp } from 'firebase-admin/firestore';
 import { COLLECTIONS } from '@/lib/types/firestore';
+import { PLAN_LIMITS } from '@/lib/planLimits';
 import crypto from 'crypto';
 
 // GET — verificación del webhook por Meta
@@ -96,6 +97,73 @@ export async function POST(request: NextRequest) {
     console.error("❌ Error crítico al recibir webhook:", error.message);
     return NextResponse.json({ status: 'error', message: error.message }, { status: 200 }); // Retornamos 200 para que Meta no reintente
   }
+}
+
+/**
+ * Obtiene los datos del workspace y resetea uso.convCount si el período mensual ya venció.
+ * Usa el campo usoReiniciaEl que ya existe en el schema de Workspace.
+ */
+async function obtenerWsDataConReset(wsId: string): Promise<any> {
+  const { Timestamp } = require('firebase-admin/firestore');
+  const { FieldValue } = require('firebase-admin').firestore;
+
+  const wsRef = adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}`);
+  const wsSnap = await wsRef.get();
+  const wsData = wsSnap.data();
+
+  if (!wsData) return wsData;
+
+  const usoReiniciaEl: number = wsData.usoReiniciaEl?.toMillis?.() || 0;
+
+  if (Date.now() >= usoReiniciaEl) {
+    const proximoReinicio = new Date();
+    proximoReinicio.setMonth(proximoReinicio.getMonth() + 1);
+
+    await wsRef.update({
+      'uso.convCount': 0,
+      usoReiniciaEl: Timestamp.fromDate(proximoReinicio),
+    });
+
+    console.log(`[RESET_MENSUAL] Workspace ${wsId}: convCount → 0. Próximo reinicio: ${proximoReinicio.toISOString()}`);
+    return { ...wsData, uso: { ...wsData.uso, convCount: 0 } };
+  }
+
+  return wsData;
+}
+
+/**
+ * Verifica si ya se contabilizó una sesión de IA para este contacto en las últimas 24hs.
+ * Una "sesión" = todos los mensajes de un mismo contacto en un día.
+ * Retorna true  → sesión nueva, hay que incrementar el contador.
+ * Retorna false → sesión activa, NO incrementar.
+ */
+async function debeContarSesion(wsId: string, contactoId: string): Promise<boolean> {
+  const { Timestamp } = require('firebase-admin/firestore');
+
+  const sesionRef = adminDb
+    .collection(COLLECTIONS.ESPACIOS).doc(wsId)
+    .collection('sesionesIA').doc(contactoId);
+
+  const snap = await sesionRef.get();
+  const ahora = Date.now();
+  const VENTANA_MS = 24 * 60 * 60 * 1000; // 24 horas
+
+  if (snap.exists) {
+    const ultimaSesion = snap.data()?.ultimaSesionEl?.toMillis?.() || 0;
+    if (ahora - ultimaSesion < VENTANA_MS) {
+      // Sesión activa — actualizar timestamp pero NO contar
+      await sesionRef.update({ ultimaSesionEl: Timestamp.now() });
+      return false;
+    }
+  }
+
+  // Sesión nueva — registrar y contar
+  await sesionRef.set({
+    contactoId,
+    ultimaSesionEl: Timestamp.now(),
+    creadoEl: Timestamp.now(),
+  });
+  return true;
 }
 
 /**
@@ -460,7 +528,18 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
     // 5. Trigger IA si está habilitado
     if (canalData.aiEnabled && canalData.agenteId) {
       console.log(`IA activada para ${canalType}. Agente: ${canalData.agenteId}`);
-      
+
+      // Verificar límite mensual (y resetear si el período venció)
+      const wsData = await obtenerWsDataConReset(wsId);
+      const planActual = (wsData?.plan as "starter" | "pro" | "agencia") || "starter";
+      const limiteConv = PLAN_LIMITS[planActual].convCountIA;
+      const usadoConv = wsData?.uso?.convCount || 0;
+
+      if (typeof limiteConv === "number" && usadoConv >= limiteConv) {
+        console.log(`[LIMITE_PLAN] Workspace ${wsId} alcanzó ${limiteConv} sesiones. Procesamiento IA detenido.`);
+        return;
+      }
+
       const cDocSnap = await contactosRef.doc(contactoId).get();
       if (cDocSnap.exists) {
         const isBlocked = await isAIBlockedForContact(wsId, cDocSnap.data());
@@ -524,13 +603,16 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
 
         if (!isCopiloto && respuestaIA) {
            await enviarMensajeAccion(wsId, canalId, senderId, respuestaIA);
-           
-           // Incrementar mensajes IA en el workspace
-           const FieldValue = require('firebase-admin').firestore.FieldValue;
-           await adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}`).update({
-             "uso.convCount": FieldValue.increment(1)
-           });
-           
+
+           // Solo contar si es una sesión nueva (no si el mismo contacto ya escribió en las últimas 24hs)
+           const esSesionNueva = await debeContarSesion(wsId, contactoId || senderId);
+           if (esSesionNueva) {
+             const FieldValue = require('firebase-admin').firestore.FieldValue;
+             await adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}`).update({
+               "uso.convCount": FieldValue.increment(1)
+             });
+           }
+
            console.log(`✅ Respuesta IA completada para Meta (${canalType}) - sender: ${senderId}`);
         }
       } catch (error) {
@@ -648,6 +730,17 @@ async function procesarMensajeWhatsapp(value: any, wabaId: string) {
 
     // 5. Trigger IA
     if (canalData.aiEnabled && canalData.agenteId) {
+      // Verificar límite mensual (y resetear si el período venció)
+      const wsData = await obtenerWsDataConReset(wsId);
+      const planActual = (wsData?.plan as "starter" | "pro" | "agencia") || "starter";
+      const limiteConv = PLAN_LIMITS[planActual].convCountIA;
+      const usadoConv = wsData?.uso?.convCount || 0;
+
+      if (typeof limiteConv === "number" && usadoConv >= limiteConv) {
+        console.log(`[LIMITE_PLAN] Workspace ${wsId} alcanzó ${limiteConv} sesiones. Procesamiento IA detenido.`);
+        return;
+      }
+
       const cDocSnap = await contactosRef.doc(contactoId).get();
       if (cDocSnap.exists) {
         const isBlocked = await isAIBlockedForContact(wsId, cDocSnap.data());
@@ -704,10 +797,14 @@ async function procesarMensajeWhatsapp(value: any, wabaId: string) {
         if (!isCopiloto && respuestaIA) {
           await enviarMensajeAccion(wsId, canalId, senderId, respuestaIA);
 
-          const FieldValue = require('firebase-admin').firestore.FieldValue;
-          await adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}`).update({
-            "uso.convCount": FieldValue.increment(1)
-          });
+          // Solo contar si es una sesión nueva (no si el mismo contacto ya escribió en las últimas 24hs)
+          const esSesionNueva = await debeContarSesion(wsId, contactoId || senderId);
+          if (esSesionNueva) {
+            const FieldValue = require('firebase-admin').firestore.FieldValue;
+            await adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}`).update({
+              "uso.convCount": FieldValue.increment(1)
+            });
+          }
 
           console.log(`✅ Respuesta IA completada para WhatsApp - sender: ${senderId}`);
         }

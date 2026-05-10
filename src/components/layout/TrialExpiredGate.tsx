@@ -35,27 +35,92 @@ type FeatureGroup = { label: string; items: string[]; locked?: boolean };
 const PRICING_FEATURES: Record<PlanKey, { tag?: string; inheritsFrom?: string; groups: FeatureGroup[] }> = {
   starter: {
     groups: [
-      { label: "IA & Agentes", items: ["1 Agente Inteligente", "1.000 conversaciones/mes", "Base de conocimiento (PDF, webs)"] },
-      { label: "Canales", items: ["WhatsApp · Instagram · Facebook"] },
-      { label: "CRM", items: ["1.500 contactos CRM", "Leads, Tareas y Contactos", "Etiquetas y segmentación"] },
-      { label: "No incluido", locked: true, items: ["Catálogo de productos", "Difusión masiva", "Meta Ads · Leads", "Workflows"] },
+      {
+        label: "IA & Agentes",
+        items: [
+          "1 Agente Inteligente",
+          "800 conversaciones IA/mes",
+          "Base de conocimiento (PDF, webs, textos)",
+          "3 fuentes de conocimiento",
+        ],
+      },
+      {
+        label: "Canales",
+        items: ["1 número WhatsApp · Instagram · Facebook", "Captura de leads de Meta Ads"],
+      },
+      {
+        label: "CRM",
+        items: ["500 contactos", "Pipeline básico", "Leads, Tareas y Etiquetas"],
+      },
+      {
+        label: "No incluido",
+        locked: true,
+        items: [
+          "Catálogo de productos / propiedades",
+          "Difusión masiva",
+          "Workflows automatizados",
+          "Chat en vivo para sitio web",
+        ],
+      },
     ],
   },
   pro: {
     tag: "Más popular",
     inheritsFrom: "Starter",
     groups: [
-      { label: "IA & Agentes", items: ["Hasta 3 Agentes Inteligentes", "3.000 conversaciones/mes", "5.000 contactos CRM"] },
-      { label: "Marketing", items: ["Catálogo de productos (200 items)", "Difusión masiva (hasta 1.000/envío)", "Meta Ads · Leads de campañas"] },
-      { label: "No incluido", locked: true, items: ["Workflows automatizados"] },
+      {
+        label: "IA & Agentes",
+        items: [
+          "2 Agentes Inteligentes con roles distintos",
+          "2.000 conversaciones IA/mes",
+          "Fuentes de conocimiento ilimitadas",
+        ],
+      },
+      {
+        label: "Catálogo",
+        items: [
+          "Catálogo de productos / propiedades (300 ítems)",
+          "Scraping automático desde tu sitio web",
+        ],
+      },
+      {
+        label: "Marketing",
+        items: [
+          "2 números WhatsApp",
+          "Difusión masiva hasta 2.000 contactos/envío",
+          "Contactos ilimitados",
+        ],
+      },
+      {
+        label: "No incluido",
+        locked: true,
+        items: ["Workflows automatizados", "Chat en vivo para sitio web"],
+      },
     ],
   },
   agencia: {
     inheritsFrom: "Pro",
     groups: [
-      { label: "IA & Agentes", items: ["Hasta 10 Agentes Inteligentes", "10.000 conversaciones/mes", "Contactos ilimitados"] },
-      { label: "Marketing ampliado", items: ["Catálogo ilimitado de productos", "Difusión masiva sin límite"] },
-      { label: "Automatización", items: ["Workflows automatizados"] },
+      {
+        label: "IA & Agentes",
+        items: [
+          "10 Agentes Inteligentes especializados",
+          "10.000 conversaciones IA/mes",
+          "5 usuarios del panel",
+        ],
+      },
+      {
+        label: "Catálogo & Canales",
+        items: [
+          "Catálogo ilimitado con re-sincronización automática",
+          "5 números WhatsApp",
+          "Chat en vivo para tu sitio web",
+        ],
+      },
+      {
+        label: "Automatización",
+        items: ["Workflows automatizados", "Asignación automática de chats", "API access"],
+      },
     ],
   },
 };
@@ -160,7 +225,7 @@ export function TrialExpiredGate() {
               >
                 Anual
                 <span className="bg-emerald-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full">
-                  −17%
+                  −15%
                 </span>
               </button>
             </div>

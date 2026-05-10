@@ -108,7 +108,7 @@ function InboxMockup() {
                 <Bot className="w-2.5 h-2.5 text-black" />
               </div>
               <div className="bg-[#2A2A28] border border-white/5 rounded-2xl rounded-tl-sm px-3 py-1.5 max-w-[75%]">
-                <p className="text-[9px] text-white/80">¡Hola María! Claro que sí 😊 Tenemos planes desde $35/mes. ¿Para qué tipo de negocio lo necesitás?</p>
+                <p className="text-[9px] text-white/80">¡Hola María! Claro que sí 😊 Tenemos planes desde $39/mes. ¿Para qué tipo de negocio lo necesitás?</p>
               </div>
             </div>
             <div className="flex justify-end">
@@ -228,6 +228,155 @@ function KnowledgeMockup() {
 }
 
 // ─────────────────────────────────────────────
+// MOCKUP: Catálogo Inteligente
+// ─────────────────────────────────────────────
+function CatalogMockup() {
+  const products = [
+    { name: "Remera oversize básica", price: "ARS 18.500", status: "Disponible", color: "bg-rose-200" },
+    { name: "Jean slim fit azul", price: "ARS 32.000", status: "Disponible", color: "bg-blue-200" },
+    { name: "Vestido floral verano", price: "ARS 27.900", status: "Reservado", color: "bg-purple-200" },
+    { name: "Campera de cuero negro", price: "ARS 89.000", status: "Disponible", color: "bg-slate-300" },
+    { name: "Short deportivo", price: "ARS 12.500", status: "Disponible", color: "bg-green-200" },
+    { name: "Blusa de seda off-white", price: "ARS 41.000", status: "Vendido", color: "bg-amber-100" },
+  ];
+  return (
+    <BrowserChrome url="app.imalavox.com/cerebro/catalogo">
+      <div className="bg-[#F5F5F4] h-[340px] overflow-hidden">
+        <div className="bg-white border-b border-[#E5E5E3] px-4 py-2.5 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold text-[#1A1A18]">Catálogo</span>
+            <span className="text-[8px] bg-[#C8FF00] text-black font-black px-2 py-0.5 rounded-full">300 productos</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[8px] text-[#A3A39E] font-medium">Extraído de mitienda.com.ar</span>
+            <div className="flex items-center gap-1 text-[7px] font-black text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">
+              <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+              Sincronizado
+            </div>
+          </div>
+        </div>
+        <div className="p-3 grid grid-cols-3 gap-2 overflow-hidden">
+          {products.map((p, i) => (
+            <div key={i} className="bg-white border border-[#E5E5E3] rounded-xl overflow-hidden">
+              <div className={cn("h-14 w-full", p.color)} />
+              <div className="p-2 space-y-1">
+                <p className="text-[8px] font-bold text-[#1A1A18] truncate leading-tight">{p.name}</p>
+                <p className="text-[9px] font-black text-[#1A1A18]">{p.price}</p>
+                <span className={cn(
+                  "text-[7px] font-black px-1.5 py-0.5 rounded-full inline-block",
+                  p.status === "Disponible" ? "bg-emerald-100 text-emerald-700" :
+                  p.status === "Reservado" ? "bg-amber-100 text-amber-700" :
+                  "bg-red-100 text-red-700"
+                )}>{p.status}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="px-4 py-2 border-t border-[#E5E5E3] bg-white flex items-center gap-2">
+          <Globe className="w-3 h-3 text-[#A3A39E]" />
+          <span className="text-[8px] text-[#A3A39E] font-medium">Última sincronización: hace 2 horas · Próxima: en 22 horas</span>
+        </div>
+      </div>
+    </BrowserChrome>
+  );
+}
+
+// ─────────────────────────────────────────────
+// MOCKUP: Web Chat Widget
+// ─────────────────────────────────────────────
+function WebChatMockup() {
+  return (
+    <BrowserChrome url="mitienda.com.ar">
+      <div className="relative bg-[#F5F5F4] h-[320px] overflow-hidden">
+        {/* Simulación del sitio web */}
+        <div className="p-5 space-y-3">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-6 h-6 rounded-lg bg-[#1F1F1E]" />
+            <div className="h-2.5 w-24 bg-[#D5D5D3] rounded-full" />
+            <div className="ml-auto flex gap-2">
+              {[48, 32, 40].map((w, i) => (
+                <div key={i} className="h-2 rounded-full bg-[#D5D5D3]" style={{ width: w }} />
+              ))}
+            </div>
+          </div>
+          <div className="bg-[#1F1F1E] rounded-2xl h-24 flex items-center justify-center px-6">
+            <div className="space-y-2 w-full">
+              <div className="h-3 w-3/4 bg-white/10 rounded-full" />
+              <div className="h-2.5 w-1/2 bg-white/6 rounded-full" />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="bg-white border border-[#E5E5E3] rounded-xl h-16" />
+            ))}
+          </div>
+          <div className="space-y-2">
+            <div className="h-2 bg-[#D5D5D3] rounded-full w-full" />
+            <div className="h-2 bg-[#D5D5D3] rounded-full w-5/6" />
+            <div className="h-2 bg-[#D5D5D3] rounded-full w-2/3" />
+          </div>
+        </div>
+
+        {/* Widget de chat flotante */}
+        <div className="absolute bottom-4 right-4 flex flex-col items-end gap-2">
+          {/* Ventana del chat */}
+          <div className="w-52 bg-white rounded-2xl shadow-2xl border border-[#E5E5E3] overflow-hidden">
+            {/* Header del widget */}
+            <div className="bg-[#1F1F1E] px-3 py-2.5 flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-[#C8FF00] flex items-center justify-center shrink-0">
+                <Bot className="w-3 h-3 text-black" />
+              </div>
+              <div>
+                <p className="text-[9px] font-black text-white leading-none">Asistente Virtual</p>
+                <p className="text-[7px] text-[#C8FF00] font-bold mt-0.5">● En línea ahora</p>
+              </div>
+            </div>
+            {/* Mensajes */}
+            <div className="p-2.5 space-y-2 bg-[#F9F9F8]">
+              <div className="flex gap-1.5 items-end">
+                <div className="w-4 h-4 rounded-full bg-[#C8FF00] flex items-center justify-center shrink-0">
+                  <Bot className="w-2 h-2 text-black" />
+                </div>
+                <div className="bg-white border border-[#E5E5E3] rounded-xl rounded-bl-sm px-2 py-1.5 max-w-[80%] shadow-sm">
+                  <p className="text-[8px] text-[#1A1A18] leading-relaxed">¡Hola! 👋 ¿En qué puedo ayudarte hoy?</p>
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <div className="bg-[#1F1F1E] rounded-xl rounded-br-sm px-2 py-1.5 max-w-[80%]">
+                  <p className="text-[8px] text-white leading-relaxed">¿Hacen envíos a Córdoba?</p>
+                </div>
+              </div>
+              <div className="flex gap-1.5 items-end">
+                <div className="w-4 h-4 rounded-full bg-[#C8FF00] flex items-center justify-center shrink-0">
+                  <Bot className="w-2 h-2 text-black" />
+                </div>
+                <div className="bg-white border border-[#E5E5E3] rounded-xl rounded-bl-sm px-2 py-1.5 max-w-[80%] shadow-sm">
+                  <p className="text-[8px] text-[#1A1A18] leading-relaxed">¡Sí! Enviamos a todo el país. El costo a Córdoba es $3.500 🚚</p>
+                </div>
+              </div>
+            </div>
+            {/* Input */}
+            <div className="px-2.5 py-2 border-t border-[#E5E5E3] flex items-center gap-1.5 bg-white">
+              <div className="flex-1 bg-[#F5F5F4] rounded-lg px-2 py-1">
+                <p className="text-[8px] text-[#A3A39E]">Escribí tu consulta...</p>
+              </div>
+              <div className="w-5 h-5 rounded-lg bg-[#C8FF00] flex items-center justify-center shrink-0">
+                <ArrowRight className="w-2.5 h-2.5 text-black" />
+              </div>
+            </div>
+          </div>
+
+          {/* Botón flotante del widget */}
+          <div className="w-10 h-10 rounded-full bg-[#1F1F1E] shadow-2xl flex items-center justify-center border-2 border-[#C8FF00]">
+            <MessageSquare className="w-4 h-4 text-[#C8FF00]" />
+          </div>
+        </div>
+      </div>
+    </BrowserChrome>
+  );
+}
+
+// ─────────────────────────────────────────────
 // NAVBAR
 // ─────────────────────────────────────────────
 function Navbar() {
@@ -338,18 +487,19 @@ function HeroSection() {
       {/* Glow central */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#C8FF00] opacity-[0.04] blur-[100px] rounded-full pointer-events-none" />
 
-      <div className="relative z-10 max-w-7xl mx-auto px-6 py-24 flex flex-col items-center text-center">
+      <div className="relative z-10 w-full max-w-7xl mx-auto px-6 py-24 flex flex-col items-center text-center">
         {/* Badge */}
-        <Reveal animation="fade-in-up" delay={100}>
-          <div className="inline-flex items-center gap-2 bg-[#C8FF00]/10 border border-[#C8FF00]/20 text-[#C8FF00] text-xs font-black px-4 py-2 rounded-full mb-8 uppercase tracking-widest">
-            <Bot className="w-3.5 h-3.5" />
-            Agentes IA para WhatsApp, Instagram y Facebook
+        <Reveal animation="fade-in-up" delay={100} className="w-full flex justify-center">
+          <div className="inline-flex items-center gap-2 bg-[#C8FF00]/10 border border-[#C8FF00]/20 text-[#C8FF00] text-xs font-black px-4 py-2 rounded-full mb-8 uppercase tracking-widest max-w-full text-center">
+            <Bot className="w-3.5 h-3.5 shrink-0" />
+            <span className="sm:hidden">Agentes IA para todos tus canales</span>
+            <span className="hidden sm:inline">Agentes IA para WhatsApp, Instagram y Facebook</span>
           </div>
         </Reveal>
 
         {/* Titular */}
-        <Reveal animation="fade-in-up" delay={200}>
-          <h1 className="text-5xl md:text-7xl font-black text-white leading-[1.05] tracking-tight mb-6 max-w-4xl">
+        <Reveal animation="fade-in-up" delay={200} className="w-full">
+          <h1 className="text-5xl md:text-7xl font-black text-white leading-[1.05] tracking-tight mb-6 max-w-4xl mx-auto text-center">
             Tus clientes escriben<br />
             a las 3am.{" "}
             <span className="text-[#C8FF00]">Tu negocio<br />
@@ -358,16 +508,16 @@ function HeroSection() {
         </Reveal>
 
         {/* Subtítulo */}
-        <Reveal animation="fade-in-up" delay={300}>
-          <p className="text-lg md:text-xl text-white/55 max-w-2xl leading-relaxed mb-10 font-medium">
+        <Reveal animation="fade-in-up" delay={300} className="w-full">
+          <p className="text-lg md:text-xl text-white/55 max-w-2xl leading-relaxed mb-10 font-medium mx-auto text-center">
             Imalá Vox crea agentes de inteligencia artificial que atienden, califican y venden por vos —
             en todos tus canales, las 24 horas, sin que tengas que estar presente.
           </p>
         </Reveal>
 
         {/* CTAs */}
-        <Reveal animation="fade-in-up" delay={400}>
-          <div className="flex flex-col sm:flex-row items-center gap-4 mb-16">
+        <Reveal animation="fade-in-up" delay={400} className="w-full flex justify-center">
+          <div className="flex flex-col sm:flex-row items-center gap-4 mb-16 w-full sm:w-auto">
             <Link
               href="/auth"
               className="w-full sm:w-auto bg-[#C8FF00] text-black font-black px-8 py-4 rounded-2xl text-base hover:bg-[#B8EF00] transition-all active:scale-95 shadow-2xl shadow-[#C8FF00]/20 flex items-center gap-2 justify-center"
@@ -622,6 +772,24 @@ function FeaturesSection() {
         </BrowserChrome>
       ),
     },
+    {
+      id: "catalogo",
+      dark: true,
+      tag: "Catálogo Inteligente",
+      title: "Tu inventario siempre actualizado, sin carga manual",
+      desc: "Ingresás la URL de tu tienda o inmobiliaria y el sistema extrae todos tus productos o propiedades automáticamente. El agente los conoce y los ofrece en cada conversación.",
+      bullets: ["Scraping automático desde tu sitio web", "Re-sincronización periódica sin intervención", "El agente menciona productos según la consulta"],
+      mockup: <CatalogMockup />,
+    },
+    {
+      id: "webchat",
+      dark: false,
+      tag: "Chat en vivo",
+      title: "Tu agente también vive en tu sitio web",
+      desc: "Insertá una línea de código y tu agente IA aparece como widget en cualquier página de tu web. Los visitantes consultan ahí y el agente responde igual que en WhatsApp — sin que salgan del sitio.",
+      bullets: ["Un snippet de código, listo en 2 minutos", "Mismo agente que atiende WhatsApp e Instagram", "Conversaciones unificadas en el inbox"],
+      mockup: <WebChatMockup />,
+    },
   ];
 
   return (
@@ -739,33 +907,232 @@ type PlanFeatureGroup = { label: string; items: string[]; locked?: boolean };
 const PRICING_FEATURES: Record<Plan, { tag?: string; inheritsFrom?: string; groups: PlanFeatureGroup[] }> = {
   starter: {
     groups: [
-      { label: "IA & Agentes", items: ["1 Agente Inteligente", "1.000 conversaciones/mes", "Base de conocimiento (PDF, webs)"] },
-      { label: "Canales", items: ["WhatsApp · Instagram · Facebook"] },
-      { label: "CRM", items: ["1.500 contactos CRM", "Leads, Tareas y Contactos", "Etiquetas y segmentación"] },
-      { label: "No incluido", locked: true, items: ["Catálogo de productos", "Difusión masiva", "Meta Ads · Captura de leads", "Workflows"] },
+      {
+        label: "IA & Agentes",
+        items: [
+          "1 Agente Inteligente",
+          "800 conversaciones IA/mes",
+          "Base de conocimiento (PDF, webs, textos)",
+          "3 fuentes de conocimiento",
+        ],
+      },
+      {
+        label: "Canales",
+        items: ["1 número WhatsApp · Instagram · Facebook", "Captura de leads de Meta Ads"],
+      },
+      {
+        label: "CRM",
+        items: ["500 contactos", "Pipeline básico", "Leads, Tareas y Etiquetas"],
+      },
+      {
+        label: "No incluido",
+        locked: true,
+        items: [
+          "Catálogo de productos / propiedades",
+          "Difusión masiva",
+          "Workflows automatizados",
+          "Chat en vivo para sitio web",
+        ],
+      },
     ],
   },
   pro: {
     tag: "Más popular",
     inheritsFrom: "Starter",
     groups: [
-      { label: "IA & Agentes", items: ["Hasta 3 Agentes Inteligentes", "3.000 conversaciones/mes", "5.000 contactos CRM"] },
-      { label: "Marketing", items: ["Catálogo de productos (200 items)", "Difusión masiva (hasta 1.000/envío)", "Meta Ads · Leads de campañas"] },
-      { label: "No incluido", locked: true, items: ["Workflows automatizados"] },
+      {
+        label: "IA & Agentes",
+        items: [
+          "2 Agentes Inteligentes con roles distintos",
+          "2.000 conversaciones IA/mes",
+          "Fuentes de conocimiento ilimitadas",
+        ],
+      },
+      {
+        label: "Catálogo",
+        items: [
+          "Catálogo de productos / propiedades (300 ítems)",
+          "Scraping automático desde tu sitio web",
+        ],
+      },
+      {
+        label: "Marketing",
+        items: [
+          "2 números WhatsApp",
+          "Difusión masiva hasta 2.000 contactos/envío",
+          "Contactos ilimitados",
+        ],
+      },
+      {
+        label: "No incluido",
+        locked: true,
+        items: ["Workflows automatizados", "Chat en vivo para sitio web"],
+      },
     ],
   },
   agencia: {
     inheritsFrom: "Pro",
     groups: [
-      { label: "IA & Agentes", items: ["Hasta 10 Agentes Inteligentes", "10.000 conversaciones/mes", "Contactos ilimitados"] },
-      { label: "Marketing ampliado", items: ["Catálogo ilimitado de productos", "Difusión masiva sin límite"] },
-      { label: "Automatización", items: ["Workflows automatizados"] },
+      {
+        label: "IA & Agentes",
+        items: [
+          "10 Agentes Inteligentes especializados",
+          "10.000 conversaciones IA/mes",
+          "5 usuarios del panel",
+        ],
+      },
+      {
+        label: "Catálogo & Canales",
+        items: [
+          "Catálogo ilimitado con re-sincronización automática",
+          "5 números WhatsApp",
+          "Chat en vivo para tu sitio web",
+        ],
+      },
+      {
+        label: "Automatización",
+        items: ["Workflows automatizados", "Asignación automática de chats", "API access"],
+      },
     ],
   },
 };
 
+function PricingCompareTable({ isAnual }: { isAnual: boolean }) {
+  type CellValue = string | boolean | null;
+
+  interface TableRow {
+    label: string;
+    starter: CellValue;
+    pro: CellValue;
+    agencia: CellValue;
+    highlight?: boolean;
+    description?: string;
+  }
+
+  const rows: TableRow[] = [
+    { label: "Precio mensual", starter: "$39 USD", pro: "$69 USD", agencia: "$179 USD" },
+    { label: "Precio anual (por mes)", starter: "$33 USD", pro: "$59 USD", agencia: "$152 USD", description: "Pagás un año por adelantado y el precio mensual baja. No es el total anual." },
+    { label: "Prueba gratuita", starter: "7 días", pro: "7 días", agencia: "7 días", description: "Probás el plan completo sin tarjeta. Al vencer elegís si suscribirse o no." },
+
+    { label: "▸ IA & Agentes", starter: "", pro: "", agencia: "", highlight: true },
+    { label: "Agentes IA", starter: "1", pro: "2", agencia: "10", description: "Cada agente tiene su propio nombre, personalidad, instrucciones y canales asignados. Podés tener uno para ventas y otro para soporte, por ejemplo." },
+    { label: "Conversaciones IA/mes", starter: "800", pro: "2.000", agencia: "10.000", description: "Cada contacto que escribe cuenta como una sesión diaria. Si la misma persona manda 10 mensajes en el día, cuenta como 1 sola conversación." },
+    { label: "Base de conocimiento", starter: true, pro: true, agencia: true, description: "El agente aprende desde archivos PDF, textos propios y sitios web. Usa esa info para responder con precisión." },
+    { label: "Fuentes de conocimiento", starter: "3", pro: "Ilimitadas", agencia: "Ilimitadas", description: "Cada PDF, texto o sitio web que le cargás al agente es una fuente. Más fuentes = más información disponible para responder." },
+    { label: "Tono y personalidad del agente", starter: true, pro: true, agencia: true, description: "Definís cómo habla el agente: su nombre, si es formal o informal, qué temas puede tocar y cuáles no." },
+    { label: "Transferencia a agente humano", starter: true, pro: true, agencia: true, description: "Cuando el agente no puede resolver algo, avisa y pasa la conversación a una persona de tu equipo." },
+    { label: "Workflows automatizados", starter: false, pro: false, agencia: true, description: "Secuencias de mensajes y acciones que se disparan solas ante eventos: primer mensaje, sin respuesta, vencimiento de tarea, etc." },
+
+    { label: "▸ Catálogo", starter: "", pro: "", agencia: "", highlight: true },
+    { label: "Catálogo de productos / propiedades", starter: false, pro: true, agencia: true, description: "El agente conoce tu inventario y puede mencionar productos o propiedades relevantes dentro de la conversación." },
+    { label: "Ítems en catálogo", starter: "—", pro: "300", agencia: "Ilimitados", description: "Cantidad máxima de productos o propiedades que podés tener cargados y activos al mismo tiempo." },
+    { label: "Scraping automático desde sitio web", starter: false, pro: true, agencia: true, description: "Ingresás la URL de tu tienda o inmobiliaria y el sistema extrae los productos o propiedades automáticamente, sin carga manual." },
+    { label: "Re-sincronización periódica del catálogo", starter: false, pro: false, agencia: true, description: "El catálogo se actualiza solo de forma periódica. Si cambiás un precio o añadís un ítem en tu web, se refleja sin que hagas nada." },
+
+    { label: "▸ Canales", starter: "", pro: "", agencia: "", highlight: true },
+    { label: "WhatsApp Business", starter: "1 número", pro: "2 números", agencia: "5 números", description: "Cantidad de líneas de WhatsApp Business que podés conectar. Cada número puede tener su propio agente asignado." },
+    { label: "Instagram DMs", starter: true, pro: true, agencia: true, description: "El agente responde automáticamente los mensajes directos que lleguen a tu cuenta de Instagram." },
+    { label: "Facebook Messenger", starter: true, pro: true, agencia: true, description: "El agente gestiona los mensajes de tu página de Facebook, igual que en WhatsApp." },
+    { label: "Meta Leads (anuncios)", starter: true, pro: true, agencia: true, description: "Cada vez que alguien completa un formulario de tus campañas de Meta Ads, el lead entra directo al CRM sin intervención manual." },
+    { label: "Chat en vivo para sitio web", starter: false, pro: false, agencia: true, description: "Un widget de chat que insertás en tu web. Los visitantes chatean ahí y el agente los atiende igual que en WhatsApp." },
+
+    { label: "▸ CRM", starter: "", pro: "", agencia: "", highlight: true },
+    { label: "Contactos", starter: "500", pro: "Ilimitados", agencia: "Ilimitados", description: "Personas guardadas en tu base de contactos. Incluye historial de conversaciones, etiquetas y datos personalizados." },
+    { label: "Pipeline de ventas", starter: "Básico", pro: "Personalizable", agencia: "Personalizable + automático", description: "Tablero visual para ver en qué etapa está cada oportunidad de venta. En Agencia los contactos avanzan de etapa solos según sus acciones." },
+    { label: "Etiquetas y segmentación", starter: true, pro: true, agencia: true, description: "Clasificás contactos con etiquetas propias (ej: 'cliente vip', 'zona norte') para filtrar y enviar campañas específicas." },
+    { label: "Tareas y recordatorios", starter: true, pro: true, agencia: true, description: "Agendás seguimientos manuales con fecha y hora. El sistema te avisa para que ningún contacto quede sin respuesta." },
+    { label: "Asignación automática de chats", starter: false, pro: false, agencia: true, description: "Los chats entrantes se reparten solos entre los operadores humanos disponibles según reglas que vos configurás." },
+
+    { label: "▸ Marketing", starter: "", pro: "", agencia: "", highlight: true },
+    { label: "Difusión masiva", starter: false, pro: true, agencia: true, description: "Enviás un mensaje de WhatsApp a una lista de contactos de una sola vez. Útil para promociones, novedades o recordatorios." },
+    { label: "Contactos por envío", starter: "—", pro: "2.000", agencia: "Ilimitados", description: "Máximo de destinatarios que podés incluir en una sola campaña de difusión." },
+    { label: "Programación de campañas", starter: false, pro: true, agencia: true, description: "Configurás el envío para una fecha y hora específica. La campaña sale sola sin que tengas que estar presente." },
+
+    { label: "▸ Equipo & Acceso", starter: "", pro: "", agencia: "", highlight: true },
+    { label: "Usuarios del panel", starter: "1", pro: "1", agencia: "5", description: "Personas de tu equipo que pueden entrar al dashboard con su propio usuario y gestionar conversaciones." },
+    { label: "API access", starter: false, pro: false, agencia: true, description: "Conectás Imalá Vox con tus propias herramientas o sistemas externos mediante nuestra API." },
+    { label: "Soporte", starter: "Email", pro: "Email + chat", agencia: "Prioritario", description: "Canal por el que podés contactar al equipo de Imalá Vox ante dudas o problemas." },
+  ];
+
+  const renderCell = (val: CellValue, _isPro: boolean) => {
+    if (val === true) {
+      return (
+        <div className="w-5 h-5 rounded-full bg-[#C8FF00] flex items-center justify-center mx-auto">
+          <Check className="w-3 h-3 text-black" strokeWidth={3} />
+        </div>
+      );
+    }
+    if (val === false) return <X className="w-3.5 h-3.5 text-white/15 mx-auto" />;
+    if (val === "" || val === null) return null;
+    return <span className="text-sm font-bold text-white/60">{val}</span>;
+  };
+
+  return (
+    <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0 pb-2">
+    <div className="min-w-[560px] rounded-3xl overflow-hidden border border-white/8">
+      <div className="grid grid-cols-4 bg-[#1F1F1E]">
+        <div className="px-5 py-4 text-[10px] font-black text-white/25 uppercase tracking-widest">Función</div>
+        {(["starter", "pro", "agencia"] as Plan[]).map((p) => {
+          const price = isAnual ? PLAN_LIMITS[p].priceYearly : PLAN_LIMITS[p].priceMonthly;
+          const isPro = p === "pro";
+          return (
+            <div key={p} className={cn("px-4 py-4 text-center", isPro && "bg-[#C8FF00]")}>
+              <p className={cn("text-[10px] font-black uppercase tracking-widest mb-0.5", isPro ? "text-black/50" : "text-white/30")}>{p}</p>
+              <p className={cn("text-lg font-black", isPro ? "text-black" : "text-white")}>
+                ${price}
+                <span className={cn("text-[10px] font-bold ml-0.5", isPro ? "text-black/40" : "text-white/30")}>/mes</span>
+              </p>
+            </div>
+          );
+        })}
+      </div>
+
+      {rows.map((row, i) => {
+        if (row.highlight) {
+          return (
+            <div key={i} className="grid grid-cols-4 bg-[#1F1F1E] border-t border-white/5">
+              <div className="px-5 py-2.5 col-span-4">
+                <span className="text-[9px] font-black text-white/25 uppercase tracking-widest">{row.label.replace("▸ ", "")}</span>
+              </div>
+            </div>
+          );
+        }
+        return (
+          <div key={i} className="grid grid-cols-4 border-t border-white/5 bg-[#2A2A28] hover:bg-[#2F2F2D] transition-colors">
+            <div className="px-5 py-3 flex items-center gap-2">
+              <span className="text-sm font-medium text-white/50">{row.label}</span>
+              {row.description && (
+                <div className="relative group/tip shrink-0">
+                  <button className="w-3.5 h-3.5 rounded-full border border-white/20 text-white/30 hover:text-white/70 hover:border-white/50 transition-colors flex items-center justify-center text-[8px] font-black leading-none">?</button>
+                  <div className="absolute left-0 bottom-full mb-2 w-56 bg-[#161615] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white/60 leading-relaxed font-medium hidden group-hover/tip:block z-50 shadow-2xl pointer-events-none">
+                    {row.description}
+                    <div className="absolute left-2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-[#161615]" />
+                  </div>
+                </div>
+              )}
+            </div>
+            {(["starter", "pro", "agencia"] as Plan[]).map((p) => (
+              <div key={p} className="px-4 py-3 flex items-center justify-center">
+                {renderCell(row[p], false)}
+              </div>
+            ))}
+          </div>
+        );
+      })}
+    </div>
+    </div>
+  );
+}
+
+const PLAN_DESCRIPTIONS: Record<Plan, string> = {
+  starter: "Para el profesional independiente o negocio que está empezando.",
+  pro: "Para el negocio activo que necesita vender y atender en automático.",
+  agencia: "Para negocios con operación continua y alto volumen de consultas.",
+};
+
 function PricingSection() {
   const [isAnual, setIsAnual] = useState(false);
+  const [showCompare, setShowCompare] = useState(false);
   const plans: Plan[] = ["starter", "pro", "agencia"];
 
   return (
@@ -796,7 +1163,7 @@ function PricingSection() {
               )}
             >
               Anual
-              <span className="bg-emerald-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full">−17%</span>
+              <span className="bg-emerald-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full">−15%</span>
             </button>
           </div>
         </Reveal>
@@ -811,7 +1178,7 @@ function PricingSection() {
                 <div className={cn(
                   "rounded-3xl flex flex-col h-full relative overflow-hidden",
                   isPro
-                    ? "bg-[#C8FF00] shadow-2xl shadow-[#C8FF00]/10 scale-[1.03]"
+                    ? "bg-[#C8FF00] shadow-2xl shadow-[#C8FF00]/10 md:scale-[1.03]"
                     : "bg-[#2A2A28] border border-white/5"
                 )}>
                   {display.tag && (
@@ -834,6 +1201,9 @@ function PricingSection() {
                         Facturado anualmente
                       </p>
                     )}
+                    <p className={cn("text-xs font-medium mt-2 leading-relaxed", isPro ? "text-black/50" : "text-white/35")}>
+                      {PLAN_DESCRIPTIONS[p]}
+                    </p>
                   </div>
 
                   <div className={cn("flex-1 px-8 pb-8 space-y-3 border-t", isPro ? "border-black/10" : "border-white/5")}>
@@ -848,7 +1218,7 @@ function PricingSection() {
                       )}
                       {display.groups.map((g, gi) => (
                         <div key={gi} className="space-y-1.5">
-                          <p className={cn("text-[9px] font-black uppercase tracking-widest px-1",
+                          <p className={cn("text-[10px] font-black uppercase tracking-widest px-1",
                             g.locked ? (isPro ? "text-black/25" : "text-white/15") : (isPro ? "text-black/40" : "text-white/30")
                           )}>{g.label}</p>
                           {g.items.map((item, ii) => (
@@ -866,7 +1236,7 @@ function PricingSection() {
                                   <Check className={cn("w-2.5 h-2.5", isPro ? "text-[#C8FF00]" : "text-[#1A1A18]")} strokeWidth={4} />
                                 </div>
                               )}
-                              <span className={cn("text-[11px] font-bold",
+                              <span className={cn("text-[13px] font-bold",
                                 g.locked
                                   ? (isPro ? "text-black/25 line-through decoration-black/20 decoration-1" : "text-white/20 line-through decoration-white/10 decoration-1")
                                   : (isPro ? "text-black/80" : "text-white/70")
@@ -897,6 +1267,26 @@ function PricingSection() {
             );
           })}
         </div>
+
+        {/* Botón expandir comparativa */}
+        <div className="flex justify-center mt-10 mb-2">
+          <button
+            onClick={() => setShowCompare(v => !v)}
+            className="flex items-center gap-2 text-xs font-black text-white/40 hover:text-white/70 transition-colors uppercase tracking-widest border border-white/10 hover:border-white/20 px-5 py-3 rounded-2xl"
+          >
+            <LayoutGrid className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden sm:inline">{showCompare ? "Ocultar comparativa" : "Ver comparativa completa de funciones"}</span>
+            <span className="sm:hidden">{showCompare ? "Ocultar" : "Comparar planes"}</span>
+            <ChevronDown className={cn("w-3.5 h-3.5 transition-transform shrink-0", showCompare && "rotate-180")} />
+          </button>
+        </div>
+
+        {/* Tabla comparativa */}
+        {showCompare && (
+          <div className="mt-6 animate-in fade-in slide-in-from-top-2 duration-300">
+            <PricingCompareTable isAnual={isAnual} />
+          </div>
+        )}
 
         <p className="text-center text-xs text-white/25 mt-8 font-medium">
           Precios en USD · Cobrado en ARS al dólar blue del día · Sin tarjeta para la prueba gratuita
