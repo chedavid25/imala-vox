@@ -21,8 +21,9 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-// Initialize Analytics (optional, only client-side)
+// Initialize Analytics (opcional, ahora manejado de forma optimizada en layout.tsx)
 export let analytics: Analytics | undefined;
+/* 
 if (typeof window !== "undefined") {
   isSupported().then((supported) => {
     if (supported) {
@@ -30,6 +31,7 @@ if (typeof window !== "undefined") {
     }
   });
 }
+*/
 
 const functions = getFunctions(app, "us-central1");
 export { app, auth, db, storage, functions };

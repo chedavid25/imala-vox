@@ -505,31 +505,27 @@ function HeroSection() {
 
       <div className="relative z-10 w-full max-w-7xl mx-auto px-6 py-24 flex flex-col items-center text-center">
         {/* Badge */}
-        <Reveal animation="fade-in-up" delay={100} className="w-full flex justify-center">
+        <div className="w-full flex justify-center">
           <div className="inline-flex items-center gap-2 bg-[#C8FF00]/10 border border-[#C8FF00]/20 text-[#C8FF00] text-xs font-black px-4 py-2 rounded-full mb-8 uppercase tracking-widest max-w-full text-center">
             <Bot className="w-3.5 h-3.5 shrink-0" />
             <span className="sm:hidden">Agentes IA para todos tus canales</span>
             <span className="hidden sm:inline">Agentes IA para WhatsApp, Instagram y Facebook</span>
           </div>
-        </Reveal>
+        </div>
 
         {/* Titular */}
-        <Reveal animation="fade-in-up" delay={200} className="w-full">
-          <h1 className="text-5xl md:text-7xl font-black text-white leading-[1.05] tracking-tight mb-6 max-w-4xl mx-auto text-center">
-            Tus clientes escriben<br />
-            a las 3am.{" "}
-            <span className="text-[#C8FF00]">Tu negocio<br />
-            les responde.</span>
-          </h1>
-        </Reveal>
+        <h1 className="text-5xl md:text-7xl font-black text-white leading-[1.05] tracking-tight mb-6 max-w-4xl mx-auto text-center w-full">
+          Tus clientes escriben<br />
+          a las 3am.{" "}
+          <span className="text-[#C8FF00]">Tu negocio<br />
+          les responde.</span>
+        </h1>
 
         {/* Subtítulo */}
-        <Reveal animation="fade-in-up" delay={300} className="w-full">
-          <p className="text-lg md:text-xl text-white/55 max-w-2xl leading-relaxed mb-10 font-medium mx-auto text-center">
-            Imalá Vox crea agentes de inteligencia artificial que atienden, califican y venden por vos —
-            en todos tus canales, las 24 horas, sin que tengas que estar presente.
-          </p>
-        </Reveal>
+        <p className="text-lg md:text-xl text-white/55 max-w-2xl leading-relaxed mb-10 font-medium mx-auto text-center w-full">
+          Imalá Vox crea agentes de inteligencia artificial que atienden, califican y venden por vos —
+          en todos tus canales, las 24 horas, sin que tengas que estar presente.
+        </p>
 
         {/* CTAs */}
         <Reveal animation="fade-in-up" delay={400} className="w-full flex justify-center">
