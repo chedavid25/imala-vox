@@ -1,20 +1,15 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { 
-  Search, 
-  Filter, 
-  MoreHorizontal, 
-  Eye, 
-  CheckCircle2, 
-  XCircle, 
+import {
+  Search,
+  MoreHorizontal,
+  Eye,
   Clock,
-  ArrowUpRight,
   Loader2,
   Mail,
-  Users,
-  MessageSquare,
-  ShieldAlert
+  ShieldAlert,
+  RefreshCw,
 } from "lucide-react";
 import { 
   Table, 
@@ -34,6 +29,7 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { obtenerMetricasSuperAdmin, bloquearWorkspace, extenderPrueba } from "@/app/actions/superadmin";
+import { sincronizarSuscripcionMP } from "@/app/actions/billing";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Workspace } from "@/lib/types/firestore";
@@ -88,6 +84,21 @@ export default function EspaciosAdminPage() {
       await extenderPrueba(id, parseInt(dias));
       toast.success(`Prueba extendida ${dias} días`);
       load();
+    }
+  };
+
+  const handleSincronizarMP = async (id: string, nombre: string) => {
+    const toastId = toast.loading(`Consultando MercadoPago para ${nombre}...`);
+    const res = await sincronizarSuscripcionMP(id);
+    if (res.success) {
+      if (res.estado === "activo" && res.plan) {
+        toast.success(`Plan ${res.plan} activado para ${nombre}`, { id: toastId });
+      } else {
+        toast.info(`Estado sync: ${res.mpStatus} — sin cambios de plan`, { id: toastId });
+      }
+      load();
+    } else {
+      toast.error(`Error: ${res.error}`, { id: toastId });
     }
   };
 
@@ -158,9 +169,16 @@ export default function EspaciosAdminPage() {
                     </div>
                   </TableCell>
                   <TableCell className="text-center">
-                     <Badge className="bg-white/5 border-white/10 text-white font-black text-[10px] uppercase tracking-widest py-1 px-3">
-                       {ws.plan}
-                     </Badge>
+                    <div className="flex flex-col items-center gap-1">
+                      <Badge className="bg-white/5 border-white/10 text-white font-black text-[10px] uppercase tracking-widest py-1 px-3">
+                        {ws.plan}
+                      </Badge>
+                      {(ws as any).facturacion?.planPendiente && (
+                        <span className="text-[8px] font-black text-amber-400 uppercase tracking-widest">
+                          → {(ws as any).facturacion.planPendiente} pendiente
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-center">
                     <Badge className={cn("rounded-full px-4 py-1 text-[10px] font-black uppercase tracking-widest border", statusMap[ws.estado]?.color)}>
@@ -194,6 +212,13 @@ export default function EspaciosAdminPage() {
                               <span className="text-sm font-bold">Extender Prueba</span>
                            </DropdownMenuItem>
                          )}
+                         <DropdownMenuItem
+                           className="gap-3 px-4 py-3 rounded-xl hover:bg-amber-500/10 text-amber-400 cursor-pointer"
+                           onClick={() => handleSincronizarMP(ws.id, ws.nombre)}
+                         >
+                           <RefreshCw className="size-4" />
+                           <span className="text-sm font-bold">Sincronizar con MP</span>
+                         </DropdownMenuItem>
                          <DropdownMenuItem className="gap-3 px-4 py-3 rounded-xl hover:bg-rose-500/20 text-rose-400 cursor-pointer" onClick={() => handleBloquear(ws.id)}>
                             <ShieldAlert className="size-4" />
                             <span className="text-sm font-bold">Bloquear Acceso</span>

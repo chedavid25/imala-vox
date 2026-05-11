@@ -178,6 +178,92 @@ export async function crearSuscripcionMP(wsId: string, plan: 'starter' | 'pro' |
   }
 }
 
+// ─── SINCRONIZAR ESTADO DESDE MERCADOPAGO ────────────────────────────────────
+// Útil cuando el webhook no llega: consulta MP directamente y actualiza el plan.
+
+export async function sincronizarSuscripcionMP(wsId: string) {
+  try {
+    const wsSnap = await adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}`).get();
+    if (!wsSnap.exists) throw new Error("Workspace no encontrado");
+
+    const ws = wsSnap.data() as any;
+    const suscripcionId = ws.facturacion?.mpSuscripcionId;
+    if (!suscripcionId) throw new Error("No hay suscripción MP registrada para este workspace");
+
+    const accessToken = getMPAccessToken();
+    if (!accessToken) throw new Error("Access Token de MP no configurado");
+
+    const mpRes = await fetch(`https://api.mercadopago.com/preapproval/${suscripcionId}`, {
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+    });
+
+    if (!mpRes.ok) {
+      const err = await mpRes.text();
+      throw new Error(`MP API error: ${err}`);
+    }
+
+    const suscripcion = await mpRes.json();
+    console.log(`[billing] Sync MP status para ${wsId}: ${suscripcion.status}`);
+
+    const estadoMap: Record<string, string> = {
+      authorized: 'activo',
+      paused: 'pago_vencido',
+      cancelled: 'cancelado',
+      pending: 'prueba',
+    };
+
+    const nuevoEstado = estadoMap[suscripcion.status] || 'pago_vencido';
+    const ciclo = ws.facturacion?.ciclo || 'mensual';
+    const periodoHasta = new Date();
+    if (ciclo === 'anual') periodoHasta.setFullYear(periodoHasta.getFullYear() + 1);
+    else periodoHasta.setMonth(periodoHasta.getMonth() + 1);
+
+    const updates: any = {
+      estado: nuevoEstado,
+      periodoVigenteHasta: Timestamp.fromDate(periodoHasta),
+      actualizadoEl: Timestamp.now(),
+    };
+
+    if (nuevoEstado === 'activo' && ws.facturacion?.planPendiente) {
+      const planPend = ws.facturacion.planPendiente as 'starter' | 'pro' | 'agencia';
+      const precioUSD = ciclo === 'anual' ? PLAN_LIMITS[planPend].priceYearly : PLAN_LIMITS[planPend].priceMonthly;
+      updates.plan = planPend;
+      updates['facturacion.planPendiente'] = null;
+      updates['facturacion.precioUSD'] = precioUSD;
+      updates['facturacion.precioARS'] = suscripcion.auto_recurring?.transaction_amount || 0;
+      updates['facturacion.precioFijadoEl'] = Timestamp.now();
+    }
+
+    await adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}`).update(updates);
+
+    if (nuevoEstado === 'activo' && updates.plan) {
+      await registrarEventoFact(wsId, {
+        tipo: 'pago_exitoso',
+        monto: suscripcion.auto_recurring?.transaction_amount || 0,
+        montoUSD: updates['facturacion.precioUSD'] || 0,
+        mpSuscripcionId: suscripcionId,
+        descripcion: `Sync manual: Plan ${updates.plan} activado (MP status: ${suscripcion.status})`,
+      });
+
+      await adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}`)
+        .collection(COLLECTIONS.NOTIFICACIONES).add({
+          tipo: 'info',
+          titulo: 'Pago confirmado',
+          mensaje: 'Tu suscripción está activa. ¡Gracias!',
+          visto: false,
+          creadoEl: Timestamp.now(),
+        });
+    }
+
+    revalidatePath('/dashboard');
+    revalidatePath('/dashboard/ajustes/facturacion');
+    return { success: true, estado: nuevoEstado, plan: updates.plan || ws.plan, mpStatus: suscripcion.status };
+  } catch (error: any) {
+    console.error("[billing] Error en sincronizarSuscripcionMP:", error);
+    return { success: false, error: error.message };
+  }
+}
+
 // ─── CANCELAR SUSCRIPCIÓN ────────────────────────────────────────────────────
 
 export async function cancelarSuscripcionMP(wsId: string) {

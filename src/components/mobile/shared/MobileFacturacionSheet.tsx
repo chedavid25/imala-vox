@@ -7,12 +7,12 @@ import { PLAN_LIMITS } from "@/lib/planLimits";
 import { db } from "@/lib/firebase";
 import { collection, query, orderBy, onSnapshot, limit } from "firebase/firestore";
 import { COLLECTIONS, EventoFacturacion } from "@/lib/types/firestore";
-import { crearSuscripcionMP, cancelarSuscripcionMP, cambiarPlan, obtenerCotizacionBlue } from "@/app/actions/billing";
+import { crearSuscripcionMP, cancelarSuscripcionMP, cambiarPlan, obtenerCotizacionBlue, sincronizarSuscripcionMP } from "@/app/actions/billing";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   Zap, Check, X, AlertCircle, Loader2,
-  History, ChevronRight, ChevronLeft, ExternalLink, Info,
+  History, ChevronRight, ChevronLeft, ExternalLink, Info, RefreshCw,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
@@ -125,6 +125,7 @@ export function MobileFacturacionSheet({ open, onClose }: Props) {
   const [cotizacion, setCotizacion] = useState<number | null>(null);
   const [history, setHistory] = useState<(EventoFacturacion & { id: string })[]>([]);
   const [loadingPlan, setLoadingPlan] = useState<Plan | null>(null);
+  const [loadingSync, setLoadingSync] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [view, setView] = useState<"main" | "plans" | "history">("main");
 
@@ -190,6 +191,26 @@ export function MobileFacturacionSheet({ open, onClose }: Props) {
       toast.error("Error al procesar");
     } finally {
       setLoadingPlan(null);
+    }
+  };
+
+  const handleSync = async () => {
+    setLoadingSync(true);
+    try {
+      const res = await sincronizarSuscripcionMP(currentWorkspaceId!);
+      if (res.success) {
+        if (res.plan && res.estado === "activo") {
+          toast.success(`Plan ${res.plan} activado correctamente`);
+        } else {
+          toast.info(`Estado sincronizado: ${res.mpStatus}`);
+        }
+      } else {
+        toast.error(res.error || "No se pudo verificar el pago");
+      }
+    } catch {
+      toast.error("Error al verificar");
+    } finally {
+      setLoadingSync(false);
     }
   };
 
@@ -303,6 +324,30 @@ export function MobileFacturacionSheet({ open, onClose }: Props) {
                 </strong>.
               </p>
             </div>
+
+            {/* Banner de pago pendiente */}
+            {workspace.facturacion?.planPendiente && (
+              <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 flex items-center gap-3">
+                <div className="size-9 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                  <AlertCircle size={16} className="text-amber-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] font-black text-amber-800 uppercase tracking-widest">Pago pendiente de confirmación</p>
+                  <p className="text-[10px] text-amber-700 font-medium mt-0.5">
+                    Plan <strong>{workspace.facturacion.planPendiente}</strong> — esperando confirmación de MercadoPago.
+                  </p>
+                </div>
+                <button
+                  onClick={handleSync}
+                  disabled={loadingSync}
+                  className="shrink-0 size-9 rounded-xl bg-amber-500 flex items-center justify-center text-white active:scale-95 transition-all disabled:opacity-60"
+                >
+                  {loadingSync
+                    ? <Loader2 size={14} className="animate-spin" />
+                    : <RefreshCw size={14} />}
+                </button>
+              </div>
+            )}
 
             {/* Acciones */}
             <div className="space-y-1">

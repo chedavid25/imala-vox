@@ -18,7 +18,7 @@ import {
   ChevronDown,
   HelpCircle,
   Lightbulb,
-  ArrowRight
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,7 +53,7 @@ import { db } from "@/lib/firebase";
 import { collection, query, orderBy, onSnapshot, Timestamp } from "firebase/firestore";
 import { COLLECTIONS, EventoFacturacion } from "@/lib/types/firestore";
 import { toast } from "sonner";
-import { crearSuscripcionMP, cancelarSuscripcionMP, cambiarPlan, obtenerCotizacionBlue } from "@/app/actions/billing";
+import { crearSuscripcionMP, cancelarSuscripcionMP, cambiarPlan, obtenerCotizacionBlue, sincronizarSuscripcionMP } from "@/app/actions/billing";
 import { cn } from "@/lib/utils";
 
 type FeatureItem = { text: string; tooltip?: string };
@@ -163,6 +163,7 @@ export default function FacturacionPage() {
   const [targetPlan, setTargetPlan] = useState<'starter' | 'pro' | 'agencia' | null>(null);
   const [isUpgradeDialogOpen, setIsUpgradeDialogOpen] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [loadingSync, setLoadingSync] = useState(false);
 
   const ayudaFacturacion = {
     titulo: "Facturación y Suscripciones",
@@ -266,6 +267,26 @@ export default function FacturacionPage() {
     } finally {
       setLoadingAction(null);
       setTargetPlan(null);
+    }
+  };
+
+  const handleSync = async () => {
+    setLoadingSync(true);
+    try {
+      const res = await sincronizarSuscripcionMP(currentWorkspaceId!);
+      if (res.success) {
+        if (res.plan && res.estado === "activo") {
+          toast.success(`¡Plan ${res.plan} activado correctamente!`);
+        } else {
+          toast.info(`Estado sincronizado con MercadoPago: ${res.mpStatus}`);
+        }
+      } else {
+        toast.error(res.error || "No se pudo verificar el pago");
+      }
+    } catch {
+      toast.error("Error al verificar con MercadoPago");
+    } finally {
+      setLoadingSync(false);
     }
   };
 
@@ -396,6 +417,30 @@ export default function FacturacionPage() {
                 Los precios en ARS se ajustan trimestralmente por paridad operativa. Próximo ajuste: <strong className="font-bold">{workspace.facturacion?.proximaActualizacion?.toDate().toLocaleDateString()}</strong>.
               </p>
             </div>
+
+            {workspace.facturacion?.planPendiente && (
+              <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 space-y-3">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="size-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-[11px] font-black text-amber-800 uppercase tracking-widest">Pago pendiente de confirmación</p>
+                    <p className="text-[10px] text-amber-700 font-medium mt-0.5">
+                      Plan <strong>{workspace.facturacion.planPendiente}</strong> pagado — esperando confirmación de MercadoPago.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  disabled={loadingSync}
+                  onClick={handleSync}
+                  className="w-full h-9 bg-amber-500 hover:bg-amber-600 text-white font-black text-[9px] uppercase tracking-widest rounded-xl"
+                >
+                  {loadingSync
+                    ? <><Loader2 className="size-3 animate-spin mr-2" />Verificando...</>
+                    : <><RefreshCw className="size-3 mr-2" />Verificar pago con MercadoPago</>}
+                </Button>
+              </div>
+            )}
           </CardContent>
           <CardFooter className="bg-slate-50/50 border-t border-[var(--border-light)] p-6 flex justify-center items-center">
              <Button 
