@@ -5,7 +5,8 @@ import { BottomSheet } from "./BottomSheet";
 import { MobileNotificacionesSheet } from "./MobileNotificacionesSheet";
 import { MobileSeguridadSheet } from "./MobileSeguridadSheet";
 import { MobileEtiquetasSheet } from "./MobileEtiquetasSheet";
-import { LogOut, Settings, Shield, Bell, HelpCircle, ChevronRight, Tags } from "lucide-react";
+import { MobileFacturacionSheet } from "./MobileFacturacionSheet";
+import { LogOut, Settings, Shield, Bell, HelpCircle, ChevronRight, Tags, CreditCard } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
@@ -18,6 +19,7 @@ export function MasBottomSheet({ open, onClose }: { open: boolean; onClose: () =
   const [showNotifs, setShowNotifs] = useState(false);
   const [showSeguridad, setShowSeguridad] = useState(false);
   const [showEtiquetas, setShowEtiquetas] = useState(false);
+  const [showFacturacion, setShowFacturacion] = useState(false);
 
   const handleSignOut = async () => {
     onClose();
@@ -55,13 +57,13 @@ export function MasBottomSheet({ open, onClose }: { open: boolean; onClose: () =
             <p className="text-[10px] font-bold text-slate-300 uppercase tracking-[0.2em] px-1 mb-2">Configuración</p>
 
             <button
-              onClick={() => navigate("/dashboard/ajustes")}
+              onClick={() => setShowNotifs(true)}
               className="w-full flex items-center gap-4 p-4 rounded-2xl active:bg-slate-50 transition-colors group"
             >
               <div className="size-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500 group-active:bg-[var(--accent)] group-active:text-black transition-colors">
-                <Settings size={20} />
+                <Bell size={20} />
               </div>
-              <span className="font-semibold text-slate-700 text-sm flex-1 text-left tracking-tight">Ajustes del CRM</span>
+              <span className="font-semibold text-slate-700 text-sm flex-1 text-left tracking-tight">Notificaciones</span>
               <ChevronRight size={16} className="text-slate-300" />
             </button>
 
@@ -77,13 +79,13 @@ export function MasBottomSheet({ open, onClose }: { open: boolean; onClose: () =
             </button>
 
             <button
-              onClick={() => setShowNotifs(true)}
+              onClick={() => navigate("/dashboard/ajustes")}
               className="w-full flex items-center gap-4 p-4 rounded-2xl active:bg-slate-50 transition-colors group"
             >
               <div className="size-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500 group-active:bg-[var(--accent)] group-active:text-black transition-colors">
-                <Bell size={20} />
+                <Settings size={20} />
               </div>
-              <span className="font-semibold text-slate-700 text-sm flex-1 text-left tracking-tight">Notificaciones</span>
+              <span className="font-semibold text-slate-700 text-sm flex-1 text-left tracking-tight">Ajustes del CRM</span>
               <ChevronRight size={16} className="text-slate-300" />
             </button>
 
@@ -95,6 +97,17 @@ export function MasBottomSheet({ open, onClose }: { open: boolean; onClose: () =
                 <Shield size={20} />
               </div>
               <span className="font-semibold text-slate-700 text-sm flex-1 text-left tracking-tight">Seguridad</span>
+              <ChevronRight size={16} className="text-slate-300" />
+            </button>
+
+            <button
+              onClick={() => setShowFacturacion(true)}
+              className="w-full flex items-center gap-4 p-4 rounded-2xl active:bg-slate-50 transition-colors group"
+            >
+              <div className="size-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500 group-active:bg-[var(--accent)] group-active:text-black transition-colors">
+                <CreditCard size={20} />
+              </div>
+              <span className="font-semibold text-slate-700 text-sm flex-1 text-left tracking-tight">Facturación y Plan</span>
               <ChevronRight size={16} className="text-slate-300" />
             </button>
           </div>
@@ -139,6 +152,7 @@ export function MasBottomSheet({ open, onClose }: { open: boolean; onClose: () =
       <MobileNotificacionesSheet open={showNotifs} onClose={() => setShowNotifs(false)} />
       <MobileSeguridadSheet open={showSeguridad} onClose={() => setShowSeguridad(false)} />
       <MobileEtiquetasSheet open={showEtiquetas} onClose={() => setShowEtiquetas(false)} />
+      <MobileFacturacionSheet open={showFacturacion} onClose={() => setShowFacturacion(false)} />
     </>
   );
 }

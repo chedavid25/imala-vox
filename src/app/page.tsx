@@ -1022,8 +1022,8 @@ function PricingCompareTable({ isAnual }: { isAnual: boolean }) {
   }
 
   const rows: TableRow[] = [
-    { label: "Precio mensual", starter: "$39 USD", pro: "$69 USD", agencia: "$179 USD" },
-    { label: "Precio anual (por mes)", starter: "$33 USD", pro: "$59 USD", agencia: "$152 USD", description: "Pagás un año por adelantado y el precio mensual baja. No es el total anual." },
+    { label: "Precio mensual", starter: `$${PLAN_LIMITS.starter.priceMonthly} USD`, pro: `$${PLAN_LIMITS.pro.priceMonthly} USD`, agencia: `$${PLAN_LIMITS.agencia.priceMonthly} USD` },
+    { label: "Precio anual (por mes)", starter: `$${PLAN_LIMITS.starter.priceYearly} USD`, pro: `$${PLAN_LIMITS.pro.priceYearly} USD`, agencia: `$${PLAN_LIMITS.agencia.priceYearly} USD`, description: "Pagás un año por adelantado y el precio mensual baja. No es el total anual." },
     { label: "Prueba gratuita", starter: "7 días", pro: "7 días", agencia: "7 días", description: "Probás el plan completo sin tarjeta. Al vencer elegís si suscribirse o no." },
 
     { label: "▸ IA & Agentes", starter: "", pro: "", agencia: "", highlight: true },

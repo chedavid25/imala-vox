@@ -95,9 +95,38 @@ export async function crearSuscripcionMP(wsId: string, plan: 'starter' | 'pro' |
       devPayerEmail = `${devPayerEmail}@testuser.com`;
     }
 
-    const payerEmail = process.env.NODE_ENV === 'development' 
+    const payerEmail = process.env.NODE_ENV === 'development'
       ? devPayerEmail
-      : ws.propietarioEmail;
+      : (ws.propietarioEmail || ws.email || null);
+
+    const transactionAmount = ciclo === 'anual'
+      ? Math.round(precioARS * 12)
+      : precioARS;
+
+    if (!transactionAmount || transactionAmount <= 0) {
+      throw new Error(`Monto inválido calculado: ${transactionAmount} ARS (cotizacion: ${cotizacion})`);
+    }
+
+    const mpBody: Record<string, unknown> = {
+      reason: `Imala Vox ${plan} ${ciclo}`,
+      auto_recurring: {
+        frequency: ciclo === 'anual' ? 12 : 1,
+        frequency_type: 'months',
+        transaction_amount: transactionAmount,
+        currency_id: 'ARS',
+      },
+      back_url: backUrl,
+    };
+
+    // payer_email es opcional en preapproval — omitirlo si es indefinido
+    // evita el error 500 cuando seller y buyer tienen el mismo email
+    if (payerEmail) {
+      mpBody.payer_email = payerEmail;
+    }
+
+    console.log("[billing] Creando preapproval MP:", JSON.stringify({
+      plan, ciclo, precioARS, transactionAmount, payerEmail, backUrl, env: process.env.NODE_ENV
+    }));
 
     // Crear suscripción en MercadoPago
     const mpRes = await fetch('https://api.mercadopago.com/preapproval', {
@@ -106,27 +135,14 @@ export async function crearSuscripcionMP(wsId: string, plan: 'starter' | 'pro' |
         'Authorization': `Bearer ${accessToken.trim()}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        // Reason simplificado para evitar errores 500 de encoding
-        reason: `Imala Vox - Plan ${plan} ${ciclo}`,
-        payer_email: payerEmail,
-        auto_recurring: {
-          frequency: ciclo === 'anual' ? 12 : 1,
-          frequency_type: 'months', 
-          transaction_amount: ciclo === 'anual' ? Math.round(precioARS * 12) : precioARS,
-          currency_id: 'ARS',
-        },
-        back_url: backUrl,
-        status: 'pending',
-      }),
+      body: JSON.stringify(mpBody),
     });
 
     if (!mpRes.ok) {
       const err = await mpRes.text();
-      console.error("--- MERCADO PAGO API ERROR ---");
-      console.error(err);
-      console.error("------------------------------");
-      throw new Error(`MP Error: ${err}`);
+      console.error("[billing] MP API Error:", mpRes.status, err);
+      console.error("[billing] Request body was:", JSON.stringify(mpBody));
+      throw new Error(`MP Error ${mpRes.status}: ${err}`);
     }
 
     const mpData = await mpRes.json();
