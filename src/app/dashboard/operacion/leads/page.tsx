@@ -53,16 +53,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { 
-  collection, 
-  onSnapshot, 
-  query, 
-  orderBy, 
-  doc, 
-  updateDoc, 
+import {
+  collection,
+  onSnapshot,
+  query,
+  orderBy,
+  doc,
+  updateDoc,
   serverTimestamp,
   addDoc,
-  deleteDoc
+  deleteDoc,
+  getDocs,
+  where
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { COLLECTIONS, Lead, EtapaEmbudo } from "@/lib/types/firestore";
@@ -145,6 +147,10 @@ export default function LeadsPage() {
   [leads, selectedLeadId]);
 
   const [converting, setConverting] = useState(false);
+  const [duplicateModal, setDuplicateModal] = useState<{
+    lead: Lead & { id: string };
+    existing: { id: string; nombre: string; telefono?: string; email?: string; matchField: 'telefono' | 'email' };
+  } | null>(null);
   
   // Estados Nueva Etapa
   const [isNewStageModalOpen, setIsNewStageModalOpen] = useState(false);
@@ -319,49 +325,91 @@ export default function LeadsPage() {
   // Acción: Convertir Lead a Contacto CRM
   const handleConvertLead = async (lead: Lead & { id: string }) => {
     if (!currentWorkspaceId || converting) return;
+
+    // Verificar duplicados por teléfono o email antes de crear
+    const contactosRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS);
+
+    if (lead.telefono) {
+      const snapTel = await getDocs(query(contactosRef, where('telefono', '==', lead.telefono)));
+      if (!snapTel.empty) {
+        const c = snapTel.docs[0];
+        setDuplicateModal({ lead, existing: { id: c.id, ...c.data() as any, matchField: 'telefono' } });
+        return;
+      }
+    }
+
+    if (lead.email) {
+      const snapEmail = await getDocs(query(contactosRef, where('email', '==', lead.email)));
+      if (!snapEmail.empty) {
+        const c = snapEmail.docs[0];
+        setDuplicateModal({ lead, existing: { id: c.id, ...c.data() as any, matchField: 'email' } });
+        return;
+      }
+    }
+
+    await doConvertLead(lead);
+  };
+
+  // Conversión efectiva (sin chequeo de duplicados)
+  const doConvertLead = async (lead: Lead & { id: string }) => {
+    if (!currentWorkspaceId) return;
     setConverting(true);
     const toastId = toast.loading("Convirtiendo lead a contacto CRM...");
-
     try {
-      // 1. Crear el contacto
-      const contactoData = {
-        nombre: lead.nombre,
-        email: lead.email,
-        telefono: lead.telefono,
-        etiquetas: lead.origen === 'meta_ads' ? ['lead-meta-ads'] : ['lead-organico'],
-        leadOrigenId: lead.id,
-        origenCampana: lead.campana || null,
-        origenFormulario: lead.formulario || null,
-        camposFormulario: lead.camposFormulario || {},
-        notas: lead.notas || '',
-        creadoEl: serverTimestamp(),
-      };
-
       const contactoRef = await addDoc(
         collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS),
-        contactoData
+        {
+          nombre: lead.nombre,
+          email: lead.email,
+          telefono: lead.telefono,
+          etiquetas: lead.origen === 'meta_ads' ? ['lead-meta-ads'] : ['lead-organico'],
+          leadOrigenId: lead.id,
+          origenCampana: lead.campana || null,
+          origenFormulario: lead.formulario || null,
+          camposFormulario: lead.camposFormulario || {},
+          notas: lead.notas || '',
+          creadoEl: serverTimestamp(),
+        }
       );
-
-      // 2. Marcar lead como convertido
-      const leadRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId!, COLLECTIONS.LEADS, lead.id);
-      await updateDoc(leadRef, {
+      await updateDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.LEADS, lead.id), {
         convertidoAContacto: true,
         contactoId: contactoRef.id,
         actualizadoEl: serverTimestamp()
       });
-
-      toast.success("Lead convertido a contacto CRM", { 
+      toast.success("Lead convertido a contacto CRM", {
         id: toastId,
-        action: {
-          label: "Ver contacto →",
-          onClick: () => router.push(`/dashboard/operacion/contactos`)
-        },
+        action: { label: "Ver contacto →", onClick: () => router.push(`/dashboard/operacion/contactos`) },
         duration: 6000,
       });
       setSelectedLeadId(null);
     } catch (err) {
       console.error("Error al convertir lead:", err);
       toast.error("Error al convertir el lead", { id: toastId });
+    } finally {
+      setConverting(false);
+    }
+  };
+
+  // Vincular lead al contacto existente (sin crear uno nuevo)
+  const handleLinkToExisting = async () => {
+    if (!currentWorkspaceId || !duplicateModal) return;
+    setConverting(true);
+    const toastId = toast.loading("Vinculando lead al contacto existente...");
+    try {
+      await updateDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.LEADS, duplicateModal.lead.id), {
+        convertidoAContacto: true,
+        contactoId: duplicateModal.existing.id,
+        actualizadoEl: serverTimestamp()
+      });
+      toast.success("Lead vinculado al contacto existente", {
+        id: toastId,
+        action: { label: "Ver contacto →", onClick: () => router.push(`/dashboard/operacion/contactos`) },
+        duration: 6000,
+      });
+      setDuplicateModal(null);
+      setSelectedLeadId(null);
+    } catch (err) {
+      toast.error("Error al vincular el lead", { id: toastId });
     } finally {
       setConverting(false);
     }
@@ -798,6 +846,61 @@ export default function LeadsPage() {
         </div>
       )}
 
+      {/* MODAL DUPLICADO */}
+      <Dialog open={!!duplicateModal} onOpenChange={(open) => { if (!open) setDuplicateModal(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <span className="text-amber-500">⚠</span> Contacto duplicado detectado
+            </DialogTitle>
+          </DialogHeader>
+          {duplicateModal && (
+            <div className="space-y-4 py-1">
+              <p className="text-sm text-[var(--text-secondary-light)]">
+                Ya existe un contacto con el mismo{' '}
+                <span className="font-bold text-[var(--text-primary-light)]">
+                  {duplicateModal.existing.matchField === 'telefono' ? 'teléfono' : 'email'}
+                </span>:
+              </p>
+              <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl px-4 py-3 space-y-1">
+                <p className="text-sm font-bold text-[var(--text-primary-light)]">{duplicateModal.existing.nombre}</p>
+                {duplicateModal.existing.telefono && (
+                  <p className="text-xs text-[var(--text-tertiary-light)]">📱 {duplicateModal.existing.telefono}</p>
+                )}
+                {duplicateModal.existing.email && (
+                  <p className="text-xs text-[var(--text-tertiary-light)]">✉ {duplicateModal.existing.email}</p>
+                )}
+              </div>
+              <p className="text-xs text-[var(--text-tertiary-light)]">¿Qué querés hacer?</p>
+              <div className="flex flex-col gap-2">
+                <Button
+                  onClick={handleLinkToExisting}
+                  disabled={converting}
+                  className="w-full bg-[var(--accent)] text-[var(--accent-text)] font-bold rounded-xl h-10"
+                >
+                  {converting ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Vincular al contacto existente"}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => { setDuplicateModal(null); doConvertLead(duplicateModal.lead); }}
+                  disabled={converting}
+                  className="w-full font-bold rounded-xl h-10"
+                >
+                  Crear igual (aceptar duplicado)
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => setDuplicateModal(null)}
+                  className="w-full text-[var(--text-tertiary-light)] rounded-xl h-9 text-sm"
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* MODAL NUEVA ETAPA */}
       <Dialog open={isNewStageModalOpen} onOpenChange={setIsNewStageModalOpen}>
         <DialogContent className="max-w-md">
@@ -1202,6 +1305,31 @@ function LeadDetailContent({
     return () => unsub();
   }, [currentWorkspaceId, lead?.id]);
 
+  // Auto-populate phone/email from form answers if lead fields are null
+  useEffect(() => {
+    if (!currentWorkspaceId || !lead?.id) return;
+    const campos = lead.camposFormulario || {};
+
+    const phoneKeys = ['PHONE NUMBER', 'FULL PHONE NUMBER', 'TELEFONO', 'PHONE', 'TEL', 'CELULAR', 'MOVIL', 'NUMERO DE TELEFONO', 'NUMERO DE CELULAR'];
+    const emailKeys = ['EMAIL', 'EMAIL ADDRESS', 'CORREO', 'MAIL', 'CORREO ELECTRONICO'];
+
+    const extractedPhone = !lead.telefono
+      ? phoneKeys.map(k => campos[k]).find(v => v && v.trim())?.trim() ?? null
+      : null;
+    const extractedEmail = !lead.email
+      ? emailKeys.map(k => campos[k]).find(v => v && v.trim())?.trim() ?? null
+      : null;
+
+    if (!extractedPhone && !extractedEmail) return;
+
+    const updates: Record<string, string> = {};
+    if (extractedPhone) updates.telefono = extractedPhone;
+    if (extractedEmail) updates.email = extractedEmail;
+
+    const leadRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.LEADS, lead.id);
+    updateDoc(leadRef, updates).catch(e => console.warn('[Lead auto-populate]', e));
+  }, [currentWorkspaceId, lead?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleAddNota = async () => {
     if (!currentWorkspaceId || !nuevaNota.trim() || !lead?.id) return;
     setGuardandoNota(true);
@@ -1437,13 +1565,13 @@ function LeadDetailContent({
         </Section>
 
         {/* Respuestas del formulario */}
-        <Section title="Respuestas del Formulario">
+        <Section title={lead.formulario && lead.formulario !== 'Formulario sin nombre' ? lead.formulario : "Respuestas del Formulario"}>
           <div className="bg-[var(--bg-input)]/50 rounded-2xl p-4 space-y-4 border border-[var(--border-light)]/50">
             {Object.entries(lead.camposFormulario || {}).length > 0 ? (
               Object.entries(lead.camposFormulario).map(([key, val]: any) => (
                 <div key={key} className="space-y-1">
                   <p className="text-[10px] font-bold text-[var(--text-tertiary-light)] uppercase tracking-wider">{key.replace(/_/g, ' ')}</p>
-                  <p className="text-sm font-medium text-[var(--text-secondary-light)]">{val}</p>
+                  <p className="text-sm font-medium text-[var(--text-secondary-light)] break-words whitespace-pre-wrap">{String(val).replace(/_/g, ' ').trim()}</p>
                 </div>
               ))
             ) : (

@@ -17,8 +17,11 @@ import {
   DropdownMenuLabel,
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { Avatar } from "@/components/ui/Avatar";
+import { doc, updateDoc } from "firebase/firestore";
+import { COLLECTIONS } from "@/lib/types/firestore";
+import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 
 interface ChatListProps {
   conversaciones: any[];
@@ -28,6 +31,7 @@ interface ChatListProps {
 
 export function ChatList({ conversaciones, selectedId, onSelect }: ChatListProps) {
   const { contactos } = useContactos();
+  const { currentWorkspaceId } = useWorkspaceStore();
   const [filter, setFilter] = useState<'all' | 'mine' | 'unread' | 'escalated'>('all');
   const [search, setSearch] = useState("");
   const [canalFilter, setCanalFilter] = useState<'all' | 'whatsapp' | 'instagram' | 'facebook'>('all');
@@ -39,9 +43,16 @@ export function ChatList({ conversaciones, selectedId, onSelect }: ChatListProps
   const getContactInfo = (contactoId: string, defaultNombre: string) => {
     const contact = contactos.find(c => c.id === contactoId);
     return {
+      id: contact?.id || null,
       nombre: contact?.nombre || defaultNombre || "Desconocido",
       foto: contact?.avatarUrl || null
     };
+  };
+
+  const handleAvatarError = (contactId: string | null) => {
+    if (!currentWorkspaceId || !contactId) return;
+    const contactRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS, contactId);
+    updateDoc(contactRef, { avatarUrl: null }).catch(() => {});
   };
 
   const filteredConversations = conversaciones.filter(conv => {
@@ -212,14 +223,15 @@ export function ChatList({ conversaciones, selectedId, onSelect }: ChatListProps
               >
                 {/* Avatar */}
                 <div className="relative shrink-0">
-                  <Avatar 
-                    src={contactInfo.foto} 
-                    name={contactInfo.nombre} 
+                  <Avatar
+                    src={contactInfo.foto}
+                    name={contactInfo.nombre}
                     size="lg"
                     className={cn(
                       "transition-all duration-300",
                       selectedId === chat.id && "border-[var(--accent)]/30 ring-2 ring-[var(--accent)]/10"
                     )}
+                    onImageError={() => handleAvatarError(contactInfo.id)}
                   />
                   <div className="absolute -bottom-1 -right-1 flex items-center justify-center shadow-2xl">
                     <CanalBadge canal={chat.canal || 'whatsapp'} showText={false} className={cn(

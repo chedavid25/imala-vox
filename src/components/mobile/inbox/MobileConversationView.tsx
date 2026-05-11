@@ -10,6 +10,10 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar } from "@/components/ui/Avatar";
 import { MobileContactSheet } from "./MobileContactSheet";
+import { db } from "@/lib/firebase";
+import { doc, updateDoc } from "firebase/firestore";
+import { COLLECTIONS } from "@/lib/types/firestore";
+import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 
 interface MobileConversationViewProps {
   conversacion: any;
@@ -20,18 +24,29 @@ interface MobileConversationViewProps {
   isRequestingSuggestion?: boolean;
 }
 
-export function MobileConversationView({ 
-  conversacion, 
-  mensajes, 
-  onSendMessage, 
+export function MobileConversationView({
+  conversacion,
+  mensajes,
+  onSendMessage,
   onBack,
   onOpenIAAssistant,
-  isRequestingSuggestion 
+  isRequestingSuggestion
 }: MobileConversationViewProps) {
   const { contactos } = useContactos();
+  const { currentWorkspaceId } = useWorkspaceStore();
   const [inputText, setInputText] = useState("");
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const handleDiscardSuggestion = async () => {
+    if (!currentWorkspaceId || !conversacion?.id) return;
+    try {
+      const convRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES, conversacion.id);
+      await updateDoc(convRef, { sugerenciaIA: null });
+    } catch (e) {
+      console.warn('[MobileInbox] Error al descartar sugerencia', e);
+    }
+  };
 
   const selectedContact = contactos.find(c => c.id === conversacion?.contactoId);
   const contactName = selectedContact?.nombre || conversacion?.contactoNombre || "Desconocido";
@@ -143,11 +158,11 @@ export function MobileConversationView({
              </div>
              <p className="text-sm text-slate-600 leading-snug">{conversacion.sugerenciaIA}</p>
              <div className="flex justify-end gap-2 mt-2">
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
+                <Button
+                  size="sm"
+                  variant="ghost"
                   className="h-7 text-xs font-semibold text-slate-400"
-                  onClick={async () => { /* Logic to discard */ }}
+                  onClick={handleDiscardSuggestion}
                 >
                   Descartar
                 </Button>

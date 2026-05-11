@@ -10,6 +10,10 @@ import { Search, MessageSquare, Bot, Check, CheckCheck, MoreVertical, Plus } fro
 import { Input } from "@/components/ui/input";
 import { Avatar } from "@/components/ui/Avatar";
 import { MobileNewChatSheet } from "./MobileNewChatSheet";
+import { db } from "@/lib/firebase";
+import { doc, updateDoc } from "firebase/firestore";
+import { COLLECTIONS } from "@/lib/types/firestore";
+import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 
 interface MobileConversationListProps {
   conversaciones: any[];
@@ -18,6 +22,7 @@ interface MobileConversationListProps {
 
 export function MobileConversationList({ conversaciones, onSelect }: MobileConversationListProps) {
   const { contactos } = useContactos();
+  const { currentWorkspaceId } = useWorkspaceStore();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<'all' | 'unread' | 'escalated'>('all');
   const [isNewChatOpen, setIsNewChatOpen] = useState(false);
@@ -25,9 +30,16 @@ export function MobileConversationList({ conversaciones, onSelect }: MobileConve
   const getContactInfo = (contactoId: string, defaultNombre: string) => {
     const contact = contactos.find(c => c.id === contactoId);
     return {
+      id: contact?.id || null,
       nombre: contact?.nombre || defaultNombre || "Desconocido",
       foto: contact?.avatarUrl || null
     };
+  };
+
+  const handleAvatarError = (contactId: string | null) => {
+    if (!currentWorkspaceId || !contactId) return;
+    const contactRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS, contactId);
+    updateDoc(contactRef, { avatarUrl: null }).catch(() => {});
   };
 
   const filteredConversations = conversaciones.filter(conv => {
@@ -133,11 +145,12 @@ export function MobileConversationList({ conversaciones, onSelect }: MobileConve
               >
                 {/* Avatar Unificado (Igual que escritorio) */}
                 <div className="relative shrink-0">
-                  <Avatar 
-                    src={info.foto} 
-                    name={info.nombre} 
+                  <Avatar
+                    src={info.foto}
+                    name={info.nombre}
                     size="lg"
                     className="transition-all duration-300"
+                    onImageError={() => handleAvatarError(info.id)}
                   />
                   {/* Badge Canal */}
                   <div className="absolute -bottom-1 -right-1 flex items-center justify-center shadow-2xl">

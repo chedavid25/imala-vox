@@ -35,12 +35,37 @@ export function MobileLeadDetailSheet({ lead, open, onClose, onConvert, onWhatsA
   React.useEffect(() => {
     if (!currentWorkspaceId || !lead?.id || !open) return;
     const notasRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.LEADS, lead.id, "notasLead");
-    const q = query(notasRef, orderBy("creadoEl", "desc")); // Descendente para móvil (más reciente arriba)
+    const q = query(notasRef, orderBy("creadoEl", "desc"));
     const unsub = onSnapshot(q, (snap) => {
       setNotasHistorial(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     return () => unsub();
   }, [currentWorkspaceId, lead?.id, open]);
+
+  // Auto-populate teléfono/email desde respuestas del formulario si los campos están vacíos
+  React.useEffect(() => {
+    if (!currentWorkspaceId || !lead?.id || !open) return;
+    const campos = lead.camposFormulario || {};
+
+    const phoneKeys = ['PHONE NUMBER', 'FULL PHONE NUMBER', 'TELEFONO', 'PHONE', 'TEL', 'CELULAR', 'MOVIL', 'NUMERO DE TELEFONO', 'NUMERO DE CELULAR'];
+    const emailKeys = ['EMAIL', 'EMAIL ADDRESS', 'CORREO', 'MAIL', 'CORREO ELECTRONICO'];
+
+    const extractedPhone = !lead.telefono
+      ? phoneKeys.map(k => campos[k]).find(v => v && v.trim())?.trim() ?? null
+      : null;
+    const extractedEmail = !lead.email
+      ? emailKeys.map(k => campos[k]).find(v => v && v.trim())?.trim() ?? null
+      : null;
+
+    if (!extractedPhone && !extractedEmail) return;
+
+    const updates: Record<string, string> = {};
+    if (extractedPhone) updates.telefono = extractedPhone;
+    if (extractedEmail) updates.email = extractedEmail;
+
+    const leadRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.LEADS, lead.id);
+    updateDoc(leadRef, updates).catch(e => console.warn('[MobileLead auto-populate]', e));
+  }, [currentWorkspaceId, lead?.id, open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!lead) return null;
 
@@ -246,7 +271,9 @@ export function MobileLeadDetailSheet({ lead, open, onClose, onConvert, onWhatsA
         {/* Respuestas del Formulario (Solo Vista) */}
         {!isEditing && lead.camposFormulario && Object.keys(lead.camposFormulario).length > 0 && (
           <div className="space-y-4">
-            <p className="text-[11px] font-semibold text-slate-300 uppercase tracking-[0.2em] px-1">Respuestas del Formulario</p>
+            <p className="text-[11px] font-semibold text-slate-300 uppercase tracking-[0.2em] px-1">
+              {lead.formulario && lead.formulario !== 'Formulario sin nombre' ? lead.formulario : 'Respuestas del Formulario'}
+            </p>
             <div className="bg-slate-50/50 rounded-[28px] p-5 space-y-4 border border-slate-100 shadow-inner">
               {Object.entries(lead.camposFormulario).map(([key, value]) => (
                 <div key={key} className="space-y-1.5 pb-3 border-b border-slate-100 last:border-0 last:pb-0">
@@ -254,7 +281,9 @@ export function MobileLeadDetailSheet({ lead, open, onClose, onConvert, onWhatsA
                      <FileText size={12} className="text-slate-300" />
                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">{key.replace(/_/g, ' ')}</p>
                   </div>
-                  <p className="text-sm font-semibold text-slate-800 pl-5">{String(value)}</p>
+                  <p className="text-sm font-semibold text-slate-800 pl-5 break-words whitespace-pre-wrap">
+                    {String(value).replace(/_/g, ' ').trim()}
+                  </p>
                 </div>
               ))}
             </div>

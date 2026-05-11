@@ -4,20 +4,30 @@ import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { User } from "lucide-react";
 
+// URLs que ya fallaron en esta sesión — evita reintentar en cada remount
+const failedUrlCache = new Set<string>();
+
 interface AvatarProps {
   src?: string | null;
   name?: string;
   className?: string;
   size?: "sm" | "md" | "lg" | "xl";
+  onImageError?: () => void;
 }
 
-export function Avatar({ src, name, className, size = "md" }: AvatarProps) {
-  const [error, setError] = useState(false);
+export function Avatar({ src, name, className, size = "md", onImageError }: AvatarProps) {
+  const [error, setError] = useState(() => Boolean(src && failedUrlCache.has(src)));
 
-  // Reset error when src changes
+  // Reset error only when src changes to a URL not in the cache
   useEffect(() => {
-    setError(false);
+    setError(Boolean(src && failedUrlCache.has(src)));
   }, [src]);
+
+  const handleError = () => {
+    if (src) failedUrlCache.add(src);
+    setError(true);
+    onImageError?.();
+  };
 
   const sizeClasses = {
     sm: "w-8 h-8 text-[10px]",
@@ -41,7 +51,7 @@ export function Avatar({ src, name, className, size = "md" }: AvatarProps) {
           src={src}
           alt={name || "avatar"}
           className="w-full h-full object-cover"
-          onError={() => setError(true)}
+          onError={handleError}
         />
       ) : (
         <span className="font-black text-[var(--accent-text)]">

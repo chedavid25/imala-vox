@@ -50,7 +50,7 @@ export function BottomTabBar() {
   return (
     <>
       <div
-        className="fixed bottom-0 left-0 right-0 flex items-center bg-[#1F1F1E] border-t border-[#2A2A28] z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]"
+        className="flex items-center w-full shrink-0 bg-[#1F1F1E] border-t border-[#2A2A28] z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]"
         style={{
           height: "calc(64px + env(safe-area-inset-bottom))",
           paddingBottom: "env(safe-area-inset-bottom)",

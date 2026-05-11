@@ -24,12 +24,7 @@ export function MobileLayout({ children }: MobileLayoutProps) {
       }}
     >
       {/* Área de contenido */}
-      <div
-        className="flex-1 overflow-hidden flex flex-col"
-        style={{
-          paddingBottom: isConversationOpen ? 0 : "calc(64px + env(safe-area-inset-bottom))",
-        }}
-      >
+      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
         {children}
       </div>
 

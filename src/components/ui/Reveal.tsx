@@ -62,7 +62,7 @@ export function Reveal({
         transitionDelay: `${delay}ms`,
       }}
       className={cn(
-        "transition-all ease-[cubic-bezier(0.21,0.47,0.32,0.98)]",
+        "transition-[opacity,transform] ease-[cubic-bezier(0.21,0.47,0.32,0.98)]",
         animationStyles[animation],
         className
       )}
