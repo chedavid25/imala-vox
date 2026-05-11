@@ -19,6 +19,7 @@ export interface FacturacionConfig {
   proximaActualizacion: Timestamp;
   mpSuscripcionId: string;
   ciclo: 'mensual' | 'anual';
+  planPendiente: 'starter' | 'pro' | 'agencia' | null;
 }
 
 export interface Workspace {

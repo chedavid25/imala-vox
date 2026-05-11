@@ -83,7 +83,7 @@ export default function RootLayout({
         <AppLayout>
           {children}
         </AppLayout>
-        <Toaster richColors position="top-right" />
+        <Toaster position="top-right" closeButton />
       </body>
     </html>
   );
