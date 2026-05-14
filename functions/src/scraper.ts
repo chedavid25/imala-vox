@@ -178,7 +178,6 @@ export async function ejecutarScrapingProfundo(
         only_main_content: true,
         exclude_tags: ['nav', 'footer', 'header', 'script', 'style', 'aside'],
       },
-      wait_for: 2500,
       domain_filter: (() => {
         try { return new URL(url).hostname; } catch { return undefined; }
       })(),
