@@ -21,6 +21,10 @@ const LOAD_MORE_SCRIPT = `
 (async () => {
   const delay = (ms) => new Promise(r => setTimeout(r, ms));
 
+  // Solo selectores que cargan contenido EN LA MISMA PÁGINA (AJAX/infinite scroll).
+  // NO incluir links de paginación por URL (ej. WooCommerce .next.page-numbers)
+  // porque navegan a otra página y cortan el scraping del listado actual.
+  // Spider sigue esos links de paginación por su cuenta con depth: 3.
   const selectores = [
     // RE/MAX Argentina
     '.remax-button', '.button-color-grey-border', '[class*="loadMore"]',
@@ -31,23 +35,19 @@ const LOAD_MORE_SCRIPT = `
     '.load_more', '[class*="load_more"]', '[data-action="load-more"]',
     // Tokko Broker
     '.btn-show-more', '[class*="show-more"]',
-    // WooCommerce
-    '.woocommerce-pagination a.next', '.next.page-numbers',
-    // Tienda Nube
+    // Tienda Nube (carga en misma página)
     '[data-store="ProductList"] button',
-    // Botones genéricos por role
-    'button[role="button"]'
   ];
 
   let clicks = 0;
-  const MAX_CLICKS = 12;
+  const MAX_CLICKS = 8;
 
   while (clicks < MAX_CLICKS) {
-    await delay(1800);
+    await delay(800);
 
     // Scroll suave para activar lazy load e infinite scroll
     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-    await delay(1200);
+    await delay(600);
 
     let boton = null;
 
@@ -92,15 +92,15 @@ const LOAD_MORE_SCRIPT = `
     if (!boton) break; // No hay más botón — terminamos
 
     boton.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    await delay(600);
+    await delay(300);
     boton.click();
     clicks++;
-    await delay(2500); // Esperar que carguen los nuevos items
+    await delay(1500); // Esperar que carguen los nuevos items
   }
 
   // Scroll final para asegurarse que todo está cargado
   window.scrollTo(0, document.body.scrollHeight);
-  await delay(1500);
+  await delay(800);
 })();
 `;
 
@@ -168,7 +168,7 @@ export async function ejecutarScrapingProfundo(
     const crawlBody = {
       url,
       limit: maxProperties + 5,      // +5 por si algunos links no son fichas
-      depth: 1,                        // Solo entrar 1 nivel (listado → ficha)
+      depth: 3,                        // 3 niveles: listado → página 2 → ficha
       return_format: 'markdown',       // Markdown limpio listo para Gemini
       request: 'chrome',               // Browser mode — necesario para JS
       execution_scripts: {
@@ -224,7 +224,10 @@ export async function ejecutarScrapingProfundo(
       .filter(p => esLinkDeDetalle(p.url))
       .slice(0, maxProperties);
 
+    const todasLasPaginas = crawlData.filter(p => p.url !== paginaPrincipal?.url);
     console.log(`[Spider] Página principal: ${paginaPrincipal?.url || 'no detectada'}`);
+    console.log(`[Spider] Otras páginas recibidas: ${todasLasPaginas.length}`);
+    console.log(`[Spider] URLs recibidas: ${todasLasPaginas.map(p => p.url).join(' | ')}`);
     console.log(`[Spider] Fichas de detalle válidas: ${fichas.length}`);
 
     // ── FASE 3: Armar el texto estructurado para el parser ────────────────────

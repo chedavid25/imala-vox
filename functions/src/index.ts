@@ -467,7 +467,7 @@ async function realizarScrapingRecursoInternal(wsId: string, recursoId: string, 
  * Responsabilidad: Ejecuta el scraper profundo en un entorno con recursos suficientes (1GB RAM).
  */
 export const procesarScrapingWeb = functions
-  .runWith({ timeoutSeconds: 120, memory: '512MB' })
+  .runWith({ timeoutSeconds: 300, memory: '512MB' })
   .https.onRequest(async (req, res) => {
     // Manejar CORS manualmente para mayor seguridad
     res.set('Access-Control-Allow-Origin', '*');
