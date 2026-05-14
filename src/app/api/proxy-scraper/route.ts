@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-/**
- * Proxy Scraper (Versión Asíncrona)
- * Evita el timeout de Vercel (10-15s) delegando todo el trabajo pesado a Cloud Functions.
- */
+const FUNCTION_URL = `https://us-central1-imala-vox.cloudfunctions.net/procesarScrapingWeb`;
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,29 +10,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Faltan parámetros" }, { status: 400 });
     }
 
-    const functionUrl = `https://us-central1-imala-vox.cloudfunctions.net/procesarScrapingWeb`;
-    console.log(`[Proxy] Disparando scraping asíncrono para: ${url}`);
+    console.log(`[Proxy] Disparando scraping para: ${url}`);
 
-    // Llamamos a la Cloud Function pero NO esperamos a que termine el scraping profundo.
-    // Simplemente nos aseguramos de que la petición fue enviada.
-    // Usamos un fetch sin await o con un timeout muy corto para soltar la conexión.
-    
-    fetch(functionUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        wsId,
-        recursoId,
-        url,
-        secret: 'imala_vox_internal_key'
-      })
-    }).catch(err => console.error(`[Proxy] Error en background fetch:`, err));
+    // Esperamos máximo 8s a que el request LLEGUE a la Cloud Function.
+    // La Cloud Function sigue corriendo sola aunque cortemos la conexión.
+    // Sin await el proceso de Vercel muere antes de enviar el request.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
 
-    // Respondemos inmediatamente al cliente para evitar el 500 de Vercel
-    return NextResponse.json({ 
-      success: true, 
-      message: "Procesamiento iniciado en segundo plano. Los objetos aparecerán en el catálogo en breve.",
-      async: true 
+    try {
+      await fetch(FUNCTION_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wsId, recursoId, url, secret: 'imala_vox_internal_key' }),
+        signal: controller.signal,
+      });
+    } catch {
+      // AbortError esperado — la Cloud Function ya recibió el request y sigue corriendo
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Procesamiento iniciado en segundo plano.",
+      async: true,
     });
 
   } catch (error: any) {
