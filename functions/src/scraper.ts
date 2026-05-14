@@ -174,13 +174,7 @@ export async function ejecutarScrapingProfundo(
       execution_scripts: {
         [url]: LOAD_MORE_SCRIPT         // Script solo en la página de listado
       },
-      filter_output: {
-        only_main_content: true,
-        exclude_tags: ['nav', 'footer', 'header', 'script', 'style', 'aside'],
-      },
-      domain_filter: (() => {
-        try { return new URL(url).hostname; } catch { return undefined; }
-      })(),
+      filter_output_main_only: true,
     };
 
     console.log('[Spider] Enviando request de crawl...');
