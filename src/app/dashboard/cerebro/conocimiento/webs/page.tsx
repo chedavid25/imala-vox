@@ -310,7 +310,7 @@ export default function WebsGlobalPage() {
                       )}
                     >
                       <h5 className="text-sm font-bold">Buscar vínculos (Profundo)</h5>
-                      <p className="text-xs text-[var(--text-tertiary-light)]">Seguir links y leer hasta 20 páginas relacionadas.</p>
+                      <p className="text-xs text-[var(--text-tertiary-light)]">Seguir links y leer todas las páginas relacionadas del sitio.</p>
                     </button>
                   </div>
                   <div className="flex gap-2 pt-4">
