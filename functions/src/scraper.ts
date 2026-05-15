@@ -207,8 +207,8 @@ export async function ejecutarScrapingProfundo(
         url,
         return_format: 'raw',
         request: 'chrome',
-        execution_scripts: { [url]: isDetail ? DETAIL_EXTRACTION_SCRIPT : LOAD_MORE_SCRIPT },
-        filter_output: { only_main_content: true }
+        execution_scripts: { [url]: isDetail ? DETAIL_EXTRACTION_SCRIPT : LOAD_MORE_SCRIPT }
+        // Sin filter_output para preservar todos los links de propiedades
       })
     });
 
@@ -236,7 +236,26 @@ export async function ejecutarScrapingProfundo(
         }
       }
       
-      // 2. Extraer links por slug en ng-state (Angular SPA)
+      // 2. Extraer slugs de __NEXT_DATA__ (RE/MAX usa Next.js)
+      const nextDataMatch = mainContentRaw.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i);
+      if (nextDataMatch) {
+        try {
+          const d = JSON.parse(nextDataMatch[1]);
+          const pp = d?.props?.pageProps || {};
+          const listingsArr = pp.listings || pp.agent?.listings || pp.properties || pp.data?.listings || [];
+          if (Array.isArray(listingsArr)) {
+            listingsArr.forEach((l: any) => {
+              const slug = l.slug || l.listingSlug;
+              if (slug) discoveredLinks.add(`https://www.remax.com.ar/listings/${slug}`);
+            });
+            console.log(`[Spider] __NEXT_DATA__ aportó ${listingsArr.length} slugs`);
+          }
+        } catch (e) {
+          console.warn('[Spider] Error extrayendo __NEXT_DATA__:', e);
+        }
+      }
+
+      // 3. Extraer slugs de ng-state (Angular SPA)
       const ngMatch = mainContentRaw.match(/<script id="ng-state"[^>]*>([\s\S]*?)<\/script>/i);
       if (ngMatch) {
           try {
@@ -258,6 +277,7 @@ export async function ejecutarScrapingProfundo(
           }
       }
 
+      console.log(`[Spider] Links descubiertos: ${discoveredLinks.size} (href) + __NEXT_DATA__ + ng-state`);
       urlsAVisitar = Array.from(discoveredLinks).filter(l => esLinkDeDetalle(l)).slice(0, maxProperties);
       console.log(`[Spider] Encontrados ${urlsAVisitar.length} links de propiedades válidos.`);
     }
@@ -277,17 +297,27 @@ export async function ejecutarScrapingProfundo(
            .then((d: any) => {
                if (d?.data) {
                    const priceStr = d.data.price ? `${d.data.currency?.value || 'USD'} ${d.data.price}` : '';
-                   const photoStr = d.data.photos?.[0]?.rawValue ? `https://d34z7eoap2mwnf.cloudfront.net/${d.data.photos[0].rawValue}` : '';
-                   
+                   const CDN = 'https://d1acdg20u0pmxj.cloudfront.net/';
+                   const photoUrls = (d.data.photos || []).slice(0, 3).map((p: any) => {
+                       const raw = p.rawValue || p.url || p.path || (typeof p === 'string' ? p : '');
+                       if (!raw) return '';
+                       return raw.startsWith('http') ? raw : `${CDN}${raw}`;
+                   }).filter(Boolean);
+
                    const syntheticContent = `
                      <div class="property-detail">
                          <h1>${d.data.title || ''}</h1>
                          <p>Precio: ${priceStr}</p>
+                         <p>PRECIO_VALOR: ${d.data.price || ''}</p>
+                         <p>Moneda: ${d.data.currency?.value || 'USD'}</p>
                          <p>SUPERFICIE_TOTAL: ${d.data.dimensionTotalBuilt || ''} m2</p>
                          <p>SUPERFICIE_CUBIERTA: ${d.data.dimensionCovered || ''} m2</p>
                          <p>CANTIDAD_BAÑOS: ${d.data.bathrooms || ''}</p>
-                         <p>Habitaciones: ${d.data.bedrooms || ''}</p>
-                         <p>Imagen Portada: ${photoStr}</p>
+                         <p>Dormitorios: ${d.data.bedrooms || ''}</p>
+                         <p>Ambientes: ${d.data.environments || d.data.rooms || ''}</p>
+                         <p>Barrio: ${d.data.neighborhood || d.data.barrio || ''}</p>
+                         <p>Localidad: ${d.data.city || d.data.localidad || ''}</p>
+                         ${photoUrls.length > 0 ? `<p>Fotos: ${photoUrls.join(' | ')}</p>` : ''}
                          <p>Descripción: ${d.data.description || ''}</p>
                      </div>
                    `;
