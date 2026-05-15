@@ -108,17 +108,24 @@ function extraerLinksDeHtml(html: string, baseUrl: string): string[] {
 // Extracción estructurada de ficha individual desde __NEXT_DATA__ (RE/MAX, etc.)
 // ─────────────────────────────────────────────────────────────────────────────
 function extraerCamposPropiedad(pp: Record<string, any>): string | null {
-  const listing = pp.listing || pp.property || pp.inmueble || pp.propiedad || pp.unit;
+  // Intentar encontrar el objeto de la propiedad en diversas estructuras (Next.js o Angular)
+  const listing = pp.listing || pp.property || pp.inmueble || pp.propiedad || pp.unit || pp.data || pp;
   if (!listing || typeof listing !== 'object') return null;
 
   const lines: string[] = [];
 
-  if (listing.title || listing.address) lines.push(`Título: ${listing.title || listing.address}`);
-  if (listing.description) lines.push(`Descripción: ${String(listing.description).slice(0, 500)}`);
+  const titulo = listing.title || listing.address || listing.name;
+  if (titulo) lines.push(`Título: ${titulo}`);
+
+  const desc = listing.description || listing.notes;
+  if (desc) lines.push(`Descripción: ${String(desc).slice(0, 500)}`);
 
   // Precio — puede ser número o string
-  if (listing.price != null) lines.push(`Precio: ${listing.price}`);
-  if (listing.currency || listing.currencyCode) lines.push(`Moneda: ${listing.currency || listing.currencyCode}`);
+  const precio = listing.price ?? listing.priceValue;
+  if (precio != null) lines.push(`Precio: ${precio}`);
+  
+  const moneda = listing.currency?.value ?? listing.currencyCode ?? listing.currency;
+  if (moneda) lines.push(`Moneda: ${moneda}`);
 
   // Tipo / operación
   if (listing.type || listing.propertyType) lines.push(`Tipo: ${listing.type || listing.propertyType}`);
@@ -126,10 +133,10 @@ function extraerCamposPropiedad(pp: Record<string, any>): string | null {
     lines.push(`Operación: ${listing.operationType || listing.operation || listing.listingType}`);
 
   // Medidas
-  // Medidas - Soporte para múltiples nomenclaturas (RE/MAX, etc.)
-  const m2Totales = listing.totalArea ?? listing.totalSurface ?? listing.surface_total ?? listing.total_area;
-  const m2Cubiertos = listing.coveredArea ?? listing.coveredSurface ?? listing.surface_covered ?? listing.covered_area;
-  const m2Terreno = listing.landArea ?? listing.landSurface ?? listing.surface_land ?? listing.land_area;
+  // Medidas - Soporte para múltiples nomenclaturas (RE/MAX Next.js y Angular)
+  const m2Totales = listing.totalArea ?? listing.totalSurface ?? listing.surface_total ?? listing.total_area ?? listing.dimensionTotalBuilt;
+  const m2Cubiertos = listing.coveredArea ?? listing.coveredSurface ?? listing.surface_covered ?? listing.covered_area ?? listing.dimensionCovered;
+  const m2Terreno = listing.landArea ?? listing.landSurface ?? listing.surface_land ?? listing.land_area ?? listing.dimensionPlot;
 
   if (m2Totales != null) lines.push(`m² totales: ${m2Totales}`);
   if (m2Cubiertos != null) lines.push(`m² cubiertos: ${m2Cubiertos}`);
@@ -218,7 +225,27 @@ async function directFetch(url: string, debug = false): Promise<{ html: string; 
         // Fallback: pageProps completo
         if (debug) console.log(`[DirectFetch] __NEXT_DATA__ pageProps completo: ${JSON.stringify(pp).length} chars`);
         return { html, text: `__NEXT_DATA__:\n${JSON.stringify(pp, null, 2).slice(0, 80000)}` };
-      } catch { /* continuar con HTML limpio */ }
+      } catch { /* continuar */ }
+    }
+
+    // Angular: extraer ng-state (RE/MAX Argentina nuevo)
+    const ngMatch = html.match(/<script id="ng-state"[^>]*>([\s\S]*?)<\/script>/i);
+    if (ngMatch) {
+      try {
+        const d = JSON.parse(ngMatch[1]);
+        // Buscar recursivamente el objeto que tenga 'price' o 'dimensionTotalBuilt'
+        const keys = Object.keys(d);
+        for (const key of keys) {
+          const val = d[key]?.b?.data || d[key]?.b;
+          if (val && typeof val === 'object' && (val.price || val.dimensionTotalBuilt)) {
+            const structured = extraerCamposPropiedad(val);
+            if (structured) {
+              if (debug) console.log(`[DirectFetch] Extracción Angular OK: ${structured.length} chars`);
+              return { html, text: structured };
+            }
+          }
+        }
+      } catch { /* continuar */ }
     }
 
     // HTML limpio sin scripts/estilos/nav/footer

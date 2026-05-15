@@ -11,13 +11,12 @@ REGLAS GENERALES:
 
 REGLAS DE PRECIOS (MUY IMPORTANTE):
 - Si ves campos JSON como "price": 259000 o "Precio: 259000", úsalos directamente como número.
+- El precio puede aparecer como: "Precio: 155000", "155.000 USD", "USD 155.000", "$ 155.000".
 - Argentina usa PUNTO como separador de miles y COMA como decimal en textos:
   "259.000" en texto argentino → precio: 259000 (doscientos cincuenta y nueve mil)
-  "1.200.000" en texto argentino → precio: 1200000 (un millón doscientos mil)
-- Formatos válidos en texto: "259.000 USD", "USD 259.000", "$ 259.000", "259000", "152,000 USD"
-- Siempre extrae el número completo ignorando separadores de miles.
-- Si dice "Consultar", "A consultar", "Precio a convenir" o no hay número → precio: null.
-- moneda: "USD" si dice USD/dólares o campo currency="USD", "ARS" si dice ARS/pesos, default "USD" para propiedades.
+- Si dice "Consultar", "A consultar" o no hay número → precio: null.
+- moneda: "USD" si dice USD/dólares, "ARS" si dice ARS/pesos, default "USD" para propiedades.
+- Si ves un número grande cerca de la palabra "USD" o "Precio", ese es el precio.
 
 REGLAS DE MEDIDAS (nombres en español Y en inglés/JSON):
 - "m² totales", "sup. total", "totalArea", "total_area", "superficie", "m2 totales" → campo m2
