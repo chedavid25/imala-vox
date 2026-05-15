@@ -97,7 +97,10 @@ function extraerCamposPropiedad(html: string): string | null {
   
   if (amb != null) lines.push(`Ambientes: ${amb}`);
   if (dorm != null) lines.push(`Dormitorios: ${dorm}`);
-  if (ban != null) lines.push(`Baños: ${ban}`);
+  if (ban != null) {
+    lines.push(`Baños: ${ban}`);
+    lines.push(`CANTIDAD_BAÑOS: ${ban}`);
+  }
 
   return lines.length >= 3 ? lines.join('\n') : null;
 }
@@ -145,15 +148,25 @@ export async function ejecutarScrapingProfundo(
     
     const rawData = await res.json();
     let pages: any[] = [];
+    
     if (Array.isArray(rawData)) {
       pages = rawData;
-    } else if (typeof rawData === 'object' && rawData !== null) {
-      // Manejar el caso donde Spider devuelve un objeto con claves numéricas {"0": {...}}
-      pages = Object.values(rawData);
+    } else if (rawData && typeof rawData === 'object') {
+      if (rawData.content) {
+        // Es una respuesta de scrape simple (un solo objeto)
+        pages = [rawData];
+      } else {
+        // Es un objeto con claves (posiblemente numéricas de un crawl)
+        pages = Object.values(rawData).filter(v => v && typeof v === 'object' && (v as any).content);
+      }
     }
     
-    if (pages.length === 0) throw new Error('Spider no devolvió contenido');
-    console.log(`[Spider] Páginas obtenidas: ${pages.length}`);
+    if (pages.length === 0) {
+      console.error('[Spider] Respuesta inválida:', JSON.stringify(rawData).slice(0, 200));
+      throw new Error('Spider no devolvió contenido válido');
+    }
+    
+    console.log(`[Spider] Páginas procesables: ${pages.length}`);
 
     // Separar principal de fichas
     const mainPage = pages.find(p => p.url === url) || pages[0];

@@ -22,7 +22,7 @@ REGLAS DE MEDIDAS:
 - "m² cubiertos", "m2 cubiertos", "superficie cubierta", "SUPERFICIE_CUBIERTA" → campo m2_cubiertos
 - "m² terreno", "m2 terreno", "superficie terreno" → m2_terreno (o m2 si no hay otro)
 - Buscá siempre el símbolo "m²" o "m2". Si ves "172 m² totales", m2 es 172.
-- Ambientes: 4, Dormitorios: 3, Baños: 2.
+- Ambientes: 4, Dormitorios: 3, Baños: 2, CANTIDAD_BAÑOS: 2.
 - Si ves "52 años antigüedad", ignoralo (no es medida).
 
 EJEMPLOS DE EXTRACCIÓN (RE/MAX):
