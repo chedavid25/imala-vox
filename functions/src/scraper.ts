@@ -1,14 +1,18 @@
 /**
- * Motor de Scraping con Spider API — Estrategia de página única
+ * Motor de Scraping — Arquitectura en dos capas
  *
- * Solo scrapeamos la página que el usuario nos pasa.
- * No visitamos fichas individuales (evita bloqueos de antibot).
+ * Capa 1 (GRATIS, sin Spider): Fetch HTTP directo con headers de browser.
+ *   - Funciona para sitios SSR: RE/MAX (Next.js), WooCommerce, Shopify,
+ *     Tienda Nube, Tokko Broker, MercadoLibre, etc.
+ *   - Extrae __NEXT_DATA__ JSON (Next.js) si existe → datos estructurados perfectos.
+ *   - Si no, devuelve el HTML limpio (sin scripts/styles/nav/footer).
  *
- * Estrategia dual:
- *   1. Intento HTTP simple: rápido, barato, funciona en sitios SSR
- *      (WooCommerce, Shopify, Tienda Nube, RE/MAX Next.js, Tokko, etc.)
- *   2. Si el contenido es escaso (<500 chars), reintento con Chrome
- *      para sitios que requieren JavaScript para renderizar.
+ * Capa 2 (Spider): Solo si Capa 1 devuelve < 500 chars útiles.
+ *   - Para SPAs puras que necesitan JavaScript para renderizar.
+ *   - Usa request: 'smart' (Spider decide http vs chrome automáticamente).
+ *   - filter_output_main_only: false para no perder contenido de tarjetas.
+ *
+ * NO visita fichas individuales — trabaja solo con la página enviada por el usuario.
  */
 
 export interface ScrapeResult {
@@ -19,82 +23,97 @@ export interface ScrapeResult {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Script inyectado en Chrome (solo cuando el fallback Chrome es necesario)
-// Clickea botones "ver más" para cargar contenido adicional
+// Capa 1: Fetch HTTP directo (gratis, confiable para SSR)
 // ─────────────────────────────────────────────────────────────────────────────
-const LOAD_MORE_SCRIPT = `
-(async () => {
-  const delay = (ms) => new Promise(r => setTimeout(r, ms));
+async function directFetch(url: string, debug = false): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'es-AR,es;q=0.9,en;q=0.8',
+        'Cache-Control': 'max-age=0',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Upgrade-Insecure-Requests': '1',
+      },
+    });
 
-  const selectores = [
-    '.remax-button', '.button-color-grey-border', '[class*="loadMore"]',
-    '.load-more', '.ver-mas', '.ver-más', '.cargar-mas', '.cargar-más',
-    '[class*="load-more"]', '[class*="ver-mas"]', '[class*="ver-más"]',
-    '.load_more', '[class*="load_more"]', '[data-action="load-more"]',
-    '.btn-show-more', '[class*="show-more"]',
-    '[data-store="ProductList"] button',
-  ];
-
-  let clicks = 0;
-  const MAX_CLICKS = 6;
-
-  while (clicks < MAX_CLICKS) {
-    await delay(800);
-    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-    await delay(600);
-
-    let boton = null;
-
-    for (const selector of selectores) {
-      try {
-        const el = document.querySelector(selector);
-        if (el) {
-          const rect = el.getBoundingClientRect();
-          if (rect.width > 0 && rect.height > 0 && el.offsetParent !== null) {
-            boton = el;
-            break;
-          }
-        }
-      } catch (e) {}
+    if (!res.ok) {
+      console.log(`[DirectFetch] HTTP ${res.status} para ${url}`);
+      return null;
     }
 
-    if (!boton) {
-      const patrones = [
-        'ver más', 'ver mas', 'cargar más', 'cargar mas',
-        'mostrar más', 'mostrar mas', 'load more', 'show more',
-        'ver todas', 'ver todos', 'más resultados',
-      ];
-      const todos = Array.from(document.querySelectorAll('button, a.btn, [role="button"], .btn'));
-      for (const btn of todos) {
-        const texto = (btn.textContent || '').toLowerCase().trim();
-        const rect = btn.getBoundingClientRect();
-        if (rect.width > 0 && rect.height > 0 && patrones.some(p => texto.includes(p))) {
-          boton = btn;
-          break;
+    const html = await res.text();
+    if (debug) console.log(`[DirectFetch] HTML total: ${html.length} chars`);
+
+    // ── Estrategia A: Extraer __NEXT_DATA__ (Next.js SSR) ──────────────────
+    // Next.js embebe TODOS los datos de la página en un JSON gigante.
+    // Para RE/MAX, contiene listings con precio, m², fotos, etc.
+    const nextDataMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i);
+    if (nextDataMatch) {
+      const rawJson = nextDataMatch[1].trim();
+      if (debug) console.log(`[DirectFetch] __NEXT_DATA__ encontrado: ${rawJson.length} chars`);
+
+      try {
+        const nextData = JSON.parse(rawJson);
+        // Buscar el array de propiedades/listings en distintas rutas posibles
+        const pageProps = nextData?.props?.pageProps || {};
+        const candidatos = [
+          pageProps.listings,
+          pageProps.properties,
+          pageProps.results,
+          pageProps.data?.listings,
+          pageProps.data?.properties,
+          pageProps.initialListings,
+          pageProps.agent?.listings,
+        ].filter(Boolean);
+
+        if (candidatos.length > 0) {
+          const listings = candidatos[0];
+          if (debug) console.log(`[DirectFetch] Listings encontrados en __NEXT_DATA__: ${Array.isArray(listings) ? listings.length : 'object'}`);
+          // Devolver el JSON de listings como texto estructurado
+          return `__NEXT_DATA__ listings:\n${JSON.stringify(listings, null, 2).slice(0, 120000)}`;
         }
+
+        // Si no encontramos listings directamente, devolver pageProps completo
+        if (debug) console.log('[DirectFetch] __NEXT_DATA__ sin array de listings obvio, usando pageProps');
+        return `__NEXT_DATA__:\n${JSON.stringify(pageProps, null, 2).slice(0, 80000)}`;
+      } catch {
+        // JSON inválido — usar el raw truncado
+        return `__NEXT_DATA__ (raw):\n${rawJson.slice(0, 80000)}`;
       }
     }
 
-    if (!boton) break;
+    // ── Estrategia B: HTML limpio (para sitios SSR sin Next.js) ────────────
+    // Eliminamos ruido (scripts, estilos, nav, footer) y dejamos el contenido.
+    const cleanHtml = html
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/<(nav|footer|header|aside|noscript)[^>]*>[\s\S]*?<\/\1>/gi, '')
+      .replace(/\s{3,}/g, '\n')
+      .trim();
 
-    boton.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    await delay(300);
-    boton.click();
-    clicks++;
-    await delay(1800);
+    if (debug) console.log(`[DirectFetch] HTML limpio: ${cleanHtml.length} chars`);
+    return cleanHtml.slice(0, 100000);
+
+  } catch (err: any) {
+    console.error(`[DirectFetch] Error: ${err.message}`);
+    return null;
   }
+}
 
-  window.scrollTo(0, document.body.scrollHeight);
-  await delay(1000);
-})();
-`;
-
+// ─────────────────────────────────────────────────────────────────────────────
+// Capa 2: Spider API (para SPAs que necesitan JS)
+// ─────────────────────────────────────────────────────────────────────────────
 async function spiderScrape(
   url: string,
   apiKey: string,
   options: Record<string, unknown> = {},
   debug = false
-): Promise<{ content: string; links: string[]; url: string } | null> {
+): Promise<string | null> {
   const response = await fetch('https://api.spider.cloud/scrape', {
     method: 'POST',
     headers: {
@@ -105,8 +124,7 @@ async function spiderScrape(
   });
 
   if (!response.ok) {
-    const err = await response.text();
-    console.error(`[Spider] Error HTTP ${response.status}: ${err.slice(0, 300)}`);
+    console.error(`[Spider] HTTP ${response.status}`);
     return null;
   }
 
@@ -115,98 +133,84 @@ async function spiderScrape(
 
   if (debug) {
     console.log(`[Spider] Keys: ${Object.keys(page || {}).join(', ')}`);
-    console.log(`[Spider] status: ${page?.status}, content: ${(page?.content || page?.markdown || page?.html || page?.text || '').length} chars`);
+    console.log(`[Spider] status: ${page?.status}`);
     console.log(`[Spider] Sample: ${JSON.stringify(page).slice(0, 400)}`);
   }
 
-  if (!page || page.status === 0) {
-    if (debug) console.log('[Spider] Respuesta inválida o bloqueada');
-    return null;
-  }
+  if (!page || page.status === 0) return null;
 
-  if (page && !page.content) {
-    page.content = page.markdown || page.html || page.text || '';
-  }
+  const content = page.content || page.markdown || page.html || page.text || '';
+  if (debug) console.log(`[Spider] content: ${content.length} chars`);
 
-  return page ?? null;
+  return content || null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Función principal — una sola página, sin visitar fichas individuales
+// Función principal
 // ─────────────────────────────────────────────────────────────────────────────
 export async function ejecutarScrapingProfundo(
   url: string,
-  maxProperties: number = 40
+  _maxProperties: number = 40
 ): Promise<ScrapeResult> {
   const SPIDER_API_KEY = process.env.SPIDER_API_KEY;
 
-  if (!SPIDER_API_KEY) {
-    return { success: false, mainText: '', items: [], error: 'SPIDER_API_KEY no configurada' };
-  }
-
   try {
-    console.log(`[Spider] Scraping: ${url}`);
+    console.log(`[Scraper] Iniciando para: ${url}`);
 
-    // ── Intento 1: HTTP simple (rápido, SSR sites devuelven todo el contenido) ──
-    console.log('[Spider] Intento 1: HTTP simple...');
-    let mainPage = await spiderScrape(url, SPIDER_API_KEY, {
-      return_format: 'markdown',
-      request: 'http',
-      stealth: true,
-    }, true);
+    // ── Capa 1: Fetch HTTP directo ────────────────────────────────────────────
+    console.log('[Scraper] Capa 1: fetch HTTP directo...');
+    let content = await directFetch(url, true);
+    const contentLen = content?.length ?? 0;
+    console.log(`[Scraper] Capa 1 resultado: ${contentLen} chars`);
 
-    const httpContent = mainPage?.content || '';
-    console.log(`[Spider] HTTP content: ${httpContent.length} chars`);
+    // ── Capa 2: Spider como fallback ──────────────────────────────────────────
+    if (contentLen < 500) {
+      if (!SPIDER_API_KEY) {
+        console.log('[Scraper] Sin SPIDER_API_KEY y Capa 1 insuficiente. Usando lo que hay.');
+      } else {
+        console.log('[Scraper] Capa 2: Spider (SPA fallback)...');
+        const spiderContent = await spiderScrape(url, SPIDER_API_KEY, {
+          return_format: 'markdown',
+          request: 'smart',
+          filter_output_main_only: false,
+          return_page_links: true,
+          stealth: true,
+        }, true);
 
-    // ── Intento 2: Chrome si HTTP no trajo suficiente contenido ──────────────
-    if (httpContent.length < 500) {
-      console.log('[Spider] Contenido HTTP insuficiente. Intento 2: Chrome...');
-      const chromePage = await spiderScrape(url, SPIDER_API_KEY, {
-        return_format: 'markdown',
-        request: 'chrome',
-        execution_scripts: { [url]: LOAD_MORE_SCRIPT },
-        return_page_links: true,
-        stealth: true,
-      }, true);
-
-      if (chromePage && (chromePage.content || '').length > httpContent.length) {
-        mainPage = chromePage;
-        console.log(`[Spider] Chrome content: ${(mainPage.content || '').length} chars`);
+        if (spiderContent && spiderContent.length > contentLen) {
+          content = spiderContent;
+          console.log(`[Scraper] Capa 2 resultado: ${content.length} chars`);
+        }
       }
     }
 
-    if (!mainPage) {
-      throw new Error('Spider no pudo obtener contenido de la página');
+    if (!content || content.length < 100) {
+      return {
+        success: false,
+        mainText: '',
+        items: [],
+        error: `No se pudo obtener contenido del sitio. El sitio puede requerir JavaScript avanzado o estar bloqueando el acceso.`,
+      };
     }
 
-    const mainContent = mainPage.content || '';
-    const allLinks: string[] = (mainPage as any).links || (mainPage as any).page_links || (mainPage as any).urls || [];
-
-    console.log(`[Spider] Contenido final: ${mainContent.length} chars, links: ${allLinks.length}`);
-
-    if (mainContent.length < 100 && allLinks.length === 0) {
-      throw new Error(`Sitio bloqueado o sin contenido accesible (${mainContent.length} chars)`);
-    }
-
-    // Armar texto para el parser — solo la página principal
     const fullText = [
       `ORIGEN: ${url}`,
-      `ESTRATEGIA: single-page (sin visitar fichas individuales)`,
+      `CHARS_CAPTURADOS: ${content.length}`,
       '',
-      '=== CONTENIDO DE LA PÁGINA DE LISTADO ===',
-      mainContent.slice(0, 100000),
+      '=== CONTENIDO ===',
+      content,
     ].join('\n');
 
-    console.log(`[Spider] Texto para parser: ${fullText.length} chars`);
+    console.log(`[Scraper] Texto total para parser: ${fullText.length} chars`);
 
     return {
       success: true,
       mainText: fullText,
-      items: allLinks,
+      items: [],
     };
 
   } catch (error: any) {
-    console.error('[Spider] Error:', error.message);
+    console.error('[Scraper] Error:', error.message);
     return { success: false, mainText: '', items: [], error: error.message };
   }
 }
