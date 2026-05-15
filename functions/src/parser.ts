@@ -101,12 +101,33 @@ export async function ejecutarParsingObjetos(params: {
     const cleanedJson = responseText.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(cleanedJson);
     const objetos = parsed.objetos || [];
-    
+
     console.log(`[Parser] Procesando ${objetos.length} objetos...`);
+
+    // Fallback de fotos: extraer URLs de líneas "Fotos: url1 | url2" del texto crudo
+    // Gemini a veces no extrae correctamente las URLs. Las tomamos nosotros si faltan.
+    const fotoLineRegex = /^Fotos:\s*(.+)$/gm;
+    const fotoBlocksFromText: string[][] = [];
+    let fotoMatch: RegExpExecArray | null;
+    while ((fotoMatch = fotoLineRegex.exec(rawText)) !== null) {
+      const urls = fotoMatch[1].split('|').map(u => u.trim()).filter(u => u.startsWith('http'));
+      if (urls.length > 0) fotoBlocksFromText.push(urls);
+    }
+
+    // Aplicar fallback a cada objeto sin fotos
+    objetos.forEach((obj: any, i: number) => {
+      if (!Array.isArray(obj.fotos) || obj.fotos.length === 0) {
+        const block = fotoBlocksFromText[i] || fotoBlocksFromText[0] || [];
+        if (block.length > 0) {
+          obj.fotos = block.slice(0, 3);
+          console.log(`[Parser] Fotos fallback aplicado al objeto ${i}: ${obj.fotos[0]}`);
+        }
+      }
+    });
 
     if (objetos.length > 0) {
       const batch = db.batch();
-      
+
       // Borrar anteriores
       const prevs = await db.collection(`espaciosDeTrabajo/${wsId}/objetos`)
         .where("recursoOrigenId", "==", recursoId).get();

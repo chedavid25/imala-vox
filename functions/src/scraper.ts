@@ -122,8 +122,117 @@ async function directFetch(url: string): Promise<string | null> {
   }
 }
 
+const LOAD_MORE_JS = `
+(async () => {
+  const delay = ms => new Promise(r => setTimeout(r, ms));
+  const patrones = ['ver más','ver mas','cargar más','mostrar más','load more','show more','ver todas','ver todos','más resultados'];
+  for (let clicks = 0; clicks < 8; clicks++) {
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    await delay(1200);
+    const todos = Array.from(document.querySelectorAll('button,[role="button"],.btn,.remax-button,.button-color-grey-border,[class*="loadMore"],[class*="load-more"],[class*="ver-mas"],[class*="show-more"]'));
+    const boton = todos.find(el => {
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0 && patrones.some(p => (el.textContent||'').toLowerCase().includes(p));
+    });
+    if (!boton) break;
+    boton.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    await delay(400);
+    boton.click();
+    await delay(2500);
+  }
+  window.scrollTo(0, document.body.scrollHeight);
+  await delay(1000);
+})();
+`;
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Spider scrape — para páginas SPA que necesitan JS
+// Firecrawl — para páginas SPA que necesitan JS (descubrimiento de links)
+// ─────────────────────────────────────────────────────────────────────────────
+async function firecrawlGetLinks(url: string, apiKey: string): Promise<string[]> {
+  try {
+    const res = await fetch('https://api.firecrawl.dev/v1/scrape', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url,
+        formats: ['links'],
+        onlyMainContent: false,
+        waitFor: 2000,
+        actions: [
+          { type: 'scroll', direction: 'down' },
+          { type: 'wait', milliseconds: 1000 },
+          { type: 'executeJavascript', script: LOAD_MORE_JS },
+          { type: 'wait', milliseconds: 4000 },
+          { type: 'scroll', direction: 'down' },
+          { type: 'wait', milliseconds: 1000 },
+        ],
+      }),
+    });
+    if (!res.ok) { console.error(`[Firecrawl] ${res.status}`); return []; }
+    const data = await res.json();
+    return data.data?.links || [];
+  } catch (e: any) {
+    console.error(`[Firecrawl] Error: ${e.message}`);
+    return [];
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RE/MAX agente — obtener todos los slugs de sus propiedades vía Firecrawl
+// ─────────────────────────────────────────────────────────────────────────────
+async function fetchRemaxAgente(agentUrl: string, firecrawlKey: string): Promise<ScrapeResult> {
+  console.log(`[Scraper] RE/MAX agente: descubriendo propiedades con Firecrawl...`);
+  const origin = 'https://www.remax.com.ar';
+
+  const allLinks = await firecrawlGetLinks(agentUrl, firecrawlKey);
+  console.log(`[Scraper] Firecrawl devolvió ${allLinks.length} links`);
+
+  // Filtrar solo links de fichas individuales del mismo dominio
+  const slugSet = new Set<string>();
+  for (const link of allLinks) {
+    const m = link.match(/remax\.com\.ar\/listings\/([a-z0-9-]{5,})(?:[/?#]|$)/i);
+    if (m) {
+      const slug = m[1];
+      const reservados = ['buy','sell','rent','map','search','list','filter','residential','commercial'];
+      if (!reservados.includes(slug)) slugSet.add(slug);
+    }
+  }
+
+  // También buscar slugs en el HTML estático (los primeros ~7 que vienen SSR)
+  const htmlLinks = await directFetch(agentUrl);
+  if (htmlLinks) {
+    const htmlSlugs = [...htmlLinks.matchAll(/\/listings\/([a-z0-9-]{5,})(?:[/?#"' ]|$)/gi)];
+    htmlSlugs.forEach(m => {
+      const reservados = ['buy','sell','rent','map','search','list','filter','residential','commercial'];
+      if (!reservados.includes(m[1])) slugSet.add(m[1]);
+    });
+  }
+
+  const slugs = [...slugSet].slice(0, 40);
+  console.log(`[Scraper] ${slugs.length} propiedades encontradas para el agente`);
+
+  if (slugs.length === 0) {
+    return { success: false, mainText: '', items: [], error: 'No se encontraron propiedades para este agente' };
+  }
+
+  // Obtener datos de cada propiedad en paralelo (3 a la vez)
+  const textos: string[] = [];
+  const CONCURRENCY = 3;
+  for (let i = 0; i < slugs.length; i += CONCURRENCY) {
+    const chunk = slugs.slice(i, i + CONCURRENCY);
+    const results = await Promise.all(
+      chunk.map(slug => fetchRemaxNativo(slug, `${origin}/listings/${slug}`))
+    );
+    results.forEach(t => { if (t) textos.push(t); });
+    console.log(`[Scraper] Agente: ${textos.length}/${slugs.length} propiedades OK`);
+  }
+
+  const mainText = textos.map((t, i) => `=== PROPIEDAD ${i + 1} ===\n${t}\n=== FIN ${i + 1} ===`).join('\n\n');
+  return { success: true, mainText, items: slugs.map(s => `${origin}/listings/${s}`) };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Spider fallback — para páginas SPA que no son RE/MAX
 // ─────────────────────────────────────────────────────────────────────────────
 async function spiderScrape(url: string, apiKey: string): Promise<string | null> {
   try {
@@ -146,24 +255,32 @@ async function spiderScrape(url: string, apiKey: string): Promise<string | null>
 // ─────────────────────────────────────────────────────────────────────────────
 export async function ejecutarScrapingProfundo(
   url: string,
-  _maxProperties: number = 20
+  _maxProperties: number = 40
 ): Promise<ScrapeResult> {
   console.log(`[Scraper] Iniciando para: ${url}`);
+  const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
+  const SPIDER_API_KEY = process.env.SPIDER_API_KEY;
 
   try {
-    // ── RE/MAX ficha individual → API nativa, sin Spider ─────────────────────
-    const remaxMatch = url.match(/remax\.com\.ar\/listings\/([^/?#]+)/i);
-    if (remaxMatch) {
-      const slug = remaxMatch[1];
-      console.log(`[Scraper] RE/MAX slug detectado: ${slug}`);
+    // ── RE/MAX ficha individual → API nativa (sin créditos) ──────────────────
+    const remaxListingMatch = url.match(/remax\.com\.ar\/listings\/([^/?#]+)/i);
+    if (remaxListingMatch) {
+      const slug = remaxListingMatch[1];
+      console.log(`[Scraper] RE/MAX ficha: ${slug}`);
       const content = await fetchRemaxNativo(slug, url);
-      if (content) {
-        return { success: true, mainText: content, items: [url] };
-      }
-      // Fallback: directFetch si la API falla
-      console.log('[Scraper] API nativa falló, probando directFetch...');
+      if (content) return { success: true, mainText: content, items: [url] };
+      // Fallback si la API falla
       const html = await directFetch(url);
       if (html) return { success: true, mainText: html, items: [url] };
+    }
+
+    // ── RE/MAX página de agente → Firecrawl para links + API nativa por cada propiedad ──
+    const remaxAgentMatch = url.match(/remax\.com\.ar\/agent\/([^/?#]+)/i);
+    if (remaxAgentMatch) {
+      if (FIRECRAWL_API_KEY) {
+        return await fetchRemaxAgente(url, FIRECRAWL_API_KEY);
+      }
+      return { success: false, mainText: '', items: [], error: 'Se necesita FIRECRAWL_API_KEY para procesar páginas de agente RE/MAX' };
     }
 
     // ── Cualquier otra URL: directFetch primero (gratis) ─────────────────────
@@ -173,8 +290,7 @@ export async function ejecutarScrapingProfundo(
       return { success: true, mainText: directContent, items: [url] };
     }
 
-    // ── Fallback: Spider para SPA (usa créditos) ──────────────────────────────
-    const SPIDER_API_KEY = process.env.SPIDER_API_KEY;
+    // ── Fallback: Spider para SPA ─────────────────────────────────────────────
     if (SPIDER_API_KEY) {
       console.log('[Scraper] Spider fallback...');
       const spiderContent = await spiderScrape(url, SPIDER_API_KEY);
