@@ -220,10 +220,11 @@ export async function ejecutarScrapingProfundo(
     if (isDetail) {
       urlsAVisitar = [url];
     } else {
-      // Extraer links del catálogo (Buscar todos los href que coincidan con ficha de detalle)
+      const discoveredLinks = new Set<string>();
+      
+      // 1. Extraer links por href (Fallback)
       const hrefRegex = /href="([^"]+)"/g;
       let match;
-      const discoveredLinks = new Set<string>();
       while ((match = hrefRegex.exec(mainContentRaw)) !== null) {
         let link = match[1];
         if (link.startsWith('/')) {
@@ -234,7 +235,30 @@ export async function ejecutarScrapingProfundo(
             discoveredLinks.add(link);
         }
       }
-      urlsAVisitar = Array.from(discoveredLinks).slice(0, maxProperties);
+      
+      // 2. Extraer links por slug en ng-state (Angular SPA)
+      const ngMatch = mainContentRaw.match(/<script id="ng-state"[^>]*>([\s\S]*?)<\/script>/i);
+      if (ngMatch) {
+          try {
+              const d = JSON.parse(ngMatch[1].trim());
+              const extractSlugs = (obj: any) => {
+                  if (!obj || typeof obj !== 'object') return;
+                  if (Array.isArray(obj)) {
+                      obj.forEach(item => extractSlugs(item));
+                  } else {
+                      if (obj.slug) {
+                          discoveredLinks.add(`https://www.remax.com.ar/listings/${obj.slug}`);
+                      }
+                      for (const k in obj) extractSlugs(obj[k]);
+                  }
+              };
+              extractSlugs(d);
+          } catch (e) {
+              console.warn('[Spider] Error extrayendo slugs de ng-state:', e);
+          }
+      }
+
+      urlsAVisitar = Array.from(discoveredLinks).filter(l => esLinkDeDetalle(l)).slice(0, maxProperties);
       console.log(`[Spider] Encontrados ${urlsAVisitar.length} links de propiedades válidos.`);
     }
 
