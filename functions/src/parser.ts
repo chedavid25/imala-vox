@@ -20,12 +20,18 @@ REGLAS DE PRECIOS (MUY IMPORTANTE):
 - moneda: "USD" si dice USD/dólares o campo currency="USD", "ARS" si dice ARS/pesos, default "USD" para propiedades.
 
 REGLAS DE MEDIDAS (nombres en español Y en inglés/JSON):
-- "m² totales", "sup. total", "totalArea", "total_area", "superficie" → campo m2
-- "m² cubiertos", "sup. cubierta", "coveredArea", "covered_area", "buildingArea" → campo m2_cubiertos
+- "m² totales", "sup. total", "totalArea", "total_area", "superficie", "m2 totales" → campo m2
+- "m² cubiertos", "sup. cubierta", "coveredArea", "covered_area", "buildingArea", "m2 cubiertos" → campo m2_cubiertos
 - "ambientes", "environments", "rooms" (cuando no es baños) → campo ambientes
-- "dormitorios", "habitaciones", "dorm.", "bedrooms", "bedRooms", "suites" → campo dormitorios
-- "baños", "banos", "bath", "bathrooms", "baths" → campo banios
+- "dormitorios", "habitaciones", "dorm.", "bedrooms", "bedRooms", "suites", "hab." → campo dormitorios
+- "baños", "banos", "bath", "bathrooms", "baths", "baño" → campo banios
 - "expensas", "expenses", "expensas_valor" → campo expensas (siempre en ARS)
+
+EJEMPLOS DE EXTRACCIÓN (RE/MAX):
+- "155.000 USD ... 172 m² totales 172 m² cubiertos 5 ambientes 2 baños 4 dormitorios"
+  -> precio: 155000, moneda: "USD", m2: 172, m2_cubiertos: 172, ambientes: 5, banios: 2, dormitorios: 4
+- "USD 59.000 ... 600 m² terreno"
+  -> precio: 59000, moneda: "USD", m2: 600 (terreno se mapea a m2 si no hay otro)
 
 REGLAS DE FOTOS:
 - Extrae URLs completas de imágenes de las propiedades.

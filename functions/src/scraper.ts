@@ -30,7 +30,7 @@ const LOAD_MORE_JS = `
 (async () => {
   const delay = ms => new Promise(r => setTimeout(r, ms));
   const patrones = ['ver más','ver mas','cargar más','cargar mas','mostrar más','load more','show more','ver todas','ver todos','más resultados'];
-  for (let clicks = 0; clicks < 6; clicks++) {
+  for (let clicks = 0; clicks < 10; clicks++) {
     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
     await delay(1000);
     const todos = Array.from(document.querySelectorAll('button,[role="button"],.btn,.remax-button,.button-color-grey-border,[class*="loadMore"],[class*="load-more"],[class*="ver-mas"],[class*="show-more"]'));
@@ -126,15 +126,25 @@ function extraerCamposPropiedad(pp: Record<string, any>): string | null {
     lines.push(`Operación: ${listing.operationType || listing.operation || listing.listingType}`);
 
   // Medidas
-  if (listing.totalArea != null) lines.push(`m² totales: ${listing.totalArea}`);
-  if (listing.coveredArea != null) lines.push(`m² cubiertos: ${listing.coveredArea}`);
-  if (listing.landArea != null) lines.push(`m² terreno: ${listing.landArea}`);
+  // Medidas - Soporte para múltiples nomenclaturas (RE/MAX, etc.)
+  const m2Totales = listing.totalArea ?? listing.totalSurface ?? listing.surface_total ?? listing.total_area;
+  const m2Cubiertos = listing.coveredArea ?? listing.coveredSurface ?? listing.surface_covered ?? listing.covered_area;
+  const m2Terreno = listing.landArea ?? listing.landSurface ?? listing.surface_land ?? listing.land_area;
 
-  // Ambientes
-  if (listing.environments != null) lines.push(`Ambientes: ${listing.environments}`);
-  if (listing.bedrooms != null) lines.push(`Dormitorios: ${listing.bedrooms}`);
-  if (listing.bathrooms != null) lines.push(`Baños: ${listing.bathrooms}`);
-  if (listing.garages != null) lines.push(`Cocheras: ${listing.garages}`);
+  if (m2Totales != null) lines.push(`m² totales: ${m2Totales}`);
+  if (m2Cubiertos != null) lines.push(`m² cubiertos: ${m2Cubiertos}`);
+  if (m2Terreno != null) lines.push(`m² terreno: ${m2Terreno}`);
+
+  // Ambientes y Habitaciones
+  const ambientes = listing.environments ?? listing.rooms ?? listing.roomsValue;
+  const dormitorios = listing.bedrooms ?? listing.bedRooms ?? listing.bedroomsValue ?? listing.habitaciones;
+  const banios = listing.bathrooms ?? listing.baths ?? listing.bathroomsValue ?? listing.banos;
+  const cocheras = listing.garages ?? listing.parking ?? listing.parkingValue ?? listing.cocheras;
+
+  if (ambientes != null) lines.push(`Ambientes: ${ambientes}`);
+  if (dormitorios != null) lines.push(`Dormitorios: ${dormitorios}`);
+  if (banios != null) lines.push(`Baños: ${banios}`);
+  if (cocheras != null) lines.push(`Cocheras: ${cocheras}`);
 
   // Ubicación
   if (listing.neighborhood || listing.barrio) lines.push(`Barrio: ${listing.neighborhood || listing.barrio}`);
@@ -383,7 +393,8 @@ export async function ejecutarScrapingProfundo(
       ? [
           `ORIGEN: ${url}`,
           `FICHAS: ${fichas.length}`,
-          `NOTA_IMAGENES: Para RE/MAX el CDN base es "https://d1acdg20u0pmxj.cloudfront.net/". Si encontrás paths como "listings/UUID/UUID.jpg", construí la URL completa con ese prefijo.`,
+          `NOTA_IMAGENES: Para RE/MAX el CDN base es "https://d1acdg20u0pmxj.cloudfront.net/".`,
+          `NOTA_DATOS: Prestá especial atención a las medidas (m² totales y cubiertos) y cantidad de baños. En RE/MAX suelen aparecer al principio del texto de la ficha o en el bloque de características.`,
           '',
           '=== PÁGINA PRINCIPAL ===',
           mainContent.slice(0, 8000),
