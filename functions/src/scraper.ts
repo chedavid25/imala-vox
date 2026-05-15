@@ -34,21 +34,23 @@ const LOAD_MORE_SCRIPT = `
 
 const DETAIL_EXTRACTION_SCRIPT = `
 (() => {
-  // Intentar expandir descripción
-  const expandBtn = document.querySelector('.remax-description__expand, [class*="description"] .ver-mas, button.expand');
-  if (expandBtn) expandBtn.click();
-
-  const data = {};
+  const data = { dom: {} };
   try {
-    // Intentar sacar de __NEXT_DATA__
-    if (window.__NEXT_DATA__) {
-      const d = window.__NEXT_DATA__.props?.pageProps?.listing || window.__NEXT_DATA__.props?.pageProps?.property;
-      if (d) Object.assign(data, d);
-    }
-    // Intentar sacar de la descripción del DOM si el JSON falla
-    data.domDescription = document.querySelector('.remax-description__content, [class*="description-text"], .property-description')?.innerText;
-    data.domPrice = document.querySelector('.remax-price, [class*="price-value"]')?.innerText;
-    data.domTitle = document.title;
+    // 1. Intentar expandir descripción
+    const expandBtn = document.querySelector('.remax-description__expand, [class*="description"] .ver-mas, button.expand');
+    if (expandBtn) expandBtn.click();
+
+    // 2. Capturar datos visibles (DOM)
+    data.dom.title = document.title;
+    data.dom.description = document.querySelector('.remax-description__content, [class*="description-text"], .property-description')?.innerText;
+    data.dom.price = document.querySelector('.remax-price, [class*="price-value"], .price-value')?.innerText;
+    
+    // 3. Capturar características técnicas del DOM (en caso de que falle el JSON)
+    const chips = Array.from(document.querySelectorAll('.remax-chips__item, .property-characteristics__item, [class*="characteristics"] li'));
+    data.dom.chips = chips.map(c => c.innerText).join(' | ');
+
+    // 4. Intentar sacar de __NEXT_DATA__ o similares
+    if (window.__NEXT_DATA__) data.next = window.__NEXT_DATA__.props?.pageProps?.listing || window.__NEXT_DATA__.props?.pageProps?.property;
   } catch (e) {}
   return JSON.stringify(data);
 })();
@@ -239,37 +241,31 @@ export async function ejecutarScrapingProfundo(
     const procesarPagina = (p: any) => {
       if (!p?.content) return '';
       
-      let structuredFromScript = null;
-      // Si el script de ejecución devolvió JSON (estará en la respuesta de Spider si lo configuramos bien)
-      // Pero Spider devuelve el resultado de execution_scripts en un campo específico
-      if (p.execution_results && p.execution_results[url]) {
+      let extraInfo = "";
+      // Recuperar datos del script de ejecución
+      const resKey = Object.keys(p.execution_results || {}).find(k => k.includes('DETAIL_EXTRACTION_SCRIPT') || k === url);
+      const scriptResult = p.execution_results?.[resKey || ''];
+      
+      if (scriptResult) {
         try {
-          const scriptData = JSON.parse(p.execution_results[url]);
-          if (scriptData.domDescription || scriptData.price) {
-             structuredFromScript = `Título: ${scriptData.domTitle || scriptData.title}\nDescripción: ${scriptData.domDescription || scriptData.description}\nPrecio: ${scriptData.domPrice || scriptData.price}\n`;
+          const sd = JSON.parse(scriptResult);
+          if (sd.dom) {
+            extraInfo = `[DATOS_DOM]\nTítulo: ${sd.dom.title}\nDescripción: ${sd.dom.description}\nPrecio: ${sd.dom.price}\nChips: ${sd.dom.chips}\n`;
           }
         } catch (e) {}
       }
 
       const estructurado = extraerCamposPropiedad(p.content);
       
-      // Combinar o elegir el mejor
-      let finalData = estructurado || structuredFromScript || '';
+      // Combinamos AMBOS para que Gemini tenga toda la info
+      let combined = [
+        estructurado ? `[DATOS_ESTRUCTURADOS]\n${estructurado}` : '',
+        extraInfo ? extraInfo : '',
+        // Fallback de texto limpio (solo si lo anterior es muy corto)
+        (!estructurado && !extraInfo) ? p.content.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 10000) : ''
+      ].filter(Boolean).join('\n\n');
       
-      if (!finalData) {
-        finalData = p.content
-          .replace(/<script[\s\S]*?<\/script>/gi, '')
-          .replace(/<style[\s\S]*?<\/style>/gi, '')
-          .replace(/<[^>]+>/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim()
-          .slice(0, 20000);
-      } else if (structuredFromScript && estructurado) {
-        // Si tenemos ambos, nos aseguramos de que la descripción sea la más larga
-        if (structuredFromScript.length > estructurado.length) finalData = structuredFromScript + "\n" + estructurado;
-      }
-      
-      return finalData;
+      return combined;
     };
 
     const mainContent = procesarPagina(mainPage);
