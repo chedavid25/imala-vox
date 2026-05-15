@@ -105,6 +105,63 @@ function extraerLinksDeHtml(html: string, baseUrl: string): string[] {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Extracción estructurada de ficha individual desde __NEXT_DATA__ (RE/MAX, etc.)
+// ─────────────────────────────────────────────────────────────────────────────
+function extraerCamposPropiedad(pp: Record<string, any>): string | null {
+  const listing = pp.listing || pp.property || pp.inmueble || pp.propiedad || pp.unit;
+  if (!listing || typeof listing !== 'object') return null;
+
+  const lines: string[] = [];
+
+  if (listing.title || listing.address) lines.push(`Título: ${listing.title || listing.address}`);
+  if (listing.description) lines.push(`Descripción: ${String(listing.description).slice(0, 500)}`);
+
+  // Precio — puede ser número o string
+  if (listing.price != null) lines.push(`Precio: ${listing.price}`);
+  if (listing.currency || listing.currencyCode) lines.push(`Moneda: ${listing.currency || listing.currencyCode}`);
+
+  // Tipo / operación
+  if (listing.type || listing.propertyType) lines.push(`Tipo: ${listing.type || listing.propertyType}`);
+  if (listing.operationType || listing.operation || listing.listingType)
+    lines.push(`Operación: ${listing.operationType || listing.operation || listing.listingType}`);
+
+  // Medidas
+  if (listing.totalArea != null) lines.push(`m² totales: ${listing.totalArea}`);
+  if (listing.coveredArea != null) lines.push(`m² cubiertos: ${listing.coveredArea}`);
+  if (listing.landArea != null) lines.push(`m² terreno: ${listing.landArea}`);
+
+  // Ambientes
+  if (listing.environments != null) lines.push(`Ambientes: ${listing.environments}`);
+  if (listing.bedrooms != null) lines.push(`Dormitorios: ${listing.bedrooms}`);
+  if (listing.bathrooms != null) lines.push(`Baños: ${listing.bathrooms}`);
+  if (listing.garages != null) lines.push(`Cocheras: ${listing.garages}`);
+
+  // Ubicación
+  if (listing.neighborhood || listing.barrio) lines.push(`Barrio: ${listing.neighborhood || listing.barrio}`);
+  if (listing.city || listing.localidad) lines.push(`Localidad: ${listing.city || listing.localidad}`);
+  if (listing.province || listing.state) lines.push(`Provincia: ${listing.province || listing.state}`);
+
+  // Fotos — construir URLs completas RE/MAX si es necesario
+  const rawPhotos = listing.photos || listing.images || listing.fotos || listing.media;
+  if (Array.isArray(rawPhotos) && rawPhotos.length > 0) {
+    const urls = rawPhotos.slice(0, 5).map((p: any) => {
+      const raw = typeof p === 'string' ? p : (p?.url || p?.path || p?.src || p?.filename || '');
+      if (!raw) return '';
+      if (raw.startsWith('http')) return raw;
+      if (raw.startsWith('listings/')) return `https://d1acdg20u0pmxj.cloudfront.net/${raw}`;
+      return raw;
+    }).filter(Boolean);
+    if (urls.length) lines.push(`Fotos: ${urls.join(' | ')}`);
+  }
+
+  // Expensas
+  if (listing.expenses != null || listing.expensas != null)
+    lines.push(`Expensas: ${listing.expenses ?? listing.expensas} ARS`);
+
+  return lines.length >= 3 ? lines.join('\n') : null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // directFetch: HTTP simple con headers de browser (gratis, funciona en SSR)
 // ─────────────────────────────────────────────────────────────────────────────
 async function directFetch(url: string, debug = false): Promise<{ html: string; text: string } | null> {
@@ -131,6 +188,15 @@ async function directFetch(url: string, debug = false): Promise<{ html: string; 
       try {
         const d = JSON.parse(nextMatch[1]);
         const pp = d?.props?.pageProps || {};
+
+        // Primero: intentar extracción estructurada de ficha individual
+        const structured = extraerCamposPropiedad(pp);
+        if (structured) {
+          if (debug) console.log(`[DirectFetch] Extracción estructurada OK: ${structured.length} chars`);
+          return { html, text: structured };
+        }
+
+        // Segundo: buscar arrays de listados (página principal del agente)
         for (const key of ['listings','properties','results','initialListings','data']) {
           const val = pp[key] || pp.data?.[key] || pp.agent?.[key];
           if (Array.isArray(val) && val.length > 0) {
@@ -138,6 +204,9 @@ async function directFetch(url: string, debug = false): Promise<{ html: string; 
             return { html, text: `__NEXT_DATA__ ${key}:\n${JSON.stringify(val, null, 2).slice(0, 100000)}` };
           }
         }
+
+        // Fallback: pageProps completo
+        if (debug) console.log(`[DirectFetch] __NEXT_DATA__ pageProps completo: ${JSON.stringify(pp).length} chars`);
         return { html, text: `__NEXT_DATA__:\n${JSON.stringify(pp, null, 2).slice(0, 80000)}` };
       } catch { /* continuar con HTML limpio */ }
     }

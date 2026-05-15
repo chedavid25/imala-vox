@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import * as admin from "firebase-admin";
 
 const PARSE_SYSTEM_PROMPT = `Eres un extractor de datos estructurados para sitios web de propiedades e inmuebles.
-Extrae CADA propiedad individual con todos sus datos disponibles. El texto puede ser markdown, HTML o texto plano.
+Extrae CADA propiedad individual con todos sus datos disponibles. El texto puede ser markdown, HTML, JSON o texto plano.
 
 REGLAS GENERALES:
 - Responde ÚNICAMENTE con JSON válido, sin texto adicional ni bloques de código.
@@ -10,25 +10,26 @@ REGLAS GENERALES:
 - Máximo 40 objetos.
 
 REGLAS DE PRECIOS (MUY IMPORTANTE):
-- Argentina usa PUNTO como separador de miles y COMA como decimal.
-  "259.000" significa DOSCIENTOS CINCUENTA Y NUEVE MIL → precio: 259000
-  "1.200.000" significa UN MILLÓN DOSCIENTOS MIL → precio: 1200000
-  "94.17" significa noventa y cuatro con diecisiete → precio: 94.17
-- Formatos válidos: "259.000 USD", "USD 259.000", "$ 259.000", "259000", "152,000 USD" (coma=miles en formato anglosajón)
+- Si ves campos JSON como "price": 259000 o "Precio: 259000", úsalos directamente como número.
+- Argentina usa PUNTO como separador de miles y COMA como decimal en textos:
+  "259.000" en texto argentino → precio: 259000 (doscientos cincuenta y nueve mil)
+  "1.200.000" en texto argentino → precio: 1200000 (un millón doscientos mil)
+- Formatos válidos en texto: "259.000 USD", "USD 259.000", "$ 259.000", "259000", "152,000 USD"
 - Siempre extrae el número completo ignorando separadores de miles.
-- Si dice "Consultar", "A consultar", "Precio a convenir" o no hay número visible → precio: null.
-- moneda: "USD" si dice USD o dólares, "ARS" si dice ARS o pesos, default "USD" para propiedades.
+- Si dice "Consultar", "A consultar", "Precio a convenir" o no hay número → precio: null.
+- moneda: "USD" si dice USD/dólares o campo currency="USD", "ARS" si dice ARS/pesos, default "USD" para propiedades.
 
-REGLAS DE MEDIDAS:
-- "m² totales" o "sup. total" → campo m2
-- "m² cubiertos" o "sup. cubierta" → campo m2_cubiertos
-- "ambientes" → campo ambientes
-- "dormitorios" o "habitaciones" o "dorm." → campo dormitorios
-- "baños" o "banos" o "bath" → campo banios
-- "expensas" → campo expensas (siempre en ARS)
+REGLAS DE MEDIDAS (nombres en español Y en inglés/JSON):
+- "m² totales", "sup. total", "totalArea", "total_area", "superficie" → campo m2
+- "m² cubiertos", "sup. cubierta", "coveredArea", "covered_area", "buildingArea" → campo m2_cubiertos
+- "ambientes", "environments", "rooms" (cuando no es baños) → campo ambientes
+- "dormitorios", "habitaciones", "dorm.", "bedrooms", "bedRooms", "suites" → campo dormitorios
+- "baños", "banos", "bath", "bathrooms", "baths" → campo banios
+- "expensas", "expenses", "expensas_valor" → campo expensas (siempre en ARS)
 
 REGLAS DE FOTOS:
 - Extrae URLs completas de imágenes de las propiedades.
+- Si ves líneas como "Fotos: url1 | url2 | url3", extraé esas URLs.
 - Para RE/MAX: si ves paths como "listings/UUID/UUID.jpg" sin dominio, construí la URL completa como "https://d1acdg20u0pmxj.cloudfront.net/listings/UUID/UUID.jpg"
 - Ignorá imágenes de logos, avatares, íconos o SVGs del sitio.
 - Máximo 3 URLs por propiedad.
@@ -90,6 +91,7 @@ export async function ejecutarParsingObjetos(params: {
     const result = await model.generateContent(`Texto a procesar:\n${textToProcess}`);
     const responseText = result.response.text();
     console.log(`[Parser] Respuesta recibida (${responseText.length} bytes)`);
+    console.log(`[Parser] Muestra Gemini: ${responseText.slice(0, 600)}`);
 
     const cleanedJson = responseText.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(cleanedJson);
