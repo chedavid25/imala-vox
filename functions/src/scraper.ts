@@ -38,68 +38,109 @@ const LOAD_MORE_SCRIPT = `
 // Helpers de extracción (Lo que sí funciona de la versión anterior)
 // ─────────────────────────────────────────────────────────────────────────────
 function extraerCamposPropiedad(html: string): string | null {
-  // Intentar Next.js
-  const nextMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i);
+  if (!html) return null;
   let dataObj: any = null;
-  
+
+  // 1. Intentar extraer JSON de __NEXT_DATA__
+  const nextMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i);
   if (nextMatch) {
     try {
       const d = JSON.parse(nextMatch[1]);
       dataObj = d?.props?.pageProps?.listing || d?.props?.pageProps?.property || d?.props?.pageProps;
-    } catch {}
+    } catch (e) {
+      console.warn('[Scraper] Error parseando __NEXT_DATA__');
+    }
   }
 
-  // Intentar Angular (ng-state)
+  // 2. Intentar extraer JSON de ng-state (Angular)
   if (!dataObj) {
     const ngMatch = html.match(/<script id="ng-state"[^>]*>([\s\S]*?)<\/script>/i);
     if (ngMatch) {
       try {
-        const d = JSON.parse(ngMatch[1]);
+        // A veces el JSON de Angular viene escapado o con caracteres extraños
+        let rawJson = ngMatch[1].trim();
+        const d = JSON.parse(rawJson);
         for (const key in d) {
           const val = d[key]?.b?.data || d[key]?.b;
-          if (val && typeof val === 'object' && (val.price || val.dimensionTotalBuilt)) {
+          if (val && typeof val === 'object' && (val.price || val.dimensionTotalBuilt || val.bathrooms)) {
             dataObj = val; break;
           }
         }
-      } catch {}
+      } catch (e) {
+        console.warn('[Scraper] Error parseando ng-state');
+      }
+    }
+  }
+
+  // 3. Fallback: Buscar fragmentos de JSON directos si los scripts fallan
+  if (!dataObj) {
+    const fallbackMatch = html.match(/"price":\s*(\d+)/i);
+    if (fallbackMatch) {
+      console.log('[Scraper] Usando fallback de regex para precio');
+      dataObj = {
+        price: parseInt(fallbackMatch[1]),
+        dimensionTotalBuilt: html.match(/"dimensionTotalBuilt":\s*(\d+)/i)?.[1],
+        dimensionCovered: html.match(/"dimensionCovered":\s*(\d+)/i)?.[1],
+        bathrooms: html.match(/"bathrooms":\s*(\d+)/i)?.[1],
+        description: html.match(/"description":\s*"([\s\S]*?)"/i)?.[1]
+      };
     }
   }
 
   if (!dataObj || typeof dataObj !== 'object') return null;
 
   const lines: string[] = [];
-  const titulo = dataObj.title || dataObj.address || dataObj.name;
+  
+  // Título
+  const titulo = dataObj.title || dataObj.address || dataObj.name || dataObj.listingTitle;
   if (titulo) lines.push(`Título: ${titulo}`);
 
-  const desc = dataObj.description || dataObj.notes;
-  if (desc) lines.push(`Descripción: ${String(desc)}`);
+  // Descripción (Limpiar escapes de JSON si vienen del fallback)
+  let desc = dataObj.description || dataObj.notes || dataObj.listingDescription;
+  if (desc) {
+    desc = String(desc).replace(/\\n/g, '\n').replace(/\\"/g, '"').trim();
+    lines.push(`Descripción: ${desc}`);
+  }
 
-  const precio = dataObj.price ?? dataObj.priceValue;
-  if (precio != null) {
+  // Precios
+  const precio = dataObj.price ?? dataObj.priceValue ?? dataObj.amount;
+  if (precio != null && precio > 0) {
     lines.push(`PRECIO_VALOR: ${precio}`);
     lines.push(`Precio: ${precio}`);
   }
   
-  const moneda = dataObj.currency?.value ?? dataObj.currencyCode ?? dataObj.currency;
+  const moneda = dataObj.currency?.value ?? dataObj.currencyCode ?? dataObj.currency ?? (html.includes('USD') ? 'USD' : 'ARS');
   if (moneda) lines.push(`Moneda: ${moneda}`);
 
-  const m2T = dataObj.totalArea ?? dataObj.totalSurface ?? dataObj.surface_total ?? dataObj.total_area ?? dataObj.dimensionTotalBuilt;
-  const m2C = dataObj.coveredArea ?? dataObj.coveredSurface ?? dataObj.surface_covered ?? dataObj.covered_area ?? dataObj.dimensionCovered;
-  if (m2T != null) lines.push(`m² totales: ${m2T}`);
+  // Medidas (Normalizar nombres de campos de RE/MAX)
+  const m2T = dataObj.totalArea ?? dataObj.totalSurface ?? dataObj.surface_total ?? dataObj.total_area ?? dataObj.dimensionTotalBuilt ?? dataObj.total_built;
+  const m2C = dataObj.coveredArea ?? dataObj.coveredSurface ?? dataObj.surface_covered ?? dataObj.covered_area ?? dataObj.dimensionCovered ?? dataObj.total_covered;
+  
+  if (m2T != null) {
+    lines.push(`m² totales: ${m2T}`);
+    lines.push(`METROS_TOTALES: ${m2T}`);
+  }
   if (m2C != null) {
     lines.push(`m² cubiertos: ${m2C}`);
-    lines.push(`SUPERFICIE_CUBIERTA: ${m2C}`); // Etiqueta extra para asegurar
+    lines.push(`SUPERFICIE_CUBIERTA: ${m2C}`);
   }
 
-  const amb = dataObj.environments ?? dataObj.rooms ?? dataObj.roomsValue;
+  // Ambientes, Dormitorios, Baños
+  const amb = dataObj.environments ?? dataObj.rooms ?? dataObj.roomsValue ?? dataObj.totalRooms;
   const dorm = dataObj.bedrooms ?? dataObj.bedRooms ?? dataObj.bedroomsValue ?? dataObj.habitaciones;
-  const ban = dataObj.bathrooms ?? dataObj.baths ?? dataObj.bathroomsValue ?? dataObj.banos;
+  const ban = dataObj.bathrooms ?? dataObj.baths ?? dataObj.bathroomsValue ?? dataObj.banos ?? dataObj.totalBaths;
   
   if (amb != null) lines.push(`Ambientes: ${amb}`);
   if (dorm != null) lines.push(`Dormitorios: ${dorm}`);
   if (ban != null) {
     lines.push(`Baños: ${ban}`);
     lines.push(`CANTIDAD_BAÑOS: ${ban}`);
+  }
+
+  // Fotos
+  if (Array.isArray(dataObj.photos)) {
+    const photos = dataObj.photos.map((p: any) => p.url || p.fullPath || p).filter(Boolean).slice(0, 5);
+    if (photos.length > 0) lines.push(`Fotos: ${photos.join(' | ')}`);
   }
 
   return lines.length >= 3 ? lines.join('\n') : null;
@@ -179,8 +220,16 @@ export async function ejecutarScrapingProfundo(
       if (!p?.content) return '';
       const estructurado = extraerCamposPropiedad(p.content);
       if (estructurado) return estructurado;
-      // Fallback: limpiar HTML si no hay JSON
-      return p.content.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 5000);
+      
+      // Fallback: limpiar HTML pero manteniendo más texto
+      let clean = p.content
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/<style[\s\S]*?<\/style>/gi, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      return clean.slice(0, 15000); // Aumentamos el límite para no cortar descripción
     };
 
     const mainContent = procesarPagina(mainPage);
