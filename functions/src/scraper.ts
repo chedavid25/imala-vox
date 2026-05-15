@@ -193,10 +193,10 @@ export async function ejecutarScrapingProfundo(
     console.log('[Spider] Fase 1: scraping página principal...');
 
     const mainPage = await spiderScrape(url, SPIDER_API_KEY, {
-      return_format: 'markdown',
+      return_format: 'html',  // html da el contenido completo de las tarjetas de propiedad
       request: 'chrome',
       execution_scripts: { [url]: LOAD_MORE_SCRIPT },
-      // NO filter_output_main_only en fase 1 — ese parámetro suprime el campo `links`
+      // NO filter_output_main_only — suprime el campo `links`
       return_page_links: true,
       stealth: true,
     }, true); // debug activado
@@ -245,7 +245,7 @@ export async function ejecutarScrapingProfundo(
             request: 'chrome',
             filter_output_main_only: true,
           }, isFirstBlock);
-          return (page?.content && page.content.length > 100)
+          return (page?.content && page.content.length > 50)
             ? { url: link, content: page.content }
             : null;
         }));
@@ -257,24 +257,28 @@ export async function ejecutarScrapingProfundo(
     }
 
     // ── FASE 3: Armar texto estructurado para el parser ──────────────────────
+    // Incluir el HTML/contenido de la página principal (con las tarjetas de listado)
+    // más el detalle de cada ficha que se pudo scrappear
+    const mainContentSlice = mainContent.slice(0, fichas.length === 0 ? 80000 : 20000);
+
     const header = [
       `ORIGEN: ${url}`,
-      `TOTAL_ITEMS_ENCONTRADOS: ${fichas.length}`,
+      `FICHAS_INDIVIDUALES: ${fichas.length}`,
+      `LINKS_DETALLE_ENCONTRADOS: ${detailLinks.length}`,
       '',
-      '=== INFORMACIÓN GENERAL DEL SITIO ===',
-      mainContent.slice(0, 3000),
+      '=== PÁGINA PRINCIPAL (HTML con tarjetas de listado) ===',
+      mainContentSlice,
       '',
     ].join('\n');
 
     const itemsText = fichas.map((f, i) => [
-      `=== ITEM ${i + 1} ===`,
+      `=== FICHA ${i + 1} ===`,
       `URL: ${f.url}`,
-      `CONTENIDO:`,
-      f.content.slice(0, 4000),
+      f.content.slice(0, 5000),
       `========================`,
     ].join('\n'));
 
-    const fullText = header + '\n\nDETALLES ITEMS:\n' + itemsText.join('\n---\n');
+    const fullText = header + (fichas.length > 0 ? '\n\n=== FICHAS INDIVIDUALES ===\n' + itemsText.join('\n---\n') : '');
 
     console.log(`[Spider] Texto total: ${fullText.length} caracteres, ${fichas.length} fichas`);
 

@@ -1,16 +1,20 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import * as admin from "firebase-admin";
 
-const PARSE_SYSTEM_PROMPT = `Eres un extractor de datos estructurados para sitios web inmobiliarios.
-Extrae OBJETOS del catálogo: cada propiedad individual con todos sus datos.
+const PARSE_SYSTEM_PROMPT = `Eres un extractor de datos estructurados para sitios web de propiedades e inmuebles.
+Extrae CADA propiedad individual con todos sus datos disponibles. El texto puede ser markdown, HTML o texto plano.
 
 REGLAS:
-- Responde ÚNICAMENTE con JSON válido.
-- Si un campo no está disponible, usa null.
+- Responde ÚNICAMENTE con JSON válido, sin texto adicional.
+- Si un campo no está disponible, usa null. NUNCA inventes datos.
 - Máximo 40 objetos.
-- Para RE/MAX: busca el ID de propiedad (MLS) en el texto.
+- Para precios: extrae solo el número (ej: "USD 120.000" → precio: 120000, moneda: "USD").
+- Si dice "Consultar" o no hay precio visible, usa precio: null.
+- Para fotos: extrae URLs de imágenes de las propiedades (busca src de img, og:image, o URLs de CDN de fotos). Máximo 3 URLs por propiedad.
+- Para tipo de propiedad usa: "casa", "departamento", "local", "oficina", "terreno", "campo", "otro".
+- Para operacion usa: "venta" o "alquiler".
 
-Formato JSON:
+Formato JSON de respuesta:
 {
   "tipo_catalogo": "propiedad",
   "objetos": [
@@ -20,13 +24,19 @@ Formato JSON:
       "moneda": "ARS" | "USD" | "EUR",
       "descripcion": string,
       "urlFuente": string | null,
+      "fotos": string[],
       "caracteristicas": {
         "mls_id": string | null,
         "tipo": string,
         "operacion": "venta" | "alquiler",
-        "m2": number | null,
+        "ambientes": number | null,
         "dormitorios": number | null,
-        "barrio": string | null
+        "banios": number | null,
+        "m2": number | null,
+        "m2_cubiertos": number | null,
+        "expensas": number | null,
+        "barrio": string | null,
+        "localidad": string | null
       }
     }
   ]
@@ -75,8 +85,26 @@ export async function ejecutarParsingObjetos(params: {
       for (const obj of objetos.slice(0, 40)) {
         const ref = db.collection(`espaciosDeTrabajo/${wsId}/objetos`).doc();
         batch.set(ref, {
-          ...obj,
+          titulo: obj.titulo || '',
+          precio: obj.precio ?? null,
+          moneda: obj.moneda || 'USD',
+          descripcion: obj.descripcion || '',
+          urlFuente: obj.urlFuente ?? null,
+          fotos: Array.isArray(obj.fotos) ? obj.fotos.filter(Boolean).slice(0, 3) : [],
           tipo: 'propiedad',
+          caracteristicas: {
+            mls_id: obj.caracteristicas?.mls_id ?? null,
+            tipo: obj.caracteristicas?.tipo || 'otro',
+            operacion: obj.caracteristicas?.operacion || 'venta',
+            ambientes: obj.caracteristicas?.ambientes ?? null,
+            dormitorios: obj.caracteristicas?.dormitorios ?? null,
+            banios: obj.caracteristicas?.banios ?? null,
+            m2: obj.caracteristicas?.m2 ?? null,
+            m2_cubiertos: obj.caracteristicas?.m2_cubiertos ?? null,
+            expensas: obj.caracteristicas?.expensas ?? null,
+            barrio: obj.caracteristicas?.barrio ?? null,
+            localidad: obj.caracteristicas?.localidad ?? null,
+          },
           urlOriginWeb: sourceUrl,
           recursoOrigenId: recursoId,
           estado: 'disponible',
