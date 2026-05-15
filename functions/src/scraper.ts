@@ -1,7 +1,12 @@
 /**
- * Motor de Scraping con Spider API
- * Reemplaza Puppeteer. Maneja paginación, "Ver más", infinite scroll
- * y deep crawl (entrar en cada ficha) con una sola llamada de API.
+ * Motor de Scraping con Spider API — Arquitectura en dos fases
+ *
+ * Fase 1: Scrape la página principal con execution_scripts (clicks "ver más")
+ *         y retorna todos los links descubiertos (return_page_links: true).
+ * Fase 2: Scrape cada ficha de detalle individualmente en paralelo (2 a la vez).
+ *
+ * Esto evita depender de que Spider siga links en el crawl, lo cual no funciona
+ * bien con SPAs React que hidratan componentes dinámicamente.
  */
 
 export interface ScrapeResult {
@@ -12,30 +17,20 @@ export interface ScrapeResult {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Script de paginación inyectado en Spider Browser Mode
-// Se ejecuta en el browser antes de extraer el contenido.
-// Carga todos los resultados haciendo click en "Ver más" / "Load More"
-// y también maneja infinite scroll.
+// Script inyectado en el browser de Spider para cargar todo el contenido
+// antes de extraer links. Solo clickea botones que cargan contenido en la
+// misma página (AJAX/infinite scroll). NO clickea links de paginación por URL.
 // ─────────────────────────────────────────────────────────────────────────────
 const LOAD_MORE_SCRIPT = `
 (async () => {
   const delay = (ms) => new Promise(r => setTimeout(r, ms));
 
-  // Solo selectores que cargan contenido EN LA MISMA PÁGINA (AJAX/infinite scroll).
-  // NO incluir links de paginación por URL (ej. WooCommerce .next.page-numbers)
-  // porque navegan a otra página y cortan el scraping del listado actual.
-  // Spider sigue esos links de paginación por su cuenta con depth: 3.
   const selectores = [
-    // RE/MAX Argentina
     '.remax-button', '.button-color-grey-border', '[class*="loadMore"]',
-    // Genéricos español
     '.load-more', '.ver-mas', '.ver-más', '.cargar-mas', '.cargar-más',
     '[class*="load-more"]', '[class*="ver-mas"]', '[class*="ver-más"]',
-    // Genéricos inglés
     '.load_more', '[class*="load_more"]', '[data-action="load-more"]',
-    // Tokko Broker
     '.btn-show-more', '[class*="show-more"]',
-    // Tienda Nube (carga en misma página)
     '[data-store="ProductList"] button',
   ];
 
@@ -44,21 +39,17 @@ const LOAD_MORE_SCRIPT = `
 
   while (clicks < MAX_CLICKS) {
     await delay(800);
-
-    // Scroll suave para activar lazy load e infinite scroll
     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
     await delay(600);
 
     let boton = null;
 
-    // Intentar por selectores CSS
     for (const selector of selectores) {
       try {
         const el = document.querySelector(selector);
         if (el) {
           const rect = el.getBoundingClientRect();
-          const visible = rect.width > 0 && rect.height > 0 && el.offsetParent !== null;
-          if (visible) {
+          if (rect.width > 0 && rect.height > 0 && el.offsetParent !== null) {
             boton = el;
             break;
           }
@@ -66,48 +57,49 @@ const LOAD_MORE_SCRIPT = `
       } catch (e) {}
     }
 
-    // Si no encontró por selector, buscar por texto del botón
     if (!boton) {
       const patrones = [
         'ver más', 'ver mas', 'cargar más', 'cargar mas',
         'mostrar más', 'mostrar mas', 'load more', 'show more',
-        'ver todas', 'ver todos', 'más resultados', 'siguiente'
+        'ver todas', 'ver todos', 'más resultados',
       ];
-
-      const todosLosBotones = Array.from(
-        document.querySelectorAll('button, a.btn, [role="button"], .btn')
-      );
-
-      for (const btn of todosLosBotones) {
+      const todos = Array.from(document.querySelectorAll('button, a.btn, [role="button"], .btn'));
+      for (const btn of todos) {
         const texto = (btn.textContent || '').toLowerCase().trim();
         const rect = btn.getBoundingClientRect();
-        const visible = rect.width > 0 && rect.height > 0;
-        if (visible && patrones.some(p => texto.includes(p))) {
+        if (rect.width > 0 && rect.height > 0 && patrones.some(p => texto.includes(p))) {
           boton = btn;
           break;
         }
       }
     }
 
-    if (!boton) break; // No hay más botón — terminamos
+    if (!boton) break;
 
     boton.scrollIntoView({ behavior: 'smooth', block: 'center' });
     await delay(300);
     boton.click();
     clicks++;
-    await delay(1500); // Esperar que carguen los nuevos items
+    await delay(1500);
   }
 
-  // Scroll final para asegurarse que todo está cargado
   window.scrollTo(0, document.body.scrollHeight);
   await delay(800);
 })();
 `;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Patrones de URLs de detalle por plataforma
-// Spider sigue estos links para entrar en cada ficha individual
+// Detecta si una URL corresponde a una ficha de detalle (propiedad o producto)
 // ─────────────────────────────────────────────────────────────────────────────
+function resolverUrl(href: string, baseUrl: string): string {
+  if (!href) return '';
+  if (href.startsWith('http')) return href;
+  if (href.startsWith('/')) {
+    try { return new URL(href, baseUrl).href; } catch { return ''; }
+  }
+  return '';
+}
+
 function esLinkDeDetalle(href: string): boolean {
   if (!href || !href.startsWith('http')) return false;
 
@@ -115,36 +107,54 @@ function esLinkDeDetalle(href: string): boolean {
     try { return new URL(href).pathname.toLowerCase(); } catch { return ''; }
   })();
 
-  // Propiedades
+  if (path.includes('/listings/')) return true;
   if (path.includes('/p/') && /\/p\/\d+/.test(path)) return true;
   if (path.includes('/propiedad/')) return true;
   if (path.includes('/property/')) return true;
-  if (path.includes('/listings/')) return true;
   if (path.includes('/ficha/')) return true;
   if (path.includes('/inmueble/')) return true;
-  if (/\/\d{6,}/.test(path)) return true; // IDs numéricos largos (Tokko, RE/MAX)
+  if (/\/\d{6,}/.test(path)) return true;
 
-  // Productos
   if (path.includes('/producto/')) return true;
   if (path.includes('/product/') && !path.includes('/product-category')) return true;
   if (path.includes('/productos/') && path.split('/').length > 3) return true;
   if (path.includes('/item/')) return true;
   if (path.includes('/articulo/')) return true;
 
-  // WooCommerce
-  if (path.includes('/?p=')) return true;
-
-  // Shopify
   if (path.includes('/products/') && path.split('/products/')[1]?.length > 0) return true;
 
-  // MercadoLibre
   if (href.includes('articulo.mercadolibre') || /\/MLA-\d+/.test(href)) return true;
 
   return false;
 }
 
+async function spiderScrape(
+  url: string,
+  apiKey: string,
+  options: Record<string, unknown> = {}
+): Promise<{ content: string; links: string[]; url: string } | null> {
+  const response = await fetch('https://api.spider.cloud/scrape', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ url, ...options }),
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    console.error(`[Spider] Error HTTP ${response.status} para ${url}: ${err.slice(0, 200)}`);
+    return null;
+  }
+
+  const data = await response.json();
+  const page = Array.isArray(data) ? data[0] : data;
+  return page ?? null;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Función principal de scraping con Spider API
+// Función principal
 // ─────────────────────────────────────────────────────────────────────────────
 export async function ejecutarScrapingProfundo(
   url: string,
@@ -153,106 +163,98 @@ export async function ejecutarScrapingProfundo(
   const SPIDER_API_KEY = process.env.SPIDER_API_KEY;
 
   if (!SPIDER_API_KEY) {
-    console.error('[Spider] Error: SPIDER_API_KEY no definida en variables de entorno.');
     return { success: false, mainText: '', items: [], error: 'SPIDER_API_KEY no configurada' };
   }
 
   try {
-    console.log(`[Spider] Iniciando scraping profundo para: ${url}`);
-    console.log(`[Spider] Máximo de ítems: ${maxProperties}`);
+    console.log(`[Spider] Iniciando scraping para: ${url}`);
 
-    // ── FASE 1: Crawl del listado con paginación ──────────────────────────────
-    // Spider carga la página, ejecuta el script de "Ver más", y luego
-    // sigue automáticamente los links de fichas individuales (depth: 1).
+    // ── FASE 1: Scrapear página principal con script y obtener links ──────────
+    console.log('[Spider] Fase 1: scraping página principal...');
 
-    const crawlBody = {
-      url,
-      limit: maxProperties + 5,      // +5 por si algunos links no son fichas
-      depth: 3,                        // 3 niveles: listado → página 2 → ficha
-      return_format: 'markdown',       // Markdown limpio listo para Gemini
-      request: 'chrome',               // Browser mode — necesario para JS
-      execution_scripts: {
-        [url]: LOAD_MORE_SCRIPT         // Script solo en la página de listado
-      },
+    const mainPage = await spiderScrape(url, SPIDER_API_KEY, {
+      return_format: 'markdown',
+      request: 'chrome',
+      execution_scripts: { [url]: LOAD_MORE_SCRIPT },
       filter_output_main_only: true,
-    };
-
-    console.log('[Spider] Enviando request de crawl...');
-
-    const crawlResponse = await fetch('https://api.spider.cloud/crawl', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${SPIDER_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(crawlBody),
+      return_page_links: true,
+      stealth: true,   // Bypass antibot de portales como RE/MAX
     });
 
-    if (!crawlResponse.ok) {
-      const errorText = await crawlResponse.text();
-      console.error(`[Spider] Error HTTP ${crawlResponse.status}:`, errorText);
-      throw new Error(`Spider API error ${crawlResponse.status}: ${errorText.slice(0, 200)}`);
-    }
+    if (!mainPage) throw new Error('Spider no devolvió resultado para la página principal');
 
-    const crawlData = await crawlResponse.json() as Array<{
-      url: string;
-      content: string;
-      status: number;
-      error?: string;
-    }>;
+    const mainContent = mainPage.content || '';
+    const allLinks: string[] = mainPage.links || [];
 
-    if (!Array.isArray(crawlData) || crawlData.length === 0) {
-      console.warn('[Spider] Respuesta vacía o no es array:', typeof crawlData);
-      throw new Error('Spider no devolvió resultados');
-    }
+    console.log(`[Spider] Links descubiertos en página principal: ${allLinks.length}`);
 
-    console.log(`[Spider] Páginas recibidas: ${crawlData.length}`);
+    const dominioOrigen = (() => { try { return new URL(url).hostname; } catch { return ''; } })();
 
-    // ── FASE 2: Separar página principal de fichas de detalle ─────────────────
-
-    const paginaPrincipal = crawlData.find(p => {
-      try {
-        return new URL(p.url).pathname === new URL(url).pathname;
-      } catch {
-        return p.url === url;
-      }
-    }) || crawlData[0];
-
-    const fichas = crawlData
-      .filter(p => p.url !== paginaPrincipal?.url)
-      .filter(p => p.status === 200 && p.content && p.content.length > 100)
-      .filter(p => esLinkDeDetalle(p.url))
+    // Resolver URLs relativas y filtrar solo fichas del mismo dominio
+    const detailLinks = allLinks
+      .map(href => resolverUrl(href, url))
+      .filter(href => {
+        if (!href) return false;
+        try { return new URL(href).hostname === dominioOrigen; } catch { return false; }
+      })
+      .filter(esLinkDeDetalle)
+      .filter((v, i, a) => a.indexOf(v) === i) // deduplicar
       .slice(0, maxProperties);
 
-    const todasLasPaginas = crawlData.filter(p => p.url !== paginaPrincipal?.url);
-    console.log(`[Spider] Página principal: ${paginaPrincipal?.url || 'no detectada'}`);
-    console.log(`[Spider] Otras páginas recibidas: ${todasLasPaginas.length}`);
-    console.log(`[Spider] URLs recibidas: ${todasLasPaginas.map(p => p.url).join(' | ')}`);
-    console.log(`[Spider] Fichas de detalle válidas: ${fichas.length}`);
+    console.log(`[Spider] Fichas de detalle filtradas: ${detailLinks.length}`);
+    if (detailLinks.length > 0) {
+      console.log(`[Spider] Primeras fichas: ${detailLinks.slice(0, 5).join(' | ')}`);
+    } else {
+      console.log(`[Spider] Sin fichas. Muestra de links encontrados: ${allLinks.slice(0, 10).join(' | ')}`);
+    }
 
-    // ── FASE 3: Armar el texto estructurado para el parser ────────────────────
+    // ── FASE 2: Scrapear cada ficha de detalle (2 en paralelo) ───────────────
+    const fichas: Array<{ url: string; content: string }> = [];
 
-    const mainText = [
+    if (detailLinks.length > 0) {
+      console.log('[Spider] Fase 2: scraping fichas individuales...');
+      const CONCURRENCY = 2;
+
+      for (let i = 0; i < detailLinks.length; i += CONCURRENCY) {
+        const chunk = detailLinks.slice(i, i + CONCURRENCY);
+        const results = await Promise.all(chunk.map(async (link) => {
+          const page = await spiderScrape(link, SPIDER_API_KEY, {
+            return_format: 'markdown',
+            request: 'smart',
+            filter_output_main_only: true,
+          });
+          return (page?.content && page.content.length > 100)
+            ? { url: link, content: page.content }
+            : null;
+        }));
+
+        const ok = results.filter(Boolean) as Array<{ url: string; content: string }>;
+        fichas.push(...ok);
+        console.log(`[Spider] Bloque ${Math.ceil(i / CONCURRENCY) + 1}: ${ok.length}/${chunk.length} OK`);
+      }
+    }
+
+    // ── FASE 3: Armar texto estructurado para el parser ──────────────────────
+    const header = [
       `ORIGEN: ${url}`,
       `TOTAL_ITEMS_ENCONTRADOS: ${fichas.length}`,
       '',
       '=== INFORMACIÓN GENERAL DEL SITIO ===',
-      paginaPrincipal?.content?.slice(0, 3000) || 'No disponible',
+      mainContent.slice(0, 3000),
       '',
     ].join('\n');
 
-    const itemsText = fichas.map((ficha, i) => [
+    const itemsText = fichas.map((f, i) => [
       `=== ITEM ${i + 1} ===`,
-      `URL: ${ficha.url}`,
+      `URL: ${f.url}`,
       `CONTENIDO:`,
-      ficha.content?.slice(0, 4000) || 'Sin contenido',
+      f.content.slice(0, 4000),
       `========================`,
     ].join('\n'));
 
-    const fullText = mainText + '\n\nDETALLES ITEMS:\n' + itemsText.join('\n---\n');
+    const fullText = header + '\n\nDETALLES ITEMS:\n' + itemsText.join('\n---\n');
 
-    console.log(`[Spider] Texto total generado: ${fullText.length} caracteres`);
-    console.log(`[Spider] Scraping completado exitosamente.`);
+    console.log(`[Spider] Texto total: ${fullText.length} caracteres, ${fichas.length} fichas`);
 
     return {
       success: true,
@@ -261,12 +263,7 @@ export async function ejecutarScrapingProfundo(
     };
 
   } catch (error: any) {
-    console.error('[Spider] Error en scraping:', error.message);
-    return {
-      success: false,
-      mainText: '',
-      items: [],
-      error: error.message,
-    };
+    console.error('[Spider] Error:', error.message);
+    return { success: false, mainText: '', items: [], error: error.message };
   }
 }
