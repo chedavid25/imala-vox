@@ -4,15 +4,38 @@ import * as admin from "firebase-admin";
 const PARSE_SYSTEM_PROMPT = `Eres un extractor de datos estructurados para sitios web de propiedades e inmuebles.
 Extrae CADA propiedad individual con todos sus datos disponibles. El texto puede ser markdown, HTML o texto plano.
 
-REGLAS:
-- Responde ÚNICAMENTE con JSON válido, sin texto adicional.
+REGLAS GENERALES:
+- Responde ÚNICAMENTE con JSON válido, sin texto adicional ni bloques de código.
 - Si un campo no está disponible, usa null. NUNCA inventes datos.
 - Máximo 40 objetos.
-- Para precios: extrae solo el número (ej: "USD 120.000" → precio: 120000, moneda: "USD").
-- Si dice "Consultar" o no hay precio visible, usa precio: null.
-- Para fotos: extrae URLs de imágenes de las propiedades (busca src de img, og:image, o URLs de CDN de fotos). Máximo 3 URLs por propiedad.
-- Para tipo de propiedad usa: "casa", "departamento", "local", "oficina", "terreno", "campo", "otro".
-- Para operacion usa: "venta" o "alquiler".
+
+REGLAS DE PRECIOS (MUY IMPORTANTE):
+- Argentina usa PUNTO como separador de miles y COMA como decimal.
+  "259.000" significa DOSCIENTOS CINCUENTA Y NUEVE MIL → precio: 259000
+  "1.200.000" significa UN MILLÓN DOSCIENTOS MIL → precio: 1200000
+  "94.17" significa noventa y cuatro con diecisiete → precio: 94.17
+- Formatos válidos: "259.000 USD", "USD 259.000", "$ 259.000", "259000", "152,000 USD" (coma=miles en formato anglosajón)
+- Siempre extrae el número completo ignorando separadores de miles.
+- Si dice "Consultar", "A consultar", "Precio a convenir" o no hay número visible → precio: null.
+- moneda: "USD" si dice USD o dólares, "ARS" si dice ARS o pesos, default "USD" para propiedades.
+
+REGLAS DE MEDIDAS:
+- "m² totales" o "sup. total" → campo m2
+- "m² cubiertos" o "sup. cubierta" → campo m2_cubiertos
+- "ambientes" → campo ambientes
+- "dormitorios" o "habitaciones" o "dorm." → campo dormitorios
+- "baños" o "banos" o "bath" → campo banios
+- "expensas" → campo expensas (siempre en ARS)
+
+REGLAS DE FOTOS:
+- Extrae URLs completas de imágenes de las propiedades.
+- Para RE/MAX: si ves paths como "listings/UUID/UUID.jpg" sin dominio, construí la URL completa como "https://d1acdg20u0pmxj.cloudfront.net/listings/UUID/UUID.jpg"
+- Ignorá imágenes de logos, avatares, íconos o SVGs del sitio.
+- Máximo 3 URLs por propiedad.
+
+REGLAS DE TIPO:
+- tipo: "casa", "departamento", "local", "oficina", "terreno", "campo", "otro"
+- operacion: "venta" o "alquiler"
 
 Formato JSON de respuesta:
 {
