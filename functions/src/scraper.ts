@@ -1,13 +1,19 @@
 /**
- * Motor de Scraping — Estrategia directFetch + fichas individuales
+ * Motor de Scraping — Firecrawl + directFetch
  *
- * Fase 1: directFetch de la página principal para obtener links de propiedades.
- *         Si Spider logra encontrar más links (clicking "ver más"), los agrega.
- * Fase 2: directFetch de cada ficha individual (sin pasar por Spider).
- *         RE/MAX devuelve precio, m², expensas, fotos, etc. en el SSR HTML.
+ * Estrategia:
+ * 1. directFetch (gratis): fetch HTTP directo con headers de browser.
+ *    Extrae links de propiedades del HTML para usarlos como fuente.
  *
- * Para imágenes RE/MAX: el path parcial "listings/UUID/UUID.jpg" se resuelve
- * con base CDN "https://d1acdg20u0pmxj.cloudfront.net/".
+ * 2. Firecrawl (principal): scrape la página con actions JS para clickear
+ *    "ver más" y obtener TODAS las propiedades. Retorna markdown + links.
+ *
+ * 3. directFetch fichas: para cada URL de propiedad encontrada, hace
+ *    directFetch (gratis, confiable en sitios SSR como RE/MAX Next.js).
+ *    Firecrawl solo se usa como fallback si directFetch falla.
+ *
+ * Esto maximiza calidad (Firecrawl para la página principal con JS actions)
+ * y minimiza créditos (directFetch para fichas individuales).
  */
 
 export interface ScrapeResult {
@@ -18,30 +24,25 @@ export interface ScrapeResult {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Script para Spider Chrome — clickea "ver más" para descubrir más links
+// Script JS para clickear "ver más" (usado tanto en Firecrawl como fallback)
 // ─────────────────────────────────────────────────────────────────────────────
-const LOAD_MORE_SCRIPT = `
+const LOAD_MORE_JS = `
 (async () => {
-  const delay = (ms) => new Promise(r => setTimeout(r, ms));
-  const patrones = ['ver más', 'ver mas', 'cargar más', 'cargar mas', 'mostrar más', 'load more', 'show more', 'más resultados'];
-  let clicks = 0;
-  while (clicks < 5) {
-    await delay(1000);
+  const delay = ms => new Promise(r => setTimeout(r, ms));
+  const patrones = ['ver más','ver mas','cargar más','cargar mas','mostrar más','load more','show more','ver todas','ver todos','más resultados'];
+  for (let clicks = 0; clicks < 6; clicks++) {
     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-    await delay(800);
-    let boton = null;
-    const todos = Array.from(document.querySelectorAll('button, a.btn, [role="button"], .btn, .remax-button, .button-color-grey-border'));
-    for (const btn of todos) {
-      const texto = (btn.textContent || '').toLowerCase().trim();
-      const rect = btn.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0 && patrones.some(p => texto.includes(p))) { boton = btn; break; }
-    }
+    await delay(1000);
+    const todos = Array.from(document.querySelectorAll('button,[role="button"],.btn,.remax-button,.button-color-grey-border,[class*="loadMore"],[class*="load-more"],[class*="ver-mas"],[class*="show-more"]'));
+    const boton = todos.find(el => {
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0 && patrones.some(p => (el.textContent||'').toLowerCase().includes(p));
+    });
     if (!boton) break;
     boton.scrollIntoView({ behavior: 'smooth', block: 'center' });
     await delay(400);
     boton.click();
-    clicks++;
-    await delay(2000);
+    await delay(2500);
   }
   window.scrollTo(0, document.body.scrollHeight);
   await delay(1000);
@@ -49,7 +50,7 @@ const LOAD_MORE_SCRIPT = `
 `;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Helpers para links
+// Helpers de URLs
 // ─────────────────────────────────────────────────────────────────────────────
 function resolverUrl(href: string, baseUrl: string): string {
   if (!href) return '';
@@ -71,41 +72,42 @@ function esLinkDeDetalle(href: string): boolean {
     if (reservados.includes(slug.split('/')[0])) return false;
     return slug.length > 3;
   }
-  if (path.includes('/propiedad/')) return true;
-  if (path.includes('/property/') && !path.includes('/property-category')) return true;
-  if (path.includes('/ficha/')) return true;
-  if (path.includes('/inmueble/')) return true;
+  if (path.includes('/propiedad/') || path.includes('/inmueble/') || path.includes('/ficha/')) return true;
+  if (path.includes('/property/') && !path.endsWith('/property/')) return true;
   if (/\/\d{6,}/.test(path)) return true;
-  if (path.includes('/producto/')) return true;
+  if (path.includes('/producto/') || path.includes('/item/') || path.includes('/articulo/')) return true;
   if (path.includes('/product/') && !path.includes('/product-category')) return true;
-  if (path.includes('/productos/') && path.split('/').length > 3) return true;
-  if (path.includes('/item/')) return true;
-  if (path.includes('/articulo/')) return true;
   if (path.includes('/products/') && path.split('/products/')[1]?.length > 0) return true;
+  if (path.includes('/productos/') && path.split('/').length > 3) return true;
   if (href.includes('articulo.mercadolibre') || /\/MLA-\d+/.test(href)) return true;
   return false;
 }
 
+function filtrarLinksDeDetalle(links: string[], baseUrl: string): string[] {
+  const dominio = (() => { try { return new URL(baseUrl).hostname; } catch { return ''; } })();
+  return [...new Set(
+    links
+      .map(l => resolverUrl(l, baseUrl))
+      .filter(l => {
+        if (!l) return false;
+        try { return new URL(l).hostname === dominio; } catch { return false; }
+      })
+      .filter(esLinkDeDetalle)
+  )];
+}
+
 function extraerLinksDeHtml(html: string, baseUrl: string): string[] {
-  const dominioOrigen = (() => { try { return new URL(baseUrl).hostname; } catch { return ''; } })();
-  const regex = /href=["']([^"']+)["']/gi;
-  const links = new Set<string>();
+  const regex = /href=["']([^"'#?][^"']*?)["']/gi;
+  const links: string[] = [];
   let m: RegExpExecArray | null;
-  while ((m = regex.exec(html)) !== null) {
-    const resolved = resolverUrl(m[1], baseUrl);
-    if (!resolved) continue;
-    try {
-      if (new URL(resolved).hostname !== dominioOrigen) continue;
-    } catch { continue; }
-    if (esLinkDeDetalle(resolved)) links.add(resolved);
-  }
-  return Array.from(links);
+  while ((m = regex.exec(html)) !== null) links.push(m[1]);
+  return filtrarLinksDeDetalle(links, baseUrl);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Capa 1: Fetch HTTP directo con headers de browser real
+// directFetch: HTTP simple con headers de browser (gratis, funciona en SSR)
 // ─────────────────────────────────────────────────────────────────────────────
-async function directFetch(url: string, debug = false): Promise<{ html: string; content: string } | null> {
+async function directFetch(url: string, debug = false): Promise<{ html: string; text: string } | null> {
   try {
     const res = await fetch(url, {
       headers: {
@@ -119,81 +121,86 @@ async function directFetch(url: string, debug = false): Promise<{ html: string; 
         'Upgrade-Insecure-Requests': '1',
       },
     });
-
-    if (!res.ok) {
-      if (debug) console.log(`[DirectFetch] HTTP ${res.status} para ${url}`);
-      return null;
-    }
-
+    if (!res.ok) { if (debug) console.log(`[DirectFetch] ${res.status} para ${url}`); return null; }
     const html = await res.text();
-    if (debug) console.log(`[DirectFetch] HTML: ${html.length} chars para ${url}`);
+    if (debug) console.log(`[DirectFetch] ${html.length} chars: ${url}`);
 
-    // Extraer __NEXT_DATA__ si existe (Next.js)
-    const nextDataMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i);
-    if (nextDataMatch) {
-      const rawJson = nextDataMatch[1].trim();
-      if (debug) console.log(`[DirectFetch] __NEXT_DATA__: ${rawJson.length} chars`);
+    // Next.js: extraer __NEXT_DATA__
+    const nextMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i);
+    if (nextMatch) {
       try {
-        const nextData = JSON.parse(rawJson);
-        const pageProps = nextData?.props?.pageProps || {};
-        // Buscar el array de propiedades en rutas conocidas
-        for (const key of ['listings', 'properties', 'results', 'initialListings', 'data']) {
-          const val = pageProps[key] || pageProps.data?.[key] || pageProps.agent?.[key];
+        const d = JSON.parse(nextMatch[1]);
+        const pp = d?.props?.pageProps || {};
+        for (const key of ['listings','properties','results','initialListings','data']) {
+          const val = pp[key] || pp.data?.[key] || pp.agent?.[key];
           if (Array.isArray(val) && val.length > 0) {
             if (debug) console.log(`[DirectFetch] __NEXT_DATA__.${key}: ${val.length} items`);
-            return { html, content: `__NEXT_DATA__ ${key}:\n${JSON.stringify(val, null, 2).slice(0, 120000)}` };
+            return { html, text: `__NEXT_DATA__ ${key}:\n${JSON.stringify(val, null, 2).slice(0, 100000)}` };
           }
         }
-        // Fallback: pageProps completo
-        return { html, content: `__NEXT_DATA__:\n${JSON.stringify(pageProps, null, 2).slice(0, 80000)}` };
-      } catch {
-        return { html, content: rawJson.slice(0, 80000) };
-      }
+        return { html, text: `__NEXT_DATA__:\n${JSON.stringify(pp, null, 2).slice(0, 80000)}` };
+      } catch { /* continuar con HTML limpio */ }
     }
 
-    // Sin __NEXT_DATA__: HTML limpio (sin scripts/estilos/nav/footer)
-    const cleanHtml = html
+    // HTML limpio sin scripts/estilos/nav/footer
+    const clean = html
       .replace(/<script[\s\S]*?<\/script>/gi, '')
       .replace(/<style[\s\S]*?<\/style>/gi, '')
       .replace(/<!--[\s\S]*?-->/g, '')
       .replace(/<(nav|footer|header|aside|noscript)[^>]*>[\s\S]*?<\/\1>/gi, '')
-      .replace(/\s{3,}/g, '\n')
-      .trim();
-
-    return { html, content: cleanHtml.slice(0, 80000) };
-
-  } catch (err: any) {
-    if (debug) console.error(`[DirectFetch] Error: ${err.message}`);
+      .replace(/\s{3,}/g, '\n').trim();
+    return { html, text: clean.slice(0, 80000) };
+  } catch (e: any) {
+    if (debug) console.error(`[DirectFetch] Error: ${e.message}`);
     return null;
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Capa 2: Spider — solo para descubrir links adicionales (no para contenido)
+// Firecrawl scrape — con soporte para actions JS
 // ─────────────────────────────────────────────────────────────────────────────
-async function spiderGetLinks(url: string, apiKey: string): Promise<string[]> {
+async function firecrawlScrape(
+  url: string,
+  apiKey: string,
+  options: Record<string, unknown> = {},
+  debug = false
+): Promise<{ markdown: string; links: string[] } | null> {
   try {
-    const response = await fetch('https://api.spider.cloud/scrape', {
+    const res = await fetch('https://api.firecrawl.dev/v1/scrape', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        url,
-        return_format: 'markdown',
-        request: 'chrome',
-        execution_scripts: { [url]: LOAD_MORE_SCRIPT },
-        return_page_links: true,
-        stealth: true,
-      }),
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ url, ...options }),
     });
-    if (!response.ok) return [];
-    const data = await response.json();
-    const page = Array.isArray(data) ? data[0] : data;
-    if (!page || page.status === 0) return [];
-    const links: string[] = page.links || page.page_links || page.urls || [];
-    console.log(`[Spider] Links descubiertos: ${links.length}`);
-    return links;
-  } catch {
-    return [];
+
+    if (!res.ok) {
+      const err = await res.text();
+      console.error(`[Firecrawl] HTTP ${res.status}: ${err.slice(0, 200)}`);
+      return null;
+    }
+
+    const data = await res.json();
+    if (debug) {
+      console.log(`[Firecrawl] success: ${data.success}`);
+      console.log(`[Firecrawl] markdown: ${(data.data?.markdown || '').length} chars`);
+      console.log(`[Firecrawl] links: ${(data.data?.links || []).length}`);
+      console.log(`[Firecrawl] Sample: ${(data.data?.markdown || '').slice(0, 300)}`);
+    }
+
+    if (!data.success) {
+      console.error(`[Firecrawl] Error: ${data.error || 'unknown'}`);
+      return null;
+    }
+
+    return {
+      markdown: data.data?.markdown || data.data?.content || '',
+      links: data.data?.links || [],
+    };
+  } catch (e: any) {
+    console.error(`[Firecrawl] Error: ${e.message}`);
+    return null;
   }
 }
 
@@ -204,59 +211,95 @@ export async function ejecutarScrapingProfundo(
   url: string,
   maxProperties: number = 40
 ): Promise<ScrapeResult> {
+  const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
   const SPIDER_API_KEY = process.env.SPIDER_API_KEY;
 
   try {
     console.log(`[Scraper] Iniciando para: ${url}`);
 
-    // ── Fase 1: Obtener página principal y links ──────────────────────────────
-    const mainResult = await directFetch(url, true);
-    if (!mainResult) {
-      return { success: false, mainText: '', items: [], error: 'No se pudo acceder a la página' };
-    }
+    // ── Fase 1a: directFetch para extraer links del HTML ──────────────────────
+    const mainDirect = await directFetch(url, true);
+    let propertyLinks = mainDirect ? extraerLinksDeHtml(mainDirect.html, url) : [];
+    console.log(`[Scraper] Links del HTML: ${propertyLinks.length}`);
 
-    const mainContent = mainResult.content;
-    const mainHtml = mainResult.html;
+    // ── Fase 1b: Firecrawl para la página principal (con click "ver más") ─────
+    let mainContent = mainDirect?.text || '';
 
-    // Extraer links de propiedades del HTML
-    let propertyLinks = extraerLinksDeHtml(mainHtml, url);
-    console.log(`[Scraper] Links extraídos del HTML: ${propertyLinks.length}`);
+    if (FIRECRAWL_API_KEY) {
+      console.log('[Scraper] Firecrawl página principal...');
+      const fcMain = await firecrawlScrape(url, FIRECRAWL_API_KEY, {
+        formats: ['markdown', 'links'],
+        onlyMainContent: false,
+        waitFor: 2000,
+        actions: [
+          { type: 'scroll', direction: 'down' },
+          { type: 'wait', milliseconds: 1000 },
+          { type: 'executeJavascript', script: LOAD_MORE_JS },
+          { type: 'wait', milliseconds: 3000 },
+          { type: 'scroll', direction: 'down' },
+          { type: 'wait', milliseconds: 1000 },
+        ],
+      }, true);
 
-    // Si tenemos pocos links, intentar con Spider para descubrir más (click "ver más")
-    if (propertyLinks.length < 10 && SPIDER_API_KEY) {
-      console.log('[Scraper] Buscando más links con Spider...');
-      const spiderLinks = await spiderGetLinks(url, SPIDER_API_KEY);
-      const dominioOrigen = (() => { try { return new URL(url).hostname; } catch { return ''; } })();
-      const extraLinks = spiderLinks
-        .map(l => resolverUrl(l, url))
-        .filter(l => {
-          if (!l) return false;
-          try { return new URL(l).hostname === dominioOrigen; } catch { return false; }
-        })
-        .filter(esLinkDeDetalle)
-        .filter(l => !propertyLinks.includes(l));
-      if (extraLinks.length > 0) {
-        console.log(`[Scraper] Spider agregó ${extraLinks.length} links adicionales`);
-        propertyLinks = [...propertyLinks, ...extraLinks];
+      if (fcMain) {
+        // Usar markdown de Firecrawl si es más rico que el HTML directo
+        if (fcMain.markdown.length > mainContent.length) {
+          mainContent = fcMain.markdown;
+          console.log(`[Scraper] Firecrawl content: ${mainContent.length} chars`);
+        }
+        // Agregar links de Firecrawl
+        const fcLinks = filtrarLinksDeDetalle(fcMain.links, url);
+        const nuevos = fcLinks.filter(l => !propertyLinks.includes(l));
+        if (nuevos.length > 0) {
+          console.log(`[Scraper] Firecrawl agregó ${nuevos.length} links`);
+          propertyLinks = [...propertyLinks, ...nuevos];
+        }
       }
     }
 
-    propertyLinks = [...new Set(propertyLinks)].slice(0, maxProperties);
-    console.log(`[Scraper] Total links de propiedades: ${propertyLinks.length}`);
+    // ── Fallback: Spider si Firecrawl no está disponible ──────────────────────
+    if (propertyLinks.length < 5 && SPIDER_API_KEY) {
+      console.log('[Scraper] Spider fallback para links...');
+      try {
+        const res = await fetch('https://api.spider.cloud/scrape', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${SPIDER_API_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, return_format: 'markdown', request: 'chrome', return_page_links: true, stealth: true }),
+        });
+        if (res.ok) {
+          const d = await res.json();
+          const page = Array.isArray(d) ? d[0] : d;
+          if (page?.status !== 0) {
+            const spLinks = filtrarLinksDeDetalle(page?.links || [], url).filter(l => !propertyLinks.includes(l));
+            if (spLinks.length > 0) { console.log(`[Scraper] Spider agregó ${spLinks.length} links`); propertyLinks = [...propertyLinks, ...spLinks]; }
+          }
+        }
+      } catch { /* ignorar */ }
+    }
 
-    // ── Fase 2: directFetch de cada ficha individual ──────────────────────────
+    propertyLinks = [...new Set(propertyLinks)].slice(0, maxProperties);
+    console.log(`[Scraper] Total links: ${propertyLinks.length}`);
+
+    // ── Fase 2: Scrape fichas individuales ────────────────────────────────────
     const fichas: Array<{ url: string; content: string }> = [];
 
     if (propertyLinks.length > 0) {
-      console.log('[Scraper] Fetching fichas individuales...');
       const CONCURRENCY = 3;
-
       for (let i = 0; i < propertyLinks.length; i += CONCURRENCY) {
         const chunk = propertyLinks.slice(i, i + CONCURRENCY);
         const results = await Promise.all(chunk.map(async (link) => {
-          const result = await directFetch(link, false);
-          if (result && result.content.length > 200) {
-            return { url: link, content: result.content };
+          // Intentar directFetch primero (gratis)
+          const direct = await directFetch(link, false);
+          if (direct && direct.text.length > 200) return { url: link, content: direct.text };
+
+          // Fallback: Firecrawl
+          if (FIRECRAWL_API_KEY) {
+            const fc = await firecrawlScrape(link, FIRECRAWL_API_KEY, {
+              formats: ['markdown'],
+              onlyMainContent: false,
+              waitFor: 1000,
+            }, false);
+            if (fc && fc.markdown.length > 100) return { url: link, content: fc.markdown };
           }
           return null;
         }));
@@ -267,49 +310,35 @@ export async function ejecutarScrapingProfundo(
     }
 
     // ── Armar texto para el parser ────────────────────────────────────────────
-    // Si tenemos fichas individuales con datos completos, usarlas como fuente principal.
-    // El contenido de la página principal sirve como contexto general.
-    let fullText: string;
-
-    if (fichas.length > 0) {
-      const header = [
-        `ORIGEN: ${url}`,
-        `FICHAS_INDIVIDUALES: ${fichas.length}`,
-        `NOTA_IMAGENES_REMAX: El CDN base para fotos de RE/MAX es "https://d1acdg20u0pmxj.cloudfront.net/". Si encuentrás paths como "listings/UUID/UUID.jpg" construí la URL completa con ese prefijo.`,
-        '',
-        '=== CONTENIDO PÁGINA PRINCIPAL ===',
-        mainContent.slice(0, 8000),
-        '',
-        '=== FICHAS INDIVIDUALES (fuente principal de datos) ===',
-      ].join('\n');
-
-      const fichasText = fichas.map((f, i) => [
-        `--- PROPIEDAD ${i + 1} ---`,
-        `URL: ${f.url}`,
-        f.content.slice(0, 6000),
-        `--- FIN ${i + 1} ---`,
-      ].join('\n'));
-
-      fullText = header + '\n' + fichasText.join('\n\n');
-    } else {
-      // Sin fichas individuales: usar solo el contenido de la página principal
-      fullText = [
-        `ORIGEN: ${url}`,
-        `NOTA: Solo se pudo obtener la página principal (sin fichas individuales).`,
-        `NOTA_IMAGENES_REMAX: El CDN base para fotos de RE/MAX es "https://d1acdg20u0pmxj.cloudfront.net/". Si encuentrás paths como "listings/UUID/UUID.jpg" construí la URL completa.`,
-        '',
-        '=== CONTENIDO ===',
-        mainContent,
-      ].join('\n');
-    }
+    const fullText = fichas.length > 0
+      ? [
+          `ORIGEN: ${url}`,
+          `FICHAS: ${fichas.length}`,
+          `NOTA_IMAGENES: Para RE/MAX el CDN base es "https://d1acdg20u0pmxj.cloudfront.net/". Si encontrás paths como "listings/UUID/UUID.jpg", construí la URL completa con ese prefijo.`,
+          '',
+          '=== PÁGINA PRINCIPAL ===',
+          mainContent.slice(0, 8000),
+          '',
+          '=== FICHAS INDIVIDUALES ===',
+          ...fichas.map((f, i) => [
+            `--- PROPIEDAD ${i + 1} ---`,
+            `URL: ${f.url}`,
+            f.content.slice(0, 6000),
+            `--- FIN ${i + 1} ---`,
+          ].join('\n')),
+        ].join('\n')
+      : [
+          `ORIGEN: ${url}`,
+          `NOTA: Solo página principal disponible.`,
+          `NOTA_IMAGENES: Para RE/MAX el CDN base es "https://d1acdg20u0pmxj.cloudfront.net/".`,
+          '',
+          '=== CONTENIDO ===',
+          mainContent,
+        ].join('\n');
 
     console.log(`[Scraper] Texto total: ${fullText.length} chars, ${fichas.length} fichas`);
 
-    return {
-      success: true,
-      mainText: fullText,
-      items: fichas.map(f => f.url),
-    };
+    return { success: true, mainText: fullText, items: fichas.map(f => f.url) };
 
   } catch (error: any) {
     console.error('[Scraper] Error:', error.message);
