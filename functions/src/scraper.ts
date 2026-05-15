@@ -33,19 +33,25 @@ const LOAD_MORE_SCRIPT = `
 `;
 
 const DETAIL_EXTRACTION_SCRIPT = `
-(() => {
+(async () => {
+  const delay = ms => new Promise(r => setTimeout(r, ms));
+  await delay(3500); // Esperar a que Angular renderice la página
+
   const data = { dom: {} };
   try {
     // 1. Intentar expandir descripción
-    const expandBtn = document.querySelector('.remax-description__expand, [class*="description"] .ver-mas, button.expand');
-    if (expandBtn) expandBtn.click();
+    const expandBtn = document.querySelector('.remax-description__expand, [class*="description"] .ver-mas, button.expand, .ver-mas');
+    if (expandBtn) {
+        expandBtn.click();
+        await delay(1000); // Esperar a que se expanda
+    }
 
     // 2. Capturar datos visibles (DOM)
     data.dom.title = document.title;
     data.dom.description = document.querySelector('.remax-description__content, [class*="description-text"], .property-description')?.innerText;
     data.dom.price = document.querySelector('.remax-price, [class*="price-value"], .price-value')?.innerText;
     
-    // 3. Capturar características técnicas del DOM (en caso de que falle el JSON)
+    // 3. Capturar características técnicas del DOM
     const chips = Array.from(document.querySelectorAll('.remax-chips__item, .property-characteristics__item, [class*="characteristics"] li'));
     data.dom.chips = chips.map(c => c.innerText).join(' | ');
 
@@ -175,75 +181,107 @@ function esLinkDeDetalle(href: string): boolean {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Función Principal
+// Función Principal (Two-Step Deep Scrape)
 // ─────────────────────────────────────────────────────────────────────────────
 export async function ejecutarScrapingProfundo(
   url: string,
-  maxProperties: number = 40
+  maxProperties: number = 20
 ): Promise<ScrapeResult> {
   const SPIDER_API_KEY = process.env.SPIDER_API_KEY;
   if (!SPIDER_API_KEY) return { success: false, mainText: '', items: [], error: 'Falta SPIDER_API_KEY' };
 
   try {
-    console.log(`[Spider] Procesando: ${url}`);
+    console.log(`[Spider] Iniciando escaneo profundo en: ${url}`);
     const isDetail = esLinkDeDetalle(url);
 
-    // Configuración de Spider
-    const body = {
-      url,
-      limit: isDetail ? 1 : maxProperties + 5,
-      depth: isDetail ? 0 : 1,
-      return_format: 'raw',
-      request: 'chrome',
-      execution_scripts: { [url]: isDetail ? DETAIL_EXTRACTION_SCRIPT : LOAD_MORE_SCRIPT },
-      filter_output: { only_main_content: true },
-      wait_for: 5000,
-      metadata: true
-    };
+    let mainContentRaw = '';
+    let mainContentUrl = url;
+    let urlsAVisitar: string[] = [];
 
-    const res = await fetch(isDetail ? 'https://api.spider.cloud/scrape' : 'https://api.spider.cloud/crawl', {
+    // PASO 1: Obtener la página principal (y descubrir links si es catálogo)
+    console.log(`[Spider] Paso 1: Scrape de página principal...`);
+    const mainRes = await fetch('https://api.spider.cloud/scrape', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${SPIDER_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+      body: JSON.stringify({
+        url,
+        return_format: 'raw',
+        request: 'chrome',
+        execution_scripts: { [url]: isDetail ? DETAIL_EXTRACTION_SCRIPT : LOAD_MORE_SCRIPT },
+        filter_output: { only_main_content: true }
+      })
     });
 
-    if (!res.ok) throw new Error(`Spider error ${res.status}`);
-    
-    const rawData = await res.json();
-    let pages: any[] = [];
-    
-    if (Array.isArray(rawData)) {
-      pages = rawData;
-    } else if (rawData && typeof rawData === 'object') {
-      if (rawData.content) {
-        // Es una respuesta de scrape simple (un solo objeto)
-        pages = [rawData];
-      } else {
-        // Es un objeto con claves (posiblemente numéricas de un crawl)
-        pages = Object.values(rawData).filter(v => v && typeof v === 'object' && (v as any).content);
-      }
-    }
-    
-    if (pages.length === 0) {
-      console.error('[Spider] Respuesta inválida:', JSON.stringify(rawData).slice(0, 200));
-      throw new Error('Spider no devolvió contenido válido');
-    }
-    
-    console.log(`[Spider] Páginas procesables: ${pages.length}`);
+    if (!mainRes.ok) throw new Error(`Spider error (Main): ${mainRes.status}`);
+    const mainData = await mainRes.json();
+    const mainPage = Array.isArray(mainData) ? mainData[0] : (mainData.content ? mainData : Object.values(mainData)[0]);
+    mainContentRaw = mainPage?.content || '';
 
-    // Separar principal de fichas
-    const mainPage = pages.find(p => p.url === url) || pages[0];
-    const fichas = pages.filter(p => p.url !== mainPage.url)
-                        .filter(p => p.url && esLinkDeDetalle(p.url))
-                        .slice(0, maxProperties);
+    if (isDetail) {
+      urlsAVisitar = [url];
+    } else {
+      // Extraer links del catálogo (Buscar todos los href que coincidan con ficha de detalle)
+      const hrefRegex = /href="([^"]+)"/g;
+      let match;
+      const discoveredLinks = new Set<string>();
+      while ((match = hrefRegex.exec(mainContentRaw)) !== null) {
+        let link = match[1];
+        if (link.startsWith('/')) {
+            const baseUrl = new URL(url).origin;
+            link = baseUrl + link;
+        }
+        if (esLinkDeDetalle(link)) {
+            discoveredLinks.add(link);
+        }
+      }
+      urlsAVisitar = Array.from(discoveredLinks).slice(0, maxProperties);
+      console.log(`[Spider] Encontrados ${urlsAVisitar.length} links de propiedades válidos.`);
+    }
+
+    // PASO 2: Extraer detalles de cada ficha
+    const fichasData: any[] = [];
+    if (!isDetail && urlsAVisitar.length > 0) {
+      console.log(`[Spider] Paso 2: Scrape profundo de ${urlsAVisitar.length} fichas concurrentemente...`);
+      const fetchPromises = urlsAVisitar.map((fichaUrl: string): Promise<any> => 
+        fetch('https://api.spider.cloud/scrape', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${SPIDER_API_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: fichaUrl,
+            return_format: 'raw',
+            request: 'chrome',
+            execution_scripts: { [fichaUrl]: DETAIL_EXTRACTION_SCRIPT },
+            filter_output: { only_main_content: true }
+          })
+        })
+        .then((r: Response): Promise<any> => r.json())
+        .then((d: any): { url: string, page: any } => {
+            const page = Array.isArray(d) ? d[0] : (d.content ? d : Object.values(d)[0]);
+            return { url: fichaUrl, page };
+        })
+        .catch((e: any): null => {
+            console.warn(`[Spider] Error scrapeando ficha ${fichaUrl}:`, e.message);
+            return null;
+        })
+      );
+      
+      const results = await Promise.all(fetchPromises);
+      for (const res of results) {
+          if (res && res.page && res.page.content) {
+              fichasData.push(res);
+          }
+      }
+      console.log(`[Spider] Recuperadas ${fichasData.length} fichas exitosamente.`);
+    } else if (isDetail) {
+      fichasData.push({ url: mainContentUrl, page: mainPage });
+    }
 
     // Procesar contenido
-    const procesarPagina = (p: any) => {
+    const procesarPagina = (urlFicha: string, p: any): string => {
       if (!p?.content) return '';
       
       let extraInfo = "";
-      // Recuperar datos del script de ejecución
-      const resKey = Object.keys(p.execution_results || {}).find(k => k.includes('DETAIL_EXTRACTION_SCRIPT') || k === url);
+      const resKey = Object.keys(p.execution_results || {}).find(k => k.includes('DETAIL_EXTRACTION_SCRIPT') || k === urlFicha);
       const scriptResult = p.execution_results?.[resKey || ''];
       
       if (scriptResult) {
@@ -257,34 +295,30 @@ export async function ejecutarScrapingProfundo(
 
       const estructurado = extraerCamposPropiedad(p.content);
       
-      // Combinamos AMBOS para que Gemini tenga toda la info
       let combined = [
         estructurado ? `[DATOS_ESTRUCTURADOS]\n${estructurado}` : '',
         extraInfo ? extraInfo : '',
-        // Fallback de texto limpio (solo si lo anterior es muy corto)
-        (!estructurado && !extraInfo) ? p.content.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 10000) : ''
+        (!estructurado && !extraInfo) ? p.content.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 8000) : ''
       ].filter(Boolean).join('\n\n');
       
       return combined;
     };
 
-    const mainContent = procesarPagina(mainPage);
-    const fichasText = fichas.map((f, i) => `=== ITEM ${i+1} ===\nURL: ${f.url}\n${procesarPagina(f)}\n========================`).join('\n\n');
+    const mainContentProcessed = isDetail ? '' : procesarPagina(url, mainPage);
+    const fichasText = fichasData.map((f, i) => `=== ITEM ${i+1} ===\nURL: ${f.url}\n${procesarPagina(f.url, f.page)}\n========================`).join('\n\n');
 
     const fullText = [
       `ORIGEN: ${url}`,
       `TIPO: ${isDetail ? 'FICHA_INDIVIDUAL' : 'CATALOGO'}`,
       '',
-      '=== INFORMACIÓN PRINCIPAL ===',
-      mainContent,
-      '',
-      fichasText ? '=== DETALLES DE PROPIEDADES ===\n' + fichasText : ''
+      isDetail ? '' : `=== INFORMACIÓN PRINCIPAL (CATÁLOGO) ===\n${mainContentProcessed}\n`,
+      fichasText ? `=== DETALLES DE PROPIEDADES ===\n${fichasText}` : ''
     ].join('\n');
 
     return {
       success: true,
       mainText: fullText,
-      items: isDetail ? [url] : fichas.map(f => f.url)
+      items: urlsAVisitar
     };
 
   } catch (error: any) {
