@@ -10,21 +10,20 @@ REGLAS GENERALES:
 - Máximo 40 objetos.
 
 REGLAS DE PRECIOS (MUY IMPORTANTE):
-- Si ves campos JSON como "price": 259000 o "Precio: 259000", úsalos directamente como número.
-- El precio puede aparecer como: "Precio: 155000", "155.000 USD", "USD 155.000", "$ 155.000".
+- Si ves "PRECIO_VALOR: 155000", ese es el precio exacto.
+- El precio puede aparecer como: "155.000 USD", "USD 155.000", "$ 155.000".
 - Argentina usa PUNTO como separador de miles y COMA como decimal en textos:
-  "259.000" en texto argentino → precio: 259000 (doscientos cincuenta y nueve mil)
-- Si dice "Consultar", "A consultar" o no hay número → precio: null.
-- moneda: "USD" si dice USD/dólares, "ARS" si dice ARS/pesos, default "USD" para propiedades.
-- Si ves un número grande cerca de la palabra "USD" o "Precio", ese es el precio.
+  "259.000" en texto argentino → precio: 259000
+- Si no hay etiqueta, buscá el primer número grande seguido de "USD" o "Dólares".
+- moneda: "USD" si dice USD/dólares, "ARS" si dice ARS/pesos.
 
-REGLAS DE MEDIDAS (nombres en español Y en inglés/JSON):
-- "m² totales", "sup. total", "totalArea", "total_area", "superficie", "m2 totales" → campo m2
-- "m² cubiertos", "sup. cubierta", "coveredArea", "covered_area", "buildingArea", "m2 cubiertos" → campo m2_cubiertos
-- "ambientes", "environments", "rooms" (cuando no es baños) → campo ambientes
-- "dormitorios", "habitaciones", "dorm.", "bedrooms", "bedRooms", "suites", "hab." → campo dormitorios
-- "baños", "banos", "bath", "bathrooms", "baths", "baño" → campo banios
-- "expensas", "expenses", "expensas_valor" → campo expensas (siempre en ARS)
+REGLAS DE MEDIDAS:
+- "m² totales", "m2 totales", "superficie total" → campo m2
+- "m² cubiertos", "m2 cubiertos", "superficie cubierta" → campo m2_cubiertos
+- "m² terreno", "m2 terreno", "superficie terreno" → m2_terreno (o m2 si no hay otro)
+- Buscá siempre el símbolo "m²" o "m2". Si ves "172 m² totales", m2 es 172.
+- Ambientes: 4, Dormitorios: 3, Baños: 2.
+- Si ves "52 años antigüedad", ignoralo (no es medida).
 
 EJEMPLOS DE EXTRACCIÓN (RE/MAX):
 - "155.000 USD ... 172 m² totales 172 m² cubiertos 5 ambientes 2 baños 4 dormitorios"

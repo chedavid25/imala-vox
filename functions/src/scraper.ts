@@ -118,11 +118,14 @@ function extraerCamposPropiedad(pp: Record<string, any>): string | null {
   if (titulo) lines.push(`Título: ${titulo}`);
 
   const desc = listing.description || listing.notes;
-  if (desc) lines.push(`Descripción: ${String(desc).slice(0, 500)}`);
+  if (desc) lines.push(`Descripción: ${String(desc)}`); // Eliminado slice de 500
 
-  // Precio — puede ser número o string
+  // Precio — muy importante para RE/MAX Angular
   const precio = listing.price ?? listing.priceValue;
-  if (precio != null) lines.push(`Precio: ${precio}`);
+  if (precio != null) {
+    lines.push(`PRECIO_VALOR: ${precio}`);
+    lines.push(`Precio: ${precio}`); // Doble entrada para asegurar
+  }
   
   const moneda = listing.currency?.value ?? listing.currencyCode ?? listing.currency;
   if (moneda) lines.push(`Moneda: ${moneda}`);
@@ -403,7 +406,12 @@ export async function ejecutarScrapingProfundo(
             const fc = await firecrawlScrape(link, FIRECRAWL_API_KEY, {
               formats: ['markdown'],
               onlyMainContent: false,
-              waitFor: 1000,
+              waitFor: 2000,
+              actions: [
+                { type: 'scroll', direction: 'down' },
+                { type: 'click', selector: 'button.mat-ripple, .ver-mas, [class*="show-more"], [class*="ver-mas"]' },
+                { type: 'wait', milliseconds: 1000 },
+              ]
             }, false);
             if (fc && fc.markdown.length > 100) return { url: link, content: fc.markdown };
           }
