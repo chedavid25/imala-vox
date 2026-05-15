@@ -1,12 +1,14 @@
 /**
- * Motor de Scraping con Spider API — Arquitectura en dos fases
+ * Motor de Scraping con Spider API — Estrategia de página única
  *
- * Fase 1: Scrape la página principal con execution_scripts (clicks "ver más")
- *         y retorna todos los links descubiertos (return_page_links: true).
- * Fase 2: Scrape cada ficha de detalle individualmente en paralelo (2 a la vez).
+ * Solo scrapeamos la página que el usuario nos pasa.
+ * No visitamos fichas individuales (evita bloqueos de antibot).
  *
- * Esto evita depender de que Spider siga links en el crawl, lo cual no funciona
- * bien con SPAs React que hidratan componentes dinámicamente.
+ * Estrategia dual:
+ *   1. Intento HTTP simple: rápido, barato, funciona en sitios SSR
+ *      (WooCommerce, Shopify, Tienda Nube, RE/MAX Next.js, Tokko, etc.)
+ *   2. Si el contenido es escaso (<500 chars), reintento con Chrome
+ *      para sitios que requieren JavaScript para renderizar.
  */
 
 export interface ScrapeResult {
@@ -17,9 +19,8 @@ export interface ScrapeResult {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Script inyectado en el browser de Spider para cargar todo el contenido
-// antes de extraer links. Solo clickea botones que cargan contenido en la
-// misma página (AJAX/infinite scroll). NO clickea links de paginación por URL.
+// Script inyectado en Chrome (solo cuando el fallback Chrome es necesario)
+// Clickea botones "ver más" para cargar contenido adicional
 // ─────────────────────────────────────────────────────────────────────────────
 const LOAD_MORE_SCRIPT = `
 (async () => {
@@ -35,7 +36,7 @@ const LOAD_MORE_SCRIPT = `
   ];
 
   let clicks = 0;
-  const MAX_CLICKS = 8;
+  const MAX_CLICKS = 6;
 
   while (clicks < MAX_CLICKS) {
     await delay(800);
@@ -80,60 +81,13 @@ const LOAD_MORE_SCRIPT = `
     await delay(300);
     boton.click();
     clicks++;
-    await delay(1500);
+    await delay(1800);
   }
 
   window.scrollTo(0, document.body.scrollHeight);
-  await delay(800);
+  await delay(1000);
 })();
 `;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Detecta si una URL corresponde a una ficha de detalle (propiedad o producto)
-// ─────────────────────────────────────────────────────────────────────────────
-function resolverUrl(href: string, baseUrl: string): string {
-  if (!href) return '';
-  if (href.startsWith('http')) return href;
-  if (href.startsWith('/')) {
-    try { return new URL(href, baseUrl).href; } catch { return ''; }
-  }
-  return '';
-}
-
-function esLinkDeDetalle(href: string): boolean {
-  if (!href || !href.startsWith('http')) return false;
-
-  const path = (() => {
-    try { return new URL(href).pathname.toLowerCase(); } catch { return ''; }
-  })();
-
-  if (path.includes('/listings/')) {
-    // Excluir endpoints de búsqueda tipo /listings/buy?page=... o /listings/map
-    if (href.includes('?')) return false;
-    const slug = path.split('/listings/')[1] || '';
-    const reservados = ['buy', 'sell', 'rent', 'map', 'search', 'list', 'filter'];
-    if (reservados.includes(slug.split('/')[0])) return false;
-    return true;
-  }
-  if (path.includes('/p/') && /\/p\/\d+/.test(path)) return true;
-  if (path.includes('/propiedad/')) return true;
-  if (path.includes('/property/')) return true;
-  if (path.includes('/ficha/')) return true;
-  if (path.includes('/inmueble/')) return true;
-  if (/\/\d{6,}/.test(path)) return true;
-
-  if (path.includes('/producto/')) return true;
-  if (path.includes('/product/') && !path.includes('/product-category')) return true;
-  if (path.includes('/productos/') && path.split('/').length > 3) return true;
-  if (path.includes('/item/')) return true;
-  if (path.includes('/articulo/')) return true;
-
-  if (path.includes('/products/') && path.split('/products/')[1]?.length > 0) return true;
-
-  if (href.includes('articulo.mercadolibre') || /\/MLA-\d+/.test(href)) return true;
-
-  return false;
-}
 
 async function spiderScrape(
   url: string,
@@ -152,7 +106,7 @@ async function spiderScrape(
 
   if (!response.ok) {
     const err = await response.text();
-    console.error(`[Spider] Error HTTP ${response.status} para ${url}: ${err.slice(0, 300)}`);
+    console.error(`[Spider] Error HTTP ${response.status}: ${err.slice(0, 300)}`);
     return null;
   }
 
@@ -160,12 +114,16 @@ async function spiderScrape(
   const page = Array.isArray(data) ? data[0] : data;
 
   if (debug) {
-    console.log(`[Spider] Raw response keys: ${Object.keys(page || {}).join(', ')}`);
-    console.log(`[Spider] status: ${page?.status}, content length: ${(page?.content || page?.markdown || page?.html || page?.text || '').length}`);
-    console.log(`[Spider] Sample: ${JSON.stringify(page).slice(0, 300)}`);
+    console.log(`[Spider] Keys: ${Object.keys(page || {}).join(', ')}`);
+    console.log(`[Spider] status: ${page?.status}, content: ${(page?.content || page?.markdown || page?.html || page?.text || '').length} chars`);
+    console.log(`[Spider] Sample: ${JSON.stringify(page).slice(0, 400)}`);
   }
 
-  // Normalizar el campo de contenido — Spider puede usar distintos nombres
+  if (!page || page.status === 0) {
+    if (debug) console.log('[Spider] Respuesta inválida o bloqueada');
+    return null;
+  }
+
   if (page && !page.content) {
     page.content = page.markdown || page.html || page.text || '';
   }
@@ -174,7 +132,7 @@ async function spiderScrape(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Función principal
+// Función principal — una sola página, sin visitar fichas individuales
 // ─────────────────────────────────────────────────────────────────────────────
 export async function ejecutarScrapingProfundo(
   url: string,
@@ -187,105 +145,64 @@ export async function ejecutarScrapingProfundo(
   }
 
   try {
-    console.log(`[Spider] Iniciando scraping para: ${url}`);
+    console.log(`[Spider] Scraping: ${url}`);
 
-    // ── FASE 1: Scrapear página principal con script y obtener links ──────────
-    console.log('[Spider] Fase 1: scraping página principal...');
-
-    const mainPage = await spiderScrape(url, SPIDER_API_KEY, {
-      return_format: 'html',  // html da el contenido completo de las tarjetas de propiedad
-      request: 'chrome',
-      execution_scripts: { [url]: LOAD_MORE_SCRIPT },
-      // NO filter_output_main_only — suprime el campo `links`
-      return_page_links: true,
+    // ── Intento 1: HTTP simple (rápido, SSR sites devuelven todo el contenido) ──
+    console.log('[Spider] Intento 1: HTTP simple...');
+    let mainPage = await spiderScrape(url, SPIDER_API_KEY, {
+      return_format: 'markdown',
+      request: 'http',
       stealth: true,
-    }, true); // debug activado
+    }, true);
 
-    if (!mainPage) throw new Error('Spider no devolvió resultado para la página principal');
+    const httpContent = mainPage?.content || '';
+    console.log(`[Spider] HTTP content: ${httpContent.length} chars`);
 
-    const mainContent = mainPage.content || '';
-    // Spider puede retornar el campo como `links`, `page_links`, o `urls`
-    const allLinks: string[] = mainPage.links || (mainPage as any).page_links || (mainPage as any).urls || [];
+    // ── Intento 2: Chrome si HTTP no trajo suficiente contenido ──────────────
+    if (httpContent.length < 500) {
+      console.log('[Spider] Contenido HTTP insuficiente. Intento 2: Chrome...');
+      const chromePage = await spiderScrape(url, SPIDER_API_KEY, {
+        return_format: 'markdown',
+        request: 'chrome',
+        execution_scripts: { [url]: LOAD_MORE_SCRIPT },
+        return_page_links: true,
+        stealth: true,
+      }, true);
 
-    console.log(`[Spider] Links descubiertos en página principal: ${allLinks.length}`);
-
-    const dominioOrigen = (() => { try { return new URL(url).hostname; } catch { return ''; } })();
-
-    // Resolver URLs relativas y filtrar solo fichas del mismo dominio
-    const detailLinks = allLinks
-      .map(href => resolverUrl(href, url))
-      .filter(href => {
-        if (!href) return false;
-        try { return new URL(href).hostname === dominioOrigen; } catch { return false; }
-      })
-      .filter(esLinkDeDetalle)
-      .filter((v, i, a) => a.indexOf(v) === i) // deduplicar
-      .slice(0, maxProperties);
-
-    console.log(`[Spider] Fichas de detalle filtradas: ${detailLinks.length}`);
-    if (detailLinks.length > 0) {
-      console.log(`[Spider] Primeras fichas: ${detailLinks.slice(0, 5).join(' | ')}`);
-    } else {
-      console.log(`[Spider] Sin fichas. Muestra de links encontrados: ${allLinks.slice(0, 10).join(' | ')}`);
-    }
-
-    // ── FASE 2: Scrapear cada ficha de detalle (2 en paralelo) ───────────────
-    const fichas: Array<{ url: string; content: string }> = [];
-
-    if (detailLinks.length > 0) {
-      console.log('[Spider] Fase 2: scraping fichas individuales...');
-      const CONCURRENCY = 2;
-
-      for (let i = 0; i < detailLinks.length; i += CONCURRENCY) {
-        const chunk = detailLinks.slice(i, i + CONCURRENCY);
-        const isFirstBlock = i === 0;
-        const results = await Promise.all(chunk.map(async (link) => {
-          const page = await spiderScrape(link, SPIDER_API_KEY, {
-            return_format: 'markdown',
-            request: 'chrome',
-            filter_output_main_only: true,
-          }, isFirstBlock);
-          return (page?.content && page.content.length > 50)
-            ? { url: link, content: page.content }
-            : null;
-        }));
-
-        const ok = results.filter(Boolean) as Array<{ url: string; content: string }>;
-        fichas.push(...ok);
-        console.log(`[Spider] Bloque ${Math.ceil(i / CONCURRENCY) + 1}: ${ok.length}/${chunk.length} OK`);
+      if (chromePage && (chromePage.content || '').length > httpContent.length) {
+        mainPage = chromePage;
+        console.log(`[Spider] Chrome content: ${(mainPage.content || '').length} chars`);
       }
     }
 
-    // ── FASE 3: Armar texto estructurado para el parser ──────────────────────
-    // Incluir el HTML/contenido de la página principal (con las tarjetas de listado)
-    // más el detalle de cada ficha que se pudo scrappear
-    const mainContentSlice = mainContent.slice(0, fichas.length === 0 ? 80000 : 20000);
+    if (!mainPage) {
+      throw new Error('Spider no pudo obtener contenido de la página');
+    }
 
-    const header = [
+    const mainContent = mainPage.content || '';
+    const allLinks: string[] = (mainPage as any).links || (mainPage as any).page_links || (mainPage as any).urls || [];
+
+    console.log(`[Spider] Contenido final: ${mainContent.length} chars, links: ${allLinks.length}`);
+
+    if (mainContent.length < 100 && allLinks.length === 0) {
+      throw new Error(`Sitio bloqueado o sin contenido accesible (${mainContent.length} chars)`);
+    }
+
+    // Armar texto para el parser — solo la página principal
+    const fullText = [
       `ORIGEN: ${url}`,
-      `FICHAS_INDIVIDUALES: ${fichas.length}`,
-      `LINKS_DETALLE_ENCONTRADOS: ${detailLinks.length}`,
+      `ESTRATEGIA: single-page (sin visitar fichas individuales)`,
       '',
-      '=== PÁGINA PRINCIPAL (HTML con tarjetas de listado) ===',
-      mainContentSlice,
-      '',
+      '=== CONTENIDO DE LA PÁGINA DE LISTADO ===',
+      mainContent.slice(0, 100000),
     ].join('\n');
 
-    const itemsText = fichas.map((f, i) => [
-      `=== FICHA ${i + 1} ===`,
-      `URL: ${f.url}`,
-      f.content.slice(0, 5000),
-      `========================`,
-    ].join('\n'));
-
-    const fullText = header + (fichas.length > 0 ? '\n\n=== FICHAS INDIVIDUALES ===\n' + itemsText.join('\n---\n') : '');
-
-    console.log(`[Spider] Texto total: ${fullText.length} caracteres, ${fichas.length} fichas`);
+    console.log(`[Spider] Texto para parser: ${fullText.length} chars`);
 
     return {
       success: true,
       mainText: fullText,
-      items: fichas.map(f => f.url),
+      items: allLinks,
     };
 
   } catch (error: any) {
