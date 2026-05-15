@@ -196,15 +196,16 @@ export async function ejecutarScrapingProfundo(
       return_format: 'markdown',
       request: 'chrome',
       execution_scripts: { [url]: LOAD_MORE_SCRIPT },
-      filter_output_main_only: true,
+      // NO filter_output_main_only en fase 1 — ese parámetro suprime el campo `links`
       return_page_links: true,
-      stealth: true,   // Bypass antibot de portales como RE/MAX
-    });
+      stealth: true,
+    }, true); // debug activado
 
     if (!mainPage) throw new Error('Spider no devolvió resultado para la página principal');
 
     const mainContent = mainPage.content || '';
-    const allLinks: string[] = mainPage.links || [];
+    // Spider puede retornar el campo como `links`, `page_links`, o `urls`
+    const allLinks: string[] = mainPage.links || (mainPage as any).page_links || (mainPage as any).urls || [];
 
     console.log(`[Spider] Links descubiertos en página principal: ${allLinks.length}`);
 
