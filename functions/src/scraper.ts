@@ -1,18 +1,13 @@
 /**
- * Motor de Scraping — Arquitectura en dos capas
+ * Motor de Scraping — Estrategia directFetch + fichas individuales
  *
- * Capa 1 (GRATIS, sin Spider): Fetch HTTP directo con headers de browser.
- *   - Funciona para sitios SSR: RE/MAX (Next.js), WooCommerce, Shopify,
- *     Tienda Nube, Tokko Broker, MercadoLibre, etc.
- *   - Extrae __NEXT_DATA__ JSON (Next.js) si existe → datos estructurados perfectos.
- *   - Si no, devuelve el HTML limpio (sin scripts/styles/nav/footer).
+ * Fase 1: directFetch de la página principal para obtener links de propiedades.
+ *         Si Spider logra encontrar más links (clicking "ver más"), los agrega.
+ * Fase 2: directFetch de cada ficha individual (sin pasar por Spider).
+ *         RE/MAX devuelve precio, m², expensas, fotos, etc. en el SSR HTML.
  *
- * Capa 2 (Spider): Solo si Capa 1 devuelve < 500 chars útiles.
- *   - Para SPAs puras que necesitan JavaScript para renderizar.
- *   - Usa request: 'smart' (Spider decide http vs chrome automáticamente).
- *   - filter_output_main_only: false para no perder contenido de tarjetas.
- *
- * NO visita fichas individuales — trabaja solo con la página enviada por el usuario.
+ * Para imágenes RE/MAX: el path parcial "listings/UUID/UUID.jpg" se resuelve
+ * con base CDN "https://d1acdg20u0pmxj.cloudfront.net/".
  */
 
 export interface ScrapeResult {
@@ -23,9 +18,94 @@ export interface ScrapeResult {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Capa 1: Fetch HTTP directo (gratis, confiable para SSR)
+// Script para Spider Chrome — clickea "ver más" para descubrir más links
 // ─────────────────────────────────────────────────────────────────────────────
-async function directFetch(url: string, debug = false): Promise<string | null> {
+const LOAD_MORE_SCRIPT = `
+(async () => {
+  const delay = (ms) => new Promise(r => setTimeout(r, ms));
+  const patrones = ['ver más', 'ver mas', 'cargar más', 'cargar mas', 'mostrar más', 'load more', 'show more', 'más resultados'];
+  let clicks = 0;
+  while (clicks < 5) {
+    await delay(1000);
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    await delay(800);
+    let boton = null;
+    const todos = Array.from(document.querySelectorAll('button, a.btn, [role="button"], .btn, .remax-button, .button-color-grey-border'));
+    for (const btn of todos) {
+      const texto = (btn.textContent || '').toLowerCase().trim();
+      const rect = btn.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0 && patrones.some(p => texto.includes(p))) { boton = btn; break; }
+    }
+    if (!boton) break;
+    boton.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    await delay(400);
+    boton.click();
+    clicks++;
+    await delay(2000);
+  }
+  window.scrollTo(0, document.body.scrollHeight);
+  await delay(1000);
+})();
+`;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers para links
+// ─────────────────────────────────────────────────────────────────────────────
+function resolverUrl(href: string, baseUrl: string): string {
+  if (!href) return '';
+  if (href.startsWith('http')) return href;
+  if (href.startsWith('/')) {
+    try { return new URL(href, baseUrl).href; } catch { return ''; }
+  }
+  return '';
+}
+
+function esLinkDeDetalle(href: string): boolean {
+  if (!href || !href.startsWith('http')) return false;
+  const path = (() => { try { return new URL(href).pathname.toLowerCase(); } catch { return ''; } })();
+
+  if (path.includes('/listings/')) {
+    if (href.includes('?')) return false;
+    const slug = path.split('/listings/')[1] || '';
+    const reservados = ['buy', 'sell', 'rent', 'map', 'search', 'list', 'filter', 'residential', 'commercial'];
+    if (reservados.includes(slug.split('/')[0])) return false;
+    return slug.length > 3;
+  }
+  if (path.includes('/propiedad/')) return true;
+  if (path.includes('/property/') && !path.includes('/property-category')) return true;
+  if (path.includes('/ficha/')) return true;
+  if (path.includes('/inmueble/')) return true;
+  if (/\/\d{6,}/.test(path)) return true;
+  if (path.includes('/producto/')) return true;
+  if (path.includes('/product/') && !path.includes('/product-category')) return true;
+  if (path.includes('/productos/') && path.split('/').length > 3) return true;
+  if (path.includes('/item/')) return true;
+  if (path.includes('/articulo/')) return true;
+  if (path.includes('/products/') && path.split('/products/')[1]?.length > 0) return true;
+  if (href.includes('articulo.mercadolibre') || /\/MLA-\d+/.test(href)) return true;
+  return false;
+}
+
+function extraerLinksDeHtml(html: string, baseUrl: string): string[] {
+  const dominioOrigen = (() => { try { return new URL(baseUrl).hostname; } catch { return ''; } })();
+  const regex = /href=["']([^"']+)["']/gi;
+  const links = new Set<string>();
+  let m: RegExpExecArray | null;
+  while ((m = regex.exec(html)) !== null) {
+    const resolved = resolverUrl(m[1], baseUrl);
+    if (!resolved) continue;
+    try {
+      if (new URL(resolved).hostname !== dominioOrigen) continue;
+    } catch { continue; }
+    if (esLinkDeDetalle(resolved)) links.add(resolved);
+  }
+  return Array.from(links);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Capa 1: Fetch HTTP directo con headers de browser real
+// ─────────────────────────────────────────────────────────────────────────────
+async function directFetch(url: string, debug = false): Promise<{ html: string; content: string } | null> {
   try {
     const res = await fetch(url, {
       headers: {
@@ -41,53 +121,37 @@ async function directFetch(url: string, debug = false): Promise<string | null> {
     });
 
     if (!res.ok) {
-      console.log(`[DirectFetch] HTTP ${res.status} para ${url}`);
+      if (debug) console.log(`[DirectFetch] HTTP ${res.status} para ${url}`);
       return null;
     }
 
     const html = await res.text();
-    if (debug) console.log(`[DirectFetch] HTML total: ${html.length} chars`);
+    if (debug) console.log(`[DirectFetch] HTML: ${html.length} chars para ${url}`);
 
-    // ── Estrategia A: Extraer __NEXT_DATA__ (Next.js SSR) ──────────────────
-    // Next.js embebe TODOS los datos de la página en un JSON gigante.
-    // Para RE/MAX, contiene listings con precio, m², fotos, etc.
+    // Extraer __NEXT_DATA__ si existe (Next.js)
     const nextDataMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i);
     if (nextDataMatch) {
       const rawJson = nextDataMatch[1].trim();
-      if (debug) console.log(`[DirectFetch] __NEXT_DATA__ encontrado: ${rawJson.length} chars`);
-
+      if (debug) console.log(`[DirectFetch] __NEXT_DATA__: ${rawJson.length} chars`);
       try {
         const nextData = JSON.parse(rawJson);
-        // Buscar el array de propiedades/listings en distintas rutas posibles
         const pageProps = nextData?.props?.pageProps || {};
-        const candidatos = [
-          pageProps.listings,
-          pageProps.properties,
-          pageProps.results,
-          pageProps.data?.listings,
-          pageProps.data?.properties,
-          pageProps.initialListings,
-          pageProps.agent?.listings,
-        ].filter(Boolean);
-
-        if (candidatos.length > 0) {
-          const listings = candidatos[0];
-          if (debug) console.log(`[DirectFetch] Listings encontrados en __NEXT_DATA__: ${Array.isArray(listings) ? listings.length : 'object'}`);
-          // Devolver el JSON de listings como texto estructurado
-          return `__NEXT_DATA__ listings:\n${JSON.stringify(listings, null, 2).slice(0, 120000)}`;
+        // Buscar el array de propiedades en rutas conocidas
+        for (const key of ['listings', 'properties', 'results', 'initialListings', 'data']) {
+          const val = pageProps[key] || pageProps.data?.[key] || pageProps.agent?.[key];
+          if (Array.isArray(val) && val.length > 0) {
+            if (debug) console.log(`[DirectFetch] __NEXT_DATA__.${key}: ${val.length} items`);
+            return { html, content: `__NEXT_DATA__ ${key}:\n${JSON.stringify(val, null, 2).slice(0, 120000)}` };
+          }
         }
-
-        // Si no encontramos listings directamente, devolver pageProps completo
-        if (debug) console.log('[DirectFetch] __NEXT_DATA__ sin array de listings obvio, usando pageProps');
-        return `__NEXT_DATA__:\n${JSON.stringify(pageProps, null, 2).slice(0, 80000)}`;
+        // Fallback: pageProps completo
+        return { html, content: `__NEXT_DATA__:\n${JSON.stringify(pageProps, null, 2).slice(0, 80000)}` };
       } catch {
-        // JSON inválido — usar el raw truncado
-        return `__NEXT_DATA__ (raw):\n${rawJson.slice(0, 80000)}`;
+        return { html, content: rawJson.slice(0, 80000) };
       }
     }
 
-    // ── Estrategia B: HTML limpio (para sitios SSR sin Next.js) ────────────
-    // Eliminamos ruido (scripts, estilos, nav, footer) y dejamos el contenido.
+    // Sin __NEXT_DATA__: HTML limpio (sin scripts/estilos/nav/footer)
     const cleanHtml = html
       .replace(/<script[\s\S]*?<\/script>/gi, '')
       .replace(/<style[\s\S]*?<\/style>/gi, '')
@@ -96,53 +160,41 @@ async function directFetch(url: string, debug = false): Promise<string | null> {
       .replace(/\s{3,}/g, '\n')
       .trim();
 
-    if (debug) console.log(`[DirectFetch] HTML limpio: ${cleanHtml.length} chars`);
-    return cleanHtml.slice(0, 100000);
+    return { html, content: cleanHtml.slice(0, 80000) };
 
   } catch (err: any) {
-    console.error(`[DirectFetch] Error: ${err.message}`);
+    if (debug) console.error(`[DirectFetch] Error: ${err.message}`);
     return null;
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Capa 2: Spider API (para SPAs que necesitan JS)
+// Capa 2: Spider — solo para descubrir links adicionales (no para contenido)
 // ─────────────────────────────────────────────────────────────────────────────
-async function spiderScrape(
-  url: string,
-  apiKey: string,
-  options: Record<string, unknown> = {},
-  debug = false
-): Promise<string | null> {
-  const response = await fetch('https://api.spider.cloud/scrape', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ url, ...options }),
-  });
-
-  if (!response.ok) {
-    console.error(`[Spider] HTTP ${response.status}`);
-    return null;
+async function spiderGetLinks(url: string, apiKey: string): Promise<string[]> {
+  try {
+    const response = await fetch('https://api.spider.cloud/scrape', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url,
+        return_format: 'markdown',
+        request: 'chrome',
+        execution_scripts: { [url]: LOAD_MORE_SCRIPT },
+        return_page_links: true,
+        stealth: true,
+      }),
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    const page = Array.isArray(data) ? data[0] : data;
+    if (!page || page.status === 0) return [];
+    const links: string[] = page.links || page.page_links || page.urls || [];
+    console.log(`[Spider] Links descubiertos: ${links.length}`);
+    return links;
+  } catch {
+    return [];
   }
-
-  const data = await response.json();
-  const page = Array.isArray(data) ? data[0] : data;
-
-  if (debug) {
-    console.log(`[Spider] Keys: ${Object.keys(page || {}).join(', ')}`);
-    console.log(`[Spider] status: ${page?.status}`);
-    console.log(`[Spider] Sample: ${JSON.stringify(page).slice(0, 400)}`);
-  }
-
-  if (!page || page.status === 0) return null;
-
-  const content = page.content || page.markdown || page.html || page.text || '';
-  if (debug) console.log(`[Spider] content: ${content.length} chars`);
-
-  return content || null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -150,63 +202,113 @@ async function spiderScrape(
 // ─────────────────────────────────────────────────────────────────────────────
 export async function ejecutarScrapingProfundo(
   url: string,
-  _maxProperties: number = 40
+  maxProperties: number = 40
 ): Promise<ScrapeResult> {
   const SPIDER_API_KEY = process.env.SPIDER_API_KEY;
 
   try {
     console.log(`[Scraper] Iniciando para: ${url}`);
 
-    // ── Capa 1: Fetch HTTP directo ────────────────────────────────────────────
-    console.log('[Scraper] Capa 1: fetch HTTP directo...');
-    let content = await directFetch(url, true);
-    const contentLen = content?.length ?? 0;
-    console.log(`[Scraper] Capa 1 resultado: ${contentLen} chars`);
+    // ── Fase 1: Obtener página principal y links ──────────────────────────────
+    const mainResult = await directFetch(url, true);
+    if (!mainResult) {
+      return { success: false, mainText: '', items: [], error: 'No se pudo acceder a la página' };
+    }
 
-    // ── Capa 2: Spider como fallback ──────────────────────────────────────────
-    if (contentLen < 500) {
-      if (!SPIDER_API_KEY) {
-        console.log('[Scraper] Sin SPIDER_API_KEY y Capa 1 insuficiente. Usando lo que hay.');
-      } else {
-        console.log('[Scraper] Capa 2: Spider (SPA fallback)...');
-        const spiderContent = await spiderScrape(url, SPIDER_API_KEY, {
-          return_format: 'markdown',
-          request: 'smart',
-          filter_output_main_only: false,
-          return_page_links: true,
-          stealth: true,
-        }, true);
+    const mainContent = mainResult.content;
+    const mainHtml = mainResult.html;
 
-        if (spiderContent && spiderContent.length > contentLen) {
-          content = spiderContent;
-          console.log(`[Scraper] Capa 2 resultado: ${content.length} chars`);
-        }
+    // Extraer links de propiedades del HTML
+    let propertyLinks = extraerLinksDeHtml(mainHtml, url);
+    console.log(`[Scraper] Links extraídos del HTML: ${propertyLinks.length}`);
+
+    // Si tenemos pocos links, intentar con Spider para descubrir más (click "ver más")
+    if (propertyLinks.length < 10 && SPIDER_API_KEY) {
+      console.log('[Scraper] Buscando más links con Spider...');
+      const spiderLinks = await spiderGetLinks(url, SPIDER_API_KEY);
+      const dominioOrigen = (() => { try { return new URL(url).hostname; } catch { return ''; } })();
+      const extraLinks = spiderLinks
+        .map(l => resolverUrl(l, url))
+        .filter(l => {
+          if (!l) return false;
+          try { return new URL(l).hostname === dominioOrigen; } catch { return false; }
+        })
+        .filter(esLinkDeDetalle)
+        .filter(l => !propertyLinks.includes(l));
+      if (extraLinks.length > 0) {
+        console.log(`[Scraper] Spider agregó ${extraLinks.length} links adicionales`);
+        propertyLinks = [...propertyLinks, ...extraLinks];
       }
     }
 
-    if (!content || content.length < 100) {
-      return {
-        success: false,
-        mainText: '',
-        items: [],
-        error: `No se pudo obtener contenido del sitio. El sitio puede requerir JavaScript avanzado o estar bloqueando el acceso.`,
-      };
+    propertyLinks = [...new Set(propertyLinks)].slice(0, maxProperties);
+    console.log(`[Scraper] Total links de propiedades: ${propertyLinks.length}`);
+
+    // ── Fase 2: directFetch de cada ficha individual ──────────────────────────
+    const fichas: Array<{ url: string; content: string }> = [];
+
+    if (propertyLinks.length > 0) {
+      console.log('[Scraper] Fetching fichas individuales...');
+      const CONCURRENCY = 3;
+
+      for (let i = 0; i < propertyLinks.length; i += CONCURRENCY) {
+        const chunk = propertyLinks.slice(i, i + CONCURRENCY);
+        const results = await Promise.all(chunk.map(async (link) => {
+          const result = await directFetch(link, false);
+          if (result && result.content.length > 200) {
+            return { url: link, content: result.content };
+          }
+          return null;
+        }));
+        const ok = results.filter(Boolean) as Array<{ url: string; content: string }>;
+        fichas.push(...ok);
+        console.log(`[Scraper] Bloque ${Math.ceil(i / CONCURRENCY) + 1}: ${ok.length}/${chunk.length} OK`);
+      }
     }
 
-    const fullText = [
-      `ORIGEN: ${url}`,
-      `CHARS_CAPTURADOS: ${content.length}`,
-      '',
-      '=== CONTENIDO ===',
-      content,
-    ].join('\n');
+    // ── Armar texto para el parser ────────────────────────────────────────────
+    // Si tenemos fichas individuales con datos completos, usarlas como fuente principal.
+    // El contenido de la página principal sirve como contexto general.
+    let fullText: string;
 
-    console.log(`[Scraper] Texto total para parser: ${fullText.length} chars`);
+    if (fichas.length > 0) {
+      const header = [
+        `ORIGEN: ${url}`,
+        `FICHAS_INDIVIDUALES: ${fichas.length}`,
+        `NOTA_IMAGENES_REMAX: El CDN base para fotos de RE/MAX es "https://d1acdg20u0pmxj.cloudfront.net/". Si encuentrás paths como "listings/UUID/UUID.jpg" construí la URL completa con ese prefijo.`,
+        '',
+        '=== CONTENIDO PÁGINA PRINCIPAL ===',
+        mainContent.slice(0, 8000),
+        '',
+        '=== FICHAS INDIVIDUALES (fuente principal de datos) ===',
+      ].join('\n');
+
+      const fichasText = fichas.map((f, i) => [
+        `--- PROPIEDAD ${i + 1} ---`,
+        `URL: ${f.url}`,
+        f.content.slice(0, 6000),
+        `--- FIN ${i + 1} ---`,
+      ].join('\n'));
+
+      fullText = header + '\n' + fichasText.join('\n\n');
+    } else {
+      // Sin fichas individuales: usar solo el contenido de la página principal
+      fullText = [
+        `ORIGEN: ${url}`,
+        `NOTA: Solo se pudo obtener la página principal (sin fichas individuales).`,
+        `NOTA_IMAGENES_REMAX: El CDN base para fotos de RE/MAX es "https://d1acdg20u0pmxj.cloudfront.net/". Si encuentrás paths como "listings/UUID/UUID.jpg" construí la URL completa.`,
+        '',
+        '=== CONTENIDO ===',
+        mainContent,
+      ].join('\n');
+    }
+
+    console.log(`[Scraper] Texto total: ${fullText.length} chars, ${fichas.length} fichas`);
 
     return {
       success: true,
       mainText: fullText,
-      items: [],
+      items: fichas.map(f => f.url),
     };
 
   } catch (error: any) {
