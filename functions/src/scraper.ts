@@ -19,7 +19,7 @@ const LOAD_MORE_SCRIPT = `
   const selectores = ['.remax-button', '.button-color-grey-border', '.ver-mas', '.load-more', '[class*="loadMore"]', '[class*="ver-mas"]'];
   for (let i = 0; i < 12; i++) {
     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-    await delay(1500);
+    await delay(1200);
     let btn = null;
     for (const s of selectores) {
       const el = document.querySelector(s);
@@ -27,10 +27,30 @@ const LOAD_MORE_SCRIPT = `
     }
     if (!btn) break;
     btn.click();
-    await delay(3000);
+    await delay(2500);
   }
-  window.scrollTo(0, document.body.scrollHeight);
-  await delay(1000);
+})();
+`;
+
+const DETAIL_EXTRACTION_SCRIPT = `
+(() => {
+  // Intentar expandir descripción
+  const expandBtn = document.querySelector('.remax-description__expand, [class*="description"] .ver-mas, button.expand');
+  if (expandBtn) expandBtn.click();
+
+  const data = {};
+  try {
+    // Intentar sacar de __NEXT_DATA__
+    if (window.__NEXT_DATA__) {
+      const d = window.__NEXT_DATA__.props?.pageProps?.listing || window.__NEXT_DATA__.props?.pageProps?.property;
+      if (d) Object.assign(data, d);
+    }
+    // Intentar sacar de la descripción del DOM si el JSON falla
+    data.domDescription = document.querySelector('.remax-description__content, [class*="description-text"], .property-description')?.innerText;
+    data.domPrice = document.querySelector('.remax-price, [class*="price-value"]')?.innerText;
+    data.domTitle = document.title;
+  } catch (e) {}
+  return JSON.stringify(data);
 })();
 `;
 
@@ -171,11 +191,11 @@ export async function ejecutarScrapingProfundo(
       url,
       limit: isDetail ? 1 : maxProperties + 5,
       depth: isDetail ? 0 : 1,
-      return_format: 'raw', // Usamos RAW para extraer JSON/Angular si está disponible
+      return_format: 'raw',
       request: 'chrome',
-      execution_scripts: isDetail ? {} : { [url]: LOAD_MORE_SCRIPT },
+      execution_scripts: { [url]: isDetail ? DETAIL_EXTRACTION_SCRIPT : LOAD_MORE_SCRIPT },
       filter_output: { only_main_content: true },
-      wait_for: 3000,
+      wait_for: 5000,
       metadata: true
     };
 
@@ -218,18 +238,38 @@ export async function ejecutarScrapingProfundo(
     // Procesar contenido
     const procesarPagina = (p: any) => {
       if (!p?.content) return '';
+      
+      let structuredFromScript = null;
+      // Si el script de ejecución devolvió JSON (estará en la respuesta de Spider si lo configuramos bien)
+      // Pero Spider devuelve el resultado de execution_scripts en un campo específico
+      if (p.execution_results && p.execution_results[url]) {
+        try {
+          const scriptData = JSON.parse(p.execution_results[url]);
+          if (scriptData.domDescription || scriptData.price) {
+             structuredFromScript = `Título: ${scriptData.domTitle || scriptData.title}\nDescripción: ${scriptData.domDescription || scriptData.description}\nPrecio: ${scriptData.domPrice || scriptData.price}\n`;
+          }
+        } catch (e) {}
+      }
+
       const estructurado = extraerCamposPropiedad(p.content);
-      if (estructurado) return estructurado;
       
-      // Fallback: limpiar HTML pero manteniendo más texto
-      let clean = p.content
-        .replace(/<script[\s\S]*?<\/script>/gi, '')
-        .replace(/<style[\s\S]*?<\/style>/gi, '')
-        .replace(/<[^>]+>/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
+      // Combinar o elegir el mejor
+      let finalData = estructurado || structuredFromScript || '';
       
-      return clean.slice(0, 15000); // Aumentamos el límite para no cortar descripción
+      if (!finalData) {
+        finalData = p.content
+          .replace(/<script[\s\S]*?<\/script>/gi, '')
+          .replace(/<style[\s\S]*?<\/style>/gi, '')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 20000);
+      } else if (structuredFromScript && estructurado) {
+        // Si tenemos ambos, nos aseguramos de que la descripción sea la más larga
+        if (structuredFromScript.length > estructurado.length) finalData = structuredFromScript + "\n" + estructurado;
+      }
+      
+      return finalData;
     };
 
     const mainContent = procesarPagina(mainPage);
