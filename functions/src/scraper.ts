@@ -266,8 +266,43 @@ export async function ejecutarScrapingProfundo(
     const fichasData: any[] = [];
     if (!isDetail && urlsAVisitar.length > 0) {
       console.log(`[Spider] Paso 2: Scrape profundo de ${urlsAVisitar.length} fichas concurrentemente...`);
-      const fetchPromises = urlsAVisitar.map((fichaUrl: string): Promise<any> => 
-        fetch('https://api.spider.cloud/scrape', {
+      const fetchPromises = urlsAVisitar.map((fichaUrl: string): Promise<any> => {
+        if (fichaUrl.includes('remax.com.ar/listings/')) {
+           // Fast-path nativo para RE/MAX (Evita timeout de Spider)
+           const slug = fichaUrl.split('/').pop();
+           return fetch(`https://api-ar.redremax.com/remaxweb-ar/api/listings/findBySlug/${slug}`, {
+               headers: { 'User-Agent': 'Mozilla/5.0' }
+           })
+           .then(r => r.json())
+           .then((d: any) => {
+               if (d?.data) {
+                   const priceStr = d.data.price ? `${d.data.currency?.value || 'USD'} ${d.data.price}` : '';
+                   const photoStr = d.data.photos?.[0]?.rawValue ? `https://d34z7eoap2mwnf.cloudfront.net/${d.data.photos[0].rawValue}` : '';
+                   
+                   const syntheticContent = `
+                     <div class="property-detail">
+                         <h1>${d.data.title || ''}</h1>
+                         <p>Precio: ${priceStr}</p>
+                         <p>SUPERFICIE_TOTAL: ${d.data.dimensionTotalBuilt || ''} m2</p>
+                         <p>SUPERFICIE_CUBIERTA: ${d.data.dimensionCovered || ''} m2</p>
+                         <p>CANTIDAD_BAÑOS: ${d.data.bathrooms || ''}</p>
+                         <p>Habitaciones: ${d.data.bedrooms || ''}</p>
+                         <p>Imagen Portada: ${photoStr}</p>
+                         <p>Descripción: ${d.data.description || ''}</p>
+                     </div>
+                   `;
+                   return { url: fichaUrl, page: { content: syntheticContent } };
+               }
+               return null;
+           })
+           .catch((e: any): null => {
+               console.warn(`[RE/MAX Native] Error en ficha ${fichaUrl}:`, e.message);
+               return null;
+           });
+        }
+
+        // Comportamiento genérico (Spider)
+        return fetch('https://api.spider.cloud/scrape', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${SPIDER_API_KEY}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -286,8 +321,8 @@ export async function ejecutarScrapingProfundo(
         .catch((e: any): null => {
             console.warn(`[Spider] Error scrapeando ficha ${fichaUrl}:`, e.message);
             return null;
-        })
-      );
+        });
+      });
       
       const results = await Promise.all(fetchPromises);
       for (const res of results) {
