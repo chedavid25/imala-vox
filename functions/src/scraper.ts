@@ -10,6 +10,15 @@ const CDN_REMAX = 'https://d1acdg20u0pmxj.cloudfront.net/';
 // ─────────────────────────────────────────────────────────────────────────────
 // RE/MAX API nativa — fetcha una propiedad por slug sin Spider
 // ─────────────────────────────────────────────────────────────────────────────
+const TIPO_MAP: Record<string, string> = {
+  departamento_piso: 'departamento', departamento: 'departamento',
+  casa: 'casa', chalet: 'casa', duplex: 'casa',
+  local_comercial: 'local', local: 'local',
+  oficina: 'oficina',
+  terreno: 'terreno', lote: 'terreno',
+  campo: 'campo', finca: 'campo',
+};
+
 async function fetchRemaxNativo(slug: string, originalUrl: string): Promise<string | null> {
   try {
     const res = await fetch(
@@ -24,34 +33,51 @@ async function fetchRemaxNativo(slug: string, originalUrl: string): Promise<stri
     const data = d?.data;
     if (!data) return null;
 
-    const photoUrls = (data.photos || []).slice(0, 3).map((p: any) => {
-      const raw = p.rawValue || p.url || p.path || (typeof p === 'string' ? p : '');
-      if (!raw) return '';
-      return raw.startsWith('http') ? raw : `${CDN_REMAX}${raw}`;
-    }).filter(Boolean);
+    // Fotos: usar photo.value (tiene extensión .jpg), no rawValue
+    const photoUrls = (data.photos || [])
+      .filter((p: any) => !p.is360)
+      .slice(0, 5)
+      .map((p: any) => {
+        const path = p.value || p.rawValue || '';
+        if (!path) return '';
+        return path.startsWith('http') ? path : `${CDN_REMAX}${path}`;
+      }).filter(Boolean);
+
+    // Dirección como título principal
+    const titulo = data.displayAddress || data.title || slug;
+
+    // Tipo y operación normalizados
+    const tipoRaw = (data.type?.value || '').toLowerCase();
+    const tipo = TIPO_MAP[tipoRaw] || 'otro';
+    const operacionRaw = (data.operation?.value || '').toLowerCase();
+    const operacion = operacionRaw === 'sale' ? 'venta' : operacionRaw === 'rent' ? 'alquiler' : 'venta';
+
+    // Localización desde geo
+    const barrio = data.geo?.neighborhood || null;
+    const localidad = data.geo?.citie || data.geo?.countie || null;
 
     const lines = [
       `URL: ${originalUrl}`,
-      data.title             && `Título: ${data.title}`,
-      data.price != null     && `PRECIO_VALOR: ${data.price}`,
-      data.price != null     && `Precio: ${data.price}`,
-      (data.currency?.value || data.currency) && `Moneda: ${data.currency?.value || data.currency || 'USD'}`,
-      data.description       && `Descripción: ${String(data.description).slice(0, 1000)}`,
-      data.dimensionTotalBuilt  != null && `m² totales: ${data.dimensionTotalBuilt}`,
-      data.dimensionCovered     != null && `m² cubiertos: ${data.dimensionCovered}`,
-      (data.environments ?? data.rooms) != null && `Ambientes: ${data.environments ?? data.rooms}`,
-      data.bedrooms          != null && `Dormitorios: ${data.bedrooms}`,
-      data.bathrooms         != null && `Baños: ${data.bathrooms}`,
-      data.garages           != null && `Cocheras: ${data.garages}`,
-      (data.neighborhood || data.barrio) && `Barrio: ${data.neighborhood || data.barrio}`,
-      (data.city || data.localidad)      && `Localidad: ${data.city || data.localidad}`,
-      (data.propertyType?.label || data.type) && `Tipo: ${data.propertyType?.label || data.type}`,
-      (data.operationType?.label || data.operation) && `Operación: ${data.operationType?.label || data.operation}`,
-      data.expenses != null  && `Expensas: ${data.expenses} ARS`,
-      photoUrls.length > 0   && `Fotos: ${photoUrls.join(' | ')}`,
+      `Título: ${titulo}`,
+      `Tipo: ${tipo}`,
+      `Operación: ${operacion}`,
+      data.price != null          && `PRECIO_VALOR: ${data.price}`,
+      data.price != null          && `Precio: ${data.price}`,
+      data.currency?.value        && `Moneda: ${data.currency.value}`,
+      data.dimensionTotalBuilt != null && `m² totales: ${data.dimensionTotalBuilt}`,
+      data.dimensionCovered    != null && `m² cubiertos: ${data.dimensionCovered}`,
+      data.totalRooms          != null && `Ambientes: ${data.totalRooms}`,
+      data.bedrooms            != null && `Dormitorios: ${data.bedrooms}`,
+      data.bathrooms           != null && `Baños: ${data.bathrooms}`,
+      data.parkingSpaces       != null && `Cocheras: ${data.parkingSpaces}`,
+      barrio                          && `Barrio: ${barrio}`,
+      localidad                       && `Localidad: ${localidad}`,
+      data.expensesPrice       != null && `Expensas: ${data.expensesPrice} ARS`,
+      photoUrls.length > 0            && `Fotos: ${photoUrls.join(' | ')}`,
+      data.description                && `Descripción: ${data.description}`,
     ].filter(Boolean).join('\n');
 
-    console.log(`[RE/MAX API] OK: ${slug} — precio:${data.price} fotos:${photoUrls.length}`);
+    console.log(`[RE/MAX API] OK: ${titulo} — precio:${data.price} fotos:${photoUrls.length}`);
     return lines;
   } catch (e: any) {
     console.error(`[RE/MAX API] Error: ${e.message}`);
