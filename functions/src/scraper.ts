@@ -107,7 +107,14 @@ function esLinkDeDetalle(href: string): boolean {
     try { return new URL(href).pathname.toLowerCase(); } catch { return ''; }
   })();
 
-  if (path.includes('/listings/')) return true;
+  if (path.includes('/listings/')) {
+    // Excluir endpoints de búsqueda tipo /listings/buy?page=... o /listings/map
+    if (href.includes('?')) return false;
+    const slug = path.split('/listings/')[1] || '';
+    const reservados = ['buy', 'sell', 'rent', 'map', 'search', 'list', 'filter'];
+    if (reservados.includes(slug.split('/')[0])) return false;
+    return true;
+  }
   if (path.includes('/p/') && /\/p\/\d+/.test(path)) return true;
   if (path.includes('/propiedad/')) return true;
   if (path.includes('/property/')) return true;
@@ -131,7 +138,8 @@ function esLinkDeDetalle(href: string): boolean {
 async function spiderScrape(
   url: string,
   apiKey: string,
-  options: Record<string, unknown> = {}
+  options: Record<string, unknown> = {},
+  debug = false
 ): Promise<{ content: string; links: string[]; url: string } | null> {
   const response = await fetch('https://api.spider.cloud/scrape', {
     method: 'POST',
@@ -144,12 +152,24 @@ async function spiderScrape(
 
   if (!response.ok) {
     const err = await response.text();
-    console.error(`[Spider] Error HTTP ${response.status} para ${url}: ${err.slice(0, 200)}`);
+    console.error(`[Spider] Error HTTP ${response.status} para ${url}: ${err.slice(0, 300)}`);
     return null;
   }
 
   const data = await response.json();
   const page = Array.isArray(data) ? data[0] : data;
+
+  if (debug) {
+    console.log(`[Spider] Raw response keys: ${Object.keys(page || {}).join(', ')}`);
+    console.log(`[Spider] status: ${page?.status}, content length: ${(page?.content || page?.markdown || page?.html || page?.text || '').length}`);
+    console.log(`[Spider] Sample: ${JSON.stringify(page).slice(0, 300)}`);
+  }
+
+  // Normalizar el campo de contenido — Spider puede usar distintos nombres
+  if (page && !page.content) {
+    page.content = page.markdown || page.html || page.text || '';
+  }
+
   return page ?? null;
 }
 
@@ -217,12 +237,13 @@ export async function ejecutarScrapingProfundo(
 
       for (let i = 0; i < detailLinks.length; i += CONCURRENCY) {
         const chunk = detailLinks.slice(i, i + CONCURRENCY);
+        const isFirstBlock = i === 0;
         const results = await Promise.all(chunk.map(async (link) => {
           const page = await spiderScrape(link, SPIDER_API_KEY, {
             return_format: 'markdown',
-            request: 'smart',
+            request: 'chrome',
             filter_output_main_only: true,
-          });
+          }, isFirstBlock);
           return (page?.content && page.content.length > 100)
             ? { url: link, content: page.content }
             : null;
