@@ -86,7 +86,10 @@ function extraerCamposPropiedad(html: string): string | null {
   const m2T = dataObj.totalArea ?? dataObj.totalSurface ?? dataObj.surface_total ?? dataObj.total_area ?? dataObj.dimensionTotalBuilt;
   const m2C = dataObj.coveredArea ?? dataObj.coveredSurface ?? dataObj.surface_covered ?? dataObj.covered_area ?? dataObj.dimensionCovered;
   if (m2T != null) lines.push(`m² totales: ${m2T}`);
-  if (m2C != null) lines.push(`m² cubiertos: ${m2C}`);
+  if (m2C != null) {
+    lines.push(`m² cubiertos: ${m2C}`);
+    lines.push(`SUPERFICIE_CUBIERTA: ${m2C}`); // Etiqueta extra para asegurar
+  }
 
   const amb = dataObj.environments ?? dataObj.rooms ?? dataObj.roomsValue;
   const dorm = dataObj.bedrooms ?? dataObj.bedRooms ?? dataObj.bedroomsValue ?? dataObj.habitaciones;
@@ -141,12 +144,22 @@ export async function ejecutarScrapingProfundo(
     if (!res.ok) throw new Error(`Spider error ${res.status}`);
     
     const rawData = await res.json();
-    const pages = Array.isArray(rawData) ? rawData : [rawData];
+    let pages: any[] = [];
+    if (Array.isArray(rawData)) {
+      pages = rawData;
+    } else if (typeof rawData === 'object' && rawData !== null) {
+      // Manejar el caso donde Spider devuelve un objeto con claves numéricas {"0": {...}}
+      pages = Object.values(rawData);
+    }
+    
+    if (pages.length === 0) throw new Error('Spider no devolvió contenido');
     console.log(`[Spider] Páginas obtenidas: ${pages.length}`);
 
     // Separar principal de fichas
     const mainPage = pages.find(p => p.url === url) || pages[0];
-    const fichas = pages.filter(p => p.url !== mainPage.url).slice(0, maxProperties);
+    const fichas = pages.filter(p => p.url !== mainPage.url)
+                        .filter(p => p.url && esLinkDeDetalle(p.url))
+                        .slice(0, maxProperties);
 
     // Procesar contenido
     const procesarPagina = (p: any) => {
