@@ -496,7 +496,6 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
     // para evitar dependencia de índice compuesto y tolerar cambios de canalId
     const convSnap = await convRef
       .where('contactoId', '==', contactoId)
-      .orderBy('ultimaActividad', 'desc')
       .limit(10)
       .get();
 
@@ -701,7 +700,6 @@ async function procesarMensajeWhatsapp(value: any, wabaId: string) {
     let convId = "";
     const convSnap = await convRef
       .where('contactoId', '==', contactoId)
-      .orderBy('ultimaActividad', 'desc')
       .limit(10)
       .get();
 
