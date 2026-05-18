@@ -1048,7 +1048,7 @@ export default function DifusionPage() {
                   <div className="grid grid-cols-2 gap-5">
                     <div className="space-y-3">
                       <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Cuenta de Instagram</Label>
-                      <Select value={newTrigger.canalId} onValueChange={v => setNewTrigger({...newTrigger, canalId: v})}>
+                      <Select value={newTrigger.canalId} onValueChange={v => setNewTrigger({...newTrigger, canalId: v ?? ""})}>
                         <SelectTrigger className="h-14 rounded-2xl bg-slate-50 border-slate-200 font-bold shadow-sm focus:bg-white transition-all hover:bg-slate-100">
                           <SelectValue placeholder={canalesIG.length === 0 ? "Sin cuentas conectadas" : "Seleccioná una cuenta"} />
                         </SelectTrigger>
