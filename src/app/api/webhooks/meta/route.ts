@@ -39,8 +39,11 @@ export async function POST(request: NextRequest) {
 
     // 1. Verificar firma HMAC (X-Hub-Signature-256)
     const signature = request.headers.get('x-hub-signature-256');
-    const appSecret = process.env.META_APP_SECRET || '';
-    
+    const isInstagramEvent = !!request.headers.get('instagram-api-version');
+    const appSecret = (isInstagramEvent
+      ? process.env.META_INSTAGRAM_APP_SECRET
+      : process.env.META_APP_SECRET) || '';
+
     if (signature && appSecret) {
       const expectedSignature = crypto
         .createHmac('sha256', appSecret)
@@ -49,7 +52,7 @@ export async function POST(request: NextRequest) {
 
       if (signature !== `sha256=${expectedSignature}`) {
         console.warn('⚠️ Firma de webhook no coincide');
-        
+
         // En producción, rechazamos con 403 si la firma no es válida
         if (process.env.NODE_ENV === 'production') {
           return new NextResponse('Invalid signature', { status: 403 });
