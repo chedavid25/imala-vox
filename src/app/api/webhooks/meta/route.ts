@@ -80,11 +80,15 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Soporte para Leads (Formularios)
+        // Soporte para Leads (Formularios) y Comentarios de Instagram
         for (const change of entry.changes || []) {
           if (change.field === 'leadgen') {
             console.log(`🎯 Lead Detectado para pageId: ${pageId}. Lead ID: ${change.value.leadgen_id}`);
             await procesarLeadMeta(change.value, pageId);
+          }
+          if (change.field === 'comments') {
+            console.log(`💬 Comentario Instagram detectado en pageId: ${pageId}`);
+            await procesarComentarioInstagram(change.value, pageId);
           }
         }
       }
@@ -862,5 +866,121 @@ async function isAIBlockedForContact(wsId: string, contactoData: any) {
   } catch (error) {
     console.error("Error verificando bloqueo en cascada:", error);
     return false; // Ante la duda, permitimos (o podrías bloquear por seguridad)
+  }
+}
+
+/**
+ * Procesa comentarios de Instagram y dispara las automatizaciones configuradas.
+ * Busca triggers activos que coincidan con la palabra clave (case-insensitive).
+ */
+async function procesarComentarioInstagram(commentData: any, pageId: string) {
+  try {
+    const commenterId = commentData.from?.id;
+    const commentText: string = commentData.message || commentData.text || '';
+    const commentId = commentData.id;
+
+    if (!commenterId || !commentText.trim()) return;
+
+    // Buscar canal Instagram por metaInstagramId o metaPageId
+    let wsQuery = await adminDb
+      .collectionGroup(COLLECTIONS.CANALES)
+      .where('metaInstagramId', '==', pageId)
+      .where('tipo', '==', 'instagram')
+      .where('status', '==', 'connected')
+      .limit(1).get();
+
+    if (wsQuery.empty) {
+      wsQuery = await adminDb
+        .collectionGroup(COLLECTIONS.CANALES)
+        .where('metaPageId', '==', pageId)
+        .where('tipo', '==', 'instagram')
+        .where('status', '==', 'connected')
+        .limit(1).get();
+    }
+
+    if (wsQuery.empty) {
+      console.warn(`[ig-comment] Canal Instagram no encontrado para pageId ${pageId}`);
+      return;
+    }
+
+    const canalDoc = wsQuery.docs[0];
+    const canalId = canalDoc.id;
+    const wsId = canalDoc.ref.parent.parent!.id;
+
+    const secretSnap = await adminDb
+      .doc(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CANALES}/${canalId}/secrets/config`)
+      .get();
+    const accessToken = secretSnap.data()?.metaAccessToken;
+    if (!accessToken) {
+      console.warn(`[ig-comment] Sin access token para canal ${canalId}`);
+      return;
+    }
+
+    // Obtener triggers activos del workspace
+    const triggersSnap = await adminDb
+      .collection(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.AUTODISPARADORES}`)
+      .where('tipo', '==', 'instagram_comment')
+      .where('activo', '==', true)
+      .get();
+
+    if (triggersSnap.empty) return;
+
+    const textNorm = commentText.trim().toUpperCase();
+
+    for (const triggerDoc of triggersSnap.docs) {
+      const trigger = triggerDoc.data();
+      const keyword = (trigger.config.palabraClave || '').trim().toUpperCase();
+
+      if (!keyword) continue;
+
+      // Si el trigger tiene canalId, verificar que coincida
+      if (trigger.config.canalId && trigger.config.canalId !== canalId) continue;
+
+      // Detección case-insensitive: el comentario contiene la palabra clave
+      if (!textNorm.includes(keyword)) continue;
+
+      console.log(`[ig-comment] ✅ Keyword "${keyword}" detectada — disparando trigger "${trigger.nombre}"`);
+
+      // 1. Respuesta pública al comentario
+      if (trigger.config.respuestaPublica) {
+        try {
+          await fetch(`https://graph.facebook.com/v19.0/${commentId}/replies`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: trigger.config.respuestaPublica,
+              access_token: accessToken,
+            }),
+          });
+        } catch (e) {
+          console.error('[ig-comment] Error enviando respuesta pública:', e);
+        }
+      }
+
+      // 2. Mensaje directo (DM) al usuario
+      if (trigger.config.respuestaDM) {
+        try {
+          await fetch(`https://graph.facebook.com/v19.0/me/messages`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              recipient: { id: commenterId },
+              message: { text: trigger.config.respuestaDM },
+              messaging_type: 'RESPONSE',
+            }),
+          });
+        } catch (e) {
+          console.error('[ig-comment] Error enviando DM:', e);
+        }
+      }
+
+      // Solo dispara el primer trigger que coincida
+      break;
+    }
+  } catch (err) {
+    console.error('[ig-comment] Error procesando comentario:', err);
   }
 }

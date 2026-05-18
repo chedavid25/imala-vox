@@ -36,15 +36,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Contacto, EtiquetaCRM, CategoriaCRM, COLLECTIONS } from "@/lib/types/firestore";
-import { 
-  Shield, 
-  ShieldOff, 
-  MoreHorizontal, 
-  Trash2, 
+import {
+  Shield,
+  ShieldOff,
+  MoreHorizontal,
+  Trash2,
   Loader2,
   Check,
   X,
-  Plus
+  Plus,
+  BellOff
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
@@ -263,16 +264,22 @@ export function ContactTable({ contactos, tags, categories }: ContactTableProps)
                   </div>
                 </TableCell>
                 <TableCell className="py-4">
-                  <div className="flex flex-col">
+                  <div className="flex flex-col gap-1">
                     <span className="text-[13px] font-semibold text-[var(--text-primary-light)]">{contacto.nombre}</span>
                     <div onClick={(e) => e.stopPropagation()}>
-                      <PhoneActionMenu 
-                        phoneNumber={contacto.telefono} 
-                        contactoId={contacto.id} 
-                        nombre={contacto.nombre} 
+                      <PhoneActionMenu
+                        phoneNumber={contacto.telefono}
+                        contactoId={contacto.id}
+                        nombre={contacto.nombre}
                         className="text-[11px] text-[var(--text-tertiary-light)] font-medium"
                       />
                     </div>
+                    {contacto.optOut && (
+                      <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-orange-50 border border-orange-200 text-[9px] font-black text-orange-500 tracking-wider w-fit">
+                        <BellOff className="size-2.5" />
+                        SIN DIFUSIÓN
+                      </div>
+                    )}
                   </div>
                 </TableCell>
                 

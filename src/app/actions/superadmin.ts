@@ -175,6 +175,8 @@ export async function obtenerEventosGlobales() {
 export async function cambiarPlanManual(wsId: string, plan: string) {
   await adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}`).update({
     plan,
+    estado: 'activo',
+    'facturacion.planPendiente': null,
     actualizadoEl: Timestamp.now()
   });
   return { success: true };

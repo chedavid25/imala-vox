@@ -10,6 +10,7 @@ import {
   Mail,
   ShieldAlert,
   RefreshCw,
+  CreditCard,
 } from "lucide-react";
 import { 
   Table, 
@@ -22,13 +23,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { obtenerMetricasSuperAdmin, bloquearWorkspace, extenderPrueba } from "@/app/actions/superadmin";
+import { obtenerMetricasSuperAdmin, bloquearWorkspace, extenderPrueba, cambiarPlanManual } from "@/app/actions/superadmin";
 import { sincronizarSuscripcionMP } from "@/app/actions/billing";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -85,6 +87,13 @@ export default function EspaciosAdminPage() {
       toast.success(`Prueba extendida ${dias} días`);
       load();
     }
+  };
+
+  const handleCambiarPlan = async (id: string, plan: 'starter' | 'pro' | 'agencia', nombre: string) => {
+    if (!confirm(`¿Cambiar ${nombre} al plan ${plan.toUpperCase()}? Esto activa el workspace y borra cualquier pago pendiente.`)) return;
+    await cambiarPlanManual(id, plan);
+    toast.success(`Plan ${plan} asignado a ${nombre}`);
+    load();
   };
 
   const handleSincronizarMP = async (id: string, nombre: string) => {
@@ -219,6 +228,25 @@ export default function EspaciosAdminPage() {
                            <RefreshCw className="size-4" />
                            <span className="text-sm font-bold">Sincronizar con MP</span>
                          </DropdownMenuItem>
+                         <DropdownMenuSeparator className="bg-white/5 my-1" />
+                         <p className="text-[9px] font-black text-white/30 uppercase tracking-widest px-4 py-1">Asignar Plan Manual</p>
+                         {(['starter', 'pro', 'agencia'] as const).map(plan => (
+                           <DropdownMenuItem
+                             key={plan}
+                             className={cn(
+                               "gap-3 px-4 py-2.5 rounded-xl cursor-pointer text-sm font-bold",
+                               ws.plan === plan
+                                 ? "text-[var(--accent)] bg-[var(--accent)]/10"
+                                 : "text-white/70 hover:bg-white/10"
+                             )}
+                             onClick={() => handleCambiarPlan(ws.id, plan, ws.nombre)}
+                           >
+                             <CreditCard className="size-4" />
+                             <span className="capitalize">{plan}</span>
+                             {ws.plan === plan && <span className="ml-auto text-[9px] font-black text-[var(--accent)] uppercase tracking-widest">Actual</span>}
+                           </DropdownMenuItem>
+                         ))}
+                         <DropdownMenuSeparator className="bg-white/5 my-1" />
                          <DropdownMenuItem className="gap-3 px-4 py-3 rounded-xl hover:bg-rose-500/20 text-rose-400 cursor-pointer" onClick={() => handleBloquear(ws.id)}>
                             <ShieldAlert className="size-4" />
                             <span className="text-sm font-bold">Bloquear Acceso</span>

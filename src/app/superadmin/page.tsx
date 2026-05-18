@@ -88,7 +88,7 @@ export default function SuperAdminPage() {
         {/* GROWTH CHART PLACEHOLDER / SUMMARY */}
         <Card className="lg:col-span-2 bg-black/40 border-white/5 rounded-[2.5rem] p-4">
           <CardHeader className="p-6">
-            <CardTitle className="text-xl font-bold flex items-center gap-3">
+            <CardTitle className="text-xl font-bold flex items-center gap-3 text-white">
               <TrendingUp className="size-5 text-[var(--accent)]" />
               Proyección de Crecimiento Anual (ARR)
             </CardTitle>
@@ -107,7 +107,7 @@ export default function SuperAdminPage() {
         {/* DISTRIBUTION BY PLAN */}
         <Card className="bg-black/40 border-white/5 rounded-[2.5rem] p-4">
           <CardHeader className="p-6">
-            <CardTitle className="text-xl font-bold flex items-center gap-3">
+            <CardTitle className="text-xl font-bold flex items-center gap-3 text-white">
               <Briefcase className="size-5 text-[var(--accent)]" />
               Distribución de Planes
             </CardTitle>

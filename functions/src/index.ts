@@ -1,5 +1,6 @@
 import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
+import * as crypto from "crypto";
 import {
   procesarConIA,
   enviarMensajeWhatsApp,
@@ -153,6 +154,17 @@ export const recibirMensajeWhatsApp = functions.https.onRequest(async (req: func
           // ── 1. Obtener o crear contacto ──
           const contactoDoc = await obtenerOCrearContacto(workspaceId, from);
           const contactoData = contactoDoc.data()!;
+
+          // ── 1b. Opt-out de difusión ──
+          const msgUpper = text.trim().toUpperCase();
+          if (msgUpper === 'SALIR' || msgUpper === 'STOP') {
+            await contactoDoc.ref.update({
+              optOut: true,
+              actualizadoEl: admin.firestore.FieldValue.serverTimestamp()
+            });
+            console.log(`📵 Opt-out registrado para ${from}`);
+            res.sendStatus(200); return;
+          }
 
           // ── 2. Verificar aiBlocked ──
           if (contactoData.aiBlocked === true) {
@@ -740,4 +752,285 @@ export const cronVerificarPruebasYSuscripciones = functions.pubsub.schedule('0 0
 
     await batch.commit();
     console.log(`Limpieza diaria: ${pruebasVencidas.size} pruebas vencidas, ${suscVencidas.size} pagos vencidos.`);
+
   });
+
+/**
+ * procesarCampañaDifusion
+ * Disparador: Firestore onUpdate — cuando estado cambia a 'en_progreso'
+ * Responsabilidad: Envía la plantilla WA a cada contacto filtrado con modo goteo.
+ */
+export const procesarCampanaDifusion = functions
+  .runWith({ timeoutSeconds: 540, memory: "512MB" })
+  .firestore.document("espaciosDeTrabajo/{wsId}/difusiones/{campanaId}")
+  .onUpdate(async (change, context) => {
+    const before = change.before.data();
+    const after = change.after.data();
+
+    if (before.estado === after.estado || after.estado !== "en_progreso") return;
+
+    const { wsId, campanaId } = context.params;
+    const db = admin.firestore();
+    const campanaRef = change.after.ref;
+
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+    try {
+      // ── 1. Plantilla ──
+      const plantillaSnap = await db
+        .doc(`espaciosDeTrabajo/${wsId}/plantillasMeta/${after.plantillaId}`)
+        .get();
+      if (!plantillaSnap.exists) throw new Error("Plantilla no encontrada");
+      const plantilla = plantillaSnap.data()!;
+
+      const bodyText =
+        (plantilla.componentes as any[]).find((c: any) => c.type === "BODY")?.text || "";
+      const rawNums: number[] = (bodyText.match(/\{\{(\d+)\}\}/g) || []).map(
+        (m: string) => parseInt(m.replace(/[{}]/g, ""), 10)
+      );
+      const varNums: number[] = [...new Set<number>(rawNums)].sort((a, b) => a - b);
+      const maxVar = varNums.length > 0 ? Math.max(...varNums) : 0;
+
+      // ── 2. Canal WhatsApp conectado ──
+      const canalesSnap = await db
+        .collection(`espaciosDeTrabajo/${wsId}/canales`)
+        .where("tipo", "==", "whatsapp")
+        .where("status", "==", "connected")
+        .limit(1)
+        .get();
+      if (canalesSnap.empty) throw new Error("No hay canal WhatsApp conectado");
+
+      const canalDoc = canalesSnap.docs[0];
+      const canalData = canalDoc.data();
+      const canalId = canalDoc.id;
+      const phoneNumberId = canalData.metaPhoneNumberId;
+      if (!phoneNumberId) throw new Error("Phone Number ID no configurado en el canal");
+
+      // ── 3. Token ──
+      const secretSnap = await db
+        .doc(`espaciosDeTrabajo/${wsId}/canales/${canalId}/secrets/config`)
+        .get();
+      if (!secretSnap.exists) throw new Error("Credenciales del canal no encontradas");
+      const { metaAccessToken } = secretSnap.data() as any;
+
+      // ── 4. Contactos ──
+      const contactosSnap = await db
+        .collection(`espaciosDeTrabajo/${wsId}/contactos`)
+        .get();
+      let contactos = contactosSnap.docs
+        .map((d) => ({ id: d.id, ...(d.data() as any) }))
+        .filter((c) => !!c.telefono && !c.optOut);
+
+      if (after.filtroEtiquetas && after.filtroEtiquetas.length > 0) {
+        contactos = contactos.filter(
+          (c) =>
+            Array.isArray(c.etiquetas) &&
+            after.filtroEtiquetas.some((tagId: string) => c.etiquetas.includes(tagId))
+        );
+      }
+
+      await campanaRef.update({ "estadisticas.total": contactos.length });
+      console.log(`[difusion] Campaña ${campanaId} → ${contactos.length} contactos`);
+
+      // ── 5. Envío con goteo ──
+      let enviados = 0;
+      let fallidos = 0;
+
+      for (const contacto of contactos) {
+        try {
+          // Construir variables en orden posicional
+          const variables: string[] = [];
+          for (let i = 1; i <= maxVar; i++) {
+            variables.push(i === 1 ? contacto.nombre || "" : after.variableValues?.[String(i)] || "");
+          }
+
+          // Normalizar número argentino (igual que enviarPlantillaWA)
+          let dest: string = contacto.telefono.replace(/\D/g, "");
+          if (dest.length === 10) dest = `549${dest}`;
+          if (dest.startsWith("549") && dest.length === 13) {
+            const rest = dest.substring(3);
+            const areaLen = rest.startsWith("11") ? 2 : 3;
+            dest = `54${rest.substring(0, areaLen)}15${rest.substring(areaLen)}`;
+          }
+
+          const bodyParameters = variables.map((v) => ({ type: "text", text: v }));
+          const payload: any = {
+            messaging_product: "whatsapp",
+            to: dest,
+            type: "template",
+            template: {
+              name: plantilla.nombre,
+              language: { code: plantilla.idioma || "es_AR" },
+              ...(bodyParameters.length > 0 && {
+                components: [{ type: "body", parameters: bodyParameters }],
+              }),
+            },
+          };
+
+          const res = await fetch(
+            `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`,
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${metaAccessToken}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(payload),
+            }
+          );
+
+          const data = await res.json();
+          if (res.ok) {
+            enviados++;
+            await campanaRef.update({ "estadisticas.enviados": enviados });
+          } else {
+            console.warn(`[difusion] Error para ${dest}:`, data.error?.message);
+            fallidos++;
+            await campanaRef.update({ "estadisticas.fallidos": fallidos });
+          }
+        } catch (err) {
+          console.error(`[difusion] Error contacto ${contacto.id}:`, err);
+          fallidos++;
+          await campanaRef.update({ "estadisticas.fallidos": fallidos });
+        }
+
+        // Goteo: 2–5 segundos aleatorios entre mensajes
+        await sleep(2000 + Math.random() * 3000);
+      }
+
+      // ── 6. Finalizar ──
+      await campanaRef.update({
+        estado: "completada",
+        actualizadoEl: admin.firestore.Timestamp.now(),
+      });
+      console.log(`[difusion] ${campanaId} completada — ${enviados} ok, ${fallidos} fallidos`);
+    } catch (error: any) {
+      console.error(`[difusion] Error fatal en ${campanaId}:`, error.message);
+      await campanaRef.update({
+        estado: "error",
+        "metadata.errorMsg": error.message,
+        actualizadoEl: admin.firestore.Timestamp.now(),
+      });
+    }
+  });
+
+/**
+ * mercadopagoWebhook
+ * Disparador: HTTP POST (Webhook de MercadoPago)
+ * Responsabilidad: Recibe notificaciones de suscripción y activa el plan automáticamente.
+ * Registrar en: https://www.mercadopago.com.ar/developers/panel/webhooks
+ */
+export const mercadopagoWebhook = functions.https.onRequest(async (req, res) => {
+  if (req.method !== "POST") {
+    res.sendStatus(405);
+    return;
+  }
+
+  // Validar firma HMAC-SHA256 si está configurado el secret
+  const signature = req.headers["x-signature"] as string | undefined;
+  const requestId = req.headers["x-request-id"] as string | undefined;
+  const webhookSecret = process.env.MP_WEBHOOK_SECRET;
+
+  if (webhookSecret && signature) {
+    const ts = signature.split(",").find((p) => p.startsWith("ts="))?.split("=")[1];
+    const v1 = signature.split(",").find((p) => p.startsWith("v1="))?.split("=")[1];
+    const resourceId = req.body?.data?.id;
+    const manifest = `id:${resourceId};request-id:${requestId};ts:${ts};`;
+    const expected = crypto.createHmac("sha256", webhookSecret).update(manifest).digest("hex");
+
+    if (expected !== v1) {
+      console.warn("[mp-webhook] Firma inválida — request rechazado");
+      res.sendStatus(401);
+      return;
+    }
+  }
+
+  // Responder 200 inmediatamente (MP requiere respuesta en < 5s)
+  res.sendStatus(200);
+
+  const { type, data } = req.body || {};
+  if (type !== "preapproval" || !data?.id) return;
+
+  const preapprovalId = String(data.id);
+  const db = admin.firestore();
+  const accessToken = process.env.MP_ACCESS_TOKEN;
+
+  if (!accessToken) {
+    console.error("[mp-webhook] MP_ACCESS_TOKEN no configurado");
+    return;
+  }
+
+  try {
+    // 1. Consultar estado actualizado en MP
+    const mpRes = await fetch(`https://api.mercadopago.com/preapproval/${preapprovalId}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!mpRes.ok) {
+      console.error(`[mp-webhook] Error MP API ${mpRes.status} para ${preapprovalId}`);
+      return;
+    }
+    const suscripcion = await mpRes.json();
+    console.log(`[mp-webhook] preapproval ${preapprovalId} → status: ${suscripcion.status}`);
+
+    // 2. Buscar workspace con esta suscripción
+    const wsSnap = await db
+      .collection("espaciosDeTrabajo")
+      .where("facturacion.mpSuscripcionId", "==", preapprovalId)
+      .limit(1)
+      .get();
+
+    if (wsSnap.empty) {
+      console.warn(`[mp-webhook] Sin workspace para preapproval ${preapprovalId}`);
+      return;
+    }
+
+    const wsDoc = wsSnap.docs[0];
+    const ws = wsDoc.data();
+
+    // 3. Mapear estado MP → estado interno
+    const estadoMap: Record<string, string> = {
+      authorized: "activo",
+      paused:     "pago_vencido",
+      cancelled:  "cancelado",
+      pending:    "prueba",
+    };
+    const nuevoEstado = estadoMap[suscripcion.status] || "pago_vencido";
+    const ciclo = ws.facturacion?.ciclo || "mensual";
+
+    const periodoHasta = new Date();
+    if (ciclo === "anual") periodoHasta.setFullYear(periodoHasta.getFullYear() + 1);
+    else periodoHasta.setMonth(periodoHasta.getMonth() + 1);
+
+    const updates: Record<string, any> = {
+      estado: nuevoEstado,
+      periodoVigenteHasta: admin.firestore.Timestamp.fromDate(periodoHasta),
+      actualizadoEl: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    // 4. Si el pago se confirmó y hay un plan pendiente, activarlo
+    if (nuevoEstado === "activo" && ws.facturacion?.planPendiente) {
+      const planPend = ws.facturacion.planPendiente as string;
+      updates.plan = planPend;
+      updates["facturacion.planPendiente"] = null;
+      updates["facturacion.precioARS"] = suscripcion.auto_recurring?.transaction_amount || 0;
+      updates["facturacion.precioFijadoEl"] = admin.firestore.FieldValue.serverTimestamp();
+    }
+
+    await wsDoc.ref.update(updates);
+
+    if (nuevoEstado === "activo" && updates.plan) {
+      await wsDoc.ref.collection("notificaciones").add({
+        tipo: "info",
+        titulo: "Pago confirmado",
+        mensaje: `Tu plan ${updates.plan} está activo. ¡Gracias!`,
+        visto: false,
+        creadoEl: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      console.log(`[mp-webhook] ✅ Plan ${updates.plan} activado para workspace ${wsDoc.id}`);
+    } else {
+      console.log(`[mp-webhook] Workspace ${wsDoc.id} → estado: ${nuevoEstado}`);
+    }
+  } catch (err) {
+    console.error("[mp-webhook] Error procesando notificación:", err);
+  }
+});

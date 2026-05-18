@@ -36,7 +36,11 @@ import {
   ChevronDown,
   ArrowRight,
   Sparkles,
-  Command
+  Command,
+  Loader2,
+  PlayCircle,
+  XCircle,
+  AlertTriangle
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -70,13 +74,15 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { collection, onSnapshot, query, orderBy, addDoc, serverTimestamp, deleteDoc, doc, updateDoc, Timestamp } from "firebase/firestore";
+import { despacharCampaña, cancelarCampaña } from "@/app/actions/difusion";
 import { db } from "@/lib/firebase";
-import { COLLECTIONS, PlantillaMeta, CampañaDifusion, DisparadorAuto, EtiquetaCRM, Contacto } from "@/lib/types/firestore";
+import { COLLECTIONS, PlantillaMeta, CampañaDifusion, DisparadorAuto, EtiquetaCRM, Contacto, Canal } from "@/lib/types/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { PlanGate } from "@/components/layout/PlanGate";
+
 
 export default function DifusionPage() {
   const { currentWorkspaceId } = useWorkspaceStore();
@@ -87,6 +93,7 @@ export default function DifusionPage() {
   const [isCreatingCampaign, setIsCreatingCampaign] = useState(false);
   const [campaignStep, setCampaignStep] = useState(1);
   const [showHelp, setShowHelp] = useState<string | null>(null);
+  const templateBodyRef = React.useRef<HTMLTextAreaElement>(null);
 
   // Estados de datos
   const [plantillas, setPlantillas] = useState<(PlantillaMeta & { id: string })[]>([]);
@@ -112,14 +119,16 @@ export default function DifusionPage() {
     idioma: "es_AR",
     header: { type: "NONE", text: "" },
     body: "Hola {{1}}! Te escribimos de Imalá Vox para...",
-    footer: "Escribe SALIR para no recibir más mensajes.",
+    footer: "Respondé SALIR para no recibir más mensajes.",
     buttons: [] as any[]
   });
 
   // Estado para nuevo disparador
+  const [canalesIG, setCanalesIG] = useState<(Canal & { id: string })[]>([]);
   const [newTrigger, setNewTrigger] = useState({
     nombre: "",
     tipo: "instagram_comment",
+    canalId: "",
     palabraClave: "",
     respuestaPublica: "¡Hola! Te enviamos la info por mensaje privado 📩",
     respuestaDM: "¡Hola! Gracias por tu interés. Aquí tienes la información que solicitaste...",
@@ -158,12 +167,22 @@ export default function DifusionPage() {
       (snap) => setContactos(snap.docs.map(d => ({ ...d.data(), id: d.id })) as any)
     );
 
+    const unsubCanalesIG = onSnapshot(
+      query(collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CANALES)),
+      (snap) => setCanalesIG(
+        snap.docs
+          .map(d => ({ ...d.data(), id: d.id }) as Canal & { id: string })
+          .filter(c => c.tipo === 'instagram' && c.status === 'connected')
+      )
+    );
+
     return () => {
       unsubPlantillas();
       unsubCampanas();
       unsubTriggers();
       unsubEtiquetas();
       unsubContactos();
+      unsubCanalesIG();
     };
   }, [currentWorkspaceId]);
 
@@ -206,7 +225,7 @@ export default function DifusionPage() {
       const componentes = [];
       if (newTemplate.header.type !== 'NONE') componentes.push({ type: 'HEADER', format: newTemplate.header.type, text: newTemplate.header.text });
       componentes.push({ type: 'BODY', text: newTemplate.body });
-      if (newTemplate.footer) componentes.push({ type: 'FOOTER', text: newTemplate.footer });
+      componentes.push({ type: 'FOOTER', text: "Respondé SALIR para no recibir más mensajes." });
       if (newTemplate.buttons.length > 0) componentes.push({ type: 'BUTTONS', buttons: newTemplate.buttons });
 
       await addDoc(collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId!, COLLECTIONS.PLANTILLAS_META), {
@@ -237,6 +256,7 @@ export default function DifusionPage() {
         activo: newTrigger.activo,
         config: {
           palabraClave: newTrigger.palabraClave.toUpperCase(),
+          canalId: newTrigger.canalId || null,
           respuestaPublica: newTrigger.respuestaPublica,
           respuestaDM: newTrigger.respuestaDM,
           aplicarATodosPosts: true
@@ -263,6 +283,19 @@ export default function DifusionPage() {
       await deleteDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId!, COLLECTIONS.AUTODISPARADORES, id));
       toast.success("Disparador eliminado");
     } catch (e) { toast.error("Error al eliminar"); }
+  };
+
+  const insertVariable = (tag: string) => {
+    const el = templateBodyRef.current;
+    if (!el) return;
+    const start = el.selectionStart ?? newTemplate.body.length;
+    const end = el.selectionEnd ?? newTemplate.body.length;
+    const newBody = newTemplate.body.slice(0, start) + tag + newTemplate.body.slice(end);
+    setNewTemplate(prev => ({ ...prev, body: newBody }));
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(start + tag.length, start + tag.length);
+    }, 0);
   };
 
   // Contenido de ayuda
@@ -347,144 +380,234 @@ export default function DifusionPage() {
             <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", showHelp === "general" && "rotate-180")} />
           </button>
 
-          <Dialog open={isCreatingCampaign} onOpenChange={setIsCreatingCampaign}>
+          <Dialog open={isCreatingCampaign} onOpenChange={v => { setIsCreatingCampaign(v); if (!v) setCampaignStep(1); }}>
             <DialogTrigger className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-11 px-6 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-[var(--accent)]/20 transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center">
               <Plus className="w-4 h-4 mr-2" />
               Nueva Campaña
             </DialogTrigger>
-            <DialogContent className="max-w-4xl bg-white border-none rounded-[40px] p-0 overflow-hidden flex flex-col h-[80vh] shadow-2xl">
-              <DialogHeader className="p-8 border-b border-[var(--border-light)] shrink-0 bg-slate-50/30">
+            <DialogContent className="max-w-4xl bg-white border-none rounded-[40px] p-0 overflow-hidden flex flex-col h-[85vh] shadow-2xl">
+              {/* Header del wizard */}
+              <DialogHeader className="px-10 pt-8 pb-6 border-b border-[var(--border-light)] shrink-0 bg-slate-50/30">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <DialogTitle className="text-2xl font-bold tracking-tight">Crear Campaña de Difusión</DialogTitle>
-                    <DialogDescription className="font-medium">Llega a tus clientes de forma masiva en 3 pasos.</DialogDescription>
+                  <div className="space-y-0.5">
+                    <DialogTitle className="text-xl font-black tracking-tight">Crear Campaña de Difusión</DialogTitle>
+                    <DialogDescription className="font-medium">
+                      {campaignStep === 1 && "Paso 1 de 3 — Elegí el nombre y la audiencia"}
+                      {campaignStep === 2 && "Paso 2 de 3 — Seleccioná la plantilla de mensaje"}
+                      {campaignStep === 3 && "Paso 3 de 3 — Programá el envío"}
+                    </DialogDescription>
                   </div>
                   <div className="flex items-center gap-2">
                     {[1, 2, 3].map(s => (
-                      <div key={s} className={cn("w-2.5 h-2.5 rounded-full transition-all duration-300", campaignStep >= s ? "bg-[var(--accent)] scale-110 shadow-[0_0_10px_rgba(var(--accent-rgb),0.5)]" : "bg-slate-200")} />
+                      <div key={s} className={cn(
+                        "h-2 rounded-full transition-all duration-300",
+                        campaignStep >= s ? "bg-[var(--accent)] w-6 shadow-[0_0_8px_rgba(var(--accent-rgb),0.4)]" : "bg-slate-200 w-2"
+                      )} />
                     ))}
                   </div>
                 </div>
               </DialogHeader>
 
               <div className="flex-1 overflow-y-auto no-scrollbar p-8">
+
+                {/* PASO 1 — Nombre + Etiquetas */}
                 {campaignStep === 1 && (
                   <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
-                    <div className="space-y-4">
-                      <Label className="text-[11px] font-black uppercase tracking-widest text-[var(--text-tertiary-light)] ml-1">1. Identificación y Audiencia</Label>
-                      <Input placeholder="Nombre de la campaña (ej: Promoción Verano 2024)" value={newCampaign.nombre} onChange={e => setNewCampaign({...newCampaign, nombre: e.target.value})} className="h-14 rounded-2xl text-sm border-[var(--border-light)] bg-[var(--bg-input)]/50 focus:ring-2 focus:ring-[var(--accent)]/20 transition-all font-bold" />
+                    <div className="space-y-3">
+                      <Label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-tertiary-light)] ml-1">Nombre de la campaña</Label>
+                      <Input
+                        placeholder="Ej: Propiedades para Inversores — Julio 2025"
+                        value={newCampaign.nombre}
+                        onChange={e => setNewCampaign({...newCampaign, nombre: e.target.value})}
+                        className="h-14 rounded-2xl text-sm border-[var(--border-light)] bg-[var(--bg-input)]/50 focus:ring-2 focus:ring-[var(--accent)]/20 transition-all font-bold"
+                      />
+                      <p className="text-[10px] text-slate-400 pl-1">Este nombre es solo para vos, el cliente no lo ve.</p>
                     </div>
 
                     <div className="space-y-4">
-                      <Label className="text-[11px] font-black uppercase tracking-widest text-[var(--text-tertiary-light)] ml-1">2. Filtrar por Etiquetas</Label>
-                      <div className="grid grid-cols-3 gap-3">
-                        {etiquetas.map(tag => (
-                          <button
-                            key={tag.id}
-                            type="button"
-                            onClick={() => {
-                              const current = newCampaign.etiquetasSeleccionadas;
-                              setNewCampaign({
-                                ...newCampaign,
-                                etiquetasSeleccionadas: current.includes(tag.id!) ? current.filter(id => id !== tag.id) : [...current, tag.id!]
-                              });
-                            }}
-                            className={cn(
-                              "p-4 rounded-2xl border transition-all text-left flex items-center justify-between group",
-                              newCampaign.etiquetasSeleccionadas.includes(tag.id!) 
-                                ? "border-[var(--accent)] bg-[var(--accent)]/5 shadow-sm" 
-                                : "border-[var(--border-light)] bg-white text-[var(--text-tertiary-light)] hover:border-[var(--accent)]/50 shadow-sm"
-                            )}
-                          >
-                            <span className="text-[11px] font-bold uppercase truncate pr-2">{tag.nombre}</span>
-                            {newCampaign.etiquetasSeleccionadas.includes(tag.id!) && <CheckCircle2 className="w-4 h-4 text-[var(--accent)] shrink-0" />}
-                          </button>
-                        ))}
+                      <div className="flex items-center justify-between ml-1">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-tertiary-light)]">
+                          ¿A quién le llega? — Elegí las etiquetas
+                        </Label>
+                        {newCampaign.etiquetasSeleccionadas.length === 0 && (
+                          <span className="text-[10px] text-slate-400 font-medium">Sin filtro = llega a todos los contactos</span>
+                        )}
                       </div>
+
+                      {etiquetas.length === 0 ? (
+                        <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-8 text-center">
+                          <p className="text-sm font-bold text-slate-400">Todavía no tenés etiquetas creadas.</p>
+                          <p className="text-xs text-slate-400 mt-1">Creá etiquetas en la sección Contactos para poder filtrar tu audiencia.</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-3 gap-3">
+                          {etiquetas.map(tag => {
+                            const selected = newCampaign.etiquetasSeleccionadas.includes(tag.id!);
+                            return (
+                              <button
+                                key={tag.id}
+                                type="button"
+                                onClick={() => {
+                                  const current = newCampaign.etiquetasSeleccionadas;
+                                  setNewCampaign({...newCampaign, etiquetasSeleccionadas: selected ? current.filter(id => id !== tag.id) : [...current, tag.id!]});
+                                }}
+                                className={cn(
+                                  "p-4 rounded-2xl border-2 transition-all text-left flex items-center gap-3 group shadow-sm",
+                                  selected ? "border-transparent shadow-md" : "border-[var(--border-light)] bg-white hover:shadow-md"
+                                )}
+                                style={selected ? { backgroundColor: tag.colorBg, borderColor: tag.colorBg } : {}}
+                              >
+                                <div className="w-3 h-3 rounded-full shrink-0 border-2 border-white/50 shadow-sm" style={{ backgroundColor: tag.colorBg }} />
+                                <span
+                                  className="text-[11px] font-black uppercase truncate flex-1"
+                                  style={selected ? { color: tag.colorText } : {}}
+                                >{tag.nombre}</span>
+                                {selected && <CheckCircle2 className="w-4 h-4 shrink-0" style={{ color: tag.colorText }} />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
 
-                    <div className="bg-slate-50 p-6 rounded-[32px] border border-[var(--border-light)] flex items-center justify-between shadow-sm">
+                    <div className="bg-slate-50 p-6 rounded-[28px] border border-[var(--border-light)] flex items-center justify-between shadow-sm">
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded-2xl bg-white border border-[var(--border-light)] flex items-center justify-center text-[var(--accent)] shadow-sm">
                           <Users className="w-6 h-6" />
                         </div>
                         <div>
-                          <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-tertiary-light)]">Audiencia Estimada</p>
-                          <p className="text-xl font-black text-[var(--text-primary-light)]">{filteredAudience} Contactos</p>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-tertiary-light)]">Contactos que recibirán el mensaje</p>
+                          <p className="text-2xl font-black text-[var(--text-primary-light)]">{filteredAudience}</p>
                         </div>
                       </div>
-                      <Badge className="bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/20 text-[10px] font-black px-4 py-1.5 rounded-xl">Target Listo</Badge>
+                      {newCampaign.etiquetasSeleccionadas.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 max-w-[200px] justify-end">
+                          {newCampaign.etiquetasSeleccionadas.map(id => {
+                            const tag = etiquetas.find(e => e.id === id);
+                            return tag ? (
+                              <span key={id} className="text-[9px] font-black px-2 py-1 rounded-lg" style={{ backgroundColor: tag.colorBg, color: tag.colorText }}>{tag.nombre}</span>
+                            ) : null;
+                          })}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
 
+                {/* PASO 2 — Elegir plantilla */}
                 {campaignStep === 2 && (
-                  <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
-                    <div className="space-y-4">
-                      <Label className="text-[11px] font-black uppercase tracking-widest text-[var(--text-tertiary-light)] ml-1">Seleccionar Contenido</Label>
-                      <div className="grid grid-cols-2 gap-4">
-                        {plantillas.filter(p => p.estado === 'APPROVED' || p.estado === 'PENDING').map(p => (
+                  <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+                    <div className="bg-slate-50 border border-slate-100 rounded-2xl px-5 py-3">
+                      <p className="text-xs font-semibold text-slate-600 leading-relaxed">
+                        Elegí el molde del mensaje que le va a llegar a tus contactos. Solo aparecen plantillas aprobadas o en revisión por Meta.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 gap-4">
+                      {plantillas.filter(p => p.estado === 'APPROVED' || p.estado === 'PENDING').map(p => {
+                        const body = p.componentes.find(c => c.type === 'BODY')?.text || '';
+                        const varCount = [...new Set((body.match(/\{\{\d+\}\}/g) || []))].length;
+                        return (
                           <button
                             key={p.id}
                             type="button"
-                            onClick={() => setNewCampaign({...newCampaign, plantillaId: p.id})}
+                            onClick={() => setNewCampaign({...newCampaign, plantillaId: p.id, variableValues: {}})}
                             className={cn(
-                              "p-6 rounded-[32px] border-2 text-left transition-all space-y-4 relative group",
-                              newCampaign.plantillaId === p.id 
-                                ? "border-[var(--accent)] bg-[var(--accent)]/5" 
-                                : "border-[var(--border-light)] bg-white hover:border-[var(--accent)]/50 shadow-sm"
+                              "p-6 rounded-[28px] border-2 text-left transition-all relative group",
+                              newCampaign.plantillaId === p.id
+                                ? "border-[var(--accent)] bg-[var(--accent)]/5 shadow-md"
+                                : "border-[var(--border-light)] bg-white hover:border-[var(--accent)]/40 shadow-sm"
                             )}
                           >
-                            <div className="flex items-center justify-between">
-                              <Badge variant="outline" className="text-[9px] font-black px-2 py-0.5 rounded-lg border-slate-200">{p.categoria}</Badge>
-                              {newCampaign.plantillaId === p.id && <CheckCircle2 className="w-5 h-5 text-[var(--accent)]" />}
-                            </div>
-                            <div className="space-y-1">
-                              <h4 className="font-bold text-sm text-[var(--text-primary-light)]">{p.nombre}</h4>
-                              <p className="text-[11px] text-[var(--text-tertiary-light)] line-clamp-2 font-medium leading-relaxed italic">
-                                "{p.componentes.find(c => c.type === 'BODY')?.text || "Sin vista previa"}"
-                              </p>
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="space-y-2 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className={cn("text-[9px] font-black px-2 py-0.5 rounded-lg", p.estado === 'APPROVED' ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200")}>
+                                    {p.estado === 'APPROVED' ? 'Aprobada' : 'En revisión'}
+                                  </Badge>
+                                  <Badge variant="outline" className="text-[9px] font-black px-2 py-0.5 rounded-lg border-slate-200 text-slate-500">{p.categoria}</Badge>
+                                  {varCount > 0 && (
+                                    <span className="text-[9px] font-black text-slate-400">{varCount} variable{varCount > 1 ? 's' : ''} a completar</span>
+                                  )}
+                                </div>
+                                <h4 className="font-black text-base text-[var(--text-primary-light)]">{p.nombre}</h4>
+                                <p className="text-[12px] text-[var(--text-tertiary-light)] font-medium leading-relaxed italic bg-slate-50 rounded-xl px-4 py-2.5">
+                                  "{body || "Sin vista previa"}"
+                                </p>
+                              </div>
+                              {newCampaign.plantillaId === p.id && (
+                                <div className="w-8 h-8 rounded-xl bg-[var(--accent)] flex items-center justify-center shrink-0">
+                                  <CheckCircle2 className="w-5 h-5 text-black" />
+                                </div>
+                              )}
                             </div>
                           </button>
-                        ))}
-                      </div>
+                        );
+                      })}
+                      {plantillas.filter(p => p.estado === 'APPROVED' || p.estado === 'PENDING').length === 0 && (
+                        <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-10 text-center space-y-2">
+                          <p className="text-sm font-bold text-slate-400">No tenés plantillas aprobadas todavía.</p>
+                          <p className="text-xs text-slate-400">Creá una plantilla en la pestaña "Plantillas Meta" y esperá la aprobación de WhatsApp.</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
 
+                {/* PASO 3 — Programar envío */}
                 {campaignStep === 3 && (
-                  <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
-                    <div className="space-y-6">
-                      <div className="flex items-center justify-between p-8 bg-slate-50 rounded-[32px] border border-[var(--border-light)] shadow-sm">
-                        <div className="space-y-1">
-                          <p className="font-bold text-[var(--text-primary-light)] text-base">Programar Envío</p>
-                          <p className="text-xs text-[var(--text-tertiary-light)] font-medium leading-relaxed">Define el momento exacto para el disparo masivo.</p>
-                        </div>
-                        <Switch checked={newCampaign.programar} onCheckedChange={v => setNewCampaign({...newCampaign, programar: v})} />
+                  <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+                    <div className="flex items-center justify-between p-7 bg-slate-50 rounded-[28px] border border-[var(--border-light)] shadow-sm">
+                      <div className="space-y-1">
+                        <p className="font-black text-[var(--text-primary-light)] text-base">¿Querés programar el envío?</p>
+                        <p className="text-xs text-[var(--text-tertiary-light)] font-medium leading-relaxed">Si no programás, la campaña se envía lo antes posible.</p>
                       </div>
+                      <Switch checked={newCampaign.programar} onCheckedChange={v => setNewCampaign({...newCampaign, programar: v})} />
+                    </div>
 
-                      {newCampaign.programar && (
-                        <div className="grid grid-cols-2 gap-4 p-8 bg-white border border-[var(--border-light)] rounded-[32px] animate-in zoom-in-95 duration-300 shadow-sm">
-                          <div className="space-y-2">
-                            <Label className="text-[10px] font-black tracking-widest uppercase ml-1">Fecha de Lanzamiento</Label>
-                            <Input type="date" value={newCampaign.fecha} onChange={e => setNewCampaign({...newCampaign, fecha: e.target.value})} className="rounded-2xl h-14 bg-slate-50 border-slate-200 font-bold" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-[10px] font-black tracking-widest uppercase ml-1">Hora de Lanzamiento</Label>
-                            <Input type="time" value={newCampaign.hora} onChange={e => setNewCampaign({...newCampaign, hora: e.target.value})} className="rounded-2xl h-14 bg-slate-50 border-slate-200 font-bold" />
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="bg-blue-50 border border-blue-100 p-8 rounded-[32px] flex items-start gap-5 shadow-sm">
-                        <div className="w-12 h-12 rounded-2xl bg-blue-100 flex items-center justify-center text-blue-600 shrink-0 border border-blue-200 shadow-inner">
-                          <ShieldCheck className="w-6 h-6" />
+                    {newCampaign.programar && (
+                      <div className="grid grid-cols-2 gap-4 p-7 bg-white border border-[var(--border-light)] rounded-[28px] animate-in zoom-in-95 duration-300 shadow-sm">
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-black tracking-widest uppercase ml-1">Fecha de envío</Label>
+                          <Input type="date" value={newCampaign.fecha} onChange={e => setNewCampaign({...newCampaign, fecha: e.target.value})} className="rounded-2xl h-12 bg-slate-50 border-slate-200 font-bold" />
                         </div>
                         <div className="space-y-2">
-                          <p className="text-sm font-black text-blue-900 uppercase tracking-widest">Seguridad: Modo Goteo (Drip)</p>
-                          <p className="text-[13px] text-blue-800/80 leading-relaxed font-medium">
-                            Para proteger la salud de tu número, los mensajes se enviarán automáticamente en intervalos aleatorios. Esto garantiza el cumplimiento de las normativas de Meta y maximiza la tasa de entrega.
-                          </p>
+                          <Label className="text-[10px] font-black tracking-widest uppercase ml-1">Hora de envío</Label>
+                          <Input type="time" value={newCampaign.hora} onChange={e => setNewCampaign({...newCampaign, hora: e.target.value})} className="rounded-2xl h-12 bg-slate-50 border-slate-200 font-bold" />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="bg-blue-50 border border-blue-100 p-7 rounded-[28px] flex items-start gap-5 shadow-sm">
+                      <div className="w-11 h-11 rounded-2xl bg-blue-100 flex items-center justify-center text-blue-600 shrink-0 border border-blue-200 shadow-inner">
+                        <ShieldCheck className="w-5 h-5" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm font-black text-blue-900">Modo Goteo activado</p>
+                        <p className="text-[13px] text-blue-800/80 leading-relaxed font-medium">
+                          Los mensajes se envían en intervalos aleatorios para proteger la reputación de tu número de WhatsApp y evitar que Meta lo limite.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Resumen final */}
+                    <div className="bg-slate-900 rounded-[28px] p-7 space-y-4 text-white">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-white/50">Resumen de la campaña</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-[10px] text-white/40 font-bold uppercase tracking-wider">Campaña</p>
+                          <p className="font-black text-base">{newCampaign.nombre || '—'}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-white/40 font-bold uppercase tracking-wider">Destinatarios</p>
+                          <p className="font-black text-base">{filteredAudience} contactos</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-white/40 font-bold uppercase tracking-wider">Plantilla</p>
+                          <p className="font-black text-base">{plantillas.find(p => p.id === newCampaign.plantillaId)?.nombre || '—'}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-white/40 font-bold uppercase tracking-wider">Envío</p>
+                          <p className="font-black text-base">{newCampaign.programar ? `${newCampaign.fecha} a las ${newCampaign.hora}` : 'Lo antes posible'}</p>
                         </div>
                       </div>
                     </div>
@@ -492,15 +615,19 @@ export default function DifusionPage() {
                 )}
               </div>
 
-              <DialogFooter className="p-8 border-t border-[var(--border-light)] bg-white shrink-0">
+              <DialogFooter className="px-8 py-6 border-t border-[var(--border-light)] bg-white shrink-0">
                 <div className="flex items-center justify-between w-full">
                   <Button variant="ghost" onClick={() => campaignStep > 1 && setCampaignStep(campaignStep - 1)} className={cn("rounded-xl px-6 font-bold text-xs gap-2 transition-all hover:bg-slate-100", campaignStep === 1 && "opacity-0 pointer-events-none")}>
                     <ChevronLeft className="w-4 h-4" /> Anterior
                   </Button>
-                  
+
                   {campaignStep < 3 ? (
-                    <Button onClick={() => setCampaignStep(campaignStep + 1)} className="bg-black text-white h-12 px-10 rounded-xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-black/10 transition-all hover:scale-[1.02] active:scale-95">
-                      Siguiente Paso <ChevronRight className="w-4 h-4 ml-2" />
+                    <Button
+                      onClick={() => setCampaignStep(campaignStep + 1)}
+                      disabled={campaignStep === 1 && !newCampaign.nombre || campaignStep === 2 && !newCampaign.plantillaId}
+                      className="bg-black text-white h-12 px-10 rounded-xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-black/10 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-40 disabled:pointer-events-none"
+                    >
+                      Siguiente <ChevronRight className="w-4 h-4 ml-2" />
                     </Button>
                   ) : (
                     <Button onClick={handleCreateCampaign} className="bg-[var(--accent)] text-[var(--accent-text)] h-12 px-10 rounded-xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-[var(--accent)]/20 transition-all hover:scale-[1.05] active:scale-95">
@@ -543,6 +670,11 @@ export default function DifusionPage() {
             </button>
           </div>
 
+          <TabDescription
+            description="Enviá un mensaje de WhatsApp al mismo tiempo a muchos contactos. Podés elegir a quién le llega filtrando por etiquetas del CRM."
+            example="Mandá una promo de invierno solo a los clientes que tienen la etiqueta 'Interesados en calzado', sin molestar al resto."
+          />
+
           {showHelp === "campanas" && <HelpPanel data={helpContent.campanas} compact />}
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -552,48 +684,128 @@ export default function DifusionPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {campanas.map(c => (
-              <div key={c.id} className="bg-white border border-[var(--border-light)] rounded-[32px] p-8 space-y-6 shadow-sm hover:border-[var(--accent)] transition-all group relative overflow-hidden">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <Badge className={cn("text-[9px] font-black uppercase tracking-widest px-2 py-0.5", c.estado === 'programada' ? 'bg-blue-500 text-white border-none' : 'bg-emerald-500 text-white border-none shadow-sm')}>
-                        {c.estado}
-                      </Badge>
-                      <span className="text-[10px] font-bold text-[var(--text-tertiary-light)] flex items-center gap-1">
-                        <Clock className="w-3 h-3" /> {c.programadaPara instanceof Timestamp ? format(c.programadaPara.toDate(), "dd MMM, HH:mm", { locale: es }) : 'Ahora'}
-                      </span>
-                    </div>
-                    <h3 className="text-lg font-bold text-[var(--text-primary-light)] tracking-tight">{c.nombre}</h3>
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger className="rounded-full h-8 w-8 hover:bg-gray-100 flex items-center justify-center transition-colors shadow-sm border border-slate-100">
-                      <MoreVertical className="w-4 h-4 text-slate-400" />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="rounded-xl p-1 border-[var(--border-light)] shadow-2xl">
-                      <DropdownMenuItem className="text-red-500 text-[10px] font-black uppercase tracking-widest gap-2 p-3 rounded-lg hover:bg-red-50 cursor-pointer">
-                        <Trash2 className="w-3.5 h-3.5" /> Cancelar Campaña
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+            {campanas.map(c => {
+              const total = c.estadisticas?.total || 0;
+              const enviados = c.estadisticas?.enviados || 0;
+              const fallidos = c.estadisticas?.fallidos || 0;
+              const progreso = total > 0 ? Math.round((enviados / total) * 100) : 0;
+              const enProgreso = c.estado === 'en_progreso';
+              const completada = c.estado === 'completada';
+              const conError = c.estado === 'error';
+              const programada = c.estado === 'programada';
 
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="text-center p-4 bg-slate-50 rounded-[20px] border border-slate-100/50 shadow-inner">
-                    <p className="text-xl font-black text-[var(--text-primary-light)]">{c.estadisticas?.enviados || 0}</p>
-                    <p className="text-[9px] font-black text-[var(--text-tertiary-light)] uppercase tracking-tighter">Enviados</p>
+              const estadoBadge: Record<string, { label: string; className: string }> = {
+                programada:  { label: 'Lista para enviar', className: 'bg-blue-100 text-blue-700 border-blue-200' },
+                en_progreso: { label: 'Enviando...', className: 'bg-amber-100 text-amber-700 border-amber-200' },
+                completada:  { label: 'Completada', className: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+                pausada:     { label: 'Pausada', className: 'bg-slate-100 text-slate-600 border-slate-200' },
+                error:       { label: 'Error', className: 'bg-red-100 text-red-700 border-red-200' },
+              };
+              const badge = estadoBadge[c.estado] || estadoBadge.pausada;
+
+              return (
+                <div key={c.id} className={cn(
+                  "bg-white border rounded-[32px] p-8 space-y-5 shadow-sm transition-all relative overflow-hidden",
+                  enProgreso ? "border-amber-200 shadow-amber-100" :
+                  completada ? "border-emerald-200" :
+                  conError ? "border-red-200" :
+                  "border-[var(--border-light)] hover:border-[var(--accent)]"
+                )}>
+                  {/* Header */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="outline" className={cn("text-[9px] font-black px-2.5 py-1 rounded-xl border flex items-center gap-1.5", badge.className)}>
+                          {enProgreso && <Loader2 className="w-2.5 h-2.5 animate-spin" />}
+                          {completada && <CheckCircle2 className="w-2.5 h-2.5" />}
+                          {conError && <XCircle className="w-2.5 h-2.5" />}
+                          {badge.label}
+                        </Badge>
+                        <span className="text-[10px] font-bold text-[var(--text-tertiary-light)] flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {c.programadaPara instanceof Timestamp ? format(c.programadaPara.toDate(), "dd MMM, HH:mm", { locale: es }) : 'Inmediato'}
+                        </span>
+                      </div>
+                      <h3 className="text-base font-black text-[var(--text-primary-light)] tracking-tight truncate">{c.nombre}</h3>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger className="rounded-full h-8 w-8 hover:bg-gray-100 flex items-center justify-center transition-colors shrink-0 border border-slate-100">
+                        <MoreVertical className="w-4 h-4 text-slate-400" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="rounded-xl p-1 border-[var(--border-light)] shadow-2xl">
+                        {(programada || conError) && (
+                          <DropdownMenuItem
+                            className="text-red-500 text-[10px] font-black uppercase tracking-widest gap-2 p-3 rounded-lg hover:bg-red-50 cursor-pointer"
+                            onClick={() => deleteDoc(doc(db, 'espaciosDeTrabajo', currentWorkspaceId!, 'difusiones', c.id))}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" /> Eliminar
+                          </DropdownMenuItem>
+                        )}
+                        {enProgreso && (
+                          <DropdownMenuItem
+                            className="text-slate-600 text-[10px] font-black uppercase tracking-widest gap-2 p-3 rounded-lg hover:bg-slate-50 cursor-pointer"
+                            onClick={() => cancelarCampaña(currentWorkspaceId!, c.id)}
+                          >
+                            <XCircle className="w-3.5 h-3.5" /> Pausar envío
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-                  <div className="text-center p-4 bg-slate-50 rounded-[20px] border border-slate-100/50 shadow-inner">
-                    <p className="text-xl font-black text-emerald-500">{c.estadisticas?.leidos || 0}</p>
-                    <p className="text-[9px] font-black text-[var(--text-tertiary-light)] uppercase tracking-tighter">Leídos</p>
+
+                  {/* Barra de progreso (en_progreso y completada) */}
+                  {(enProgreso || completada) && total > 0 && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Progreso del envío</span>
+                        <span className="text-[10px] font-black text-slate-700">{enviados} / {total}</span>
+                      </div>
+                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className={cn("h-full rounded-full transition-all duration-500", completada ? "bg-emerald-500" : "bg-amber-400")}
+                          style={{ width: `${progreso}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-medium">{progreso}% completado{fallidos > 0 && ` · ${fallidos} fallidos`}</span>
+                    </div>
+                  )}
+
+                  {/* Error */}
+                  {conError && (
+                    <div className="flex items-center gap-3 bg-red-50 border border-red-100 rounded-2xl px-4 py-3">
+                      <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
+                      <p className="text-xs text-red-700 font-semibold">{(c as any).metadata?.errorMsg || 'Ocurrió un error al enviar la campaña.'}</p>
+                    </div>
+                  )}
+
+                  {/* Stats */}
+                  <div className="grid grid-cols-4 gap-3">
+                    {[
+                      { label: 'Audiencia', value: total, color: 'text-slate-700' },
+                      { label: 'Enviados', value: enviados, color: 'text-blue-600' },
+                      { label: 'Leídos', value: c.estadisticas?.leidos || 0, color: 'text-emerald-600' },
+                      { label: 'Fallidos', value: fallidos, color: fallidos > 0 ? 'text-red-500' : 'text-slate-400' },
+                    ].map(stat => (
+                      <div key={stat.label} className="text-center p-3 bg-slate-50 rounded-[16px] border border-slate-100/50">
+                        <p className={cn("text-lg font-black", stat.color)}>{stat.value}</p>
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-tight">{stat.label}</p>
+                      </div>
+                    ))}
                   </div>
-                  <div className="text-center p-4 bg-slate-50 rounded-[20px] border border-slate-100/50 shadow-inner">
-                    <p className="text-xl font-black text-blue-500">{c.estadisticas?.total || 0}</p>
-                    <p className="text-[9px] font-black text-[var(--text-tertiary-light)] uppercase tracking-tighter">Audiencia</p>
-                  </div>
+
+                  {/* Botón Despachar */}
+                  {programada && (
+                    <button
+                      onClick={() => despacharCampaña(currentWorkspaceId!, c.id)}
+                      className="w-full bg-[var(--accent)] text-black h-12 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-lg shadow-[var(--accent)]/20 hover:scale-[1.01] active:scale-95 transition-all flex items-center justify-center gap-2"
+                    >
+                      <PlayCircle className="w-4 h-4" />
+                      Despachar campaña ahora
+                    </button>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {campanas.length === 0 && !loading && (
@@ -621,6 +833,11 @@ export default function DifusionPage() {
             </button>
           </div>
 
+          <TabDescription
+            description="WhatsApp obliga a que todos los mensajes masivos usen un 'molde' pre-aprobado por Meta. Acá creás y administrás esos moldes."
+            example="Creás el mensaje '¡Hola {{nombre}}! Tenemos 20% de descuento este finde' y Meta lo revisa en hasta 24 hs. Una vez aprobado, podés usarlo en tus campañas."
+          />
+
           {showHelp === "plantillas" && <HelpPanel data={helpContent.plantillas} compact />}
 
           <div className="flex items-center justify-between px-2">
@@ -633,56 +850,133 @@ export default function DifusionPage() {
               <DialogTrigger className="bg-black text-white h-11 px-6 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-black/10 transition-all hover:scale-[1.02] flex items-center">
                 <Plus className="w-4 h-4 mr-2" />Nueva Plantilla
               </DialogTrigger>
-              <DialogContent className="max-w-6xl h-[90vh] bg-white border-none rounded-[40px] p-0 overflow-hidden flex flex-col shadow-2xl">
-                <DialogHeader className="p-8 border-b bg-slate-50/50 shrink-0">
-                  <DialogTitle className="text-2xl font-bold tracking-tight">Diseñar Nueva Plantilla Meta</DialogTitle>
-                  <DialogDescription className="font-medium">Define el mensaje que enviarás a tus clientes.</DialogDescription>
+              <DialogContent className="max-w-5xl h-[90vh] bg-white border-none rounded-[40px] p-0 overflow-hidden flex flex-col shadow-2xl">
+                <DialogHeader className="px-10 pt-8 pb-6 border-b bg-slate-50/50 shrink-0">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-[1.5rem] bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 border border-blue-200 shadow-inner">
+                      <LayoutGrid className="w-6 h-6" />
+                    </div>
+                    <div className="space-y-0.5">
+                      <DialogTitle className="text-xl font-black tracking-tight text-[var(--text-primary-light)]">Nueva Plantilla de Mensaje</DialogTitle>
+                      <DialogDescription className="font-medium text-[var(--text-secondary-light)]">Creá el molde del mensaje que Meta deberá aprobar antes de usarlo en campañas.</DialogDescription>
+                    </div>
+                  </div>
                 </DialogHeader>
                 <div className="flex-1 flex overflow-hidden">
-                  <div className="flex-1 p-10 overflow-y-auto no-scrollbar space-y-10 bg-white">
-                    <div className="grid grid-cols-2 gap-8">
+                  {/* Formulario */}
+                  <div className="flex-1 p-8 overflow-y-auto no-scrollbar space-y-8 bg-white">
+
+                    {/* Nombre + Categoría */}
+                    <div className="grid grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Nombre Único</Label>
-                        <Input placeholder="ej: oferta_flash_agosto" value={newTemplate.nombre} onChange={e => setNewTemplate({...newTemplate, nombre: e.target.value})} className="h-14 rounded-2xl bg-slate-50 border-slate-200 font-bold px-6 shadow-sm focus:bg-white transition-all" />
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Nombre interno</Label>
+                        <Input placeholder="ej: oferta_flash_agosto" value={newTemplate.nombre} onChange={e => setNewTemplate({...newTemplate, nombre: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-slate-200 font-bold px-5 shadow-sm focus:bg-white transition-all" />
+                        <p className="text-[10px] text-slate-400 pl-1">Solo letras minúsculas, números y guion bajo. Sin espacios.</p>
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Categoría</Label>
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Tipo de mensaje</Label>
                         <Select value={newTemplate.categoria} onValueChange={v => setNewTemplate({...newTemplate, categoria: v as any})}>
-                          <SelectTrigger className="h-14 rounded-2xl bg-slate-50 border-slate-200 font-bold shadow-sm focus:bg-white transition-all"><SelectValue /></SelectTrigger>
-                          <SelectContent className="rounded-xl shadow-2xl"><SelectItem value="MARKETING">Marketing (Promociones)</SelectItem><SelectItem value="UTILITY">Utilidad (Información)</SelectItem></SelectContent>
+                          <SelectTrigger className="h-12 rounded-2xl bg-slate-50 border-slate-200 font-bold shadow-sm focus:bg-white transition-all"><SelectValue /></SelectTrigger>
+                          <SelectContent className="rounded-xl shadow-2xl min-w-[280px]">
+                            <SelectItem value="MARKETING" className="py-3 px-4">
+                              <div className="space-y-0.5">
+                                <p className="font-black text-sm">Marketing</p>
+                                <p className="text-[11px] text-slate-400 font-medium">Promociones, ofertas y novedades</p>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="UTILITY" className="py-3 px-4">
+                              <div className="space-y-0.5">
+                                <p className="font-black text-sm">Utilidad</p>
+                                <p className="text-[11px] text-slate-400 font-medium">Confirmaciones, recordatorios, avisos</p>
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
                         </Select>
                       </div>
                     </div>
+
+                    {/* Cuerpo del mensaje */}
                     <div className="space-y-3">
-                      <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Mensaje Principal</Label>
-                      <Textarea className="min-h-[200px] bg-slate-50 border-slate-200 rounded-[28px] p-6 leading-relaxed resize-none font-bold text-sm focus:ring-2 focus:ring-[var(--accent)]/10 transition-all shadow-sm focus:bg-white" value={newTemplate.body} onChange={e => setNewTemplate({...newTemplate, body: e.target.value})} />
-                      <p className="text-[10px] text-slate-400 font-medium pl-2 italic">Puedes usar {"{{1}}"}, {"{{2}}"} etc. para datos variables.</p>
+                      <div className="flex items-center justify-between ml-1">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Texto del mensaje</Label>
+                        <span className="text-[10px] font-bold text-slate-300">{newTemplate.body.length} / 1024</span>
+                      </div>
+                      <Textarea
+                        ref={templateBodyRef}
+                        className="min-h-[160px] bg-slate-50 border-slate-200 rounded-[24px] p-6 leading-relaxed resize-none font-semibold text-sm focus:ring-2 focus:ring-[var(--accent)]/10 transition-all shadow-sm focus:bg-white"
+                        value={newTemplate.body}
+                        onChange={e => setNewTemplate({...newTemplate, body: e.target.value})}
+                      />
+
+                      {/* Botón insertar nombre */}
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => insertVariable("{{1}}")}
+                          className={cn(
+                            "flex items-center gap-2 px-4 py-2.5 rounded-xl border text-xs font-black transition-all hover:scale-[1.02] active:scale-95",
+                            newTemplate.body.includes("{{1}}")
+                              ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                              : "bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:shadow-sm"
+                          )}
+                        >
+                          <Users className="w-3.5 h-3.5" />
+                          Insertar nombre del cliente
+                          {newTemplate.body.includes("{{1}}") && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
+                        </button>
+                        <p className="text-[11px] text-slate-400 font-medium">
+                          Se reemplaza automáticamente con el nombre de cada contacto al enviar.
+                        </p>
+                      </div>
                     </div>
+
+                    {/* Pie de página */}
                     <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Pie de Página (Opcional)</Label>
-                      <Input value={newTemplate.footer} onChange={e => setNewTemplate({...newTemplate, footer: e.target.value})} className="h-12 rounded-xl bg-slate-50 border-slate-200 font-bold text-xs px-6 shadow-sm focus:bg-white transition-all" />
+                      <div className="flex items-center gap-2 ml-1">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Pie de página</Label>
+                        <span className="text-[9px] font-black uppercase tracking-widest text-orange-500 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-md">Obligatorio</span>
+                      </div>
+                      <div className="h-12 rounded-2xl bg-slate-100 border border-slate-200 font-semibold text-sm px-5 flex items-center text-slate-400 select-none cursor-not-allowed">
+                        Respondé SALIR para no recibir más mensajes.
+                      </div>
+                      <p className="text-[10px] text-slate-400 pl-1">Meta exige incluir una opción de baja en mensajes masivos. Si el contacto responde "SALIR", queda excluido automáticamente.</p>
                     </div>
                   </div>
+
                   {/* Vista Previa Móvil */}
-                  <div className="w-[450px] bg-slate-900 border-l border-white/5 p-12 flex flex-col items-center justify-center relative overflow-hidden">
+                  <div className="w-[380px] bg-slate-900 border-l border-white/5 p-8 flex flex-col items-center gap-6 relative overflow-hidden shrink-0">
                     <div className="absolute inset-0 bg-[var(--accent)]/5 blur-[100px] rounded-full" />
-                    <div className="bg-[#E5DDD5] rounded-[48px] border-[10px] border-[#202c33] shadow-2xl overflow-hidden aspect-[9/18.5] w-full max-w-[280px] relative z-10 flex flex-col">
-                      <div className="bg-[#075e54] p-4 flex items-center gap-3 shrink-0 shadow-lg">
-                        <div className="w-7 h-7 rounded-full bg-white/20 border border-white/10 flex items-center justify-center"><Phone className="w-3.5 h-3.5 text-white/80" /></div>
-                        <div className="text-[10px] font-black text-white uppercase tracking-widest">Imalá Vox Business</div>
+                    <p className="text-[10px] font-black text-white/40 uppercase tracking-widest relative z-10">Vista previa</p>
+                    <div className="bg-[#E5DDD5] rounded-[40px] border-[8px] border-[#202c33] shadow-2xl overflow-hidden w-full max-w-[260px] relative z-10 flex flex-col" style={{ aspectRatio: '9/18.5' }}>
+                      <div className="bg-[#075e54] p-3 flex items-center gap-2.5 shrink-0 shadow-md">
+                        <div className="w-6 h-6 rounded-full bg-white/20 border border-white/10 flex items-center justify-center"><Phone className="w-3 h-3 text-white/80" /></div>
+                        <div className="text-[9px] font-black text-white uppercase tracking-widest">Imalá Vox Business</div>
                       </div>
-                      <div className="flex-1 p-4 bg-repeat overflow-y-auto no-scrollbar" style={{ backgroundImage: 'url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png")' }}>
-                        <div className="bg-white rounded-[18px] p-4 shadow-sm text-[11px] whitespace-pre-wrap font-bold leading-relaxed relative before:absolute before:w-3 before:h-3 before:bg-white before:top-0 before:-left-1 before:rotate-45 before:rounded-sm">
-                          {newTemplate.body.replace(/\{\{\d+\}\}/g, '_____')}
-                          {newTemplate.footer && <div className="mt-3 pt-2 border-t border-slate-100 text-[9px] text-slate-400 font-bold">{newTemplate.footer}</div>}
+                      <div className="flex-1 p-3 overflow-y-auto no-scrollbar" style={{ backgroundImage: 'url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png")' }}>
+                        <div className="bg-white rounded-[16px] p-3 shadow-sm text-[10px] whitespace-pre-wrap font-semibold leading-relaxed relative before:absolute before:w-2.5 before:h-2.5 before:bg-white before:top-0 before:-left-1 before:rotate-45 before:rounded-sm">
+                          {newTemplate.body.replace(/\{\{\d+\}\}/g, (m) => {
+                            const names = ['_Juan_', '_pedido_122_', '_dato_'];
+                            const idx = parseInt(m.replace(/[{}]/g, '')) - 1;
+                            return names[idx] || '______';
+                          })}
+                          {newTemplate.footer && <div className="mt-2 pt-2 border-t border-slate-100 text-[8px] text-slate-400 font-medium">{newTemplate.footer}</div>}
                         </div>
                       </div>
                     </div>
+                    <p className="text-[9px] text-white/30 font-medium text-center relative z-10 leading-relaxed">Las variables como {"{{1}}"} se muestran<br/>con datos de ejemplo</p>
                   </div>
                 </div>
-                <DialogFooter className="p-8 border-t bg-slate-50/50 shrink-0">
+                <DialogFooter className="px-10 py-6 border-t bg-slate-50/50 shrink-0">
                   <div className="flex items-center justify-between w-full">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 flex items-center gap-2"><Clock className="w-3.5 h-3.5" /> Revisión en 2 a 24 horas</p>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600 border border-amber-200">
+                        <Clock className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-black text-slate-600">Revisión en 2 a 24 horas</p>
+                        <p className="text-[10px] text-slate-400 font-medium">Meta revisa el contenido antes de aprobarlo</p>
+                      </div>
+                    </div>
                     <Button onClick={handleCreateTemplate} className="bg-[var(--accent)] text-black h-12 px-10 rounded-xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-[var(--accent)]/20 transition-all hover:scale-[1.05]">
                       Enviar a Revisión
                     </Button>
@@ -712,6 +1006,11 @@ export default function DifusionPage() {
             </button>
           </div>
 
+          <TabDescription
+            description="Cuando alguien comenta una palabra específica en tu Instagram, el bot responde automáticamente: primero en el post (público) y luego por mensaje privado (DM)."
+            example="Publicás una foto de un producto y alguien comenta 'PRECIO'. El bot responde al instante en el post y le manda el catálogo completo por DM, sin que tengas que hacer nada."
+          />
+
           {showHelp === "automatizaciones" && <HelpPanel data={helpContent.automatizaciones} compact />}
 
           <div className="flex items-center justify-between px-2">
@@ -724,15 +1023,15 @@ export default function DifusionPage() {
               <DialogTrigger className="bg-black text-white h-11 px-6 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-black/10 transition-all hover:scale-[1.02] flex items-center justify-center">
                 <Plus className="w-4 h-4 mr-2" />Nuevo Disparador
               </DialogTrigger>
-              <DialogContent className="max-w-xl bg-white border-none rounded-[40px] p-0 overflow-hidden shadow-2xl flex flex-col">
+              <DialogContent className="max-w-2xl bg-white border-none rounded-[40px] p-0 overflow-hidden shadow-2xl flex flex-col">
                 <DialogHeader className="p-10 pb-6 text-center space-y-4">
                   <div className="w-16 h-16 rounded-[2.2rem] bg-amber-100 text-amber-600 flex items-center justify-center mx-auto shadow-inner border border-amber-200 group relative">
                     <Zap className="w-8 h-8" />
                     <Sparkles className="w-4 h-4 absolute -top-1 -right-1 text-amber-500 animate-pulse" />
                   </div>
                   <div className="space-y-1">
-                    <DialogTitle className="text-2xl font-black tracking-tight text-[var(--text-primary-light)]">Nueva Automatización</DialogTitle>
-                    <DialogDescription className="font-semibold text-[var(--text-secondary-light)]">Define qué palabra activará al bot.</DialogDescription>
+                    <DialogTitle className="text-2xl font-black tracking-tight text-[var(--text-primary-light)]">Automatización de Instagram</DialogTitle>
+                    <DialogDescription className="font-semibold text-[var(--text-secondary-light)]">Cuando alguien comente la palabra clave en tu post, el bot responde en público y por DM automáticamente.</DialogDescription>
                   </div>
                 </DialogHeader>
 
@@ -747,18 +1046,24 @@ export default function DifusionPage() {
 
                   <div className="grid grid-cols-2 gap-5">
                     <div className="space-y-3">
-                      <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Canal de Origen</Label>
-                      <Select value={newTrigger.tipo} onValueChange={v => setNewTrigger({...newTrigger, tipo: v as any})}>
+                      <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Cuenta de Instagram</Label>
+                      <Select value={newTrigger.canalId} onValueChange={v => setNewTrigger({...newTrigger, canalId: v})}>
                         <SelectTrigger className="h-14 rounded-2xl bg-slate-50 border-slate-200 font-bold shadow-sm focus:bg-white transition-all hover:bg-slate-100">
-                          <SelectValue />
+                          <SelectValue placeholder={canalesIG.length === 0 ? "Sin cuentas conectadas" : "Seleccioná una cuenta"} />
                         </SelectTrigger>
                         <SelectContent className="rounded-2xl shadow-2xl border-slate-100">
-                          <SelectItem value="instagram_comment" className="p-3">
-                            <div className="flex items-center gap-2">
-                              <Instagram className="w-4 h-4 text-rose-500" />
-                              <span className="font-bold">Instagram Post</span>
-                            </div>
-                          </SelectItem>
+                          {canalesIG.length === 0 ? (
+                            <div className="p-4 text-center text-sm text-slate-400 font-medium">No hay cuentas de Instagram conectadas</div>
+                          ) : (
+                            canalesIG.map(canal => (
+                              <SelectItem key={canal.id} value={canal.id} className="p-3">
+                                <div className="flex items-center gap-2">
+                                  <Instagram className="w-4 h-4 text-rose-500" />
+                                  <span className="font-bold">{canal.nombre || canal.cuenta}</span>
+                                </div>
+                              </SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
@@ -809,10 +1114,18 @@ export default function DifusionPage() {
                 </div>
                 <div className="space-y-2">
                   <h4 className="text-base font-bold text-[var(--text-primary-light)] tracking-tight">{trigger.nombre}</h4>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Badge variant="outline" className="bg-slate-900 text-white text-[9px] font-black tracking-widest px-3 py-1 border-none rounded-lg shadow-md">
                       KEYWORD: {trigger.config.palabraClave}
                     </Badge>
+                    {trigger.config.canalId && (() => {
+                      const canal = canalesIG.find(c => c.id === trigger.config.canalId);
+                      return canal ? (
+                        <Badge variant="outline" className="bg-rose-50 text-rose-500 border-rose-100 text-[9px] font-black tracking-widest px-3 py-1 rounded-lg gap-1">
+                          <Instagram className="w-3 h-3" />{canal.nombre || canal.cuenta}
+                        </Badge>
+                      ) : null;
+                    })()}
                   </div>
                 </div>
                 <div className="pt-6 border-t border-slate-50 flex items-center gap-2">
@@ -839,6 +1152,11 @@ export default function DifusionPage() {
               <Lightbulb className="w-3.5 h-3.5" /> Métricas de Reputación
             </button>
           </div>
+
+          <TabDescription
+            description="Muestra si tu número de WhatsApp Business está en buen estado ante Meta. Si muchos usuarios te marcan como spam, WhatsApp puede reducir la cantidad de mensajes que podés enviar por día."
+            example="Si tu 'Quality Rating' baja a amarillo o rojo, revisá que estés enviando mensajes solo a personas que te dieron su número voluntariamente y que el contenido sea relevante para ellas."
+          />
 
           {showHelp === "salud" && <HelpPanel data={helpContent.salud} compact />}
 
@@ -983,6 +1301,23 @@ function HealthCard({ label, value, desc, color, percent }: any) {
         <div className={cn("h-full rounded-full transition-all duration-1000", colors[color])} style={{ width: `${percent}%` }} />
       </div>
       <p className="text-[11px] text-slate-400 font-bold leading-relaxed">{desc}</p>
+    </div>
+  );
+}
+
+function TabDescription({ description, example }: { description: string; example: string }) {
+  return (
+    <div className="mx-2 bg-white border border-[var(--border-light)] rounded-2xl px-6 py-4 flex items-start gap-4 shadow-sm">
+      <div className="w-8 h-8 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center shrink-0 mt-0.5">
+        <Lightbulb className="w-4 h-4 text-[var(--accent)]" />
+      </div>
+      <div className="space-y-1">
+        <p className="text-sm font-semibold text-[var(--text-primary-light)] leading-relaxed">{description}</p>
+        <p className="text-xs text-[var(--text-tertiary-light)] font-medium leading-relaxed">
+          <span className="font-black text-[var(--text-secondary-light)] uppercase tracking-wider text-[10px]">Ejemplo: </span>
+          {example}
+        </p>
+      </div>
     </div>
   );
 }

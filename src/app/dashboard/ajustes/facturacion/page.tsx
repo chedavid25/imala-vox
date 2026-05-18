@@ -18,7 +18,6 @@ import {
   ChevronDown,
   HelpCircle,
   Lightbulb,
-  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,7 +52,7 @@ import { db } from "@/lib/firebase";
 import { collection, query, orderBy, onSnapshot, Timestamp } from "firebase/firestore";
 import { COLLECTIONS, EventoFacturacion } from "@/lib/types/firestore";
 import { toast } from "sonner";
-import { crearSuscripcionMP, cancelarSuscripcionMP, cambiarPlan, obtenerCotizacionBlue, sincronizarSuscripcionMP } from "@/app/actions/billing";
+import { crearSuscripcionMP, cancelarSuscripcionMP, cambiarPlan, obtenerCotizacionBlue } from "@/app/actions/billing";
 import { cn } from "@/lib/utils";
 
 type FeatureItem = { text: string; tooltip?: string };
@@ -67,32 +66,34 @@ const PLAN_DISPLAY: Record<'starter' | 'pro' | 'agencia', PlanDisplay> = {
         label: "IA & Agentes",
         items: [
           { text: "1 Agente Inteligente", tooltip: "Experto virtual entrenado con tu información. Responde 24/7 en todos tus canales." },
-          { text: "1.000 conversaciones/mes", tooltip: "Cada conversación es una sesión con un cliente. Mensajes ilimitados por sesión." },
-          { text: "Base de conocimiento", tooltip: "Entrená a tu agente con archivos PDF, textos y sitios web." },
+          { text: "800 conversaciones IA/mes", tooltip: "Cada conversación es una sesión con un cliente. Mensajes ilimitados por sesión." },
+          { text: "Base de conocimiento (PDF, webs, textos)", tooltip: "Entrená a tu agente con archivos PDF, textos y sitios web." },
+          { text: "3 fuentes de conocimiento" },
         ],
       },
       {
         label: "Canales",
         items: [
-          { text: "WhatsApp · Instagram · Facebook" },
+          { text: "1 número WhatsApp · Instagram · Facebook" },
+          { text: "Captura de leads de Meta Ads" },
         ],
       },
       {
         label: "CRM",
         items: [
-          { text: "1.500 contactos CRM" },
-          { text: "Leads, Tareas y Contactos" },
-          { text: "Etiquetas y segmentación" },
+          { text: "500 contactos" },
+          { text: "Pipeline básico" },
+          { text: "Leads, Tareas y Etiquetas" },
         ],
       },
       {
         label: "No incluido",
         locked: true,
         items: [
-          { text: "Catálogo de productos" },
+          { text: "Catálogo de productos / propiedades" },
           { text: "Difusión masiva" },
-          { text: "Meta Ads · Captura de leads" },
           { text: "Workflows automatizados" },
+          { text: "Chat en vivo para tu sitio web" },
         ],
       },
     ],
@@ -103,17 +104,24 @@ const PLAN_DISPLAY: Record<'starter' | 'pro' | 'agencia', PlanDisplay> = {
       {
         label: "IA & Agentes",
         items: [
-          { text: "Hasta 3 Agentes Inteligentes", tooltip: "Cada agente con su propio rol, conocimiento y comportamiento independiente." },
-          { text: "3.000 conversaciones/mes" },
-          { text: "5.000 contactos CRM" },
+          { text: "2 Agentes Inteligentes con roles distintos", tooltip: "Cada agente con su propio rol, conocimiento y comportamiento independiente." },
+          { text: "2.000 conversaciones IA/mes" },
+          { text: "Fuentes de conocimiento ilimitadas" },
+        ],
+      },
+      {
+        label: "Catálogo",
+        items: [
+          { text: "Catálogo de productos / propiedades (300 ítems)", tooltip: "Mostrá tus productos directamente en el chat y automatizaciones." },
+          { text: "Scraping automático desde tu sitio web" },
         ],
       },
       {
         label: "Marketing",
         items: [
-          { text: "Catálogo de productos (200 items)", tooltip: "Mostrá tus productos directamente en el chat y automatizaciones." },
-          { text: "Difusión masiva (hasta 1.000/envío)", tooltip: "Enviá mensajes en masa a segmentos de contactos con seguimiento." },
-          { text: "Meta Ads · Leads de campañas", tooltip: "Captura automática de leads desde campañas de Facebook e Instagram." },
+          { text: "2 números WhatsApp" },
+          { text: "Difusión masiva hasta 2.000 contactos/envío", tooltip: "Enviá mensajes en masa a segmentos de contactos con seguimiento." },
+          { text: "Contactos ilimitados" },
         ],
       },
       {
@@ -121,6 +129,7 @@ const PLAN_DISPLAY: Record<'starter' | 'pro' | 'agencia', PlanDisplay> = {
         locked: true,
         items: [
           { text: "Workflows automatizados" },
+          { text: "Chat en vivo para tu sitio web" },
         ],
       },
     ],
@@ -131,22 +140,25 @@ const PLAN_DISPLAY: Record<'starter' | 'pro' | 'agencia', PlanDisplay> = {
       {
         label: "IA & Agentes",
         items: [
-          { text: "Hasta 10 Agentes Inteligentes" },
-          { text: "10.000 conversaciones/mes" },
-          { text: "Contactos ilimitados" },
+          { text: "10 Agentes Inteligentes especializados" },
+          { text: "10.000 conversaciones IA/mes" },
+          { text: "5 usuarios del panel" },
         ],
       },
       {
-        label: "Marketing ampliado",
+        label: "Catálogo & Canales",
         items: [
-          { text: "Catálogo ilimitado de productos" },
-          { text: "Difusión masiva sin límite" },
+          { text: "Catálogo ilimitado con re-sincronización automática" },
+          { text: "5 números WhatsApp" },
+          { text: "Chat en vivo para tu sitio web" },
         ],
       },
       {
         label: "Automatización",
         items: [
           { text: "Workflows automatizados", tooltip: "Flujos visuales para automatizar respuestas, notificaciones y acciones complejas." },
+          { text: "Asignación automática de chats" },
+          { text: "API access" },
         ],
       },
     ],
@@ -163,7 +175,6 @@ export default function FacturacionPage() {
   const [targetPlan, setTargetPlan] = useState<'starter' | 'pro' | 'agencia' | null>(null);
   const [isUpgradeDialogOpen, setIsUpgradeDialogOpen] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const [loadingSync, setLoadingSync] = useState(false);
 
   const ayudaFacturacion = {
     titulo: "Facturación y Suscripciones",
@@ -270,25 +281,6 @@ export default function FacturacionPage() {
     }
   };
 
-  const handleSync = async () => {
-    setLoadingSync(true);
-    try {
-      const res = await sincronizarSuscripcionMP(currentWorkspaceId!);
-      if (res.success) {
-        if (res.plan && res.estado === "activo") {
-          toast.success(`¡Plan ${res.plan} activado correctamente!`);
-        } else {
-          toast.info(`Estado sincronizado con MercadoPago: ${res.mpStatus}`);
-        }
-      } else {
-        toast.error(res.error || "No se pudo verificar el pago");
-      }
-    } catch {
-      toast.error("Error al verificar con MercadoPago");
-    } finally {
-      setLoadingSync(false);
-    }
-  };
 
   const nextBillingDate = () => {
     const d = new Date();
@@ -419,26 +411,14 @@ export default function FacturacionPage() {
             </div>
 
             {workspace.facturacion?.planPendiente && (
-              <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 space-y-3">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="size-4 text-amber-600 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-[11px] font-black text-amber-800 uppercase tracking-widest">Pago pendiente de confirmación</p>
-                    <p className="text-[10px] text-amber-700 font-medium mt-0.5">
-                      Plan <strong>{workspace.facturacion.planPendiente}</strong> pagado — esperando confirmación de MercadoPago.
-                    </p>
-                  </div>
+              <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 flex items-center gap-3">
+                <Loader2 className="size-4 text-amber-600 shrink-0 animate-spin" />
+                <div>
+                  <p className="text-[11px] font-black text-amber-800 uppercase tracking-widest">Confirmando pago…</p>
+                  <p className="text-[10px] text-amber-700 font-medium mt-0.5">
+                    Plan <strong>{workspace.facturacion.planPendiente}</strong> — MercadoPago está procesando. Se activará automáticamente.
+                  </p>
                 </div>
-                <Button
-                  size="sm"
-                  disabled={loadingSync}
-                  onClick={handleSync}
-                  className="w-full h-9 bg-amber-500 hover:bg-amber-600 text-white font-black text-[9px] uppercase tracking-widest rounded-xl"
-                >
-                  {loadingSync
-                    ? <><Loader2 className="size-3 animate-spin mr-2" />Verificando...</>
-                    : <><RefreshCw className="size-3 mr-2" />Verificar pago con MercadoPago</>}
-                </Button>
               </div>
             )}
           </CardContent>

@@ -127,6 +127,7 @@ export interface Contacto {
   esContactoCRM?: boolean;
   relacionTag: 'Personal' | 'Laboral' | 'Lead';
   aiBlocked: boolean;
+  optOut?: boolean;
   etiquetas: string[];
   ultimaInteraccion: Timestamp;
   fechaNacimiento?: string;        // Formato YYYY-MM-DD
@@ -434,6 +435,7 @@ export interface CampañaDifusion {
   nombre: string;
   plantillaId: string;
   filtroEtiquetas: string[];
+  variableValues?: Record<string, string>; // ej: { "2": "Depto en Palermo, USD 85k", "3": "link.com/prop" }
   estado: 'programada' | 'en_progreso' | 'completada' | 'pausada' | 'error';
   estadisticas: {
     total: number;
@@ -455,6 +457,7 @@ export interface DisparadorAuto {
   activo: boolean;
   config: {
     palabraClave: string;
+    canalId?: string;
     aplicarATodosPosts?: boolean;
     postIds?: string[];
     respuestaPublica?: string;
