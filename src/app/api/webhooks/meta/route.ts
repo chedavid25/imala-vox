@@ -491,17 +491,23 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
     // 3. Obtener o crear conversación
     const convRef = adminDb.collection(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CONVERSACIONES}`);
     let convId = "";
+
+    // Buscar por contactoId primero, luego filtrar por canalId en memoria
+    // para evitar dependencia de índice compuesto y tolerar cambios de canalId
     const convSnap = await convRef
       .where('contactoId', '==', contactoId)
-      .where('canalId', '==', canalId)
-      .limit(1)
+      .orderBy('ultimaActividad', 'desc')
+      .limit(10)
       .get();
 
-    if (convSnap.empty) {
+    const convExistente = convSnap.docs.find(d => d.data().canalId === canalId)
+      || convSnap.docs[0]; // fallback: misma persona en cualquier canal
+
+    if (!convExistente) {
       const res = await convRef.add({
         contactoId,
-        contactoNombre, // Denormalización para el Inbox
-        canal: canalType, // Denormalización para el Inbox
+        contactoNombre,
+        canal: canalType,
         canalId,
         agenteId: canalData.agenteId || null,
         ultimoMensaje: text,
@@ -513,7 +519,7 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
       convId = res.id;
       console.log(`🆕 Conversación creada: ${convId}`);
     } else {
-      convId = convSnap.docs[0].id;
+      convId = convExistente.id;
       console.log(`💬 Conversación existente: ${convId}`);
       await convRef.doc(convId).update({
         ultimoMensaje: text,
@@ -695,11 +701,14 @@ async function procesarMensajeWhatsapp(value: any, wabaId: string) {
     let convId = "";
     const convSnap = await convRef
       .where('contactoId', '==', contactoId)
-      .where('canalId', '==', canalId)
-      .limit(1)
+      .orderBy('ultimaActividad', 'desc')
+      .limit(10)
       .get();
 
-    if (convSnap.empty) {
+    const convExistente = convSnap.docs.find(d => d.data().canalId === canalId)
+      || convSnap.docs[0];
+
+    if (!convExistente) {
       const res = await convRef.add({
         contactoId,
         contactoNombre,
@@ -716,14 +725,14 @@ async function procesarMensajeWhatsapp(value: any, wabaId: string) {
       convId = res.id;
       console.log(`🆕 Conversación WA creada: ${convId}`);
     } else {
-      convId = convSnap.docs[0].id;
+      convId = convExistente.id;
       console.log(`💬 Conversación WA existente: ${convId}`);
       await convRef.doc(convId).update({
         ultimoMensaje: text,
         contactoNombre,
         ultimaActividad: Timestamp.now(),
         ultimoMensajeCliente: Timestamp.now(),
-        unreadCount: (convSnap.docs[0].data().unreadCount || 0) + 1
+        unreadCount: (convExistente.data().unreadCount || 0) + 1
       });
     }
 
