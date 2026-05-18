@@ -107,6 +107,7 @@ export default function DifusionPage() {
     nombre: "",
     etiquetasSeleccionadas: [] as string[],
     plantillaId: "",
+    variableValues: {} as Record<string, string>,
     programar: false,
     fecha: format(new Date(), "yyyy-MM-dd"),
     hora: "09:00"
