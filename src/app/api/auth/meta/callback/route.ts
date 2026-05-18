@@ -147,11 +147,23 @@ export async function GET(req: NextRequest) {
           });
           igCanalId = igRef.id;
         }
-        
-      // Compartir el mismo token de la página para Instagram
-      await guardarTokenCanal(wsId, igCanalId, pageAccessToken);
+
+        // Compartir el mismo token de la página para Instagram
+        await guardarTokenCanal(wsId, igCanalId, pageAccessToken);
+
+        // Suscribir la página a eventos de Instagram (comentarios y mensajes)
+        try {
+          const igSubUrl = new URL(`https://graph.facebook.com/v19.0/${metaPageId}/subscribed_apps`);
+          igSubUrl.searchParams.set('subscribed_fields', 'instagram_manage_comments,instagram_manage_messages,messages');
+          igSubUrl.searchParams.set('access_token', pageAccessToken);
+          const igSubRes = await fetch(igSubUrl.toString(), { method: 'POST' });
+          const igSubData = await igSubRes.json();
+          console.log(`[IG-SUBSCRIBE] Resultado suscripción Instagram para página ${metaPageId}:`, igSubData);
+        } catch (igSubErr) {
+          console.error('[IG-SUBSCRIBE] Error al suscribir webhooks de Instagram:', igSubErr);
+        }
+      }
     }
-  }
 
   // --- DETECTION DE WHATSAPP BUSINESS (Búsqueda Profunda) ---
   try {
