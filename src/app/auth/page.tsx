@@ -7,7 +7,8 @@ import {
   createUserWithEmailAndPassword,
   updateProfile,
   GoogleAuthProvider,
-  signInWithPopup
+  signInWithPopup,
+  sendPasswordResetEmail
 } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -33,6 +34,7 @@ import { verificarYSetearAdmin } from "@/app/actions/superadmin";
 
 export default function AuthPage() {
   const [loading, setLoading] = useState(false);
+  const [resetMode, setResetMode] = useState(false);
   const router = useRouter();
 
   // Estados para Login
@@ -44,6 +46,25 @@ export default function AuthPage() {
   const [registerEmail, setRegisterEmail] = useState("");
   const [registerPassword, setRegisterPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!loginEmail) {
+      toast.error("Por favor, ingresa tu correo electrónico.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, loginEmail);
+      toast.success("Correo de recuperación enviado. Revisa tu bandeja de entrada.");
+      setResetMode(false);
+    } catch (error: any) {
+      console.error("Error al enviar correo de recuperación:", error);
+      toast.error(error.message || "Error al enviar el correo de recuperación");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -202,7 +223,7 @@ export default function AuthPage() {
             <h1 className="text-xl font-black tracking-tight text-[var(--text-primary-light)]">Imalá Vox</h1>
           </Link>
 
-          <Tabs defaultValue="login" className="w-full">
+          <Tabs defaultValue="login" className="w-full" onValueChange={() => setResetMode(false)}>
             <TabsList className="grid w-full grid-cols-2 mb-8 bg-[var(--bg-input)] p-1 h-12 rounded-xl">
               <TabsTrigger value="login" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 Iniciar sesión
@@ -213,71 +234,127 @@ export default function AuthPage() {
             </TabsList>
 
             <TabsContent value="login" className="space-y-6">
-              <form onSubmit={handleLogin} className="space-y-5">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="text-sm font-bold text-[var(--text-secondary-light)]">Email Corporativo</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 w-4 h-4 text-[var(--text-tertiary-light)]" />
-                      <Input 
-                        id="email" 
-                        type="email" 
-                        placeholder="ejemplo@negocio.com" 
-                        required 
-                        className="pl-10 h-11 border-[var(--border-light)] bg-white focus:ring-[var(--accent)] rounded-xl"
-                        value={loginEmail}
-                        onChange={(e) => setLoginEmail(e.target.value)}
-                      />
+              {resetMode ? (
+                <form onSubmit={handlePasswordReset} className="space-y-5">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-bold text-[var(--text-primary-light)]">Restablecer contraseña</h3>
+                      <p className="text-xs text-[var(--text-tertiary-light)] font-medium leading-relaxed">
+                        Ingresa tu correo electrónico registrado y te enviaremos un enlace para restablecer tu contraseña.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="reset-email" className="text-sm font-bold text-[var(--text-secondary-light)]">Email Corporativo</Label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-3 w-4 h-4 text-[var(--text-tertiary-light)]" />
+                        <Input 
+                          id="reset-email" 
+                          type="email" 
+                          placeholder="ejemplo@negocio.com" 
+                          required 
+                          className="pl-10 h-11 border-[var(--border-light)] bg-white focus:ring-[var(--accent)] rounded-xl"
+                          value={loginEmail}
+                          onChange={(e) => setLoginEmail(e.target.value)}
+                        />
+                      </div>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <Label htmlFor="pass" className="text-sm font-bold text-[var(--text-secondary-light)]">Contraseña</Label>
-                      <button type="button" className="text-[11px] font-bold text-[var(--accent-active)] hover:underline">Olvide mi clave</button>
+
+                  <Button 
+                    type="submit" 
+                    disabled={loading}
+                    className="w-full h-11 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-bold text-md rounded-xl shadow-lg shadow-[var(--accent)]/10"
+                  >
+                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                      <span className="flex items-center gap-2">Enviar enlace <ArrowRight className="w-4 h-4" /></span>
+                    )}
+                  </Button>
+                  
+                  <div className="text-center">
+                    <button 
+                      type="button" 
+                      onClick={() => setResetMode(false)}
+                      className="text-xs font-bold text-[var(--accent-active)] hover:underline"
+                    >
+                      Volver al inicio de sesión
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <>
+                  <form onSubmit={handleLogin} className="space-y-5">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="email" className="text-sm font-bold text-[var(--text-secondary-light)]">Email Corporativo</Label>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-3 w-4 h-4 text-[var(--text-tertiary-light)]" />
+                          <Input 
+                            id="email" 
+                            type="email" 
+                            placeholder="ejemplo@negocio.com" 
+                            required 
+                            className="pl-10 h-11 border-[var(--border-light)] bg-white focus:ring-[var(--accent)] rounded-xl"
+                            value={loginEmail}
+                            onChange={(e) => setLoginEmail(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <Label htmlFor="pass" className="text-sm font-bold text-[var(--text-secondary-light)]">Contraseña</Label>
+                          <button 
+                            type="button" 
+                            onClick={() => setResetMode(true)}
+                            className="text-[11px] font-bold text-[var(--accent-active)] hover:underline"
+                          >
+                            Olvide mi clave
+                          </button>
+                        </div>
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-3 w-4 h-4 text-[var(--text-tertiary-light)]" />
+                          <Input 
+                            id="pass" 
+                            type="password" 
+                            placeholder="••••••••" 
+                            required 
+                            className="pl-10 h-11 border-[var(--border-light)] bg-white focus:ring-[var(--accent)] rounded-xl"
+                            value={loginPassword}
+                            onChange={(e) => setLoginPassword(e.target.value)}
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 w-4 h-4 text-[var(--text-tertiary-light)]" />
-                      <Input 
-                        id="pass" 
-                        type="password" 
-                        placeholder="••••••••" 
-                        required 
-                        className="pl-10 h-11 border-[var(--border-light)] bg-white focus:ring-[var(--accent)] rounded-xl"
-                        value={loginPassword}
-                        onChange={(e) => setLoginPassword(e.target.value)}
-                      />
+
+                    <Button 
+                      type="submit" 
+                      disabled={loading}
+                      className="w-full h-11 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-bold text-md rounded-xl shadow-lg shadow-[var(--accent)]/10"
+                    >
+                      {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                        <span className="flex items-center gap-2">Ingresar <ArrowRight className="w-4 h-4" /></span>
+                      )}
+                    </Button>
+                  </form>
+
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t border-[var(--border-light)]" />
+                    </div>
+                    <div className="relative flex justify-center text-[10px] uppercase font-bold tracking-widest text-[var(--text-tertiary-light)]">
+                      <span className="bg-[var(--bg-main)] px-4">O continuar con</span>
                     </div>
                   </div>
-                </div>
 
-                <Button 
-                  type="submit" 
-                  disabled={loading}
-                  className="w-full h-11 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-bold text-md rounded-xl shadow-lg shadow-[var(--accent)]/10"
-                >
-                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-                    <span className="flex items-center gap-2">Ingresar <ArrowRight className="w-4 h-4" /></span>
-                  )}
-                </Button>
-              </form>
-
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-[var(--border-light)]" />
-                </div>
-                <div className="relative flex justify-center text-[10px] uppercase font-bold tracking-widest text-[var(--text-tertiary-light)]">
-                  <span className="bg-[var(--bg-main)] px-4">O continuar con</span>
-                </div>
-              </div>
-
-              <Button 
-                onClick={handleGoogleLogin}
-                variant="outline"
-                className="w-full h-11 bg-white border-[var(--border-light)] hover:bg-gray-50 rounded-xl font-bold flex items-center gap-3 transition-all"
-              >
-                <SVGGoogle />
-                Continuar con Google
-              </Button>
+                  <Button 
+                    onClick={handleGoogleLogin}
+                    variant="outline"
+                    className="w-full h-11 bg-white border-[var(--border-light)] hover:bg-gray-50 rounded-xl font-bold flex items-center gap-3 transition-all"
+                  >
+                    <SVGGoogle />
+                    Continuar con Google
+                  </Button>
+                </>
+              )}
             </TabsContent>
 
             <TabsContent value="register" className="space-y-6">
