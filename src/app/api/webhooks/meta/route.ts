@@ -525,7 +525,7 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
         contactoNombre,
         canal: canalType,
         ultimaActividad: Timestamp.now(),
-        unreadCount: (convSnap.docs[0].data().unreadCount || 0) + 1
+        unreadCount: (convExistente.data().unreadCount || 0) + 1
       });
     }
 
