@@ -237,7 +237,7 @@ async function procesarLeadMeta(leadData: any, pageId: string) {
     // 3. Obtener datos del lead desde Meta
     console.log(`📡 [LEAD ${leadId}] Consultando Meta Graph API...`);
     const metaRes = await fetch(
-      `https://graph.facebook.com/v19.0/${leadId}?fields=field_data,ad_name,campaign_name,form_id&access_token=${clienteToken}`
+      `https://graph.facebook.com/v19.0/${leadId}?fields=field_data,ad_id,ad_name,campaign_name,form_id&access_token=${clienteToken}`
     );
 
     if (!metaRes.ok) {
