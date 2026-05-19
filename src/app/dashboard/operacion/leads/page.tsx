@@ -674,19 +674,17 @@ export default function LeadsPage() {
             </div>
 
             <div className="flex gap-2">
-              {campanasDisponibles.length > 0 && (
-                <Select value={filtroCampana} onValueChange={(val) => setFiltroCampana(val || 'todas')}>
-                  <SelectTrigger className="h-11 bg-white border border-[var(--border-light)] rounded-2xl focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/10 transition-all text-sm font-semibold text-slate-700 w-[200px] shadow-sm">
-                    <SelectValue placeholder="Todas las campañas" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white rounded-2xl border-slate-100 shadow-xl z-[150]">
-                    <SelectItem value="todas" className="rounded-xl font-bold py-2">Todas las campañas</SelectItem>
-                    {campanasDisponibles.map(c => (
-                      <SelectItem key={c} value={c} className="rounded-xl font-medium py-2">{c}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+              <Select value={filtroCampana} onValueChange={(val) => setFiltroCampana(val || 'todas')}>
+                <SelectTrigger className="h-11 bg-white border border-[var(--border-light)] rounded-2xl focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/10 transition-all text-sm font-semibold text-slate-700 w-[200px] shadow-sm">
+                  <SelectValue placeholder="Todas las campañas" />
+                </SelectTrigger>
+                <SelectContent className="bg-white rounded-2xl border-slate-100 shadow-xl z-[150]">
+                  <SelectItem value="todas" className="rounded-xl font-bold py-2">Todas las campañas</SelectItem>
+                  {campanasDisponibles.map(c => (
+                    <SelectItem key={c} value={c} className="rounded-xl font-medium py-2">{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Button 
                 onClick={() => {
                   setNewLeadData({

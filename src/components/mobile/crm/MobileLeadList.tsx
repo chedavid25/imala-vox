@@ -107,35 +107,33 @@ export function MobileLeadList({ leads, etapas, onSelect, onNewLead, onConvert, 
           ))}
         </div>
 
-        {campanasDisponibles.length > 0 && (
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+          <button
+            onClick={() => setActiveCampana('todas')}
+            className={cn(
+              "px-4 py-2 rounded-xl text-[10px] font-semibold uppercase tracking-widest transition-all border-2 shrink-0",
+              activeCampana === 'todas' 
+                ? "bg-[var(--accent)] border-[var(--accent)] text-slate-900 shadow-sm" 
+                : "bg-white border-slate-50 text-slate-400"
+            )}
+          >
+            Todas las campañas
+          </button>
+          {campanasDisponibles.map(c => (
             <button
-              onClick={() => setActiveCampana('todas')}
+              key={c as string}
+              onClick={() => setActiveCampana(c as string)}
               className={cn(
                 "px-4 py-2 rounded-xl text-[10px] font-semibold uppercase tracking-widest transition-all border-2 shrink-0",
-                activeCampana === 'todas' 
+                activeCampana === c 
                   ? "bg-[var(--accent)] border-[var(--accent)] text-slate-900 shadow-sm" 
                   : "bg-white border-slate-50 text-slate-400"
               )}
             >
-              Todas las campañas
+              {c as string}
             </button>
-            {campanasDisponibles.map(c => (
-              <button
-                key={c as string}
-                onClick={() => setActiveCampana(c as string)}
-                className={cn(
-                  "px-4 py-2 rounded-xl text-[10px] font-semibold uppercase tracking-widest transition-all border-2 shrink-0",
-                  activeCampana === c 
-                    ? "bg-[var(--accent)] border-[var(--accent)] text-slate-900 shadow-sm" 
-                    : "bg-white border-slate-50 text-slate-400"
-                )}
-              >
-                {c as string}
-              </button>
-            ))}
-          </div>
-        )}
+          ))}
+        </div>
       </div>
 
       {/* Lista de Cards */}
