@@ -454,7 +454,8 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
         }
       }
 
-      const res = await contactosRef.add({
+      contactoId = `meta_${senderId}`;
+      await contactosRef.doc(contactoId).set({
         nombre: contactoNombre,
         avatarUrl,
         metaId: senderId,
@@ -462,8 +463,7 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
         aiBlocked: false,
         esContactoCRM: false, // Inician como prospectos de chat, no en el CRM real
         creadoEl: Timestamp.now()
-      });
-      contactoId = res.id;
+      }, { merge: true });
     } else {
       const cDoc = contactSnap.docs[0];
       contactoId = cDoc.id;
@@ -503,7 +503,8 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
       || convSnap.docs[0]; // fallback: misma persona en cualquier canal
 
     if (!convExistente) {
-      const res = await convRef.add({
+      convId = `conv_${contactoId}_${canalId}`;
+      await convRef.doc(convId).set({
         contactoId,
         contactoNombre,
         canal: canalType,
@@ -514,8 +515,7 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
         unreadCount: 1,
         modoIA: 'auto',
         creadoEl: Timestamp.now()
-      });
-      convId = res.id;
+      }, { merge: true });
       console.log(`🆕 Conversación creada: ${convId}`);
     } else {
       convId = convExistente.id;
@@ -696,15 +696,15 @@ async function procesarMensajeWhatsapp(value: any, wabaId: string) {
     const contactSnap = await contactosRef.where('telefono', '==', senderId).limit(1).get();
 
     if (contactSnap.empty) {
-      const res = await contactosRef.add({
+      contactoId = `wa_${senderId}`;
+      await contactosRef.doc(contactoId).set({
         nombre: contactoNombre,
         telefono: senderId,
         canalOrigen: 'whatsapp',
         aiBlocked: false,
         esContactoCRM: false,
         creadoEl: Timestamp.now()
-      });
-      contactoId = res.id;
+      }, { merge: true });
     } else {
       const cDoc = contactSnap.docs[0];
       contactoId = cDoc.id;
@@ -723,7 +723,8 @@ async function procesarMensajeWhatsapp(value: any, wabaId: string) {
       || convSnap.docs[0];
 
     if (!convExistente) {
-      const res = await convRef.add({
+      convId = `conv_${contactoId}_${canalId}`;
+      await convRef.doc(convId).set({
         contactoId,
         contactoNombre,
         canal: 'whatsapp',
@@ -735,8 +736,7 @@ async function procesarMensajeWhatsapp(value: any, wabaId: string) {
         unreadCount: 1,
         modoIA: 'auto',
         creadoEl: Timestamp.now()
-      });
-      convId = res.id;
+      }, { merge: true });
       console.log(`🆕 Conversación WA creada: ${convId}`);
     } else {
       convId = convExistente.id;
