@@ -529,13 +529,29 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
       });
     }
 
-    // 4. Guardar mensaje
-    await convRef.doc(convId).collection(COLLECTIONS.MENSAJES).add({
-      text,
-      from: 'user',
-      creadoEl: Timestamp.now(),
-      visto: false
-    });
+    // 4. Guardar mensaje y evitar duplicados
+    const metaMessageId = messagingItem.message?.mid;
+    if (metaMessageId) {
+      const msgDocRef = convRef.doc(convId).collection(COLLECTIONS.MENSAJES).doc(metaMessageId);
+      const msgDocSnap = await msgDocRef.get();
+      if (msgDocSnap.exists) {
+        console.log(`⚠️ Mensaje duplicado de Meta ignorado: ${metaMessageId}`);
+        return;
+      }
+      await msgDocRef.set({
+        text,
+        from: 'user',
+        creadoEl: Timestamp.now(),
+        visto: false
+      });
+    } else {
+      await convRef.doc(convId).collection(COLLECTIONS.MENSAJES).add({
+        text,
+        from: 'user',
+        creadoEl: Timestamp.now(),
+        visto: false
+      });
+    }
 
     // 5. Trigger IA si está habilitado
     if (canalData.aiEnabled && canalData.agenteId) {
@@ -734,13 +750,29 @@ async function procesarMensajeWhatsapp(value: any, wabaId: string) {
       });
     }
 
-    // 4. Guardar mensaje
-    await convRef.doc(convId).collection(COLLECTIONS.MENSAJES).add({
-      text,
-      from: 'user',
-      creadoEl: Timestamp.now(),
-      visto: false
-    });
+    // 4. Guardar mensaje y evitar duplicados
+    const metaMessageId = message.id;
+    if (metaMessageId) {
+      const msgDocRef = convRef.doc(convId).collection(COLLECTIONS.MENSAJES).doc(metaMessageId);
+      const msgDocSnap = await msgDocRef.get();
+      if (msgDocSnap.exists) {
+        console.log(`⚠️ Mensaje duplicado de WhatsApp ignorado: ${metaMessageId}`);
+        return;
+      }
+      await msgDocRef.set({
+        text,
+        from: 'user',
+        creadoEl: Timestamp.now(),
+        visto: false
+      });
+    } else {
+      await convRef.doc(convId).collection(COLLECTIONS.MENSAJES).add({
+        text,
+        from: 'user',
+        creadoEl: Timestamp.now(),
+        visto: false
+      });
+    }
 
     // 5. Trigger IA
     if (canalData.aiEnabled && canalData.agenteId) {
