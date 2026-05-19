@@ -22,13 +22,17 @@ interface MobileLeadListProps {
 export function MobileLeadList({ leads, etapas, onSelect, onNewLead, onConvert, onWhatsApp }: MobileLeadListProps) {
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<'todos' | 'meta_ads' | 'organico'>('todos');
+  const [activeCampana, setActiveCampana] = useState<string>('todas');
   const [selectedLead, setSelectedLead] = useState<any>(null);
+
+  const campanasDisponibles = Array.from(new Set(leads.map(l => l.campana).filter(Boolean))).sort();
 
   const filteredLeads = leads.filter(l => {
     const matchesSearch = (l.nombre || "").toLowerCase().includes(search.toLowerCase()) || 
                           (l.telefono || "").includes(search);
     const matchesFilter = activeFilter === 'todos' || l.origen === activeFilter;
-    return matchesSearch && matchesFilter;
+    const matchesCampana = activeCampana === 'todas' || l.campana === activeCampana;
+    return matchesSearch && matchesFilter && matchesCampana;
   });
 
   const getEtapaColor = (etapaId: string) => {
@@ -102,6 +106,36 @@ export function MobileLeadList({ leads, etapas, onSelect, onNewLead, onConvert, 
             </button>
           ))}
         </div>
+
+        {campanasDisponibles.length > 0 && (
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+            <button
+              onClick={() => setActiveCampana('todas')}
+              className={cn(
+                "px-4 py-2 rounded-xl text-[10px] font-semibold uppercase tracking-widest transition-all border-2 shrink-0",
+                activeCampana === 'todas' 
+                  ? "bg-[var(--accent)] border-[var(--accent)] text-slate-900 shadow-sm" 
+                  : "bg-white border-slate-50 text-slate-400"
+              )}
+            >
+              Todas las campañas
+            </button>
+            {campanasDisponibles.map(c => (
+              <button
+                key={c as string}
+                onClick={() => setActiveCampana(c as string)}
+                className={cn(
+                  "px-4 py-2 rounded-xl text-[10px] font-semibold uppercase tracking-widest transition-all border-2 shrink-0",
+                  activeCampana === c 
+                    ? "bg-[var(--accent)] border-[var(--accent)] text-slate-900 shadow-sm" 
+                    : "bg-white border-slate-50 text-slate-400"
+                )}
+              >
+                {c as string}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Lista de Cards */}

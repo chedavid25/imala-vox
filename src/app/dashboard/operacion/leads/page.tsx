@@ -115,6 +115,7 @@ export default function LeadsPage() {
   const [etapas, setEtapas] = useState<(EtapaEmbudo & { id: string })[]>([]);
   const [search, setSearch] = useState("");
   const [filtroOrigen, setFiltroOrigen] = useState<'todos' | 'meta_ads' | 'organico' | 'manual'>('todos');
+  const [filtroCampana, setFiltroCampana] = useState<string>('todas');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   
@@ -206,6 +207,14 @@ export default function LeadsPage() {
     return () => unsubscribe();
   }, [currentWorkspaceId]);
 
+  const campanasDisponibles = useMemo(() => {
+    const campanas = new Set<string>();
+    leads.forEach(l => {
+      if (l.campana) campanas.add(l.campana);
+    });
+    return Array.from(campanas).sort();
+  }, [leads]);
+
   // Filtrado de Leads
   const filteredLeads = useMemo(() => {
     return leads.filter(l => {
@@ -213,9 +222,10 @@ export default function LeadsPage() {
         l.email?.toLowerCase().includes(search.toLowerCase()) ||
         l.telefono?.includes(search);
       const matchOrigen = filtroOrigen === 'todos' || l.origen === filtroOrigen;
-      return matchSearch && matchOrigen;
+      const matchCampana = filtroCampana === 'todas' || l.campana === filtroCampana;
+      return matchSearch && matchOrigen && matchCampana;
     });
-  }, [leads, search, filtroOrigen]);
+  }, [leads, search, filtroOrigen, filtroCampana]);
 
   // Cálculos de Métricas Reales
   const metrics = useMemo(() => {
@@ -664,6 +674,19 @@ export default function LeadsPage() {
             </div>
 
             <div className="flex gap-2">
+              {campanasDisponibles.length > 0 && (
+                <Select value={filtroCampana} onValueChange={setFiltroCampana}>
+                  <SelectTrigger className="h-11 bg-[var(--bg-input)] border-transparent rounded-2xl focus:border-[var(--accent-active)] focus:ring-2 focus:ring-[var(--accent)]/20 transition-all text-sm font-medium w-[180px]">
+                    <SelectValue placeholder="Todas las campañas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todas">Todas las campañas</SelectItem>
+                    {campanasDisponibles.map(c => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               <Button 
                 onClick={() => {
                   setNewLeadData({
