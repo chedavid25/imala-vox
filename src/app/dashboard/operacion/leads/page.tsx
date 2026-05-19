@@ -675,7 +675,7 @@ export default function LeadsPage() {
 
             <div className="flex gap-2">
               {campanasDisponibles.length > 0 && (
-                <Select value={filtroCampana} onValueChange={setFiltroCampana}>
+                <Select value={filtroCampana} onValueChange={(val) => setFiltroCampana(val || 'todas')}>
                   <SelectTrigger className="h-11 bg-[var(--bg-input)] border-transparent rounded-2xl focus:border-[var(--accent-active)] focus:ring-2 focus:ring-[var(--accent)]/20 transition-all text-sm font-medium w-[180px]">
                     <SelectValue placeholder="Todas las campañas" />
                   </SelectTrigger>
