@@ -364,6 +364,15 @@ export function ContextPanel({ onSendMessage }: { onSendMessage?: (text: string)
           
           <TabsContent value="perfil" className="p-6 m-0 space-y-8 animate-in fade-in">
             <div className="space-y-4">
+               {selectedContact && selectedContact.esContactoCRM !== true && (
+                 <Button 
+                   onClick={() => handleUpdateField("esContactoCRM", true)}
+                   className="w-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-11 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-[var(--accent)]/15 transition-all hover:scale-[1.01] active:scale-95 flex items-center justify-center gap-2 mb-4"
+                 >
+                   <Plus className="size-4" /> Agregar a Contactos CRM
+                 </Button>
+               )}
+
                <div className="flex items-center justify-between px-1">
                   <Label className="text-[10px] font-bold text-[var(--text-tertiary-light)] uppercase tracking-widest">Información Directa</Label>
                   {suggestedData && (

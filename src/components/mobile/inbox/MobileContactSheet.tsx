@@ -217,6 +217,23 @@ export function MobileContactSheet({ open, onClose, contactoId }: MobileContactS
           </div>
         </div>
 
+        {/* Botón para promocionar a CRM (Solo en modo vista y si no es contacto CRM) */}
+        {!isEditing && contact.esContactoCRM !== true && (
+          <button 
+            onClick={() => {
+              if (!currentWorkspaceId || !contactoId) return;
+              const contactRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS, contactoId);
+              updateDoc(contactRef, { esContactoCRM: true })
+                .then(() => toast.success("Agregado a Contactos CRM"))
+                .catch(() => toast.error("Error al agregar a contactos"));
+            }}
+            className="w-full h-12 bg-[var(--accent)] text-[var(--accent-text)] rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-all shadow-md shadow-[var(--accent)]/15 mb-3"
+          >
+            <Plus size={18} />
+            Agregar a Contactos CRM
+          </button>
+        )}
+
         {/* Acciones Principales (Solo en modo vista) */}
         {!isEditing && (
           <div className="grid grid-cols-2 gap-3 px-1">

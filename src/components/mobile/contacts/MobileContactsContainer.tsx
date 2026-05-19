@@ -89,6 +89,8 @@ export function MobileContactsContainer() {
   const filteredContactos = useMemo(() => {
     return contactos
       .filter(c => {
+        if (c.esContactoCRM !== true) return false;
+        
         // Filtro de búsqueda
         const matchesSearch = (c.nombre || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
                              (c.telefono || "").includes(searchTerm);

@@ -132,6 +132,7 @@ export default function ContactosPage() {
   const filteredContactos = useMemo(() => {
     if (!contactos) return [];
     return contactos.filter(c => {
+      if (c.esContactoCRM !== true) return false;
       const matchesSearch = (c.nombre || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
                             (c.telefono || "").includes(searchTerm);
       const matchesTags = selectedTagIds.length === 0 || 
