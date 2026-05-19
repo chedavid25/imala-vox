@@ -675,13 +675,17 @@ export default function LeadsPage() {
 
             <div className="flex gap-2">
               <Select value={filtroCampana} onValueChange={(val) => setFiltroCampana(val || 'todas')}>
-                <SelectTrigger className="h-11 bg-white border border-[var(--border-light)] rounded-2xl focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/10 transition-all text-sm font-semibold text-slate-700 w-[200px] shadow-sm">
+                <SelectTrigger className="h-11 bg-[var(--bg-input)] border border-[var(--border-light)]/50 rounded-2xl focus:border-[var(--border-light)]/50 focus:ring-0 focus-visible:ring-0 transition-all text-[11px] font-semibold uppercase tracking-widest text-[var(--text-secondary-light)] hover:text-[var(--text-primary-light)] w-[200px] shadow-none flex items-center justify-between px-4">
                   <SelectValue placeholder="Todas las campañas" />
                 </SelectTrigger>
-                <SelectContent className="bg-white rounded-2xl border-slate-100 shadow-xl z-[150]">
-                  <SelectItem value="todas" className="rounded-xl font-bold py-2">Todas las campañas</SelectItem>
+                <SelectContent className="bg-white rounded-2xl border-slate-100 shadow-xl z-[150] p-1">
+                  <SelectItem value="todas" className="rounded-xl text-[10px] font-bold uppercase tracking-widest py-2 px-3 text-slate-700 hover:bg-slate-50 cursor-pointer">
+                    Todas las campañas
+                  </SelectItem>
                   {campanasDisponibles.map(c => (
-                    <SelectItem key={c} value={c} className="rounded-xl font-medium py-2">{c}</SelectItem>
+                    <SelectItem key={c} value={c} className="rounded-xl text-[10px] font-semibold uppercase tracking-widest py-2 px-3 text-slate-600 hover:bg-slate-50 cursor-pointer">
+                      {c}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
