@@ -1581,7 +1581,7 @@ function LeadDetailContent({
         </Section>
 
         {/* Respuestas del formulario */}
-        <Section title={lead.formulario && lead.formulario !== 'Formulario sin nombre' ? lead.formulario : "Respuestas del Formulario"}>
+        <Section title={lead.formulario && !lead.formulario.startsWith('Formulario sin nombre') ? lead.formulario : "Respuestas del Formulario"}>
           <div className="bg-[var(--bg-input)]/50 rounded-2xl p-4 space-y-4 border border-[var(--border-light)]/50">
             {Object.entries(lead.camposFormulario || {}).length > 0 ? (
               Object.entries(lead.camposFormulario).map(([key, val]: any) => (

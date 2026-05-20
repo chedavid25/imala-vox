@@ -272,7 +272,7 @@ export function MobileLeadDetailSheet({ lead, open, onClose, onConvert, onWhatsA
         {!isEditing && lead.camposFormulario && Object.keys(lead.camposFormulario).length > 0 && (
           <div className="space-y-4">
             <p className="text-[11px] font-semibold text-slate-300 uppercase tracking-[0.2em] px-1">
-              {lead.formulario && lead.formulario !== 'Formulario sin nombre' ? lead.formulario : 'Respuestas del Formulario'}
+              {lead.formulario && !lead.formulario.startsWith('Formulario sin nombre') ? lead.formulario : 'Respuestas del Formulario'}
             </p>
             <div className="bg-slate-50/50 rounded-[28px] p-5 space-y-4 border border-slate-100 shadow-inner">
               {Object.entries(lead.camposFormulario).map(([key, value]) => (

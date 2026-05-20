@@ -257,16 +257,19 @@ async function procesarLeadMeta(leadData: any, pageId: string) {
 
     // --- ENRIQUECIMIENTO DE DATOS (Nombres de Formulario y Campaña) ---
     let campaignName = metaLead.ad_name || metaLead.campaign_name || 'Campaña de Meta Ads';
-    let formName = 'Formulario sin nombre';
+    const fId = formId || metaLead.form_id;
+    let formName = fId ? `Formulario (ID: ${fId})` : 'Formulario sin nombre';
 
     try {
       // 3.1 Obtener nombre real del formulario
-      const fId = formId || metaLead.form_id;
       if (fId) {
         const formRes = await fetch(`https://graph.facebook.com/v19.0/${fId}?fields=name&access_token=${clienteToken}`);
         if (formRes.ok) {
           const formData = await formRes.json();
           formName = formData.name || formName;
+        } else {
+          const errText = await formRes.text();
+          console.warn(`⚠️ [LEAD ${leadId}] No se pudo obtener el nombre real del formulario (ID: ${fId}). Status: ${formRes.status}. Respuesta:`, errText);
         }
       }
 
