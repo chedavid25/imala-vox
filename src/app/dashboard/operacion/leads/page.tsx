@@ -773,18 +773,9 @@ export default function LeadsPage() {
                         <td className="p-4">
                           <div className="flex flex-col">
                             <span className="text-sm font-bold text-[var(--text-primary-light)]">{lead.nombre}</span>
-                            {lead.telefono ? (
-                              <div onClick={(e) => e.stopPropagation()}>
-                                <PhoneActionMenu 
-                                  phoneNumber={lead.telefono} 
-                                  contactoId={lead.contactoId} 
-                                  nombre={lead.nombre} 
-                                  className="text-[11px] text-[var(--text-tertiary-light)]"
-                                />
-                              </div>
-                            ) : (
-                              <span className="text-[11px] text-[var(--text-tertiary-light)]">{lead.email || "Sin contacto"}</span>
-                            )}
+                            <span className="text-[11px] text-[var(--text-tertiary-light)] font-medium">
+                              {lead.campana || "Sin campaña"}
+                            </span>
                           </div>
                         </td>
                         <td className="p-4">

@@ -163,7 +163,10 @@ export function MobileLeadList({ leads, etapas, onSelect, onNewLead, onConvert, 
                   </div>
                   <div>
                     <h3 className="font-bold text-slate-900 text-[15px] tracking-tight leading-tight">{lead.nombre}</h3>
-                    <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
+                      {lead.campana || "Sin campaña"}
+                    </span>
+                    <div className="flex items-center gap-2 mt-1">
                        <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-widest">
                          {lead.origen === 'meta_ads' ? 'Meta Ads' : 'Orgánico'}
                        </span>
