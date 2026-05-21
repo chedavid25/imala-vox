@@ -158,6 +158,7 @@ export interface Objeto {
   urlFuente?: string;           // URL del ítem individual (ej: la ficha de la propiedad)
   urlOriginWeb?: string;        // URL del sitio padre que se indexó
   recursoOrigenId?: string;     // ID del doc en baseConocimiento del que se extrajo
+  agenteId?: string | null;     // ID del agente asignado (opcional, null o ausente = global)
   estado: 'disponible' | 'vendido' | 'reservado' | 'pausado';
   creadoEl: Timestamp;
   actualizadoEl: Timestamp;

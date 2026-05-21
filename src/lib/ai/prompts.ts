@@ -66,16 +66,20 @@ export async function construirSystemPrompt(wsId: string, agenteId: string): Pro
     .map(doc => doc.data())
     .filter(data => data.instruccionIA && data.instruccionIA.trim() !== "");
 
-  // 5. Cargar objetos/propiedades activos (limitado para no saturar contexto)
+  // 5. Cargar objetos/propiedades activos (se limita y se filtra en memoria por agente para no saturar contexto)
   const objetosSnap = await adminDb
     .collection(COLLECTIONS.ESPACIOS).doc(wsId)
     .collection(COLLECTIONS.OBJETOS)
     .where("estado", "==", "disponible")
-    .limit(60)
+    .limit(300)
     .get();
 
-  const objetosFormateados = objetosSnap.docs.map(o => {
-    const d = o.data();
+  const objetosFiltrados = objetosSnap.docs
+    .map(doc => ({ id: doc.id, ...doc.data() } as any))
+    .filter(obj => !obj.agenteId || obj.agenteId === agenteId)
+    .slice(0, 60);
+
+  const objetosFormateados = objetosFiltrados.map(d => {
     const c = d.caracteristicas || {};
     
     if (d.tipo === 'propiedad') {
@@ -172,8 +176,8 @@ ${multimedia.length > 0
   : "No hay recursos multimedia disponibles para enviar."}
 
 ## CATÁLOGO DE PRODUCTOS/PROPIEDADES DISPONIBLES
-${objetosSnap.docs.length > 0
-  ? `Tenés ${objetosSnap.docs.length} ítem(s) disponibles. Cuando el cliente pregunte por opciones, filtrá según sus criterios y recomendá los más relevantes. Si pregunta por precio de un ítem específico que no está en la lista, decí que vas a consultar.\n\n${objetosFormateados}`
+${objetosFiltrados.length > 0
+  ? `Tenés ${objetosFiltrados.length} ítem(s) disponibles. Cuando el cliente pregunte por opciones, filtrá según sus criterios y recomendá los más relevantes. Si pregunta por precio de un ítem específico que no está en la lista, decí que vas a consultar.\n\n${objetosFormateados}`
   : "No hay ítems en el catálogo actualmente. Si el cliente pregunta por productos o propiedades, derivar a un asesor humano."}
 
 

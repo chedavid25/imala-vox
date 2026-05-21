@@ -1,19 +1,23 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Papa from "papaparse";
 import { db } from "@/lib/firebase";
-import { collection, writeBatch, doc, serverTimestamp, Timestamp } from "firebase/firestore";
-import { COLLECTIONS, Objeto } from "@/lib/types/firestore";
+import { collection, writeBatch, doc, serverTimestamp, Timestamp, getDocs } from "firebase/firestore";
+import { COLLECTIONS, Objeto, Agente } from "@/lib/types/firestore";
 import { 
   Upload, FileText, CheckCircle2, AlertCircle, Loader2, 
-  X, ChevronRight, ShoppingCart, Tag, Image as ImageIcon 
+  X, ChevronRight, ShoppingCart, Tag, Image as ImageIcon,
+  HelpCircle, ChevronDown, ChevronUp, Bot
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
   Dialog, DialogContent, DialogHeader, DialogTitle, 
   DialogFooter, DialogDescription 
 } from "@/components/ui/dialog";
+import { 
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -31,12 +35,38 @@ export function ImportadorCSV({ workspaceId, onSuccess }: ImportadorCSVProps) {
   const [progreso, setProgreso] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [agentes, setAgentes] = useState<Agente[]>([]);
+  const [agenteSeleccionado, setAgenteSeleccionado] = useState<string>("global");
+  const [mostrarAyuda, setMostrarAyuda] = useState(false);
+
+  useEffect(() => {
+    if (!open || !workspaceId) return;
+    
+    const cargarAgentes = async () => {
+      try {
+        const agentesRef = collection(db, COLLECTIONS.ESPACIOS, workspaceId, COLLECTIONS.AGENTES);
+        const querySnapshot = await getDocs(agentesRef);
+        const lista: Agente[] = [];
+        querySnapshot.forEach((doc) => {
+          lista.push({ id: doc.id, ...doc.data() } as Agente);
+        });
+        setAgentes(lista.filter(a => a.activo !== false)); // solo agentes activos
+      } catch (error) {
+        console.error("Error al cargar agentes:", error);
+      }
+    };
+    
+    cargarAgentes();
+  }, [open, workspaceId]);
+
   const reset = () => {
     setFile(null);
     setPreview([]);
     setParsing(false);
     setImportando(false);
     setProgreso(0);
+    setAgenteSeleccionado("global");
+    setMostrarAyuda(false);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -89,6 +119,8 @@ export function ImportadorCSV({ workspaceId, onSuccess }: ImportadorCSVProps) {
         let procesados = 0;
 
         try {
+          const agenteId = agenteSeleccionado === "global" ? null : agenteSeleccionado;
+
           for (let i = 0; i < total; i += batchSize) {
             const chunk = data.slice(i, i + batchSize);
             const batch = writeBatch(db);
@@ -120,6 +152,7 @@ export function ImportadorCSV({ workspaceId, onSuccess }: ImportadorCSVProps) {
                   importado: true,
                   fuente: 'CSV WooCommerce'
                 },
+                agenteId,
                 estado: 'disponible',
                 creadoEl: serverTimestamp(),
                 actualizadoEl: serverTimestamp()
@@ -166,6 +199,47 @@ export function ImportadorCSV({ workspaceId, onSuccess }: ImportadorCSVProps) {
             </DialogDescription>
           </DialogHeader>
 
+          {/* Instructivo de ayuda interactivo */}
+          <div className="border border-[var(--border-light)] rounded-xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setMostrarAyuda(!mostrarAyuda)}
+              className="w-full flex items-center justify-between p-3 bg-[var(--bg-input)]/50 hover:bg-[var(--bg-input)] text-xs font-bold text-[var(--text-secondary-light)] transition-all outline-none"
+            >
+              <span className="flex items-center gap-2">
+                <HelpCircle className="w-4 h-4 text-[var(--accent)] animate-pulse" />
+                ¿Cómo exportar el CSV desde WooCommerce / WordPress?
+              </span>
+              {mostrarAyuda ? <ChevronUp className="w-4 h-4 text-[var(--text-tertiary-light)]" /> : <ChevronDown className="w-4 h-4 text-[var(--text-tertiary-light)]" />}
+            </button>
+            {mostrarAyuda && (
+              <div className="p-4 bg-[var(--bg-card)] border-t border-[var(--border-light)] text-xs text-[var(--text-secondary-light)] space-y-3">
+                <div className="flex gap-2">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] font-bold flex items-center justify-center text-[10px]">1</span>
+                  <p>Inicia sesión en tu panel de administración de <strong>WordPress</strong>.</p>
+                </div>
+                <div className="flex gap-2">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] font-bold flex items-center justify-center text-[10px]">2</span>
+                  <p>En el menú lateral izquierdo, ve a <strong>Productos</strong> &gt; <strong>Todos los productos</strong>.</p>
+                </div>
+                <div className="flex gap-2">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] font-bold flex items-center justify-center text-[10px]">3</span>
+                  <p>En la parte superior de la lista de productos, haz clic en el botón <strong>Exportar</strong>.</p>
+                </div>
+                <div className="flex gap-2">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] font-bold flex items-center justify-center text-[10px]">4</span>
+                  <p>Activa la opción <em>&quot;¿Exportar todas las columnas personalizadas?&quot;</em> y haz clic en <strong>Generar CSV</strong>.</p>
+                </div>
+                <div className="flex gap-2 bg-[var(--accent)]/5 border border-[var(--accent)]/10 rounded-lg p-2.5 mt-1">
+                  <AlertCircle className="w-4 h-4 text-[var(--accent)] flex-shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-[var(--text-tertiary-light)]">
+                    El archivo CSV generado se descargará en tu computadora. Luego, selecciónalo o arrástralo en la zona inferior para iniciar la importación.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
           {!file ? (
             <div 
               onClick={() => fileInputRef.current?.click()}
@@ -205,6 +279,33 @@ export function ImportadorCSV({ workspaceId, onSuccess }: ImportadorCSVProps) {
                   </Button>
                 )}
               </div>
+
+              {/* Selector de Agente */}
+              {!importando && (
+                <div className="space-y-2 p-4 border border-[var(--border-light)] rounded-xl bg-[var(--bg-input)]/10">
+                  <label className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest block">
+                    🤖 Asignar a un Agente IA
+                  </label>
+                  <Select value={agenteSeleccionado} onValueChange={(val) => setAgenteSeleccionado(val || "global")}>
+                    <SelectTrigger className="w-full bg-[var(--bg-card)] border-[var(--border-light)] h-9 text-xs font-medium rounded-xl text-[var(--text-primary-light)]">
+                      <SelectValue placeholder="Seleccionar Agente" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[var(--bg-card)] border-[var(--border-light)] text-xs text-[var(--text-primary-light)] max-h-60 rounded-xl">
+                      <SelectItem value="global">
+                        🌍 Global (Todos los agentes)
+                      </SelectItem>
+                      {agentes.map((ag) => (
+                        <SelectItem key={ag.id} value={ag.id || ""}>
+                          🤖 {ag.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-[var(--text-tertiary-light)]">
+                    Los productos importados solo serán visibles y recomendados por el agente seleccionado (o por todos si es Global).
+                  </p>
+                </div>
+              )}
 
               {/* Preview */}
               {preview.length > 0 && !importando && (

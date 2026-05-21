@@ -44,12 +44,17 @@ export async function construirSystemPromptAdmin(wsId: string, agenteId: string)
     .where("activa", "==", true)
     .get();
 
-  // 5. Catálogo de objetos (aumentamos un poco el límite y sumamos descripción)
+  // 5. Catálogo de objetos (se limita y se filtra en memoria por agente para no saturar contexto)
   const objetosSnap = await db
     .collection(`espaciosDeTrabajo/${wsId}/objetos`)
     .where("estado", "==", "disponible")
-    .limit(50)
+    .limit(300)
     .get();
+
+  const objetosFiltrados = objetosSnap.docs
+    .map(doc => ({ id: doc.id, ...doc.data() } as any))
+    .filter(obj => !obj.agenteId || obj.agenteId === agenteId)
+    .slice(0, 50);
 
   return `
 ## IDENTIDAD Y ROL
@@ -71,9 +76,9 @@ ${multimedia.length > 0
   : "No hay recursos multimedia disponibles."}
 
 ## CATÁLOGO DE OBJETOS/PROPIEDADES DISPONIBLES
-${objetosSnap.docs.length > 0
-  ? objetosSnap.docs.map(o => {
-      const d = o.data();
+${objetosFiltrados.length > 0
+  ? objetosFiltrados.map(o => {
+      const d = o;
       const c = d.caracteristicas || {};
       const specs = d.tipo === 'propiedad' 
         ? `${c.tipo || ''} ${c.operacion || ''} en ${c.barrio || c.localidad || ''}. ${c.dormitorios || 0} dorm, ${c.m2 || 0}m2.`

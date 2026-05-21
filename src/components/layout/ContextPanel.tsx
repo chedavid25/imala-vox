@@ -86,6 +86,25 @@ export function ContextPanel({ onSendMessage }: { onSendMessage?: (text: string)
   const [editingInteraction, setEditingInteraction] = useState<InteraccionCRM | null>(null);
   const { mensajes } = useMensajes(selectedChatId);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [agenteIdChat, setAgenteIdChat] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!currentWorkspaceId || !selectedChatId) {
+      setAgenteIdChat(null);
+      return;
+    }
+    const chatRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES, selectedChatId);
+    return onSnapshot(chatRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setAgenteIdChat(docSnap.data().agenteId || null);
+      } else {
+        setAgenteIdChat(null);
+      }
+    }, (err) => {
+      console.error("Error al escuchar chat activo:", err);
+      setAgenteIdChat(null);
+    });
+  }, [currentWorkspaceId, selectedChatId]);
 
   const selectedContact = contactos.find(c => 
     c.id === selectedContactId || (c as any).metaId === selectedContactId
@@ -146,14 +165,23 @@ export function ContextPanel({ onSendMessage }: { onSendMessage?: (text: string)
   }, [currentWorkspaceId, activeTab]);
 
   const objetosFiltrados = useMemo(() => {
-    if (!busquedaObjetos) return objetos;
+    // Filtrar para mostrar solo globales (!o.agenteId) o los asignados al agente del chat activo (o.agenteId === agenteIdChat)
+    let items = objetos;
+    if (agenteIdChat) {
+      items = objetos.filter(o => !o.agenteId || o.agenteId === agenteIdChat);
+    } else {
+      // Si el chat no tiene un agente asignado, mostramos los objetos globales
+      items = objetos.filter(o => !o.agenteId);
+    }
+
+    if (!busquedaObjetos) return items;
     const q = busquedaObjetos.toLowerCase();
-    return objetos.filter(o => 
+    return items.filter(o => 
       o.titulo.toLowerCase().includes(q) || 
       o.descripcion.toLowerCase().includes(q) ||
       (o.caracteristicas?.marca && o.caracteristicas.marca.toLowerCase().includes(q))
     );
-  }, [objetos, busquedaObjetos]);
+  }, [objetos, busquedaObjetos, agenteIdChat]);
 
   const handleEnviarObjeto = async (obj: any) => {
     if (!onSendMessage) {

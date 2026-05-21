@@ -7,12 +7,12 @@ import {
   updateDoc, serverTimestamp, writeBatch, increment
 } from "firebase/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
-import { COLLECTIONS, Objeto } from "@/lib/types/firestore";
+import { COLLECTIONS, Objeto, Agente } from "@/lib/types/firestore";
 import {
   LayoutGrid, Building2, ShoppingCart, Pencil, Trash2,
   ExternalLink, Loader2, Globe, Filter, Home,
   Maximize2, BedDouble, Bath, MapPin, Tag, Package,
-  CheckCircle2, Clock, XCircle, PauseCircle, Search, FileText
+  CheckCircle2, Clock, XCircle, PauseCircle, Search, FileText, Bot
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,11 +44,14 @@ function CatalogoContent() {
   const { currentWorkspaceId } = useWorkspaceStore();
   const searchParams = useSearchParams();
   const [objetos, setObjetos] = useState<ObjetoConId[]>([]);
+  const [agentes, setAgentes] = useState<Agente[]>([]);
   const [loading, setLoading] = useState(true);
   const [busqueda, setBusqueda] = useState("");
   const [filtroTipo, setFiltroTipo] = useState<string>("todos");
   const [filtroEstado, setFiltroEstado] = useState<string>("todos");
   const [filtroFuente, setFiltroFuente] = useState<string>("todos");
+  const [filtroAgente, setFiltroAgente] = useState<string>("todos");
+  const [filtroOrigen, setFiltroOrigen] = useState<string>("todos");
   const [editando, setEditando] = useState<ObjetoConId | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [form, setForm] = useState<Partial<Objeto>>({});
@@ -58,11 +61,12 @@ function CatalogoContent() {
   useEffect(() => {
     if (!currentWorkspaceId) return;
 
+    // Escuchar objetos
     const q = query(
       collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.OBJETOS)
     );
 
-    const unsub = onSnapshot(q, (snap) => {
+    const unsubObjetos = onSnapshot(q, (snap) => {
       const docs = snap.docs.map(d => ({ ...d.data(), id: d.id })) as ObjetoConId[];
       // Ordenar: disponibles primero, luego por título
       docs.sort((a, b) => {
@@ -74,7 +78,17 @@ function CatalogoContent() {
       setLoading(false);
     });
 
-    return () => unsub();
+    // Escuchar agentes
+    const agentesRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.AGENTES);
+    const unsubAgentes = onSnapshot(agentesRef, (snap) => {
+      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Agente));
+      setAgentes(docs.filter(a => a.activo !== false));
+    });
+
+    return () => {
+      unsubObjetos();
+      unsubAgentes();
+    };
   }, [currentWorkspaceId]);
 
   // Manejar query param 'fuente'
@@ -100,6 +114,25 @@ function CatalogoContent() {
       if (filtroTipo !== 'todos' && o.tipo !== filtroTipo) return false;
       if (filtroEstado !== 'todos' && o.estado !== filtroEstado) return false;
       if (filtroFuente !== 'todos' && o.recursoOrigenId !== filtroFuente) return false;
+      
+      // Filtro por Agente
+      if (filtroAgente !== 'todos') {
+        if (filtroAgente === 'global') {
+          if (o.agenteId) return false;
+        } else {
+          if (o.agenteId !== filtroAgente) return false;
+        }
+      }
+
+      // Filtro por Origen
+      if (filtroOrigen !== 'todos') {
+        const esScraping = !!(o.recursoOrigenId || o.urlOriginWeb);
+        const esCsv = !!(o.caracteristicas?.importado || o.caracteristicas?.fuente === 'CSV WooCommerce');
+        if (filtroOrigen === 'scraping' && !esScraping) return false;
+        if (filtroOrigen === 'csv' && !esCsv) return false;
+        if (filtroOrigen === 'manual' && (esScraping || esCsv)) return false;
+      }
+
       if (busqueda) {
         const q = busqueda.toLowerCase();
         return (
@@ -110,7 +143,7 @@ function CatalogoContent() {
       }
       return true;
     });
-  }, [objetos, filtroTipo, filtroEstado, filtroFuente, busqueda]);
+  }, [objetos, filtroTipo, filtroEstado, filtroFuente, filtroAgente, filtroOrigen, busqueda]);
 
   const abrirEdicion = (obj: ObjetoConId) => {
     setEditando(obj);
@@ -332,9 +365,43 @@ function CatalogoContent() {
                 </SelectContent>
               </Select>
 
-              {(filtroTipo !== 'todos' || filtroEstado !== 'todos' || filtroFuente !== 'todos' || busqueda) && (
+              {/* Filtro agente */}
+              <Select value={filtroAgente} onValueChange={(v) => setFiltroAgente(v || "todos")}>
+                <SelectTrigger className="w-36 bg-[var(--bg-card)] border-[var(--border-light)] rounded-xl h-9 text-xs font-bold">
+                  <SelectValue placeholder="Todos los agentes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos los agentes</SelectItem>
+                  <SelectItem value="global">🌍 Globales</SelectItem>
+                  {agentes.map(ag => (
+                    <SelectItem key={ag.id} value={ag.id || ""}>🤖 {ag.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Filtro origen */}
+              <Select value={filtroOrigen} onValueChange={(v) => setFiltroOrigen(v || "todos")}>
+                <SelectTrigger className="w-38 bg-[var(--bg-card)] border-[var(--border-light)] rounded-xl h-9 text-xs font-bold">
+                  <SelectValue placeholder="Todos los orígenes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos los orígenes</SelectItem>
+                  <SelectItem value="scraping">🌐 Web Scraping</SelectItem>
+                  <SelectItem value="csv">📄 CSV WooCommerce</SelectItem>
+                  <SelectItem value="manual">✍️ Carga Manual</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {(filtroTipo !== 'todos' || filtroEstado !== 'todos' || filtroFuente !== 'todos' || filtroAgente !== 'todos' || filtroOrigen !== 'todos' || busqueda) && (
                 <button
-                  onClick={() => { setFiltroTipo('todos'); setFiltroEstado('todos'); setFiltroFuente('todos'); setBusqueda(''); }}
+                  onClick={() => { 
+                    setFiltroTipo('todos'); 
+                    setFiltroEstado('todos'); 
+                    setFiltroFuente('todos'); 
+                    setFiltroAgente('todos');
+                    setFiltroOrigen('todos');
+                    setBusqueda(''); 
+                  }}
                   className="text-xs font-bold text-[var(--text-tertiary-light)] hover:text-[var(--text-primary-light)] transition-colors px-2 py-1.5 rounded-lg hover:bg-[var(--bg-input)]"
                 >
                   Limpiar filtros
@@ -437,6 +504,7 @@ function CatalogoContent() {
             <ObjetoCard
               key={obj.id}
               obj={obj}
+              agentes={agentes}
               onEditar={() => abrirEdicion(obj)}
               onEliminar={() => eliminar(obj)}
               onCambiarEstado={(estado) => cambiarEstado(obj, estado)}
@@ -504,6 +572,21 @@ function CatalogoContent() {
                       <SelectItem value="reservado">Reservado</SelectItem>
                       <SelectItem value="vendido">Vendido</SelectItem>
                       <SelectItem value="pausado">Pausado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest">Agente IA Asignado</Label>
+                  <Select value={form.agenteId || 'global'} onValueChange={v => setForm(f => ({ ...f, agenteId: v === 'global' ? null : v }))}>
+                    <SelectTrigger className="bg-[var(--bg-input)] border-[var(--border-light)] rounded-xl h-10 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="global">🌍 Global (Todos)</SelectItem>
+                      {agentes.map(ag => (
+                        <SelectItem key={ag.id} value={ag.id || ""}>🤖 {ag.nombre}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -657,6 +740,7 @@ export default function CatalogoPage() {
 
 function ObjetoCard({
   obj,
+  agentes,
   onEditar,
   onEliminar,
   onCambiarEstado,
@@ -664,6 +748,7 @@ function ObjetoCard({
   onToggleSeleccion,
 }: {
   obj: ObjetoConId;
+  agentes: Agente[];
   onEditar: () => void;
   onEliminar: () => void;
   onCambiarEstado: (estado: Objeto['estado']) => void;
@@ -673,6 +758,8 @@ function ObjetoCard({
   const estadoCfg = ESTADO_CONFIG[obj.estado] || ESTADO_CONFIG.disponible;
   const c = obj.caracteristicas || {};
   const esPropiedad = obj.tipo === 'propiedad';
+  
+  const agenteAsignado = obj.agenteId ? agentes.find(a => a.id === obj.agenteId) : null;
 
   const precioFormateado = obj.precio > 0
     ? `${obj.moneda || 'USD'} ${obj.precio.toLocaleString('es-AR')}`
@@ -729,9 +816,17 @@ function ObjetoCard({
           </div>
           <div className="min-w-0">
             <p className="text-sm font-bold text-[var(--text-primary-light)] truncate">{obj.titulo}</p>
-            <p className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest">
-              {esPropiedad ? c.operacion || 'Propiedad' : 'Producto'}
-            </p>
+            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+              <span className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest">
+                {esPropiedad ? c.operacion || 'Propiedad' : 'Producto'}
+              </span>
+              {agenteAsignado && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-[var(--accent)]/10 text-[var(--accent)] text-[9px] font-black uppercase tracking-wider">
+                  <Bot className="w-2.5 h-2.5" />
+                  {agenteAsignado.nombre}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
