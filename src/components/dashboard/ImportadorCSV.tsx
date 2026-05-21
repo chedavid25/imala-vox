@@ -121,24 +121,63 @@ export function ImportadorCSV({ workspaceId, onSuccess }: ImportadorCSVProps) {
         try {
           const agenteId = agenteSeleccionado === "global" ? null : agenteSeleccionado;
 
+          // Obtener todos los productos del catálogo existentes en este Workspace para evitar duplicados
+          const existentesSnap = await getDocs(
+            collection(db, COLLECTIONS.ESPACIOS, workspaceId, COLLECTIONS.OBJETOS)
+          );
+
+          const objetoPorSku = new Map<string, string>(); // sku.toLowerCase() -> docId
+          const objetoPorTitulo = new Map<string, string>(); // titulo.toLowerCase() -> docId
+
+          existentesSnap.forEach((docSnap) => {
+            const d = docSnap.data();
+            const sku = d.caracteristicas?.sku;
+            const titulo = d.titulo;
+            
+            if (sku && typeof sku === "string") {
+              objetoPorSku.set(sku.trim().toLowerCase(), docSnap.id);
+            }
+            if (titulo && typeof titulo === "string") {
+              objetoPorTitulo.set(titulo.trim().toLowerCase(), docSnap.id);
+            }
+          });
+
           for (let i = 0; i < total; i += batchSize) {
             const chunk = data.slice(i, i + batchSize);
             const batch = writeBatch(db);
 
             chunk.forEach((row) => {
               // Mapeo automático de WooCommerce
-              const titulo = row.Nombre || row.title || row.nombre || "Sin título";
+              const tituloRaw = row.Nombre || row.title || row.nombre || "Sin título";
+              const titulo = typeof tituloRaw === "string" ? tituloRaw.trim() : "Sin título";
               const precio = parseFloat(row["Precio normal"] || row.regular_price || row.precio || "0");
               const descripcion = row["Descripción corta"] || row["Descripción"] || row.description || "";
               const fotosStr = row["Imágenes"] || row.images || "";
               const fotos = fotosStr ? fotosStr.split(",").map((s: string) => s.trim()) : [];
-              const sku = row.SKU || row.sku || null;
+              const skuRaw = row.SKU || row.sku || "";
+              const sku = typeof skuRaw === "string" ? skuRaw.trim() : "";
               const categoria = row["Categorías"] || row.categories || null;
               const marca = row.Marcas || row.brands || null;
 
-              const ref = doc(collection(db, COLLECTIONS.ESPACIOS, workspaceId, COLLECTIONS.OBJETOS));
-              
-              batch.set(ref, {
+              // Intentar encontrar si ya existe por SKU o por Título
+              let idExistente: string | undefined;
+              if (sku) {
+                idExistente = objetoPorSku.get(sku.toLowerCase());
+              }
+              if (!idExistente && titulo) {
+                idExistente = objetoPorTitulo.get(titulo.toLowerCase());
+              }
+
+              let ref;
+              let esNuevo = false;
+              if (idExistente) {
+                ref = doc(db, COLLECTIONS.ESPACIOS, workspaceId, COLLECTIONS.OBJETOS, idExistente);
+              } else {
+                ref = doc(collection(db, COLLECTIONS.ESPACIOS, workspaceId, COLLECTIONS.OBJETOS));
+                esNuevo = true;
+              }
+
+              const datosProducto: any = {
                 tipo: 'producto',
                 titulo,
                 precio,
@@ -146,7 +185,7 @@ export function ImportadorCSV({ workspaceId, onSuccess }: ImportadorCSVProps) {
                 descripcion: descripcion.replace(/<[^>]*>?/gm, ''), // Limpiar HTML
                 fotos,
                 caracteristicas: {
-                  sku,
+                  sku: sku || null,
                   categoria,
                   marca,
                   importado: true,
@@ -154,9 +193,14 @@ export function ImportadorCSV({ workspaceId, onSuccess }: ImportadorCSVProps) {
                 },
                 agenteId,
                 estado: 'disponible',
-                creadoEl: serverTimestamp(),
                 actualizadoEl: serverTimestamp()
-              });
+              };
+
+              if (esNuevo) {
+                datosProducto.creadoEl = serverTimestamp();
+              }
+
+              batch.set(ref, datosProducto, { merge: true });
             });
 
             await batch.commit();
