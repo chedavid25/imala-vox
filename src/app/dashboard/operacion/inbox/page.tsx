@@ -44,6 +44,15 @@ function InboxContent() {
   const isMobile = useMobileLayout();
   const [isRequestingSuggestion, setIsRequestingSuggestion] = useState(false);
 
+  const workspaceIdRef = React.useRef(currentWorkspaceId);
+  workspaceIdRef.current = currentWorkspaceId;
+
+  const selectedChatIdRef = React.useRef(selectedChatId);
+  selectedChatIdRef.current = selectedChatId;
+
+  const conversacionesRef = React.useRef(conversaciones);
+  conversacionesRef.current = conversaciones;
+
   // Sincronizar el contacto seleccionado en el store global cuando cambia el chat
   useEffect(() => {
     const selectedChat = conversaciones.find(c => c.id === selectedChatId);
@@ -86,6 +95,9 @@ function InboxContent() {
 
   const selectedChat = conversaciones.find(c => c.id === selectedChatId);
 
+  const selectedChatRef = React.useRef(selectedChat);
+  selectedChatRef.current = selectedChat;
+
   const handleRequestSuggestion = async () => {
     if (!currentWorkspaceId || !selectedChatId) return;
     const { pedirSugerenciaIAAction } = await import("@/app/actions/ai");
@@ -106,35 +118,46 @@ function InboxContent() {
   };
 
   const handleSendMessage = async (text: string, isInternal: boolean = false) => {
-    if (!currentWorkspaceId || !selectedChatId) return;
+    const wsId = workspaceIdRef.current;
+    const chatId = selectedChatIdRef.current;
 
-    // Si el chat no existe en la lista, es un chat nuevo con un contacto
-    let chatActual = selectedChat;
-    let actualChatId = selectedChatId;
+    console.log("[handleSendMessage] Iniciando envío:", { wsId, chatId, isInternal, textLength: text?.length });
+
+    if (!wsId || !chatId) {
+      console.warn("[handleSendMessage] wsId o chatId nulos, abortando");
+      return;
+    }
+
+    // Usar la conversación seleccionada síncronamente desde el ref
+    let chatActual = selectedChatRef.current;
+    let actualChatId = chatId;
+
+    console.log("[handleSendMessage] Chat actual obtenido del ref:", chatActual);
 
     try {
       if (!chatActual) {
+        console.log("[handleSendMessage] Chat actual no encontrado en el ref, intentando inicializar conversación...");
         // Para notas internas, necesitamos el chatId si ya existe
         // Si no existe y es nota interna, tal vez deberíamos crearla igual o manejar el error
         if (isInternal) {
            // Si es interna y no hay chat, no podemos guardarla en un chat que no existe
-           // Podríamos crear el chat primero, pero las notas suelen ser para chats existentes.
            // Por ahora, asumimos que si es interna debe existir el chat.
            if (!actualChatId) throw new Error("No se puede guardar una nota en una conversación inexistente");
         } else {
           // Buscar el primer canal disponible para iniciar el chat
-          const channelsRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CANALES);
+          const channelsRef = collection(db, COLLECTIONS.ESPACIOS, wsId, COLLECTIONS.CANALES);
           const channelsSnap = await getDocs(firestoreQuery(channelsRef, limit(1)));
           
           if (channelsSnap.empty) throw new Error("No hay canales configurados para enviar mensajes");
           
           const canalDoc = channelsSnap.docs[0];
           const canalData = canalDoc.data();
+          console.log("[handleSendMessage] Canal por defecto para chat nuevo:", canalDoc.id, canalData.tipo);
 
           // Crear la conversación en Firestore
-          const convsRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES);
+          const convsRef = collection(db, COLLECTIONS.ESPACIOS, wsId, COLLECTIONS.CONVERSACIONES);
           const newConvDoc = await addDoc(convsRef, {
-            contactoId: selectedChatId,
+            contactoId: chatId,
             canal: canalData.tipo || 'whatsapp',
             canalId: canalDoc.id,
             estado: 'abierto',
@@ -150,23 +173,24 @@ function InboxContent() {
           // Creamos un objeto virtual para que el resto de la lógica funcione
           chatActual = {
             id: actualChatId,
-            contactoId: selectedChatId,
+            contactoId: chatId,
             canal: canalData.tipo || 'whatsapp',
             canalId: canalDoc.id
           };
+          console.log("[handleSendMessage] Creado chat virtual:", chatActual);
         }
       }
 
       const messagesRef = collection(
         db, 
-        COLLECTIONS.ESPACIOS, currentWorkspaceId, 
+        COLLECTIONS.ESPACIOS, wsId, 
         COLLECTIONS.CONVERSACIONES, actualChatId, 
         COLLECTIONS.MENSAJES
       );
 
       const convRef = doc(
         db, 
-        COLLECTIONS.ESPACIOS, currentWorkspaceId, 
+        COLLECTIONS.ESPACIOS, wsId, 
         COLLECTIONS.CONVERSACIONES, actualChatId
       );
       if (isInternal) {
@@ -181,7 +205,7 @@ function InboxContent() {
         // 2. Sincronizar con el historial de SALUD (interacciones)
         const interactionsRef = collection(
           db, 
-          COLLECTIONS.ESPACIOS, currentWorkspaceId, 
+          COLLECTIONS.ESPACIOS, wsId, 
           COLLECTIONS.CONTACTOS, chatActual.contactoId, 
           "interacciones"
         );
@@ -198,7 +222,7 @@ function InboxContent() {
         // 3. Mantener compatibilidad con notas_internas si es necesario
         const contactNotesRef = collection(
           db, 
-          COLLECTIONS.ESPACIOS, currentWorkspaceId, 
+          COLLECTIONS.ESPACIOS, wsId, 
           COLLECTIONS.CONTACTOS, chatActual.contactoId, 
           "notas_internas"
         );
@@ -225,15 +249,19 @@ function InboxContent() {
       }
 
       // Proceso de envío real para mensajes públicos
-      const contactSnap = await getDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS, chatActual.contactoId));
+      console.log("[handleSendMessage] Buscando contacto:", chatActual.contactoId);
+      const contactSnap = await getDoc(doc(db, COLLECTIONS.ESPACIOS, wsId, COLLECTIONS.CONTACTOS, chatActual.contactoId));
       if (!contactSnap.exists()) throw new Error("Contacto no encontrado");
       
       const contactData = contactSnap.data() as Contacto;
       const destinatario = (contactData as any).metaId || contactData.telefono;
+      console.log("[handleSendMessage] Destinatario:", destinatario, "CanalID:", chatActual.canalId);
 
       if (!destinatario) throw new Error("No se pudo determinar el destinatario");
 
-      const res = await enviarMensajeAccion(currentWorkspaceId, chatActual.canalId, destinatario, text);
+      console.log("[handleSendMessage] Llamando a enviarMensajeAccion...");
+      const res = await enviarMensajeAccion(wsId, chatActual.canalId, destinatario, text);
+      console.log("[handleSendMessage] Respuesta de enviarMensajeAccion:", res);
       
       if (!res.success) {
         toast.error(`Error de envío: ${res.error}`);

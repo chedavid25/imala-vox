@@ -339,13 +339,24 @@ export async function enviarMensajeAccion(
   tag?: 'CONFIRMED_EVENT_UPDATE' | 'POST_PURCHASE_UPDATE' | 'ACCOUNT_UPDATE' | 'HUMAN_AGENT'
 ) {
   try {
-    if (!wsId || !canalId || !destinatario || (!texto && !media && !senderAction)) throw new Error("Faltan parámetros de envío");
+    console.log("[enviarMensajeAccion] Iniciando envío de mensaje:", { wsId, canalId, destinatario, textoLength: texto?.length });
+
+    if (!wsId || !canalId || !destinatario || (!texto && !media && !senderAction)) {
+      console.warn("[enviarMensajeAccion] Faltan parámetros de envío");
+      throw new Error("Faltan parámetros de envío");
+    }
 
     const canalPath = `${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CANALES}/${canalId}`;
+    console.log("[enviarMensajeAccion] Buscando canal en Firestore en la ruta:", canalPath);
     const canalSnap = await adminDb.doc(canalPath).get();
-    if (!canalSnap.exists) throw new Error("Canal no encontrado");
+    
+    if (!canalSnap.exists) {
+      console.error(`[enviarMensajeAccion] Canal no encontrado. Ruta consultada: ${canalPath}`);
+      throw new Error(`Canal no encontrado (ID: ${canalId}, Workspace: ${wsId})`);
+    }
     
     const canalData = canalSnap.data() as any;
+    console.log("[enviarMensajeAccion] Canal encontrado:", { tipo: canalData.tipo, nombre: canalData.nombre });
     const secretSnap = await adminDb.doc(`${canalPath}/secrets/config`).get();
     if (!secretSnap.exists) throw new Error("Credenciales de canal no encontradas");
     
