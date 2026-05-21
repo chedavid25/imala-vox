@@ -220,15 +220,18 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
     setIsTyping(true);
 
     try {
-      const mappedHistory = messages.map(({ role, content, attachment }) => ({
-        role,
-        content,
-        attachment: attachment ? {
-          name: attachment.name,
-          type: attachment.type,
-          base64: attachment.base64
-        } : undefined
-      }));
+      const mappedHistory = messages.map(({ role, content, attachment }) => {
+        const isImage = attachment?.type.startsWith("image/");
+        return {
+          role,
+          content,
+          attachment: attachment ? {
+            name: attachment.name,
+            type: attachment.type,
+            base64: isImage ? attachment.base64 : ""
+          } : undefined
+        };
+      });
 
       const result = await chatPlaygroundAction(
         wsId,
@@ -239,12 +242,33 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
       );
 
       if (result.success && result.reply) {
-        setMessages((prev) => [...prev, { role: "assistant", content: result.reply }]);
+        if (result.userMessageConsolidated) {
+          setMessages((prev) => {
+            const updated = [...prev];
+            const lastUserIdx = updated.findLastIndex((m) => m.role === "user");
+            if (lastUserIdx !== -1) {
+              updated[lastUserIdx] = {
+                ...updated[lastUserIdx],
+                content: result.userMessageConsolidated!,
+                attachment: updated[lastUserIdx].attachment
+                  ? {
+                      ...updated[lastUserIdx].attachment!,
+                      base64: "" // Limpiar base64 en local una vez procesado
+                    }
+                  : undefined
+              };
+            }
+            return [...updated, { role: "assistant", content: result.reply! }];
+          });
+        } else {
+          setMessages((prev) => [...prev, { role: "assistant", content: result.reply! }]);
+        }
       } else {
         setError(result.error || "La IA no pudo responder.");
       }
-    } catch (err) {
-      setError("Error de conexión con el motor de IA.");
+    } catch (err: any) {
+      console.error("Error al enviar mensaje a la IA:", err);
+      setError(`Error de conexión con el motor de IA: ${err?.message || String(err)}`);
     } finally {
       setIsTyping(false);
     }

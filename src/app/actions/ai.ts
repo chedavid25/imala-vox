@@ -1,7 +1,8 @@
 "use server";
 
-import { anthropic, MODELOS } from "@/lib/ai/anthropic";
+import { genAI, MODELOS, getGeminiModel } from "@/lib/ai/gemini";
 import { construirSystemPrompt } from "@/lib/ai/prompts";
+import { Part } from "@google/generative-ai";
 import { adminDb } from "@/lib/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS } from "@/lib/types/firestore";
@@ -64,70 +65,80 @@ export async function chatPlaygroundAction(
     // 1. Construir el prompt del sistema (RAG: Base de Conocimiento activa)
     const systemPrompt = await construirSystemPrompt(wsId, agenteId);
 
-    // 2. Formatear mensajes históricos
+    // 2. Formatear mensajes históricos para Gemini (roles: 'user' o 'model')
     const formattedHistory = await Promise.all(
       history.map(async (msg) => {
+        const parts: Part[] = [];
+
         if (msg.attachment) {
           const type = msg.attachment.type;
           const name = msg.attachment.name;
           const base64 = msg.attachment.base64;
 
-          if (type.startsWith("image/")) {
-            return {
-              role: msg.role,
-              content: [
-                {
-                  type: "image" as const,
-                  source: {
-                    type: "base64" as const,
-                    media_type: type as any,
-                    data: base64,
-                  },
-                },
-                {
-                  type: "text" as const,
-                  text: msg.content || "Aquí está la imagen.",
-                },
-              ],
-            };
+          if (type.startsWith("image/") && base64) {
+            let mediaType = type;
+            if (mediaType === "image/jpg") {
+              mediaType = "image/jpeg";
+            }
+            const supported = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+            if (!supported.includes(mediaType)) {
+              mediaType = "image/jpeg";
+            }
+
+            parts.push({
+              inlineData: {
+                data: base64,
+                mimeType: mediaType,
+              },
+            });
+            parts.push({ text: msg.content || "Aquí está la imagen." });
           } else {
             let docText = "";
-            try {
-              docText = await extraerTextoDeDocumento(name, type, base64);
-            } catch (e: any) {
-              docText = `[Error al leer contenido de ${name}: ${e.message}]`;
+            if (base64) {
+              try {
+                docText = await extraerTextoDeDocumento(name, type, base64);
+              } catch (e: any) {
+                docText = `[Error al leer contenido de ${name}: ${e.message}]`;
+              }
             }
-            return {
-              role: msg.role,
-              content: `[Archivo adjunto: ${name}]\n--- CONTENIDO DEL ARCHIVO ---\n${docText}\n----------------------------\n\n${msg.content}`,
-            };
+            const textContent = docText
+              ? `[Archivo adjunto: ${name}]\n--- CONTENIDO DEL ARCHIVO ---\n${docText}\n----------------------------\n\n${msg.content}`
+              : msg.content;
+            parts.push({ text: textContent });
           }
+        } else {
+          parts.push({ text: msg.content });
         }
+
         return {
-          role: msg.role,
-          content: msg.content,
+          role: (msg.role === "user" ? "user" : "model") as "user" | "model",
+          parts
         };
       })
     );
 
-    let currentContent: any = userMessage;
+    // 3. Formatear el contenido actual del usuario
+    const currentParts: Part[] = [];
+    let userMessageConsolidated: string | undefined = undefined;
 
     if (attachment) {
       if (attachment.type.startsWith("image/")) {
-        currentContent = [
-          {
-            type: "image" as const,
-            source: {
-              type: "base64" as const,
-              media_type: attachment.type as any,
-              data: attachment.base64,
-            },
+        let mediaType = attachment.type;
+        if (mediaType === "image/jpg") {
+          mediaType = "image/jpeg";
+        }
+        const supported = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+        if (!supported.includes(mediaType)) {
+          mediaType = "image/jpeg";
+        }
+
+        currentParts.push({
+          inlineData: {
+            data: attachment.base64,
+            mimeType: mediaType,
           },
-          {
-            type: "text" as const,
-            text: userMessage || "Aquí está la imagen.",
-          },
-        ];
+        });
+        currentParts.push({ text: userMessage || "Aquí está la imagen." });
       } else {
         let docText = "";
         try {
@@ -135,33 +146,32 @@ export async function chatPlaygroundAction(
         } catch (e: any) {
           docText = `[Error al extraer texto: ${e.message}]`;
         }
-        currentContent = `[Archivo adjunto: ${attachment.name}]\n--- CONTENIDO DEL ARCHIVO ---\n${docText}\n----------------------------\n\n${userMessage}`;
+        userMessageConsolidated = `[Archivo adjunto: ${attachment.name}]\n--- CONTENIDO DEL ARCHIVO ---\n${docText}\n----------------------------\n\n${userMessage}`;
+        currentParts.push({
+          text: userMessageConsolidated,
+        });
       }
+    } else {
+      currentParts.push({ text: userMessage });
     }
 
-    // 3. Llamada a Anthropic Sonnet 3.5 con Prompt Caching
-    const response = await anthropic.messages.create({
-      model: MODELOS.AGENTE,
-      max_tokens: 1024,
-      system: [
-        {
-          type: "text",
-          text: systemPrompt,
-          // @ts-ignore
-          cache_control: { type: "ephemeral" }
-        }
-      ],
-      messages: [
-        ...formattedHistory,
-        { role: "user", content: currentContent }
-      ]
+    // 4. Inicializar modelo de Gemini con prompt de sistema
+    const model = getGeminiModel(
+      MODELOS.AGENTE,
+      systemPrompt
+    );
+
+    const chat = model.startChat({
+      history: formattedHistory,
     });
 
-    const reply = (response.content[0] as any).text;
+    const result = await chat.sendMessage(currentParts);
+    const reply = result.response.text();
 
     return {
       success: true,
-      reply
+      reply,
+      userMessageConsolidated
     };
 
   } catch (error: any) {
@@ -197,16 +207,9 @@ export async function mejorarInstruccionesAction(instruccionesActuales: string) 
       Tu respuesta debe ser exclusivamente el nuevo set de instrucciones optimizado.
     `.trim();
 
-    const response = await anthropic.messages.create({
-      model: MODELOS.AGENTE,
-      max_tokens: 4000,
-      system: systemPrompt,
-      messages: [
-        { role: "user", content: `Optimiza estas instrucciones:\n\n${instruccionesActuales}` }
-      ]
-    });
-
-    const optimizedText = (response.content[0] as any).text;
+    const model = getGeminiModel(MODELOS.AGENTE, systemPrompt);
+    const response = await model.generateContent(`Optimiza estas instrucciones:\n\n${instruccionesActuales}`);
+    const optimizedText = response.response.text();
 
     return {
       success: true,
