@@ -1,7 +1,7 @@
 "use server";
 
-import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
+import { adminDb } from "@/lib/firebase-admin";
+import { Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS } from "@/lib/types/firestore";
 
 // Polyfill para evitar error "DOMMatrix is not defined" en pdf-parse
@@ -46,19 +46,23 @@ export async function subirYProcesarArchivoAction(
     }
 
     // 2. Guardar en Firestore (Base de Conocimiento Global)
-    const docRef = await addDoc(collection(db, COLLECTIONS.ESPACIOS, wsId, COLLECTIONS.CONOCIMIENTO), {
-      tipo: 'archivo',
-      titulo: file.name,
-      archivoNombre: file.name,
-      archivoTamano: file.size,
-      archivoTipo: file.type,
-      contenidoTexto: extractedText, // AQUí ESTÁ EL CEREBRO
-      estado: 'activo',
-      descripcion: `Archivo procesado automáticamente: ${file.name}`,
-      creadoEl: serverTimestamp(),
-      actualizadoEl: serverTimestamp(),
-      creadoPor: "admin"
-    });
+    const docRef = await adminDb
+      .collection(COLLECTIONS.ESPACIOS)
+      .doc(wsId)
+      .collection(COLLECTIONS.CONOCIMIENTO)
+      .add({
+        tipo: 'archivo',
+        titulo: file.name,
+        archivoNombre: file.name,
+        archivoTamano: file.size,
+        archivoTipo: file.type,
+        contenidoTexto: extractedText, // AQUí ESTÁ EL CEREBRO
+        estado: 'activo',
+        descripcion: `Archivo procesado automáticamente: ${file.name}`,
+        creadoEl: Timestamp.now(),
+        actualizadoEl: Timestamp.now(),
+        creadoPor: "admin"
+      });
 
     return {
       success: true,
