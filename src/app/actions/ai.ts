@@ -7,9 +7,40 @@ import { Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS } from "@/lib/types/firestore";
 import { procesarMensajeConIA } from "@/lib/ai/engine";
 
+// Polyfill para evitar error "DOMMatrix is not defined" en pdf-parse
+if (typeof global.DOMMatrix === "undefined") {
+  // @ts-ignore
+  global.DOMMatrix = class DOMMatrix {};
+}
+
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  attachment?: {
+    name: string;
+    type: string;
+    base64: string;
+  };
+}
+
+async function extraerTextoDeDocumento(name: string, type: string, base64: string): Promise<string> {
+  const buffer = Buffer.from(base64, 'base64');
+  
+  if (type === "application/pdf" || name.endsWith(".pdf")) {
+    const pdf = require("pdf-parse");
+    const data = await pdf(buffer);
+    return data.text;
+  } 
+  else if (type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || name.endsWith(".docx")) {
+    const mammoth = require("mammoth");
+    const result = await mammoth.extractRawText({ buffer });
+    return result.value;
+  } 
+  else if (type === "text/plain" || name.endsWith(".txt") || name.endsWith(".md") || type === "text/markdown") {
+    return buffer.toString("utf-8");
+  } 
+  
+  return "Formato de archivo no soportado para extracción de texto.";
 }
 
 /**
@@ -20,7 +51,12 @@ export async function chatPlaygroundAction(
   wsId: string,
   agenteId: string,
   userMessage: string,
-  history: ChatMessage[] = []
+  history: ChatMessage[] = [],
+  attachment?: {
+    name: string;
+    type: string;
+    base64: string;
+  }
 ) {
   try {
     if (!wsId || !agenteId) throw new Error("Faltan parámetros de identificación.");
@@ -28,12 +64,82 @@ export async function chatPlaygroundAction(
     // 1. Construir el prompt del sistema (RAG: Base de Conocimiento activa)
     const systemPrompt = await construirSystemPrompt(wsId, agenteId);
 
-    // DEBUG: Ver qué está leyendo realmente el agente
-    console.log("--- DEBUG SYSTEM PROMPT ---");
-    console.log(systemPrompt);
-    console.log("----------------------------");
+    // 2. Formatear mensajes históricos
+    const formattedHistory = await Promise.all(
+      history.map(async (msg) => {
+        if (msg.attachment) {
+          const type = msg.attachment.type;
+          const name = msg.attachment.name;
+          const base64 = msg.attachment.base64;
 
-    // 2. Llamada a Anthropic Sonnet 3.5 con Prompt Caching
+          if (type.startsWith("image/")) {
+            return {
+              role: msg.role,
+              content: [
+                {
+                  type: "image" as const,
+                  source: {
+                    type: "base64" as const,
+                    media_type: type as any,
+                    data: base64,
+                  },
+                },
+                {
+                  type: "text" as const,
+                  text: msg.content || "Aquí está la imagen.",
+                },
+              ],
+            };
+          } else {
+            let docText = "";
+            try {
+              docText = await extraerTextoDeDocumento(name, type, base64);
+            } catch (e: any) {
+              docText = `[Error al leer contenido de ${name}: ${e.message}]`;
+            }
+            return {
+              role: msg.role,
+              content: `[Archivo adjunto: ${name}]\n--- CONTENIDO DEL ARCHIVO ---\n${docText}\n----------------------------\n\n${msg.content}`,
+            };
+          }
+        }
+        return {
+          role: msg.role,
+          content: msg.content,
+        };
+      })
+    );
+
+    let currentContent: any = userMessage;
+
+    if (attachment) {
+      if (attachment.type.startsWith("image/")) {
+        currentContent = [
+          {
+            type: "image" as const,
+            source: {
+              type: "base64" as const,
+              media_type: attachment.type as any,
+              data: attachment.base64,
+            },
+          },
+          {
+            type: "text" as const,
+            text: userMessage || "Aquí está la imagen.",
+          },
+        ];
+      } else {
+        let docText = "";
+        try {
+          docText = await extraerTextoDeDocumento(attachment.name, attachment.type, attachment.base64);
+        } catch (e: any) {
+          docText = `[Error al extraer texto: ${e.message}]`;
+        }
+        currentContent = `[Archivo adjunto: ${attachment.name}]\n--- CONTENIDO DEL ARCHIVO ---\n${docText}\n----------------------------\n\n${userMessage}`;
+      }
+    }
+
+    // 3. Llamada a Anthropic Sonnet 3.5 con Prompt Caching
     const response = await anthropic.messages.create({
       model: MODELOS.AGENTE,
       max_tokens: 1024,
@@ -46,8 +152,8 @@ export async function chatPlaygroundAction(
         }
       ],
       messages: [
-        ...history,
-        { role: "user", content: userMessage }
+        ...formattedHistory,
+        { role: "user", content: currentContent }
       ]
     });
 

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, Loader2, RefreshCw, AlertCircle, FileText, Image as ImageIcon, FileVideo, FileAudio, ExternalLink } from "lucide-react";
+import { Send, Bot, User, Loader2, RefreshCw, AlertCircle, FileText, Image as ImageIcon, FileVideo, FileAudio, ExternalLink, Paperclip, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,10 +9,17 @@ import { chatPlaygroundAction } from "@/app/actions/ai";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { COLLECTIONS, RecursoConocimiento } from "@/lib/types/firestore";
+import { toast } from "sonner";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
+  attachment?: {
+    name: string;
+    type: string;
+    base64: string;
+    previewUrl?: string;
+  };
 }
 
 interface TestChatProps {
@@ -109,8 +116,18 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recursos, setRecursos] = useState<(RecursoConocimiento & { id: string })[]>([]);
+  
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    return () => {
+      if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
+    };
+  }, [filePreviewUrl]);
 
   // Cargar recursos multimedia del workspace para parsear links en el chat
   useEffect(() => {
@@ -132,22 +149,93 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
     }
   }, [messages, isTyping]);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("El archivo supera el límite de 10MB");
+      return;
+    }
+    
+    if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
+    
+    setSelectedFile(file);
+    if (file.type.startsWith("image/")) {
+      setFilePreviewUrl(URL.createObjectURL(file));
+    } else {
+      setFilePreviewUrl(null);
+    }
+  };
+
+  const toBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64 = result.split(",")[1];
+      resolve(base64);
+    };
+    reader.onerror = error => reject(error);
+  });
+
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!input.trim() || isTyping) return;
+    if ((!input.trim() && !selectedFile) || isTyping) return;
 
     const userMessage = input.trim();
     setInput("");
     setError(null);
-    setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
+
+    let fileAttach = undefined;
+    let localMsgAttachment = undefined;
+
+    if (selectedFile) {
+      try {
+        const base64 = await toBase64(selectedFile);
+        fileAttach = {
+          name: selectedFile.name,
+          type: selectedFile.type,
+          base64: base64
+        };
+        localMsgAttachment = {
+          name: selectedFile.name,
+          type: selectedFile.type,
+          base64: base64,
+          previewUrl: filePreviewUrl || undefined
+        };
+      } catch (err) {
+        toast.error("Error al procesar el archivo adjunto.");
+        return;
+      }
+    }
+
+    // Limpiar estado de archivo
+    setSelectedFile(null);
+    setFilePreviewUrl(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+
+    const newMsg: Message = { role: "user", content: userMessage, attachment: localMsgAttachment };
+    setMessages((prev) => [...prev, newMsg]);
     setIsTyping(true);
 
     try {
+      const mappedHistory = messages.map(({ role, content, attachment }) => ({
+        role,
+        content,
+        attachment: attachment ? {
+          name: attachment.name,
+          type: attachment.type,
+          base64: attachment.base64
+        } : undefined
+      }));
+
       const result = await chatPlaygroundAction(
         wsId,
         agentId,
         userMessage,
-        messages.slice(-10)
+        mappedHistory.slice(-10),
+        fileAttach
       );
 
       if (result.success && result.reply) {
@@ -165,6 +253,9 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
   const clearChat = () => {
     setMessages([]);
     setError(null);
+    setSelectedFile(null);
+    setFilePreviewUrl(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   return (
@@ -223,15 +314,33 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
                 {m.role === "user" ? <User className="w-3.5 h-3.5" /> : <Bot className="w-3.5 h-3.5" />}
               </div>
               <div className={cn(
-                "max-w-[80%] p-4 rounded-2xl text-[13px] leading-relaxed shadow-sm",
+                "max-w-[80%] p-4 rounded-2xl text-[13px] leading-relaxed shadow-sm space-y-2",
                 m.role === "user" 
                   ? "bg-[var(--bg-input)] text-[var(--text-primary-light)] rounded-tr-none" 
                   : "bg-white border border-[var(--border-light)] text-[var(--text-primary-light)] rounded-tl-none font-medium"
               )}>
-                {m.role === "assistant"
-                  ? <MessageContent content={m.content} recursos={recursos} />
-                  : m.content
-                }
+                {m.attachment && (
+                  <div className="mb-2">
+                    {m.attachment.type.startsWith("image/") ? (
+                      <img 
+                        src={m.attachment.previewUrl || `data:${m.attachment.type};base64,${m.attachment.base64}`} 
+                        alt={m.attachment.name} 
+                        className="max-w-[200px] max-h-[150px] rounded-xl object-cover border border-[var(--border-light)] shadow-sm"
+                      />
+                    ) : (
+                      <div className="inline-flex items-center gap-2 p-2 px-3 rounded-xl bg-white/50 border border-[var(--border-light)] text-xs font-semibold text-[var(--text-secondary-light)] shadow-sm">
+                        <FileText className="w-4 h-4 text-[var(--accent)]" />
+                        <span className="truncate max-w-[150px]">{m.attachment.name}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div>
+                  {m.role === "assistant"
+                    ? <MessageContent content={m.content} recursos={recursos} />
+                    : m.content
+                  }
+                </div>
               </div>
             </div>
           ))
@@ -258,20 +367,69 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
       </div>
 
       {/* Input de Mensaje */}
-      <div className="p-4 bg-[var(--bg-card)] border-t border-[var(--border-light)]">
+      <div className="p-4 bg-[var(--bg-card)] border-t border-[var(--border-light)] space-y-3">
+        {selectedFile && (
+          <div className="flex items-center gap-3 p-2 bg-[var(--bg-input)] border border-[var(--border-light)] rounded-2xl animate-in slide-in-from-bottom-2 fade-in max-w-fit pr-4">
+            {filePreviewUrl ? (
+              <img 
+                src={filePreviewUrl} 
+                alt="Vista previa" 
+                className="w-10 h-10 rounded-lg object-cover border border-[var(--border-light)]"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-lg bg-[var(--bg-sidebar)] flex items-center justify-center text-[var(--accent)] border border-[var(--border-light)]">
+                <FileText className="w-5 h-5" />
+              </div>
+            )}
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold text-[var(--text-primary-light)] truncate max-w-[150px]">{selectedFile.name}</p>
+              <p className="text-[9px] text-[var(--text-tertiary-light)] font-semibold uppercase">{selectedFile.type.split("/")[1] || "archivo"}</p>
+            </div>
+            <button 
+              type="button"
+              onClick={() => {
+                setSelectedFile(null);
+                setFilePreviewUrl(null);
+                if (fileInputRef.current) fileInputRef.current.value = "";
+              }}
+              className="p-1 hover:bg-[var(--bg-sidebar)] text-[var(--text-tertiary-light)] hover:text-red-500 rounded-lg transition-all ml-2"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
         <form 
           onSubmit={handleSend}
           className="relative flex items-center gap-2"
         >
+          <input 
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept=".pdf,.docx,.txt,.md,image/*"
+            className="hidden"
+          />
+          <Button 
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isTyping}
+            className="w-11 h-11 rounded-xl text-[var(--text-tertiary-light)] hover:text-[var(--text-primary-light)] hover:bg-[var(--bg-input)] shrink-0 transition-all border border-[var(--border-light)]"
+          >
+            <Paperclip className="w-4 h-4" />
+          </Button>
+
           <Input 
             value={input}
             onChange={(e) => setInput(e.target.value)}
             disabled={isTyping}
-            placeholder="Haz una pregunta técnica..."
+            placeholder={selectedFile ? "Añadir un mensaje sobre el archivo..." : "Haz una pregunta técnica..."}
             className="flex-1 bg-[var(--bg-input)] border-none rounded-2xl h-12 pr-12 focus-visible:ring-1 focus-visible:ring-[var(--accent)]/50 transition-all shadow-inner"
           />
           <Button 
-            disabled={!input.trim() || isTyping}
+            disabled={(!input.trim() && !selectedFile) || isTyping}
             type="submit"
             size="icon"
             className="absolute right-1 w-10 h-10 rounded-xl bg-[var(--accent)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)] transition-all shadow-lg shadow-[var(--accent)]/20"
