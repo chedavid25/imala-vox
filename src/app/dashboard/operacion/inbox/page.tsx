@@ -8,7 +8,7 @@ import { useConversaciones } from "@/hooks/useConversaciones";
 import { useMensajes } from "@/hooks/useMensajes";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, updateDoc, doc, Timestamp, getDocs, limit, query as firestoreQuery } from "firebase/firestore";
+import { collection, addDoc, updateDoc, doc, Timestamp, getDocs, limit, query as firestoreQuery, where } from "firebase/firestore";
 import { COLLECTIONS, Contacto } from "@/lib/types/firestore";
 import { enviarMensajeAccion } from "@/app/actions/channels";
 import { getDoc } from "firebase/firestore";
@@ -255,12 +255,43 @@ function InboxContent() {
       
       const contactData = contactSnap.data() as Contacto;
       const destinatario = (contactData as any).metaId || contactData.telefono;
-      console.log("[handleSendMessage] Destinatario:", destinatario, "CanalID:", chatActual.canalId);
 
       if (!destinatario) throw new Error("No se pudo determinar el destinatario");
 
+      // Validar si el canalId asociado a la conversación existe en Firestore
+      let canalIdValido = chatActual.canalId;
+      const canalRef = doc(db, COLLECTIONS.ESPACIOS, wsId, COLLECTIONS.CANALES, chatActual.canalId);
+      const canalSnap = await getDoc(canalRef);
+
+      if (!canalSnap.exists()) {
+        console.warn(`[handleSendMessage] Canal con ID ${chatActual.canalId} no existe en Firestore. Buscando canal alternativo del tipo ${chatActual.canal}...`);
+        
+        const canalesRef = collection(db, COLLECTIONS.ESPACIOS, wsId, COLLECTIONS.CANALES);
+        const qCanal = firestoreQuery(canalesRef, where("tipo", "==", chatActual.canal));
+        const qSnap = await getDocs(qCanal);
+
+        if (qSnap.empty) {
+          const canalTipoVisual = chatActual.canal ? chatActual.canal.toUpperCase() : "chat";
+          throw new Error(`No se pudo enviar el mensaje. No tienes un canal de ${canalTipoVisual} configurado o activo en este Workspace. Por favor, configúralo en Ajustes.`);
+        }
+
+        const canalDoc = qSnap.docs[0];
+        canalIdValido = canalDoc.id;
+        console.log(`[handleSendMessage] Canal alternativo encontrado: ${canalIdValido}. Actualizando conversación en Firestore.`);
+
+        // Actualizar el canal en el documento de la conversación para repararla
+        await updateDoc(convRef, {
+          canalId: canalIdValido
+        });
+
+        // Actualizar el canalId en memoria local
+        chatActual.canalId = canalIdValido;
+      }
+
+      console.log("[handleSendMessage] Destinatario:", destinatario, "CanalID Final:", canalIdValido);
+
       console.log("[handleSendMessage] Llamando a enviarMensajeAccion...");
-      const res = await enviarMensajeAccion(wsId, chatActual.canalId, destinatario, text);
+      const res = await enviarMensajeAccion(wsId, canalIdValido, destinatario, text);
       console.log("[handleSendMessage] Respuesta de enviarMensajeAccion:", res);
       
       if (!res.success) {
