@@ -231,7 +231,8 @@ export default function CanalesPage() {
         'ads_management', 
         'pages_show_list', 
         'pages_manage_metadata', 
-        'pages_read_engagement'
+        'pages_read_engagement',
+        'business_management'
       ];
     } else {
       // Por si acaso, si no hay pestaña específica (o 'all'), pedimos los básicos de mensajería
@@ -240,7 +241,7 @@ export default function CanalesPage() {
 
     const scope = [...new Set([...baseScopes, ...specificScopes])].join(',');
 
-    const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&state=${currentWorkspaceId}`;
+    const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&state=${currentWorkspaceId}&auth_type=rerequest`;
     window.location.href = authUrl;
   };
 
