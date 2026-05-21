@@ -57,7 +57,7 @@ import { deleteDoc } from "firebase/firestore";
 import { Avatar } from "@/components/ui/Avatar";
 import { ModalNuevaTarea } from "@/components/crm/tasks/ModalNuevaTarea";
 
-export function ContextPanel({ onSendMessage }: { onSendMessage?: (text: string) => void }) {
+export function ContextPanel({ onSendMessage }: { onSendMessage?: (text: string) => Promise<any> | void }) {
   const router = useRouter();
   const { selectedContactId, currentWorkspaceId, selectedChatId } = useWorkspaceStore();
   const { contactos } = useContactos();
@@ -155,15 +155,53 @@ export function ContextPanel({ onSendMessage }: { onSendMessage?: (text: string)
     );
   }, [objetos, busquedaObjetos]);
 
-  const handleEnviarObjeto = (obj: any) => {
+  const handleEnviarObjeto = async (obj: any) => {
     if (!onSendMessage) {
       toast.error("No se puede enviar mensajes desde este panel");
       return;
     }
-    const precioStr = obj.precio > 0 ? `💰 *Precio:* ${obj.moneda || 'USD'} ${obj.precio.toLocaleString('es-AR')}` : '💰 *Precio:* Consultar';
-    const text = `🙌 *¡Hola! Te comparto la información de este inmueble:*\n\n🏠 *${obj.titulo}*\n${precioStr}\n\n📝 ${obj.descripcion}\n\n${obj.urlFuente ? `🔗 *Ver ficha completa:* ${obj.urlFuente}` : ''}`;
-    onSendMessage(text);
-    toast.success("Información enviada al chat");
+
+    try {
+      const precioStr = obj.precio > 0 
+        ? `💰 *Precio:* ${obj.moneda || 'USD'} ${obj.precio.toLocaleString('es-AR')}` 
+        : '💰 *Precio:* Consultar';
+      
+      // Mensaje 1: Información básica de presentación (Título, precio y link)
+      const msgPrincipal = [
+        `🙌 *¡Hola! Te comparto la información de este inmueble:*`,
+        `🏠 *${obj.titulo}*`,
+        precioStr,
+        obj.urlFuente ? `🔗 *Ver ficha completa:* ${obj.urlFuente}` : ''
+      ].filter(Boolean).join('\n\n');
+
+      await onSendMessage(msgPrincipal);
+
+      // Mensaje 2 (y opcionales): Descripción detallada completa
+      if (obj.descripcion && obj.descripcion.trim()) {
+        const descCompleta = obj.descripcion.trim();
+        const maxDescChunk = 850; // Margen de lectura seguro y por debajo de los 1000 chars de Meta
+
+        if (descCompleta.length <= maxDescChunk) {
+          const msgDesc = `📝 *Descripción detallada:*\n\n${descCompleta}`;
+          await onSendMessage(msgDesc);
+        } else {
+          let index = 0;
+          let partNumber = 1;
+          while (index < descCompleta.length) {
+            const chunk = descCompleta.substring(index, index + maxDescChunk);
+            const msgDescPart = `📝 *Descripción detallada (Parte ${partNumber}):*\n\n${chunk}`;
+            await onSendMessage(msgDescPart);
+            index += maxDescChunk;
+            partNumber++;
+          }
+        }
+      }
+
+      toast.success("Información enviada al chat");
+    } catch (err: any) {
+      console.error("Error al enviar inmueble:", err);
+      toast.error(err?.message || "Ocurrió un error al enviar la información completa");
+    }
   };
 
   // Cargar Interacciones
