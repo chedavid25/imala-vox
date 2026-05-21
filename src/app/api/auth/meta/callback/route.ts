@@ -59,8 +59,28 @@ export async function GET(req: NextRequest) {
 
     const pages = accountsData.data || [];
 
-    // 4. Iterar sobre las páginas y sincronizar
     const workspaceRef = adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}`);
+
+    if (pages.length === 0) {
+      console.warn(`[WARN-OAUTH] No se encontraron páginas para el usuario. Verificando scopes...`);
+      // Consultar qué scopes tiene el token para depurar
+      const debugTokenRes = await fetch(`https://graph.facebook.com/debug_token?input_token=${longLivedUserToken}&access_token=${appId}|${appSecret}`);
+      const debugData = await debugTokenRes.json();
+      console.warn(`[WARN-OAUTH] Scopes activos del token:`, debugData.data?.scopes || []);
+      
+      // Guardar un log de depuración en Firestore para que el administrador pueda revisarlo
+      await workspaceRef.collection('system_logs').add({
+        tipo: 'meta_oauth_warning',
+        detalle: 'El inicio de sesión de Meta no retornó ninguna página de Facebook.',
+        scopesActivos: debugData.data?.scopes || [],
+        creadoEl: Timestamp.now(),
+      });
+
+      const msg = encodeURIComponent("No se encontraron páginas de Facebook seleccionadas o asociadas. Asegúrate de ser Administrador de la página y de seleccionarla durante el inicio de sesión.");
+      return NextResponse.redirect(new URL(`/dashboard/ajustes/canales?error=${msg}`, req.url));
+    }
+
+    // 4. Iterar sobre las páginas y sincronizar
     const newPageIds: string[] = [];
 
     for (const page of pages) {
