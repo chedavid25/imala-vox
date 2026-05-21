@@ -356,7 +356,7 @@ export function ContextPanel({ onSendMessage }: { onSendMessage?: (text: string)
           <TabsList className="w-full bg-transparent h-12 justify-start gap-4">
             <TabsTrigger value="perfil" className="text-[10px] font-bold uppercase tracking-widest">Perfil</TabsTrigger>
             <TabsTrigger value="interacciones" className="text-[10px] font-bold uppercase tracking-widest">Salud</TabsTrigger>
-            <TabsTrigger value="objetos" className="text-[10px] font-bold uppercase tracking-widest">Interés</TabsTrigger>
+            <TabsTrigger value="objetos" className="text-[10px] font-bold uppercase tracking-widest">Catálogo</TabsTrigger>
           </TabsList>
         </div>
 

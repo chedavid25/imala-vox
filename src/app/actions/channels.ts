@@ -452,7 +452,19 @@ export async function enviarMensajeAccion(
         };
       }
 
-      return { success: false, error: data.error?.message || "Error al enviar mensaje vía Meta" };
+      const errMsg = data.error?.message || "";
+      if (
+        errMsg.includes("must be granted before impersonating a user's page") ||
+        errMsg.includes("pages_messaging") ||
+        errMsg.includes("pages_read_user_content")
+      ) {
+        return {
+          success: false,
+          error: "El canal no tiene los permisos de mensajería necesarios. Por favor, ve a Ajustes > Canales, desconectá el canal y volvé a conectarlo asegurándote de otorgar todos los permisos solicitados de Facebook/Instagram (incluyendo páginas y mensajería)."
+        };
+      }
+
+      return { success: false, error: errMsg || "Error al enviar mensaje vía Meta" };
     }
 
     return { success: true, messageId: data.message_id || data.wam_id };
