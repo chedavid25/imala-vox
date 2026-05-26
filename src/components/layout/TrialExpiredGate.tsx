@@ -20,8 +20,16 @@ const SUPPORT_WA =
 function isExpired(workspace: {
   estado: string;
   pruebaTerminaEl?: { toDate: () => Date } | null;
+  cancelacionPendiente?: boolean;
+  cancelaEl?: { toDate: () => Date } | null;
 }): boolean {
-  if (workspace.estado === "pago_vencido" || workspace.estado === "cancelado") return true;
+  if (workspace.estado === "pago_vencido") return true;
+  // Corte inmediato heredado (registros anteriores a este cambio)
+  if (workspace.estado === "cancelado") return true;
+  // Cancelación con período de gracia: bloquear solo cuando ya venció
+  if (workspace.cancelacionPendiente && workspace.cancelaEl) {
+    return workspace.cancelaEl.toDate().getTime() < Date.now();
+  }
   if (workspace.estado === "prueba" && workspace.pruebaTerminaEl) {
     return workspace.pruebaTerminaEl.toDate().getTime() < Date.now();
   }
@@ -137,9 +145,14 @@ export function TrialExpiredGate() {
   if (ALLOWED_PATHS.some((p) => pathname.startsWith(p))) return null;
 
   const isPagoVencido = workspace.estado === "pago_vencido";
+  const isCancelado = workspace.estado === "cancelado" ||
+    (workspace.cancelacionPendiente === true && workspace.cancelaEl != null && workspace.cancelaEl.toDate() < new Date());
+
   const headline = isPagoVencido
     ? "Tu pago no pudo procesarse."
-    : "Tu período de prueba finalizó.";
+    : isCancelado
+      ? "Tu suscripción fue cancelada."
+      : "Tu período de prueba finalizó.";
 
   const handleSubscribe = async (plan: PlanKey) => {
     if (!currentWorkspaceId) return;
@@ -197,12 +210,18 @@ export function TrialExpiredGate() {
             </span>
             <h2 className="text-3xl md:text-5xl font-black text-white mt-3 leading-tight">
               {headline}<br />
-              {isPagoVencido ? "Renová tu suscripción para recuperar el acceso." : "Elegí tu plan."}
+              {isPagoVencido
+                ? "Renová tu suscripción para recuperar el acceso."
+                : isCancelado
+                  ? "Suscribite de nuevo para seguir usando Imalá Vox."
+                  : "Elegí tu plan."}
             </h2>
             <p className="text-base text-white/40 mt-3 font-medium">
               {isPagoVencido
                 ? "Seleccioná un plan y completá el pago para volver a activar tu cuenta."
-                : "Sin contratos. Cancelás cuando querés."}
+                : isCancelado
+                  ? "Tus datos y configuraciones están guardados. Solo necesitás reactivar."
+                  : "Sin contratos. Cancelás cuando querés."}
             </p>
 
             {/* Toggle — idéntico al de la landing */}

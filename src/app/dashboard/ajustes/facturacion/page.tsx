@@ -423,106 +423,27 @@ export default function FacturacionPage() {
             )}
           </CardContent>
           <CardFooter className="bg-slate-50/50 border-t border-[var(--border-light)] p-6 flex justify-center items-center">
-             <Button 
-               variant="ghost" 
-               className="text-[10px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-600 hover:bg-rose-50 transition-all px-8 h-10 rounded-xl" 
-               onClick={() => setIsCancelDialogOpen(true)}
-             >
-               {workspace.estado === 'cancelado' ? "Suscripción ya cancelada" : "Cancelar suscripción"}
-             </Button>
-
-             <Dialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
-               <DialogContent className="max-w-md bg-white border-none shadow-2xl rounded-[32px] overflow-hidden p-0">
-                 <DialogHeader className="bg-rose-50/50 p-8 pb-4">
-                   <DialogTitle className="text-2xl font-black tracking-tight flex items-center gap-3 text-rose-900">
-                      <div className="size-10 rounded-2xl bg-rose-500 flex items-center justify-center text-white">
-                        <AlertCircle className="size-5" />
-                      </div>
-                      ¿Confirmar Cancelación?
-                   </DialogTitle>
-                 </DialogHeader>
-                 <div className="p-8 space-y-4">
-                    <p className="text-sm text-rose-800/70 leading-relaxed font-medium">
-                      Estás a punto de cancelar tu <strong>Plan {workspace.plan}</strong>. Perderás el acceso a tus agentes inteligentes y automatizaciones al finalizar el periodo actual.
-                    </p>
-                    <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 flex items-start gap-3">
-                      <Info className="size-4 text-amber-600 shrink-0 mt-0.5" />
-                      <p className="text-[11px] text-amber-700 font-bold leading-relaxed">
-                        Tus datos y configuraciones se mantendrán guardados por 30 días, pero tus agentes dejarán de responder mensajes.
-                      </p>
-                    </div>
-                 </div>
-                 <DialogFooter className="p-8 pt-0 flex flex-col gap-3">
-                    <Button 
-                      className="w-full bg-rose-600 hover:bg-rose-700 text-white font-black text-[10px] uppercase tracking-widest h-12 rounded-2xl shadow-xl shadow-rose-500/20"
-                      onClick={() => {
-                        setIsCancelDialogOpen(false);
-                        toast.promise(cancelarSuscripcionMP(currentWorkspaceId!), {
-                          loading: 'Cancelando suscripción...',
-                          success: 'Suscripción cancelada correctamente',
-                          error: 'Error al cancelar'
-                        });
-                      }}
-                    >
-                      Sí, confirmar cancelación
-                    </Button>
-                    <Button 
-                      variant="ghost"
-                      onClick={() => setIsCancelDialogOpen(false)}
-                      className="w-full text-slate-400 font-bold text-[10px] uppercase tracking-widest h-12 rounded-2xl"
-                    >
-                      No, mantener mi plan
-                    </Button>
-                 </DialogFooter>
-               </DialogContent>
-             </Dialog>
+            {workspace.cancelacionPendiente ? (
+              <div className="text-center space-y-1">
+                <p className="text-[10px] font-black uppercase tracking-widest text-amber-600">Cancelación programada</p>
+                <p className="text-xs text-slate-500 font-medium">
+                  Acceso hasta el{" "}
+                  <strong className="text-slate-700">
+                    {workspace.cancelaEl?.toDate().toLocaleDateString("es-AR") ?? "—"}
+                  </strong>
+                </p>
+              </div>
+            ) : (
+              <Button
+                variant="ghost"
+                className="text-[10px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-600 hover:bg-rose-50 transition-all px-8 h-10 rounded-xl"
+                onClick={() => setIsCancelDialogOpen(true)}
+                disabled={workspace.estado === 'cancelado'}
+              >
+                {workspace.estado === 'cancelado' ? "Suscripción cancelada" : "Cancelar suscripción"}
+              </Button>
+            )}
           </CardFooter>
-
-          <Dialog open={isUpgradeDialogOpen} onOpenChange={setIsUpgradeDialogOpen}>
-             <DialogContent className="max-w-md bg-white border-none shadow-2xl rounded-[32px] overflow-hidden p-0">
-               <DialogHeader className="bg-slate-50/50 p-8 pb-4">
-                 <div className="size-16 rounded-[2rem] bg-[var(--accent)] flex items-center justify-center text-white mx-auto mb-4 shadow-lg shadow-[var(--accent)]/20">
-                    <Zap className="size-8" />
-                 </div>
-                 <DialogTitle className="text-2xl font-black text-[var(--text-primary-light)] text-center tracking-tight">¡Preparate para el cambio!</DialogTitle>
-                 <DialogDescription className="text-center text-[var(--text-secondary-light)] text-sm leading-relaxed px-2 font-medium">
-                   Tu nuevo plan <strong>{targetPlan?.toUpperCase()}</strong> se activará ahora mismo y tendrás acceso inmediato.
-                 </DialogDescription>
-               </DialogHeader>
-
-               <div className="p-8 pt-4 space-y-6">
-                 <div className="bg-slate-900 rounded-[2rem] p-6 space-y-4 shadow-2xl">
-                    <div className="flex justify-between items-center pb-4 border-b border-white/10">
-                      <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Próximo Cobro</span>
-                      <span className="text-sm font-black text-[var(--accent)]">{nextBillingDate()}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Monto Estimado</span>
-                      <div className="text-right">
-                        <p className="text-xl font-black text-white">${targetPlan ? (isAnual ? PLAN_LIMITS[targetPlan].priceYearly : PLAN_LIMITS[targetPlan].priceMonthly) : 0} <span className="text-xs text-white/40 uppercase tracking-widest">USD</span></p>
-                        <p className="text-[9px] font-black text-[var(--accent)] uppercase tracking-widest">Ciclo {isAnual ? 'Anual' : 'Mensual'}</p>
-                      </div>
-                    </div>
-                 </div>
-
-                 <div className="flex flex-col gap-3 pt-2">
-                   <Button 
-                     className="w-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-black text-[10px] uppercase tracking-widest h-12 rounded-2xl shadow-xl shadow-[var(--accent)]/20"
-                     onClick={confirmUpgrade}
-                   >
-                     Confirmar y pagar ahora
-                   </Button>
-                   <Button 
-                     variant="ghost" 
-                     className="w-full text-slate-400 font-bold text-[10px] uppercase tracking-widest"
-                     onClick={() => setIsUpgradeDialogOpen(false)}
-                   >
-                     Volver atrás
-                   </Button>
-                 </div>
-               </div>
-             </DialogContent>
-            </Dialog>
         </Card>
 
         {/* COMPARADOR DE PLANES */}
@@ -736,6 +657,105 @@ export default function FacturacionPage() {
           </Table>
         </Card>
       </div>
+
+      {/* MODAL CANCELAR SUSCRIPCIÓN */}
+      <Dialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
+        <DialogContent className="max-w-md bg-white border-none shadow-2xl rounded-[32px] overflow-hidden p-0">
+          <DialogHeader className="bg-rose-50/50 p-8 pb-6">
+            <DialogTitle className="text-2xl font-black tracking-tight flex items-center gap-3 text-rose-900">
+              <div className="size-10 rounded-2xl bg-rose-500 flex items-center justify-center text-white shrink-0">
+                <AlertCircle className="size-5" />
+              </div>
+              ¿Confirmar Cancelación?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="px-8 pb-6 space-y-4">
+            <p className="text-sm text-slate-600 leading-relaxed font-medium">
+              Estás a punto de cancelar tu <strong className="text-slate-800">Plan {workspace.plan}</strong>. Tu acceso se mantiene activo hasta el{" "}
+              <strong className="text-slate-800">
+                {workspace.periodoVigenteHasta?.toDate().toLocaleDateString("es-AR")}
+              </strong>
+              , y luego se cortará automáticamente.
+            </p>
+            <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 flex items-start gap-3">
+              <Info className="size-4 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-[11px] text-amber-700 font-bold leading-relaxed">
+                No se realizarán más cobros. Tus datos y configuraciones quedan guardados para que puedas volver cuando quieras.
+              </p>
+            </div>
+          </div>
+          <div className="px-8 pb-8 flex flex-col gap-3">
+            <Button
+              className="w-full bg-rose-600 hover:bg-rose-700 text-white font-black text-[10px] uppercase tracking-widest h-12 rounded-2xl shadow-xl shadow-rose-500/20"
+              onClick={() => {
+                setIsCancelDialogOpen(false);
+                toast.promise(cancelarSuscripcionMP(currentWorkspaceId!), {
+                  loading: 'Cancelando suscripción...',
+                  success: 'Suscripción cancelada. Seguís con acceso hasta el vencimiento del período.',
+                  error: 'Error al cancelar'
+                });
+              }}
+            >
+              Sí, cancelar mi suscripción
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => setIsCancelDialogOpen(false)}
+              className="w-full text-slate-400 hover:text-slate-600 font-bold text-[10px] uppercase tracking-widest h-12 rounded-2xl"
+            >
+              No, mantener mi plan
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL UPGRADE/CAMBIO DE PLAN */}
+      <Dialog open={isUpgradeDialogOpen} onOpenChange={setIsUpgradeDialogOpen}>
+        <DialogContent className="max-w-md bg-white border-none shadow-2xl rounded-[32px] overflow-hidden p-0">
+          <DialogHeader className="bg-slate-50/50 p-8 pb-4">
+            <div className="size-16 rounded-[2rem] bg-[var(--accent)] flex items-center justify-center text-white mx-auto mb-4 shadow-lg shadow-[var(--accent)]/20">
+              <Zap className="size-8" />
+            </div>
+            <DialogTitle className="text-2xl font-black text-[var(--text-primary-light)] text-center tracking-tight">¡Preparate para el cambio!</DialogTitle>
+            <DialogDescription className="text-center text-[var(--text-secondary-light)] text-sm leading-relaxed px-2 font-medium">
+              Tu nuevo plan <strong>{targetPlan?.toUpperCase()}</strong> se activará ahora mismo y tendrás acceso inmediato.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-8 pt-4 space-y-6">
+            <div className="bg-slate-900 rounded-[2rem] p-6 space-y-4 shadow-2xl">
+              <div className="flex justify-between items-center pb-4 border-b border-white/10">
+                <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Próximo Cobro</span>
+                <span className="text-sm font-black text-[var(--accent)]">{nextBillingDate()}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Monto Estimado</span>
+                <div className="text-right">
+                  <p className="text-xl font-black text-white">
+                    ${targetPlan ? (isAnual ? PLAN_LIMITS[targetPlan].priceYearly : PLAN_LIMITS[targetPlan].priceMonthly) : 0}{" "}
+                    <span className="text-xs text-white/40 uppercase tracking-widest">USD</span>
+                  </p>
+                  <p className="text-[9px] font-black text-[var(--accent)] uppercase tracking-widest">Ciclo {isAnual ? 'Anual' : 'Mensual'}</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col gap-3">
+              <Button
+                className="w-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-black text-[10px] uppercase tracking-widest h-12 rounded-2xl shadow-xl shadow-[var(--accent)]/20"
+                onClick={confirmUpgrade}
+              >
+                Confirmar y pagar ahora
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full text-slate-400 font-bold text-[10px] uppercase tracking-widest"
+                onClick={() => setIsUpgradeDialogOpen(false)}
+              >
+                Volver atrás
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* FOOTER INFO */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-10 bg-slate-900 border border-white/5 rounded-[2.5rem] shadow-2xl relative overflow-hidden">

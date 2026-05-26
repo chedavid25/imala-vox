@@ -48,15 +48,52 @@ async function procesarPreapproval(suscripcionId: string, accessToken: string, s
 
   const nuevoEstado = estadoMap[suscripcion.status] ?? 'pago_vencido';
   const ciclo = wsData.facturacion?.ciclo || 'mensual';
+
+  // Para estados activos: calcular nuevo período de vigencia
   const periodoHasta = new Date();
   if (ciclo === 'anual') periodoHasta.setFullYear(periodoHasta.getFullYear() + 1);
   else periodoHasta.setMonth(periodoHasta.getMonth() + 1);
 
-  const updates: Record<string, any> = {
-    estado: nuevoEstado,
-    periodoVigenteHasta: Timestamp.fromDate(periodoHasta),
-    actualizadoEl: Timestamp.now(),
-  };
+  const updates: Record<string, any> = { actualizadoEl: Timestamp.now() };
+
+  if (nuevoEstado === 'cancelado') {
+    // Si ya está marcado como cancelación pendiente (usuario lo inició desde el panel),
+    // el webhook solo confirma — no hay que cambiar nada más.
+    if (wsData.cancelacionPendiente) {
+      console.log(`[webhook] Cancelación ya registrada para ${wsDoc.id}, sin cambios adicionales.`);
+      await wsDoc.ref.update(updates);
+    } else {
+      // Cancelación externa (MP la inició). Respetar el período pagado.
+      const periodoExistente: Timestamp | undefined = wsData.periodoVigenteHasta;
+      if (periodoExistente && periodoExistente.toDate() > new Date()) {
+        updates.cancelacionPendiente = true;
+        updates.cancelaEl = periodoExistente;
+      } else {
+        // Período ya vencido, corte inmediato
+        updates.estado = 'cancelado';
+      }
+      await wsDoc.ref.update(updates);
+    }
+
+    await wsDoc.ref.collection(COLLECTIONS.NOTIFICACIONES).add({
+      tipo: 'alerta',
+      titulo: 'Suscripción cancelada',
+      mensaje: `Tu acceso se mantiene hasta el ${(updates.cancelaEl ?? wsData.periodoVigenteHasta)?.toDate().toLocaleDateString('es-AR') ?? 'fin del período'}.`,
+      visto: false,
+      creadoEl: Timestamp.now(),
+    });
+
+    return; // nada más que procesar para cancelaciones
+  }
+
+  // Para estados no-cancelados: actualizar estado y período normalmente
+  updates.estado = nuevoEstado;
+  updates.periodoVigenteHasta = Timestamp.fromDate(periodoHasta);
+  // Si vuelve a estar activo, limpiar cancelación pendiente
+  if (nuevoEstado === 'activo') {
+    updates.cancelacionPendiente = false;
+    updates.cancelaEl = null;
+  }
 
   if (nuevoEstado === 'activo' && wsData.facturacion?.planPendiente) {
     const planPend = wsData.facturacion.planPendiente as 'starter' | 'pro' | 'agencia';
@@ -84,16 +121,6 @@ async function procesarPreapproval(suscripcionId: string, accessToken: string, s
       tipo: 'info',
       titulo: 'Pago confirmado',
       mensaje: '¡Tu suscripción está activa. Gracias!',
-      visto: false,
-      creadoEl: Timestamp.now(),
-    });
-  }
-
-  if (nuevoEstado === 'cancelado') {
-    await wsDoc.ref.collection(COLLECTIONS.NOTIFICACIONES).add({
-      tipo: 'alerta',
-      titulo: 'Suscripción cancelada',
-      mensaje: 'Tu acceso finalizará al término del período actual.',
       visto: false,
       creadoEl: Timestamp.now(),
     });

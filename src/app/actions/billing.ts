@@ -158,6 +158,8 @@ export async function crearSuscripcionMP(wsId: string, plan: 'starter' | 'pro' |
       'facturacion.mpSuscripcionId': mpData.id,
       'facturacion.ciclo': ciclo,
       'facturacion.planPendiente': plan,
+      cancelacionPendiente: false,
+      cancelaEl: null,
       actualizadoEl: Timestamp.now(),
     });
 
@@ -273,6 +275,7 @@ export async function cancelarSuscripcionMP(wsId: string) {
     const suscripcionId = ws?.facturacion?.mpSuscripcionId;
     const accessToken = getMPAccessToken();
 
+    // Cancelar en MercadoPago (detiene futuros cobros)
     if (suscripcionId && accessToken) {
       await fetch(`https://api.mercadopago.com/preapproval/${suscripcionId}`, {
         method: 'PUT',
@@ -284,8 +287,13 @@ export async function cancelarSuscripcionMP(wsId: string) {
       });
     }
 
+    // El acceso continúa hasta periodoVigenteHasta (ya fue abonado).
+    // Solo marcamos cancelación pendiente; el gate bloquea cuando esa fecha pasa.
+    const cancelaEl = ws?.periodoVigenteHasta ?? Timestamp.now();
+
     await adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}`).update({
-      estado: 'cancelado',
+      cancelacionPendiente: true,
+      cancelaEl,
       actualizadoEl: Timestamp.now(),
     });
 
@@ -293,7 +301,7 @@ export async function cancelarSuscripcionMP(wsId: string) {
       tipo: 'suscripcion_cancelada',
       monto: 0,
       montoUSD: 0,
-      descripcion: 'Suscripción cancelada por el usuario',
+      descripcion: `Suscripción cancelada por el usuario. Acceso vigente hasta ${cancelaEl.toDate().toLocaleDateString('es-AR')}`,
     });
 
     revalidatePath('/dashboard/ajustes/facturacion');

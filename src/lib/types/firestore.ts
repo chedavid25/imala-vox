@@ -31,6 +31,8 @@ export interface Workspace {
   estado: WorkspaceStatus;
   pruebaTerminaEl: Timestamp | null;
   periodoVigenteHasta: Timestamp;
+  cancelacionPendiente?: boolean;  // cancelado en MP pero período aún vigente
+  cancelaEl?: Timestamp | null;    // fecha efectiva de corte de acceso
   uso: WorkspaceUsage;
   usoReiniciaEl: Timestamp;
   facturacion: FacturacionConfig;
