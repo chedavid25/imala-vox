@@ -259,7 +259,7 @@ export default function CanalesPage() {
                   phoneNumberId,
                   wabaId,
                   wsId: currentWorkspaceId,
-                  origin: window.location.origin
+                  redirectUri: window.location.href.split('?')[0]
                 }),
               });
               const data = await res.json();
