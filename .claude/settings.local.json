@@ -48,7 +48,10 @@
       "WebFetch(domain:chakrahq.com)",
       "WebFetch(domain:whautomate.com)",
       "WebFetch(domain:zixflow.com)",
-      "Bash(npx next *)"
+      "Bash(npx next *)",
+      "Bash(netstat -ano)",
+      "Bash(tasklist //FI \"PID eq 37272\")",
+      "Bash(taskkill //PID 37272 //F)"
     ]
   }
 }
