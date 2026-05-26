@@ -158,7 +158,12 @@ export default function CanalesPage() {
       // Solo procesamos mensajes del popup oficial de Meta con datos del Embedded Signup
       if (event.origin !== 'https://www.facebook.com' && event.origin !== 'https://web.facebook.com') return;
       try {
-        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        let data: any = event.data;
+        if (typeof data === 'string') {
+          // El SDK manda muchos mensajes internos no-JSON (cb=...), los ignoramos
+          if (!data.startsWith('{')) return;
+          data = JSON.parse(data);
+        }
         if (data?.type !== 'WA_EMBEDDED_SIGNUP') return;
         console.log("[WA-DEBUG] Evento Embedded Signup:", data);
         if (data?.event === 'FINISH') {
@@ -259,6 +264,9 @@ export default function CanalesPage() {
     isSubmittingRef.current = true;
 
     try {
+      // El SDK de Meta asocia el code a la URL donde se invocó FB.login().
+      // El backend debe usar exactamente esa URL al intercambiar el code.
+      const pageUrl = `${window.location.origin}${window.location.pathname}`;
       const res = await fetch('/api/auth/meta/whatsapp-embedded', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -267,6 +275,7 @@ export default function CanalesPage() {
           phoneNumberId,
           wabaId,
           wsId: currentWorkspaceId,
+          pageUrl,
         }),
       });
       const data = await res.json();

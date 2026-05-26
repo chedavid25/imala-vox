@@ -5,7 +5,7 @@ import { COLLECTIONS } from '@/lib/types/firestore';
 
 export async function POST(req: NextRequest) {
   try {
-    const { code, phoneNumberId, wabaId, wsId } = await req.json();
+    const { code, phoneNumberId, wabaId, wsId, pageUrl } = await req.json();
 
     if (!code || !wsId) {
       return NextResponse.json({ error: 'Faltan parámetros requeridos' }, { status: 400 });
@@ -15,11 +15,25 @@ export async function POST(req: NextRequest) {
     const appSecret = process.env.META_APP_SECRET;
 
     // 1. Intercambiar code por short-lived token.
-    // El code viene de FB.login() (SDK), por lo que NO se envía redirect_uri.
-    const shortRes = await fetch(
-      `https://graph.facebook.com/v21.0/oauth/access_token?client_id=${appId}&client_secret=${appSecret}&code=${code}`
-    );
-    const shortData = await shortRes.json();
+    // El SDK de Meta asocia el code a la URL donde se llamó FB.login(),
+    // por lo que el intercambio debe incluir ese mismo redirect_uri.
+    // Si no llega pageUrl (compat), reintentamos sin redirect_uri.
+    const buildExchangeUrl = (redirect?: string) =>
+      `https://graph.facebook.com/v21.0/oauth/access_token` +
+      `?client_id=${appId}` +
+      `&client_secret=${appSecret}` +
+      `&code=${code}` +
+      (redirect ? `&redirect_uri=${encodeURIComponent(redirect)}` : '');
+
+    let shortRes = await fetch(buildExchangeUrl(pageUrl));
+    let shortData = await shortRes.json();
+
+    // Fallback: si falla con pageUrl, probar sin redirect_uri (flujo embedded puro)
+    if (!shortRes.ok || shortData.error) {
+      console.warn('[whatsapp-embedded] Reintentando sin redirect_uri. Error previo:', shortData?.error?.message);
+      shortRes = await fetch(buildExchangeUrl());
+      shortData = await shortRes.json();
+    }
 
     if (!shortRes.ok || shortData.error) {
       console.error('[whatsapp-embedded] Error short token:', shortData);
