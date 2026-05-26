@@ -657,14 +657,75 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
 }
 
 /**
+ * Detecta si un texto es una notificación automática del sistema de WhatsApp
+ * (conexión a Business Platform, cambio de número, cifrado, etc.)
+ * En esos casos el agente de IA no debe responder nada.
+ */
+function esNotificacionSistemaWA(texto: string): boolean {
+  const t = texto.toLowerCase();
+  const patrones = [
+    // Conexión a Meta Business Platform
+    'servicio seguro de meta',
+    'secure meta service',
+    'usando un servicio',
+    'using a secure service',
+    'administrar este chat',
+    'manage this chat',
+    // Cambio de número de teléfono
+    'cambió su número de teléfono',
+    'changed their phone number',
+    'ha cambiado su número',
+    'changed to a new phone number',
+    // Mensajes temporales / disappearing
+    'mensajes temporales ya no son compatibles',
+    'disappearing messages are turned off',
+    'los mensajes que desaparecen',
+    'desaparecen están desactivados',
+    // Cifrado extremo a extremo (notificación automática)
+    'mensajes y llamadas están cifrados de extremo a extremo',
+    'messages and calls are end-to-end encrypted',
+    'cifrado de extremo a extremo. toca para obtener',
+    // Notificaciones de privacidad y seguridad de Meta
+    'toca para obtener más información',
+    'tap to learn more',
+    'tap for more info',
+    // Cuenta de WhatsApp Business
+    'esta cuenta de whatsapp business',
+    'this whatsapp business account',
+  ];
+  return patrones.some(p => t.includes(p));
+}
+
+/**
  * Procesa mensajes entrantes de WhatsApp Cloud API.
  */
 async function procesarMensajeWhatsapp(value: any, wabaId: string) {
   try {
+    // Ignorar status updates (delivered, read, failed) — no son mensajes entrantes
+    if (value.statuses?.length && !value.messages?.length) return;
+
     const message = value.messages?.[0];
     const contact = value.contacts?.[0];
-    
-    if (!message || message.type !== 'text') return;
+
+    if (!message) return;
+
+    // Ignorar mensajes del sistema de WhatsApp (conexión a plataforma, cambio de número, etc.)
+    if (message.type === 'system' || message.type === 'reaction' || message.type === 'ephemeral') {
+      console.log(`[WA] Mensaje tipo '${message.type}' ignorado — no es un mensaje de cliente.`);
+      return;
+    }
+
+    // Solo procesar mensajes de texto con contenido real
+    if (message.type !== 'text' || !message.text?.body?.trim()) {
+      console.log(`[WA] Mensaje tipo '${message.type}' ignorado (no es texto o está vacío).`);
+      return;
+    }
+
+    // Ignorar textos que son notificaciones del sistema de WhatsApp
+    if (esNotificacionSistemaWA(message.text.body)) {
+      console.log(`[WA] Texto de notificación del sistema ignorado: "${message.text.body.slice(0, 80)}..."`);
+      return;
+    }
 
     const senderId = message.from;
     const text = message.text.body;
