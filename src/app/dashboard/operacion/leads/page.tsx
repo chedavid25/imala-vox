@@ -74,6 +74,7 @@ import { toast } from "sonner";
 import { formatDistanceToNow, format } from "date-fns";
 import { es } from "date-fns/locale";
 import { PhoneActionMenu } from "@/components/crm/PhoneActionMenu";
+import { MetaLeadsImporter } from "@/components/crm/MetaLeadsImporter";
 
 // DnD Kit Imports
 import {
@@ -689,7 +690,13 @@ export default function LeadsPage() {
                   ))}
                 </SelectContent>
               </Select>
-              <Button 
+              <MetaLeadsImporter
+                leads={leads}
+                etapaId={etapas[0]?.id || ''}
+                workspaceId={currentWorkspaceId!}
+                onImported={(count) => toast.success(`${count} leads importados desde Meta`)}
+              />
+              <Button
                 onClick={() => {
                   setNewLeadData({
                     nombre: "",
