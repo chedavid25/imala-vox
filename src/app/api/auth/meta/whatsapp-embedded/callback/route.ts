@@ -51,9 +51,9 @@ export async function GET(req: NextRequest) {
           
           if (window.opener) {
             if (code) {
-              window.opener.postMessage({ type: 'WA_SIGNUP_CODE', code: code }, window.location.origin);
+              window.opener.postMessage({ type: 'WA_SIGNUP_CODE', code: code }, '*');
             } else if (error) {
-              window.opener.postMessage({ type: 'WA_SIGNUP_ERROR', error: error }, window.location.origin);
+              window.opener.postMessage({ type: 'WA_SIGNUP_ERROR', error: error }, '*');
             }
           }
         } catch (e) {

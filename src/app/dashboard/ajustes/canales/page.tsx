@@ -153,30 +153,41 @@ export default function CanalesPage() {
     };
 
     const handleMessage = (event: MessageEvent) => {
+      console.log("[WA-DEBUG] Mensaje recibido del origen:", event.origin, "Datos:", event.data);
       // 1. Mensajes del popup de Meta (contienen los IDs de WABA y Teléfono)
       if (event.origin === 'https://www.facebook.com') {
         try {
           const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+          console.log("[WA-DEBUG] Procesando datos de Meta:", data);
           if (data?.type === 'WA_EMBEDDED_SIGNUP' && data?.event === 'FINISH') {
             wabaDataRef.current = {
               phoneNumberId: data.data?.phone_number_id,
               wabaId: data.data?.waba_id,
             };
+            console.log("[WA-DEBUG] IDs guardados:", wabaDataRef.current);
             if (receivedCodeRef.current) {
+              console.log("[WA-DEBUG] Código ya recibido, iniciando registro en backend");
               triggerBackendSignup(receivedCodeRef.current);
+            } else {
+              console.log("[WA-DEBUG] Esperando que llegue el código...");
             }
           }
-        } catch {}
+        } catch (err) {
+          console.error("[WA-DEBUG] Error al parsear datos de Meta:", err);
+        }
         return;
       }
 
       // 2. Mensajes desde nuestro propio callback redirigido en el popup
       if (event.origin === window.location.origin) {
+        console.log("[WA-DEBUG] Mensaje del mismo origen. Tipo:", event.data?.type);
         if (event.data?.type === 'WA_SIGNUP_CODE') {
           const code = event.data.code;
           receivedCodeRef.current = code;
+          console.log("[WA-DEBUG] Código recibido:", code);
           triggerBackendSignup(code);
         } else if (event.data?.type === 'WA_SIGNUP_ERROR') {
+          console.error("[WA-DEBUG] Error recibido del callback:", event.data.error);
           toast.error(`Error al conectar WhatsApp: ${event.data.error}`);
           setIsConnectingEmbedded(false);
         }
