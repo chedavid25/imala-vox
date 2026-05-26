@@ -166,50 +166,55 @@ export async function sincronizarWebhooks(wsId: string, canalId: string) {
       throw new Error("Faltan credenciales de Meta (Access Token o Page ID) para la sincronización");
     }
 
-    // 🔧 FIX: subscribed_fields debe ir como QUERY STRING separado por comas,
-    // NO como JSON body. Meta Graph API ignora silenciosamente los campos
-    // cuando se envían en el body JSON en este endpoint.
-    // Obtener los permisos del token para saber qué campos podemos suscribir
     const appId = process.env.NEXT_PUBLIC_META_APP_ID;
     const appSecret = process.env.META_APP_SECRET;
+
+    // Verificar permisos del token ANTES de intentar suscribir
     const debugTokenRes = await fetch(`https://graph.facebook.com/debug_token?input_token=${metaAccessToken}&access_token=${appId}|${appSecret}`);
     const debugToken = await debugTokenRes.json();
-    const currentScopes = debugToken.data?.scopes || [];
+    const currentScopes: string[] = debugToken.data?.scopes || [];
+    const tokenExpired = debugToken.data?.is_valid === false;
 
-    const fields = [
-      "messages",
-      "messaging_postbacks",
-      "messaging_optins",
-      "message_deliveries",
-      "message_reads"
-    ];
+    if (tokenExpired) {
+      return {
+        success: false,
+        error: "El token de acceso expiró. Usá el botón '¿Token expirado? Actualizar token' o reconectá la página desde 'Conectar con Meta'."
+      };
+    }
 
-    // Solo suscribir leadgen si tenemos permiso expreso, para evitar errores #200 en Instagram
+    if (!currentScopes.includes('pages_messaging')) {
+      return {
+        success: false,
+        error: "El token no tiene el permiso 'pages_messaging'. Hacé clic en 'Conectar con Meta' nuevamente y asegurate de aprobar todos los permisos solicitados sin desmarcar ninguno."
+      };
+    }
+
+    const fields = ["messages", "messaging_postbacks", "messaging_optins", "message_deliveries", "message_reads"];
+
+    // Solo suscribir leadgen si tenemos permiso expreso
     if (currentScopes.includes('leads_retrieval')) {
       fields.push("leadgen");
     }
 
-    const subscribedFields = fields.join(",");
-
     const url = new URL(`https://graph.facebook.com/v19.0/${metaPageId}/subscribed_apps`);
-    url.searchParams.set("subscribed_fields", subscribedFields);
+    url.searchParams.set("subscribed_fields", fields.join(","));
     url.searchParams.set("access_token", metaAccessToken);
 
-    const res = await fetch(url.toString(), {
-      method: "POST",
-      // Sin body. Sin Content-Type. Todo va por query string.
-    });
-
+    const res = await fetch(url.toString(), { method: "POST" });
     const data = await res.json();
 
     if (!res.ok || !data.success) {
-      console.error("Error al suscribir webhooks en Meta:", {
-        status: res.status,
-        data
-      });
+      console.error("Error al suscribir webhooks en Meta:", { status: res.status, data });
+      const errorCode = data.error?.code;
+      if (errorCode === 200 || data.error?.message?.includes('pages_messaging')) {
+        return {
+          success: false,
+          error: "Meta rechazó la suscripción por falta de permisos. Reconectá la página desde 'Conectar con Meta' y aprobá todos los permisos que solicita."
+        };
+      }
       return {
         success: false,
-        error: data.error?.message || `HTTP ${res.status}: Error desconocido en Meta`
+        error: `Error de Meta (código ${errorCode ?? res.status}). Intentá reconectar el canal desde 'Conectar con Meta'.`
       };
     }
 

@@ -88,16 +88,14 @@ export async function crearSuscripcionMP(wsId: string, plan: 'starter' | 'pro' |
       ? 'https://imala-vox.vercel.app/dashboard/ajustes/facturacion'
       : `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/ajustes/facturacion`;
 
-    // MercadoPago requiere obligatoriamente un payer_email para suscripciones.
-    // Usamos el de prueba en desarrollo (asegurando formato mail) y el del propietario en producción.
+    // En desarrollo usamos un email de prueba de MP (requerido por sandbox).
+    // En producción NO fijamos payer_email: si se fija, MP bloquea el pago a ese
+    // email exacto y el cliente no puede pagar si su cuenta MP usa otro email.
+    // La suscripción ya queda ligada al workspace vía Firestore, sin necesidad de restricción por email.
     let devPayerEmail = process.env.MP_TEST_USER_EMAIL || 'test_user_imala_checkout@testuser.com';
-    if (process.env.NODE_ENV === 'development' && !devPayerEmail.includes('@')) {
+    if (!devPayerEmail.includes('@')) {
       devPayerEmail = `${devPayerEmail}@testuser.com`;
     }
-
-    const payerEmail = process.env.NODE_ENV === 'development'
-      ? devPayerEmail
-      : (ws.propietarioEmail || ws.email || null);
 
     const transactionAmount = ciclo === 'anual'
       ? Math.round(precioARS * 12)
@@ -118,14 +116,12 @@ export async function crearSuscripcionMP(wsId: string, plan: 'starter' | 'pro' |
       back_url: backUrl,
     };
 
-    // payer_email es opcional en preapproval — omitirlo si es indefinido
-    // evita el error 500 cuando seller y buyer tienen el mismo email
-    if (payerEmail) {
-      mpBody.payer_email = payerEmail;
+    if (process.env.NODE_ENV === 'development') {
+      mpBody.payer_email = devPayerEmail;
     }
 
     console.log("[billing] Creando preapproval MP:", JSON.stringify({
-      plan, ciclo, precioARS, transactionAmount, payerEmail, backUrl, env: process.env.NODE_ENV
+      plan, ciclo, precioARS, transactionAmount, backUrl, env: process.env.NODE_ENV
     }));
 
     // Crear suscripción en MercadoPago
