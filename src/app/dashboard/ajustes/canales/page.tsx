@@ -1003,7 +1003,7 @@ export default function CanalesPage() {
               <div className="ml-10 space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1">
-                    <p className="text-[11px] font-black text-slate-700 uppercase">Ya tengo una WABA</p>
+                    <p className="text-[11px] font-black text-slate-700 uppercase">Ya tengo cuenta de WhatsApp Business</p>
                     <p className="text-[12px] text-slate-600 font-medium">El popup la muestra directamente. Solo la seleccionás y listo.</p>
                   </div>
                   <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1">
