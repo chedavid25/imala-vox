@@ -254,7 +254,13 @@ export default function CanalesPage() {
               const res = await fetch('/api/auth/meta/whatsapp-embedded', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code, phoneNumberId, wabaId, wsId: currentWorkspaceId }),
+                body: JSON.stringify({
+                  code,
+                  phoneNumberId,
+                  wabaId,
+                  wsId: currentWorkspaceId,
+                  origin: window.location.origin
+                }),
               });
               const data = await res.json();
               if (data.success) {
