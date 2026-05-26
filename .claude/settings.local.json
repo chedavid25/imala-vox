@@ -47,7 +47,8 @@
       "WebFetch(domain:www.hubtype.com)",
       "WebFetch(domain:chakrahq.com)",
       "WebFetch(domain:whautomate.com)",
-      "WebFetch(domain:zixflow.com)"
+      "WebFetch(domain:zixflow.com)",
+      "Bash(npx next *)"
     ]
   }
 }

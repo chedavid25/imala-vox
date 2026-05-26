@@ -1,11 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { 
-  MessageSquare, 
-  Instagram, 
-  MessageCircle, 
-  Plus, 
+import { useState, useEffect, useRef } from "react";
+import {
+  MessageSquare,
+  Instagram,
+  Plus,
   Loader2,
   MoreVertical,
   Activity,
@@ -54,12 +53,11 @@ import { COLLECTIONS, Canal } from "@/lib/types/firestore";
 import { useRouter } from "next/navigation";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { toast } from "sonner";
-import { 
-  eliminarCanal, 
-  sincronizarWebhooks, 
+import {
+  eliminarCanal,
+  sincronizarWebhooks,
   sincronizarWebhooksWhatsApp,
   configurarCanalIA,
-  conectarCanalManual,
   actualizarTokenAcceso,
   obtenerTokenCanal
 } from "@/app/actions/channels";
@@ -121,15 +119,11 @@ export default function CanalesPage() {
   const [isSavingConfig, setIsSavingConfig] = useState(false);
 
   // Estado para el modal de conexión WhatsApp
-  const [isWAModalOpen, setIsWAModalOpen] = useState(false);
-  const [waPhoneNumberId, setWaPhoneNumberId] = useState('');
-  const [waAccessToken, setWaAccessToken] = useState('');
-  const [waDisplayName, setWaDisplayName] = useState('');
-  const [waWabaId, setWaWabaId] = useState('');
-  const [isConnectingWA, setIsConnectingWA] = useState(false);
+  const [isConnectingEmbedded, setIsConnectingEmbedded] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [isWAHelpModalOpen, setIsWAHelpModalOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const wabaDataRef = useRef<{ phoneNumberId?: string; wabaId?: string }>({});
 
   // Estado para la pestaña activa
   const [activeTab, setActiveTab] = useState<'whatsapp' | 'instagram' | 'facebook' | 'leads' | 'web'>('whatsapp');
@@ -143,13 +137,53 @@ export default function CanalesPage() {
     setIsMounted(true);
   }, []);
 
+  // Cargar FB SDK para Embedded Signup
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    (window as any).fbAsyncInit = function () {
+      (window as any).FB.init({
+        appId: process.env.NEXT_PUBLIC_META_APP_ID,
+        autoLogAppEvents: true,
+        xfbml: true,
+        version: 'v21.0',
+      });
+    };
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== 'https://www.facebook.com') return;
+      try {
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        if (data?.type === 'WA_EMBEDDED_SIGNUP' && data?.event === 'FINISH') {
+          wabaDataRef.current = {
+            phoneNumberId: data.data?.phone_number_id,
+            wabaId: data.data?.waba_id,
+          };
+        }
+      } catch {}
+    };
+
+    window.addEventListener('message', handleMessage);
+
+    if (!document.getElementById('facebook-jssdk')) {
+      const script = document.createElement('script');
+      script.id = 'facebook-jssdk';
+      script.src = 'https://connect.facebook.net/en_US/sdk.js';
+      script.async = true;
+      script.defer = true;
+      document.body.appendChild(script);
+    }
+
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
   const ayudaCanales = {
     titulo: "¿Cómo conectar tus canales de atención?",
-    descripcion: "Los canales permiten que Imalá Vox reciba y envíe mensajes de tus clientes. Puedes conectar WhatsApp mediante API o tus páginas de Facebook e Instagram vía Meta OAuth.",
-    recomendacion: "Para WhatsApp, asegúrate de usar un 'Access Token Permanente'. Los tokens temporales expiran en 24 horas y el agente dejará de responder.",
+    descripcion: "Los canales permiten que Imalá Vox reciba y envíe mensajes de tus clientes. WhatsApp se conecta con un clic vía Meta. Instagram y Facebook se vinculan con OAuth.",
+    recomendacion: "Para Instagram y Facebook, asegurate de ser Administrador de la Página. Para WhatsApp, solo necesitás una cuenta de Facebook y tu número.",
     items: [
-      { titulo: "WhatsApp API", detalle: "Requiere el ID del número y un Token. Es ideal para cuentas oficiales y soporte masivo." },
-      { titulo: "Meta OAuth", detalle: "Inicia sesión con Facebook para conectar tus Páginas y cuentas de Instagram de forma automática." },
+      { titulo: "WhatsApp", detalle: "Conexión directa con Meta vía un popup seguro. No necesitás tokens ni configuraciones técnicas." },
+      { titulo: "Meta OAuth", detalle: "Iniciá sesión con Facebook para conectar tus Páginas e Instagram de forma automática." },
       { titulo: "Webhooks", detalle: "Es el 'enlace' que avisa al sistema cuando llega un mensaje. Deben estar en estado 'OK' para funcionar." },
     ]
   };
@@ -196,6 +230,57 @@ export default function CanalesPage() {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
+
+  const handleEmbeddedSignup = () => {
+    if (!currentWorkspaceId) return;
+    const configId = process.env.NEXT_PUBLIC_META_WA_CONFIG_ID;
+    if (!configId) {
+      toast.error("Configuración de Embedded Signup no disponible. Contactá al soporte.");
+      return;
+    }
+    const FB = (window as any).FB;
+    if (!FB) { toast.error("FB SDK aún no cargó, intentá en un momento"); return; }
+
+    wabaDataRef.current = {};
+    setIsConnectingEmbedded(true);
+
+    FB.login(
+      async (response: any) => {
+        if (response.authResponse?.code) {
+          const { code } = response.authResponse;
+          const { phoneNumberId, wabaId } = wabaDataRef.current;
+          try {
+            const res = await fetch('/api/auth/meta/whatsapp-embedded', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ code, phoneNumberId, wabaId, wsId: currentWorkspaceId }),
+            });
+            const data = await res.json();
+            if (data.success) {
+              toast.success("¡WhatsApp conectado! Entrá a 'Configurar' para activar la IA.");
+            } else {
+              toast.error(data.error || "No se pudo conectar WhatsApp");
+            }
+          } catch {
+            toast.error("Error de red al conectar WhatsApp");
+          }
+        } else if (response.status !== 'connected') {
+          toast.error("Conexión cancelada o sin autorización");
+        }
+        setIsConnectingEmbedded(false);
+      },
+      {
+        config_id: configId,
+        response_type: 'code',
+        override_default_response_type: true,
+        extras: {
+          setup: {},
+          featureType: '',
+          sessionInfoVersion: '3',
+        },
+      }
+    );
+  };
 
   const handleOAuthConnect = () => {
     const appId = process.env.NEXT_PUBLIC_META_APP_ID;
@@ -244,41 +329,6 @@ export default function CanalesPage() {
 
     const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&state=${currentWorkspaceId}&auth_type=rerequest`;
     window.location.href = authUrl;
-  };
-
-  const handleConnectWhatsApp = async () => {
-    if (!currentWorkspaceId) return;
-    if (!waPhoneNumberId.trim() || !waAccessToken.trim()) {
-      toast.error("El Phone Number ID y el Access Token son obligatorios");
-      return;
-    }
-
-    setIsConnectingWA(true);
-    try {
-      const res = await conectarCanalManual(currentWorkspaceId, {
-        tipo: 'whatsapp',
-        nombre: waDisplayName.trim() || 'WhatsApp Business',
-        cuenta: waPhoneNumberId.trim(),
-        metaPhoneNumberId: waPhoneNumberId.trim(),
-        metaWABAId: waWabaId.trim(),
-        accessToken: waAccessToken.trim(),
-      });
-
-      if (res.success) {
-        toast.success("Canal de WhatsApp conectado. Ahora verificá los webhooks desde 'Configurar'.");
-        setIsWAModalOpen(false);
-        setWaPhoneNumberId('');
-        setWaAccessToken('');
-        setWaDisplayName('');
-        setWaWabaId('');
-      } else {
-        toast.error(res.error || "No se pudo conectar el canal");
-      }
-    } catch (error) {
-      toast.error("Error de red al conectar WhatsApp");
-    } finally {
-      setIsConnectingWA(false);
-    }
   };
 
   const handleDelete = async (canalId: string) => {
@@ -502,10 +552,10 @@ export default function CanalesPage() {
                 <h4 className="text-sm font-bold text-[var(--text-primary-light)]">Antes de conectar, verifica lo siguiente:</h4>
                 <ul className="space-y-3">
                   {(activeTab === 'whatsapp' ? [
-                    "Tener acceso al Administrador comercial de WhatsApp.",
-                    "Contar con el ID del número de teléfono (Phone ID).",
-                    "Generar un Token de Acceso Permanente (para evitar desconexiones).",
-                    "Asegúrate de que el número no esté en uso en una App de WhatsApp personal."
+                    "Tener una cuenta de Facebook activa (personal o de empresa).",
+                    "Un número de teléfono disponible para verificar (puede ser el que ya usás en WhatsApp Business).",
+                    "El número no puede estar registrado en WhatsApp personal — solo en WhatsApp Business.",
+                    "Imalá Vox no afecta tu app de WhatsApp Business del celular."
                   ] : activeTab === 'instagram' ? [
                     "Usar una cuenta de Instagram de tipo Empresa o Creador.",
                     "Tener la cuenta vinculada a una Página de Facebook.",
@@ -551,23 +601,20 @@ export default function CanalesPage() {
                   {activeTab === 'whatsapp' ? (
                     <>
                       <Button
-                        onClick={handleOAuthConnect}
+                        onClick={handleEmbeddedSignup}
+                        disabled={isConnectingEmbedded}
                         className="w-full rounded-xl bg-[#25D366] hover:bg-[#22c55e] text-white font-black text-[11px] uppercase tracking-widest h-12 shadow-xl shadow-[#25D366]/20 transition-all active:scale-95 flex items-center justify-center gap-2"
                       >
-                        <MetaIcon className="w-4 h-4 fill-white" /> Vincular WhatsApp con Meta
+                        {isConnectingEmbedded
+                          ? <Loader2 className="animate-spin w-4 h-4" />
+                          : <><MetaIcon className="w-4 h-4 fill-white" /> Conectar WhatsApp con Meta</>}
                       </Button>
-                      <button
-                        onClick={() => setIsWAModalOpen(true)}
-                        className="text-[9px] font-bold text-[var(--text-tertiary-light)] hover:text-white transition-colors text-center uppercase tracking-widest"
-                      >
-                        ¿Configuración manual avanzada?
-                      </button>
                       <button
                         onClick={() => setIsWAHelpModalOpen(true)}
                         className="flex items-center justify-center gap-1.5 text-[9px] font-bold text-[#25D366]/70 hover:text-[#25D366] transition-colors text-center"
                       >
                         <HelpCircle className="w-3 h-3" />
-                        ¿Necesitás ayuda para conectar tu WhatsApp manualmente?
+                        ¿Cómo funciona la conexión?
                       </button>
                     </>
                   ) : activeTab === 'web' ? (
@@ -704,84 +751,6 @@ export default function CanalesPage() {
         </div>
       </div>
     )}
-
-      {/* Modal conexión WhatsApp */}
-      <Dialog open={isWAModalOpen} onOpenChange={setIsWAModalOpen}>
-        <DialogContent className="max-w-md rounded-3xl p-8 border-none bg-white shadow-2xl">
-          <DialogHeader className="space-y-3">
-            <DialogTitle className="text-2xl font-bold flex items-center gap-3">
-              <MessageSquare className="w-6 h-6 text-[#25D366]" />
-              Conectar WhatsApp Business
-            </DialogTitle>
-            <DialogDescription className="text-[var(--text-secondary-light)] text-sm">
-              Necesitás el Phone Number ID y un System User Access Token de tu cuenta de WhatsApp Business API en el panel de Meta for Developers.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-6 mt-6">
-            <div className="space-y-2">
-              <Label className="text-[10px] uppercase font-black text-[var(--text-tertiary-light)] ml-1">Phone Number ID *</Label>
-              <Input
-                placeholder="Ej: 123456789012345"
-                value={waPhoneNumberId}
-                onChange={(e) => setWaPhoneNumberId(e.target.value)}
-                className="h-12 rounded-2xl bg-slate-50 border-none px-4 text-sm font-semibold"
-              />
-              <p className="text-[9px] text-[var(--text-tertiary-light)] px-1 font-medium">Encontralo en Meta for Developers → Tu App → WhatsApp → Configuración de la API</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-[10px] uppercase font-black text-[var(--text-tertiary-light)] ml-1">Access Token permanente *</Label>
-              <Input
-                placeholder="EAAxxxxxx..."
-                value={waAccessToken}
-                onChange={(e) => setWaAccessToken(e.target.value)}
-                type="password"
-                className="h-12 rounded-2xl bg-slate-50 border-none px-4 text-sm font-semibold"
-              />
-              <p className="text-[9px] text-[var(--text-tertiary-light)] px-1 font-medium">Generá un System User Token en Meta Business Suite → Configuración del negocio</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-[10px] uppercase font-black text-[var(--text-tertiary-light)] ml-1">WhatsApp Business Account (WABA) ID</Label>
-              <Input
-                placeholder="Ej: 1588419892267089"
-                value={waWabaId}
-                onChange={(e) => setWaWabaId(e.target.value)}
-                className="h-12 rounded-2xl bg-slate-50 border-none px-4 text-sm font-semibold"
-              />
-              <p className="text-[9px] text-[var(--text-tertiary-light)] px-1 font-medium">Opcional para números reales, pero RECOMENDADO para números de prueba.</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-[10px] uppercase font-black text-[var(--text-tertiary-light)] ml-1">Nombre para mostrar (opcional)</Label>
-              <Input
-                placeholder="Ej: Soporte WhatsApp"
-                value={waDisplayName}
-                onChange={(e) => setWaDisplayName(e.target.value)}
-                className="h-12 rounded-2xl bg-slate-50 border-none px-4 text-sm font-semibold"
-              />
-            </div>
-
-            <div className="p-5 rounded-[24px] bg-amber-50 border border-amber-100 space-y-2">
-              <p className="text-[11px] font-black text-amber-800 uppercase tracking-wider">Configuración en Meta:</p>
-              <ol className="list-decimal list-inside space-y-1 text-[11px] text-amber-700 font-medium">
-                <li>Webhook URL: <code className="font-mono bg-amber-100 px-1.5 py-0.5 rounded">/api/webhooks/meta</code></li>
-                <li>Verify Token: <code className="font-mono bg-amber-100 px-1.5 py-0.5 rounded">imala_vox_2024</code></li>
-                <li>Suscribirse al campo <code className="font-mono bg-amber-100 px-1.5 py-0.5 rounded font-black">messages</code></li>
-              </ol>
-            </div>
-
-            <Button
-              onClick={handleConnectWhatsApp}
-              disabled={isConnectingWA || !waPhoneNumberId.trim() || !waAccessToken.trim()}
-              className="w-full h-12 rounded-2xl font-black text-[11px] uppercase tracking-widest bg-[#25D366] hover:bg-[#22c55e] text-white shadow-xl shadow-[#25D366]/20 transition-all active:scale-95"
-            >
-              {isConnectingWA ? <Loader2 className="animate-spin w-5 h-5" /> : "Conectar WhatsApp"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Modal de configuración de canal (existente, con fix para WhatsApp) */}
       <Dialog open={isConfigModalOpen} onOpenChange={setIsConfigModalOpen}>
@@ -967,7 +936,7 @@ export default function CanalesPage() {
             </div>
           </div>
 
-          <div className="px-10 py-8 space-y-10">
+          <div className="px-10 py-8 space-y-8">
 
             {/* Aviso principal */}
             <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-5 py-4 flex items-start gap-3">
@@ -975,26 +944,27 @@ export default function CanalesPage() {
               <div className="space-y-1">
                 <p className="text-[12px] font-black text-emerald-800 uppercase tracking-widest">Tu app de WhatsApp no se ve afectada</p>
                 <p className="text-[13px] text-emerald-700 font-medium leading-relaxed">
-                  Conectar tu número a Imalá Vox <span className="font-black">no elimina ni modifica</span> tu app de WhatsApp Business del celular. Nuestro sistema accede a tu cuenta vía API sin interferir con la app. Vas a poder seguir usándola normalmente.
+                  Conectar tu número <span className="font-black">no elimina ni modifica</span> tu app de WhatsApp Business del celular. Vas a poder seguir usándola con normalidad.
                 </p>
               </div>
             </div>
 
-            {/* ¿Ya tenés WABA? */}
-            <section className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-7 h-7 rounded-full bg-slate-200 text-slate-700 text-[11px] font-black flex items-center justify-center shrink-0">?</div>
-                <h3 className="text-base font-bold text-slate-900">¿Ya usás la WhatsApp Business API (Cloud API)?</h3>
-              </div>
-              <div className="ml-10 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
-                  <p className="text-[11px] font-black text-slate-700 uppercase tracking-widest">Sí, ya la uso</p>
-                  <p className="text-[13px] text-slate-600 font-medium leading-relaxed">Tenés un número en Meta Business Manager con acceso a la API. Saltá directo al <span className="font-black text-slate-900">Paso 3</span> para obtener el token y conectarte.</p>
-                </div>
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
-                  <p className="text-[11px] font-black text-slate-700 uppercase tracking-widest">No, es la primera vez</p>
-                  <p className="text-[13px] text-slate-600 font-medium leading-relaxed">Seguí la guía completa desde el Paso 1. Tardás unos 15-20 minutos y al final podés conectar tu número o uno nuevo.</p>
-                </div>
+            {/* Qué necesitás */}
+            <section className="space-y-3">
+              <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Lo único que necesitás</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[
+                  { icon: "👤", titulo: "Una cuenta de Facebook", detalle: "Personal o de empresa. Con eso alcanza para autenticarte con Meta." },
+                  { icon: "📱", titulo: "Un número de teléfono", detalle: "Puede ser tu número actual de WhatsApp Business, uno nuevo, o de VoIP." },
+                ].map((item, i) => (
+                  <div key={i} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex gap-3">
+                    <span className="text-xl shrink-0">{item.icon}</span>
+                    <div className="space-y-1">
+                      <p className="text-[12px] font-black text-slate-800">{item.titulo}</p>
+                      <p className="text-[12px] text-slate-600 font-medium leading-relaxed">{item.detalle}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </section>
 
@@ -1002,21 +972,12 @@ export default function CanalesPage() {
             <section className="space-y-4">
               <div className="flex items-center gap-3">
                 <div className="w-7 h-7 rounded-full bg-slate-900 text-white text-[11px] font-black flex items-center justify-center shrink-0">1</div>
-                <h3 className="text-base font-bold text-slate-900">Crear tu cuenta de desarrollador en Meta</h3>
+                <h3 className="text-base font-bold text-slate-900">Hacé clic en "Conectar WhatsApp con Meta"</h3>
               </div>
-              <div className="ml-10 space-y-2.5">
-                <p className="text-[13px] text-slate-500 font-medium italic">Si ya tenés cuenta en Meta for Developers, saltá al Paso 2.</p>
-                {[
-                  <>Abrí el navegador y entrá a <span className="font-mono text-[12px] bg-slate-100 px-2 py-0.5 rounded font-bold">developers.facebook.com</span>.</>,
-                  <>Hacé clic en <span className="font-black text-slate-900">"Iniciar sesión"</span> y usá tu cuenta de Facebook personal.</>,
-                  <>Si es la primera vez, Meta te pedirá que aceptes ser desarrollador. Hacé clic en <span className="font-black text-slate-900">"Registrarme"</span> o <span className="font-black text-slate-900">"Empezar"</span>.</>,
-                  <>Verificá tu cuenta con un número de teléfono si te lo pide.</>,
-                ].map((step, i) => (
-                  <div key={i} className="flex gap-3 text-[13px] text-slate-700">
-                    <span className="text-[#25D366] font-black shrink-0 mt-0.5">{i + 1}.</span>
-                    <span className="leading-relaxed font-medium">{step}</span>
-                  </div>
-                ))}
+              <div className="ml-10 space-y-2">
+                <p className="text-[13px] text-slate-600 font-medium leading-relaxed">
+                  Cerrá este panel y hacé clic en el botón verde <span className="font-black text-slate-900">"Conectar WhatsApp con Meta"</span>. Se va a abrir una ventana emergente de Meta — es el proceso oficial y seguro de Meta para conectar tu número.
+                </p>
               </div>
             </section>
 
@@ -1024,21 +985,12 @@ export default function CanalesPage() {
             <section className="space-y-4">
               <div className="flex items-center gap-3">
                 <div className="w-7 h-7 rounded-full bg-slate-900 text-white text-[11px] font-black flex items-center justify-center shrink-0">2</div>
-                <h3 className="text-base font-bold text-slate-900">Crear una app en Meta for Developers</h3>
+                <h3 className="text-base font-bold text-slate-900">Iniciá sesión con Facebook en el popup</h3>
               </div>
-              <div className="ml-10 space-y-2.5">
-                <p className="text-[13px] text-slate-500 font-medium italic">Si ya tenés una app con WhatsApp habilitado, saltá al Paso 3.</p>
-                {[
-                  <>En el menú superior hacé clic en <span className="font-black text-slate-900">"Mis apps"</span> → luego en el botón <span className="font-black text-slate-900">"Crear app"</span>.</>,
-                  <>Cuando pregunte el tipo, elegí <span className="font-black text-slate-900">"Otro"</span> y luego <span className="font-black text-slate-900">"Negocios"</span>.</>,
-                  <>Poné un nombre (ej: <em>"Mi Empresa WA"</em>), tu email de contacto y hacé clic en <span className="font-black text-slate-900">"Crear app"</span>. Meta puede pedirte la contraseña de Facebook para confirmar.</>,
-                  <>Ya dentro del panel de tu nueva app, buscá el producto <span className="font-black text-slate-900">"WhatsApp"</span> en la lista y hacé clic en <span className="font-black text-slate-900">"Configurar"</span>.</>,
-                ].map((step, i) => (
-                  <div key={i} className="flex gap-3 text-[13px] text-slate-700">
-                    <span className="text-[#25D366] font-black shrink-0 mt-0.5">{i + 1}.</span>
-                    <span className="leading-relaxed font-medium">{step}</span>
-                  </div>
-                ))}
+              <div className="ml-10 space-y-2">
+                <p className="text-[13px] text-slate-600 font-medium leading-relaxed">
+                  En la ventana que aparece, iniciá sesión con tu cuenta de Facebook. Si ya estás logueado en el navegador, Meta puede saltearse este paso automáticamente.
+                </p>
               </div>
             </section>
 
@@ -1046,30 +998,19 @@ export default function CanalesPage() {
             <section className="space-y-4">
               <div className="flex items-center gap-3">
                 <div className="w-7 h-7 rounded-full bg-slate-900 text-white text-[11px] font-black flex items-center justify-center shrink-0">3</div>
-                <h3 className="text-base font-bold text-slate-900">Agregar un número de teléfono a la API</h3>
+                <h3 className="text-base font-bold text-slate-900">Seleccioná o creá tu cuenta de WhatsApp Business</h3>
               </div>
               <div className="ml-10 space-y-3">
-                <div className="bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3 space-y-2">
-                  <p className="text-[11px] font-black text-blue-800 uppercase tracking-widest">¿Qué número usar?</p>
-                  <p className="text-[13px] text-blue-700 font-medium leading-relaxed">
-                    <span className="font-black">Opción A — número nuevo o sin WhatsApp activo:</span> La más simple. Podés usar un número de línea fija, VoIP, o uno que ya no estés usando en WhatsApp. Sin complicaciones.
-                  </p>
-                  <p className="text-[13px] text-blue-700 font-medium leading-relaxed">
-                    <span className="font-black">Opción B — tu número actual de WhatsApp Business:</span> También es posible. Imalá Vox no elimina ni toca tu app — simplemente le da a la API acceso a ese número. La app del celular y la API funcionan sobre la misma cuenta de WhatsApp Business en Meta y pueden coexistir sin problemas en la mayoría de los casos.
-                  </p>
-                </div>
-                {[
-                  <>En el menú izquierdo andá a <span className="font-black text-slate-900">WhatsApp → Configuración de la API</span>.</>,
-                  <>En la sección <span className="font-black text-slate-900">"Número de teléfono"</span>, hacé clic en <span className="font-black text-slate-900">"Agregar número de teléfono"</span>.</>,
-                  <>Completá el nombre de tu empresa, zona horaria y categoría. Ingresá el número con código de país (ej: <span className="font-mono text-[12px] bg-slate-100 px-1.5 rounded">+54911...</span>).</>,
-                  <>Meta te enviará un SMS o llamada. Ingresá el código de 6 dígitos que recibas.</>,
-                  <>Una vez verificado, anotá el <span className="font-black text-slate-900">ID del número de teléfono</span> que aparece abajo del número — lo necesitás en el último paso.</>,
-                ].map((step, i) => (
-                  <div key={i} className="flex gap-3 text-[13px] text-slate-700">
-                    <span className="text-[#25D366] font-black shrink-0 mt-0.5">{i + 1}.</span>
-                    <span className="leading-relaxed font-medium">{step}</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1">
+                    <p className="text-[11px] font-black text-slate-700 uppercase">Ya tengo una WABA</p>
+                    <p className="text-[12px] text-slate-600 font-medium">El popup la muestra directamente. Solo la seleccionás y listo.</p>
                   </div>
-                ))}
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1">
+                    <p className="text-[11px] font-black text-slate-700 uppercase">Es mi primera vez</p>
+                    <p className="text-[12px] text-slate-600 font-medium">Meta te guía para crear la cuenta de WhatsApp Business dentro del mismo popup.</p>
+                  </div>
+                </div>
               </div>
             </section>
 
@@ -1077,84 +1018,40 @@ export default function CanalesPage() {
             <section className="space-y-4">
               <div className="flex items-center gap-3">
                 <div className="w-7 h-7 rounded-full bg-slate-900 text-white text-[11px] font-black flex items-center justify-center shrink-0">4</div>
-                <h3 className="text-base font-bold text-slate-900">Generar un Access Token permanente</h3>
+                <h3 className="text-base font-bold text-slate-900">Agregá y verificá tu número de teléfono</h3>
               </div>
-              <div className="ml-10 space-y-2.5">
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-start gap-2.5 mb-3">
-                  <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                  <p className="text-[12px] text-amber-700 font-medium leading-relaxed">
-                    Este paso es el más importante. Un token temporal expira en 24 horas y la integración dejará de funcionar. El token de System User es permanente y no expira.
+              <div className="ml-10 space-y-2">
+                <p className="text-[13px] text-slate-600 font-medium leading-relaxed">
+                  Si tu número aún no está registrado en la API, el popup te pide que lo ingreses y lo verifiques con un código SMS o llamada. Si ya está registrado, Meta lo detecta solo.
+                </p>
+                <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+                  <p className="text-[12px] text-blue-700 font-medium leading-relaxed">
+                    <span className="font-black">¿Tu número ya está en WhatsApp Business App?</span> Podés usarlo igual. Imalá Vox accede vía API sin desinstalar ni afectar tu app del celular.
                   </p>
                 </div>
-                {[
-                  <>Abrí una nueva pestaña y entrá a <span className="font-mono text-[12px] bg-slate-100 px-2 py-0.5 rounded font-bold">business.facebook.com</span>.</>,
-                  <>En el menú izquierdo, abajo del todo, hacé clic en el ícono de engranaje (<span className="font-black text-slate-900">Configuración del negocio</span>).</>,
-                  <>En el menú izquierdo buscá <span className="font-black text-slate-900">Usuarios → Usuarios del sistema</span> y hacé clic ahí.</>,
-                  <>Hacé clic en <span className="font-black text-slate-900">"Agregar"</span>. Poné cualquier nombre (ej: "Bot Imala") y elegí el rol <span className="font-black text-slate-900">"Administrador"</span>. Luego <span className="font-black text-slate-900">"Crear usuario del sistema"</span>.</>,
-                  <>Con el usuario creado, hacé clic en <span className="font-black text-slate-900">"Agregar activos"</span>. En la ventana que aparece, elegí <span className="font-black text-slate-900">Cuentas de WhatsApp Business</span> en el menú izquierdo, seleccioná tu cuenta y activá el toggle de <span className="font-black text-slate-900">"Control total"</span>. Guardá.</>,
-                  <>Volvé al usuario y hacé clic en <span className="font-black text-slate-900">"Generar nuevo token"</span>. Seleccioná tu app de la lista. Marcá los permisos <span className="font-mono text-[11px] bg-slate-100 px-1.5 py-0.5 rounded">whatsapp_business_messaging</span> y <span className="font-mono text-[11px] bg-slate-100 px-1.5 py-0.5 rounded">whatsapp_business_management</span>. Hacé clic en <span className="font-black text-slate-900">"Generar token"</span>.</>,
-                  <>Se muestra el token solo esta vez. <span className="font-black text-slate-900">Copialo ahora</span> y guardalo en un lugar seguro. Empieza con "EAA...".</>,
-                ].map((step, i) => (
-                  <div key={i} className="flex gap-3 text-[13px] text-slate-700">
-                    <span className="text-[#25D366] font-black shrink-0 mt-0.5">{i + 1}.</span>
-                    <span className="leading-relaxed font-medium">{step}</span>
-                  </div>
-                ))}
               </div>
             </section>
 
             {/* Paso 5 */}
             <section className="space-y-4">
               <div className="flex items-center gap-3">
-                <div className="w-7 h-7 rounded-full bg-slate-900 text-white text-[11px] font-black flex items-center justify-center shrink-0">5</div>
-                <h3 className="text-base font-bold text-slate-900">Configurar el Webhook en Meta</h3>
-              </div>
-              <div className="ml-10 space-y-2.5">
-                {[
-                  <>Volvé a <span className="font-mono text-[12px] bg-slate-100 px-2 py-0.5 rounded font-bold">developers.facebook.com</span>, entrá a tu app y en el menú izquierdo andá a <span className="font-black text-slate-900">WhatsApp → Configuración</span>.</>,
-                  <>En la sección <span className="font-black text-slate-900">"Webhooks"</span>, hacé clic en <span className="font-black text-slate-900">"Editar"</span>.</>,
-                  <>En <span className="font-black text-slate-900">"URL de devolución de llamada"</span> pegá exactamente esto: <span className="font-mono text-[11px] bg-slate-100 px-2 py-0.5 rounded block mt-1 break-all">https://imala-vox.vercel.app/api/webhooks/meta</span></>,
-                  <>En <span className="font-black text-slate-900">"Verificar token"</span> poné exactamente: <span className="font-mono text-[11px] bg-slate-100 px-2 py-0.5 rounded">imala_vox_2024</span></>,
-                  <>Hacé clic en <span className="font-black text-slate-900">"Verificar y guardar"</span>. Si todo está bien, aparecerá una confirmación verde.</>,
-                  <>Bajá a <span className="font-black text-slate-900">"Campos del webhook"</span> y buscá el campo <span className="font-mono text-[11px] bg-slate-100 px-1.5 py-0.5 rounded">messages</span>. Hacé clic en <span className="font-black text-slate-900">"Suscribirse"</span>.</>,
-                ].map((step, i) => (
-                  <div key={i} className="flex gap-3 text-[13px] text-slate-700">
-                    <span className="text-[#25D366] font-black shrink-0 mt-0.5">{i + 1}.</span>
-                    <span className="leading-relaxed font-medium">{step}</span>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            {/* Paso 6 - Conectar en Imala */}
-            <section className="space-y-4">
-              <div className="flex items-center gap-3">
                 <div className="w-7 h-7 rounded-full bg-[#25D366] text-white text-[11px] font-black flex items-center justify-center shrink-0">✓</div>
-                <h3 className="text-base font-bold text-slate-900">Conectar en Imalá Vox</h3>
+                <h3 className="text-base font-bold text-slate-900">¡Listo! Configurá el agente de IA</h3>
               </div>
-              <div className="ml-10 space-y-2.5">
-                {[
-                  <>Volvé acá y hacé clic en <span className="font-black text-slate-900">"¿Configuración manual avanzada?"</span>.</>,
-                  <>En el campo <span className="font-black text-slate-900">Phone Number ID</span> pegá el ID que anotaste en el Paso 3.</>,
-                  <>En el campo <span className="font-black text-slate-900">Access Token permanente</span> pegá el token que generaste en el Paso 4.</>,
-                  <>Opcionalmente, en <span className="font-black text-slate-900">WABA ID</span> pegá el ID de tu cuenta de WhatsApp Business (lo encontrás en la pantalla de Configuración de la API, sección "Cuenta de WhatsApp Business").</>,
-                  <>Hacé clic en <span className="font-black text-slate-900">"Conectar WhatsApp"</span> y listo.</>,
-                ].map((step, i) => (
-                  <div key={i} className="flex gap-3 text-[13px] text-slate-700">
-                    <span className="text-[#25D366] font-black shrink-0 mt-0.5">{i + 1}.</span>
-                    <span className="leading-relaxed font-medium">{step}</span>
-                  </div>
-                ))}
+              <div className="ml-10 space-y-2">
+                <p className="text-[13px] text-slate-600 font-medium leading-relaxed">
+                  Una vez que cerrás el popup de Meta, Imalá Vox recibe el acceso automáticamente y crea el canal. Vas a ver el número en la lista de "Conexiones Activas". Desde ahí hacé clic en <span className="font-black text-slate-900">"Configurar"</span> para asignarle un agente de IA.
+                </p>
               </div>
             </section>
 
             {/* Footer */}
             <div className="border-t border-slate-100 pt-6">
               <Button
-                onClick={() => { setIsWAHelpModalOpen(false); setIsWAModalOpen(true); }}
+                onClick={() => { setIsWAHelpModalOpen(false); handleEmbeddedSignup(); }}
                 className="w-full h-12 rounded-2xl font-black text-[11px] uppercase tracking-widest bg-[#25D366] hover:bg-[#22c55e] text-white shadow-xl shadow-[#25D366]/20 transition-all active:scale-95"
               >
-                Ya tengo los datos — Ir a conectar
+                Entendido — Conectar ahora
               </Button>
             </div>
           </div>
