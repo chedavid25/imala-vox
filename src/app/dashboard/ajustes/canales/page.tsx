@@ -245,29 +245,32 @@ export default function CanalesPage() {
     setIsConnectingEmbedded(true);
 
     FB.login(
-      async (response: any) => {
-        if (response.authResponse?.code) {
-          const { code } = response.authResponse;
-          const { phoneNumberId, wabaId } = wabaDataRef.current;
-          try {
-            const res = await fetch('/api/auth/meta/whatsapp-embedded', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ code, phoneNumberId, wabaId, wsId: currentWorkspaceId }),
-            });
-            const data = await res.json();
-            if (data.success) {
-              toast.success("¡WhatsApp conectado! Entrá a 'Configurar' para activar la IA.");
-            } else {
-              toast.error(data.error || "No se pudo conectar WhatsApp");
+      (response: any) => {
+        const handleResponse = async () => {
+          if (response.authResponse?.code) {
+            const { code } = response.authResponse;
+            const { phoneNumberId, wabaId } = wabaDataRef.current;
+            try {
+              const res = await fetch('/api/auth/meta/whatsapp-embedded', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code, phoneNumberId, wabaId, wsId: currentWorkspaceId }),
+              });
+              const data = await res.json();
+              if (data.success) {
+                toast.success("¡WhatsApp conectado! Entrá a 'Configurar' para activar la IA.");
+              } else {
+                toast.error(data.error || "No se pudo conectar WhatsApp");
+              }
+            } catch {
+              toast.error("Error de red al conectar WhatsApp");
             }
-          } catch {
-            toast.error("Error de red al conectar WhatsApp");
+          } else if (response.status !== 'connected') {
+            toast.error("Conexión cancelada o sin autorización");
           }
-        } else if (response.status !== 'connected') {
-          toast.error("Conexión cancelada o sin autorización");
-        }
-        setIsConnectingEmbedded(false);
+          setIsConnectingEmbedded(false);
+        };
+        handleResponse();
       },
       {
         config_id: configId,

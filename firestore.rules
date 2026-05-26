@@ -21,13 +21,20 @@ service cloud.firestore {
     match /espaciosDeTrabajo/{wsId} {
       allow read, write: if isSuperAdmin() || (
         request.auth != null && 
-        (resource == null || resource.data.propietarioUid == request.auth.uid)
+        (
+          resource == null || 
+          resource.data.propietarioUid == request.auth.uid ||
+          exists(/databases/$(database)/documents/espaciosDeTrabajo/$(wsId)/miembros/$(request.auth.uid))
+        )
       );
       
       match /{allPaths=**} {
         allow read, write: if isSuperAdmin() || (
           request.auth != null && 
-          get(/databases/$(database)/documents/espaciosDeTrabajo/$(wsId)).data.propietarioUid == request.auth.uid
+          (
+            get(/databases/$(database)/documents/espaciosDeTrabajo/$(wsId)).data.propietarioUid == request.auth.uid ||
+            exists(/databases/$(database)/documents/espaciosDeTrabajo/$(wsId)/miembros/$(request.auth.uid))
+          )
         );
       }
 
