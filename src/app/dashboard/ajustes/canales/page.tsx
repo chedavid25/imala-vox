@@ -124,6 +124,8 @@ export default function CanalesPage() {
   const [isWAHelpModalOpen, setIsWAHelpModalOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const wabaDataRef = useRef<{ phoneNumberId?: string; wabaId?: string }>({});
+  const receivedCodeRef = useRef<string | null>(null);
+  const isSubmittingRef = useRef<boolean>(false);
 
   // Estado para la pestaña activa
   const [activeTab, setActiveTab] = useState<'whatsapp' | 'instagram' | 'facebook' | 'leads' | 'web'>('whatsapp');
@@ -151,16 +153,34 @@ export default function CanalesPage() {
     };
 
     const handleMessage = (event: MessageEvent) => {
-      if (event.origin !== 'https://www.facebook.com') return;
-      try {
-        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-        if (data?.type === 'WA_EMBEDDED_SIGNUP' && data?.event === 'FINISH') {
-          wabaDataRef.current = {
-            phoneNumberId: data.data?.phone_number_id,
-            wabaId: data.data?.waba_id,
-          };
+      // 1. Mensajes del popup de Meta (contienen los IDs de WABA y Teléfono)
+      if (event.origin === 'https://www.facebook.com') {
+        try {
+          const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+          if (data?.type === 'WA_EMBEDDED_SIGNUP' && data?.event === 'FINISH') {
+            wabaDataRef.current = {
+              phoneNumberId: data.data?.phone_number_id,
+              wabaId: data.data?.waba_id,
+            };
+            if (receivedCodeRef.current) {
+              triggerBackendSignup(receivedCodeRef.current);
+            }
+          }
+        } catch {}
+        return;
+      }
+
+      // 2. Mensajes desde nuestro propio callback redirigido en el popup
+      if (event.origin === window.location.origin) {
+        if (event.data?.type === 'WA_SIGNUP_CODE') {
+          const code = event.data.code;
+          receivedCodeRef.current = code;
+          triggerBackendSignup(code);
+        } else if (event.data?.type === 'WA_SIGNUP_ERROR') {
+          toast.error(`Error al conectar WhatsApp: ${event.data.error}`);
+          setIsConnectingEmbedded(false);
         }
-      } catch {}
+      }
     };
 
     window.addEventListener('message', handleMessage);
@@ -175,7 +195,7 @@ export default function CanalesPage() {
     }
 
     return () => window.removeEventListener('message', handleMessage);
-  }, []);
+  }, [currentWorkspaceId]);
 
   const ayudaCanales = {
     titulo: "¿Cómo conectar tus canales de atención?",
@@ -231,6 +251,42 @@ export default function CanalesPage() {
     }
   }, []);
 
+  const triggerBackendSignup = async (code: string) => {
+    if (!currentWorkspaceId) return;
+    const { phoneNumberId, wabaId } = wabaDataRef.current;
+
+    // Evitar peticiones duplicadas
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+
+    try {
+      const res = await fetch('/api/auth/meta/whatsapp-embedded', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code,
+          phoneNumberId,
+          wabaId,
+          wsId: currentWorkspaceId,
+          redirectUri: `${window.location.origin}/api/auth/meta/whatsapp-embedded/callback`
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("¡WhatsApp conectado! Entrá a 'Configurar' para activar la IA.");
+      } else {
+        toast.error(data.error || "No se pudo conectar WhatsApp");
+      }
+    } catch {
+      toast.error("Error de red al conectar WhatsApp");
+    } finally {
+      setIsConnectingEmbedded(false);
+      isSubmittingRef.current = false;
+      receivedCodeRef.current = null;
+      wabaDataRef.current = {};
+    }
+  };
+
   const handleEmbeddedSignup = () => {
     if (!currentWorkspaceId) return;
     const configId = process.env.NEXT_PUBLIC_META_WA_CONFIG_ID;
@@ -238,57 +294,49 @@ export default function CanalesPage() {
       toast.error("Configuración de Embedded Signup no disponible. Contactá al soporte.");
       return;
     }
-    const FB = (window as any).FB;
-    if (!FB) { toast.error("FB SDK aún no cargó, intentá en un momento"); return; }
 
     wabaDataRef.current = {};
+    receivedCodeRef.current = null;
+    isSubmittingRef.current = false;
     setIsConnectingEmbedded(true);
 
-    FB.login(
-      (response: any) => {
-        const handleResponse = async () => {
-          if (response.authResponse?.code) {
-            const { code } = response.authResponse;
-            const { phoneNumberId, wabaId } = wabaDataRef.current;
-            try {
-              const res = await fetch('/api/auth/meta/whatsapp-embedded', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  code,
-                  phoneNumberId,
-                  wabaId,
-                  wsId: currentWorkspaceId,
-                  redirectUri: window.location.href.split('?')[0]
-                }),
-              });
-              const data = await res.json();
-              if (data.success) {
-                toast.success("¡WhatsApp conectado! Entrá a 'Configurar' para activar la IA.");
-              } else {
-                toast.error(data.error || "No se pudo conectar WhatsApp");
-              }
-            } catch {
-              toast.error("Error de red al conectar WhatsApp");
-            }
-          } else if (response.status !== 'connected') {
-            toast.error("Conexión cancelada o sin autorización");
-          }
-          setIsConnectingEmbedded(false);
-        };
-        handleResponse();
-      },
-      {
-        config_id: configId,
-        response_type: 'code',
-        override_default_response_type: true,
-        extras: {
-          setup: {},
-          featureType: '',
-          sessionInfoVersion: '3',
-        },
-      }
+    const appId = process.env.NEXT_PUBLIC_META_APP_ID;
+    const redirectUri = `${window.location.origin}/api/auth/meta/whatsapp-embedded/callback`;
+    
+    const oauthUrl = `https://www.facebook.com/v21.0/dialog/oauth?` +
+      `client_id=${appId}` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      `&response_type=code` +
+      `&config_id=${configId}` +
+      `&override_default_response_type=true` +
+      `&extras=${encodeURIComponent(JSON.stringify({ setup: {}, featureType: '', sessionInfoVersion: '3' }))}`;
+
+    const width = 600;
+    const height = 650;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+
+    const popup = window.open(
+      oauthUrl,
+      'whatsapp_signup',
+      `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,status=yes`
     );
+
+    if (popup) {
+      const timer = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(timer);
+          setTimeout(() => {
+            if (!isSubmittingRef.current) {
+              setIsConnectingEmbedded(false);
+            }
+          }, 1500);
+        }
+      }, 500);
+    } else {
+      toast.error("El navegador bloqueó la ventana emergente. Permití los popups para este sitio.");
+      setIsConnectingEmbedded(false);
+    }
   };
 
   const handleOAuthConnect = () => {
