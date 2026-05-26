@@ -969,26 +969,32 @@ export default function CanalesPage() {
 
           <div className="px-10 py-8 space-y-10">
 
-            {/* Paso 0 */}
+            {/* Aviso principal */}
+            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-5 py-4 flex items-start gap-3">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="text-[12px] font-black text-emerald-800 uppercase tracking-widest">Tu app de WhatsApp no se ve afectada</p>
+                <p className="text-[13px] text-emerald-700 font-medium leading-relaxed">
+                  Conectar tu número a Imalá Vox <span className="font-black">no elimina ni modifica</span> tu app de WhatsApp Business del celular. Nuestro sistema accede a tu cuenta vía API sin interferir con la app. Vas a poder seguir usándola normalmente.
+                </p>
+              </div>
+            </div>
+
+            {/* ¿Ya tenés WABA? */}
             <section className="space-y-4">
               <div className="flex items-center gap-3">
-                <div className="w-7 h-7 rounded-full bg-slate-900 text-white text-[11px] font-black flex items-center justify-center shrink-0">0</div>
-                <h3 className="text-base font-bold text-slate-900">Qué necesitás antes de empezar</h3>
+                <div className="w-7 h-7 rounded-full bg-slate-200 text-slate-700 text-[11px] font-black flex items-center justify-center shrink-0">?</div>
+                <h3 className="text-base font-bold text-slate-900">¿Ya usás la WhatsApp Business API (Cloud API)?</h3>
               </div>
               <div className="ml-10 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {[
-                  "Una cuenta de Facebook personal (para acceder a Meta).",
-                  "Un número de teléfono que NO esté usando WhatsApp actualmente (puede ser un número nuevo o de VoIP).",
-                  "Acceso a internet desde una computadora.",
-                  "Aproximadamente 15-20 minutos disponibles.",
-                ].map((item, i) => (
-                  <div key={i} className="flex items-start gap-2.5 bg-slate-50 rounded-2xl px-4 py-3">
-                    <div className="w-4 h-4 rounded-full bg-emerald-100 border border-emerald-200 flex items-center justify-center shrink-0 mt-0.5">
-                      <Check className="w-2.5 h-2.5 text-emerald-600" />
-                    </div>
-                    <span className="text-[13px] text-slate-600 font-medium leading-relaxed">{item}</span>
-                  </div>
-                ))}
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
+                  <p className="text-[11px] font-black text-slate-700 uppercase tracking-widest">Sí, ya la uso</p>
+                  <p className="text-[13px] text-slate-600 font-medium leading-relaxed">Tenés un número en Meta Business Manager con acceso a la API. Saltá directo al <span className="font-black text-slate-900">Paso 3</span> para obtener el token y conectarte.</p>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
+                  <p className="text-[11px] font-black text-slate-700 uppercase tracking-widest">No, es la primera vez</p>
+                  <p className="text-[13px] text-slate-600 font-medium leading-relaxed">Seguí la guía completa desde el Paso 1. Tardás unos 15-20 minutos y al final podés conectar tu número o uno nuevo.</p>
+                </div>
               </div>
             </section>
 
@@ -999,7 +1005,7 @@ export default function CanalesPage() {
                 <h3 className="text-base font-bold text-slate-900">Crear tu cuenta de desarrollador en Meta</h3>
               </div>
               <div className="ml-10 space-y-2.5">
-                <p className="text-[13px] text-slate-500 font-medium italic">Si ya tenés una cuenta de desarrollador en Meta, saltá al Paso 2.</p>
+                <p className="text-[13px] text-slate-500 font-medium italic">Si ya tenés cuenta en Meta for Developers, saltá al Paso 2.</p>
                 {[
                   <>Abrí el navegador y entrá a <span className="font-mono text-[12px] bg-slate-100 px-2 py-0.5 rounded font-bold">developers.facebook.com</span>.</>,
                   <>Hacé clic en <span className="font-black text-slate-900">"Iniciar sesión"</span> y usá tu cuenta de Facebook personal.</>,
@@ -1040,15 +1046,24 @@ export default function CanalesPage() {
             <section className="space-y-4">
               <div className="flex items-center gap-3">
                 <div className="w-7 h-7 rounded-full bg-slate-900 text-white text-[11px] font-black flex items-center justify-center shrink-0">3</div>
-                <h3 className="text-base font-bold text-slate-900">Agregar y verificar tu número de teléfono</h3>
+                <h3 className="text-base font-bold text-slate-900">Agregar un número de teléfono a la API</h3>
               </div>
-              <div className="ml-10 space-y-2.5">
+              <div className="ml-10 space-y-3">
+                <div className="bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3 space-y-2">
+                  <p className="text-[11px] font-black text-blue-800 uppercase tracking-widest">¿Qué número usar?</p>
+                  <p className="text-[13px] text-blue-700 font-medium leading-relaxed">
+                    <span className="font-black">Opción A — número nuevo o sin WhatsApp activo:</span> La más simple. Podés usar un número de línea fija, VoIP, o uno que ya no estés usando en WhatsApp. Sin complicaciones.
+                  </p>
+                  <p className="text-[13px] text-blue-700 font-medium leading-relaxed">
+                    <span className="font-black">Opción B — tu número actual de WhatsApp Business:</span> También es posible. Imalá Vox no elimina ni toca tu app — simplemente le da a la API acceso a ese número. La app del celular y la API funcionan sobre la misma cuenta de WhatsApp Business en Meta y pueden coexistir sin problemas en la mayoría de los casos.
+                  </p>
+                </div>
                 {[
                   <>En el menú izquierdo andá a <span className="font-black text-slate-900">WhatsApp → Configuración de la API</span>.</>,
                   <>En la sección <span className="font-black text-slate-900">"Número de teléfono"</span>, hacé clic en <span className="font-black text-slate-900">"Agregar número de teléfono"</span>.</>,
-                  <>Completá el nombre de tu empresa, la zona horaria y la categoría. Luego ingresá el número de teléfono que querés usar (con código de país, ej: <span className="font-mono text-[12px] bg-slate-100 px-1.5 rounded">+54911...</span>).</>,
-                  <>Meta te enviará un SMS o llamada para verificar el número. Ingresá el código de 6 dígitos que recibas.</>,
-                  <>Una vez verificado, el número aparece en la lista. Anotá el <span className="font-black text-slate-900">ID del número de teléfono</span> que aparece abajo del número — lo vas a necesitar después.</>,
+                  <>Completá el nombre de tu empresa, zona horaria y categoría. Ingresá el número con código de país (ej: <span className="font-mono text-[12px] bg-slate-100 px-1.5 rounded">+54911...</span>).</>,
+                  <>Meta te enviará un SMS o llamada. Ingresá el código de 6 dígitos que recibas.</>,
+                  <>Una vez verificado, anotá el <span className="font-black text-slate-900">ID del número de teléfono</span> que aparece abajo del número — lo necesitás en el último paso.</>,
                 ].map((step, i) => (
                   <div key={i} className="flex gap-3 text-[13px] text-slate-700">
                     <span className="text-[#25D366] font-black shrink-0 mt-0.5">{i + 1}.</span>
@@ -1068,7 +1083,7 @@ export default function CanalesPage() {
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-start gap-2.5 mb-3">
                   <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
                   <p className="text-[12px] text-amber-700 font-medium leading-relaxed">
-                    Este paso es el más importante. Un token temporal expira en 24 horas y tu WhatsApp dejará de funcionar. El token permanente no expira nunca.
+                    Este paso es el más importante. Un token temporal expira en 24 horas y la integración dejará de funcionar. El token de System User es permanente y no expira.
                   </p>
                 </div>
                 {[
@@ -1078,7 +1093,7 @@ export default function CanalesPage() {
                   <>Hacé clic en <span className="font-black text-slate-900">"Agregar"</span>. Poné cualquier nombre (ej: "Bot Imala") y elegí el rol <span className="font-black text-slate-900">"Administrador"</span>. Luego <span className="font-black text-slate-900">"Crear usuario del sistema"</span>.</>,
                   <>Con el usuario creado, hacé clic en <span className="font-black text-slate-900">"Agregar activos"</span>. En la ventana que aparece, elegí <span className="font-black text-slate-900">Cuentas de WhatsApp Business</span> en el menú izquierdo, seleccioná tu cuenta y activá el toggle de <span className="font-black text-slate-900">"Control total"</span>. Guardá.</>,
                   <>Volvé al usuario y hacé clic en <span className="font-black text-slate-900">"Generar nuevo token"</span>. Seleccioná tu app de la lista. Marcá los permisos <span className="font-mono text-[11px] bg-slate-100 px-1.5 py-0.5 rounded">whatsapp_business_messaging</span> y <span className="font-mono text-[11px] bg-slate-100 px-1.5 py-0.5 rounded">whatsapp_business_management</span>. Hacé clic en <span className="font-black text-slate-900">"Generar token"</span>.</>,
-                  <>Se muestra el token solo esta vez. <span className="font-black text-slate-900">Copialo ahora</span> y guardalo en un lugar seguro (bloc de notas, etc.). Empieza con "EAA...".</>,
+                  <>Se muestra el token solo esta vez. <span className="font-black text-slate-900">Copialo ahora</span> y guardalo en un lugar seguro. Empieza con "EAA...".</>,
                 ].map((step, i) => (
                   <div key={i} className="flex gap-3 text-[13px] text-slate-700">
                     <span className="text-[#25D366] font-black shrink-0 mt-0.5">{i + 1}.</span>
@@ -1101,7 +1116,7 @@ export default function CanalesPage() {
                   <>En <span className="font-black text-slate-900">"URL de devolución de llamada"</span> pegá exactamente esto: <span className="font-mono text-[11px] bg-slate-100 px-2 py-0.5 rounded block mt-1 break-all">https://imala-vox.vercel.app/api/webhooks/meta</span></>,
                   <>En <span className="font-black text-slate-900">"Verificar token"</span> poné exactamente: <span className="font-mono text-[11px] bg-slate-100 px-2 py-0.5 rounded">imala_vox_2024</span></>,
                   <>Hacé clic en <span className="font-black text-slate-900">"Verificar y guardar"</span>. Si todo está bien, aparecerá una confirmación verde.</>,
-                  <>Bajá a la sección <span className="font-black text-slate-900">"Campos del webhook"</span> y buscá el campo <span className="font-mono text-[11px] bg-slate-100 px-1.5 py-0.5 rounded">messages</span>. Hacé clic en <span className="font-black text-slate-900">"Suscribirse"</span> en ese campo.</>,
+                  <>Bajá a <span className="font-black text-slate-900">"Campos del webhook"</span> y buscá el campo <span className="font-mono text-[11px] bg-slate-100 px-1.5 py-0.5 rounded">messages</span>. Hacé clic en <span className="font-black text-slate-900">"Suscribirse"</span>.</>,
                 ].map((step, i) => (
                   <div key={i} className="flex gap-3 text-[13px] text-slate-700">
                     <span className="text-[#25D366] font-black shrink-0 mt-0.5">{i + 1}.</span>
@@ -1121,8 +1136,8 @@ export default function CanalesPage() {
                 {[
                   <>Volvé acá y hacé clic en <span className="font-black text-slate-900">"¿Configuración manual avanzada?"</span>.</>,
                   <>En el campo <span className="font-black text-slate-900">Phone Number ID</span> pegá el ID que anotaste en el Paso 3.</>,
-                  <>En el campo <span className="font-black text-slate-900">Access Token permanente</span> pegá el token que guardaste en el Paso 4.</>,
-                  <>Opcionalmente, en el campo <span className="font-black text-slate-900">WABA ID</span> podés pegar el ID de tu cuenta de WhatsApp Business (lo encontrás en la misma pantalla de Configuración de la API, en la sección "Cuenta de WhatsApp Business").</>,
+                  <>En el campo <span className="font-black text-slate-900">Access Token permanente</span> pegá el token que generaste en el Paso 4.</>,
+                  <>Opcionalmente, en <span className="font-black text-slate-900">WABA ID</span> pegá el ID de tu cuenta de WhatsApp Business (lo encontrás en la pantalla de Configuración de la API, sección "Cuenta de WhatsApp Business").</>,
                   <>Hacé clic en <span className="font-black text-slate-900">"Conectar WhatsApp"</span> y listo.</>,
                 ].map((step, i) => (
                   <div key={i} className="flex gap-3 text-[13px] text-slate-700">

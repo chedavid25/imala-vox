@@ -35,7 +35,19 @@
       "WebFetch(domain:developers-wallet.astropay.com)",
       "WebFetch(domain:www.astropay.co.zw)",
       "WebFetch(domain:doc.epg-services.com)",
-      "WebFetch(domain:akurateco.com)"
+      "WebFetch(domain:akurateco.com)",
+      "WebFetch(domain:developers.facebook.com)",
+      "WebFetch(domain:www.whatsapp.com)",
+      "WebFetch(domain:business.whatsapp.com)",
+      "WebFetch(domain:whatsappbusiness.com)",
+      "WebFetch(domain:docs.360dialog.com)",
+      "WebFetch(domain:clientify.com)",
+      "WebFetch(domain:pickyassist.com)",
+      "WebFetch(domain:www.ycloud.com)",
+      "WebFetch(domain:www.hubtype.com)",
+      "WebFetch(domain:chakrahq.com)",
+      "WebFetch(domain:whautomate.com)",
+      "WebFetch(domain:zixflow.com)"
     ]
   }
 }
