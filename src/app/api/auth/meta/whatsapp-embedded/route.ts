@@ -13,11 +13,10 @@ export async function POST(req: NextRequest) {
 
     const appId = process.env.NEXT_PUBLIC_META_APP_ID;
     const appSecret = process.env.META_APP_SECRET;
-    const redirectUri = clientRedirectUri || process.env.NEXT_PUBLIC_APP_URL || 'https://imalavox.com';
 
-    // 1. Intercambiar code por short-lived token
+    // 1. Intercambiar code por short-lived token (sin redirect_uri, según la documentación oficial de WhatsApp Embedded Signup)
     const shortRes = await fetch(
-      `https://graph.facebook.com/v21.0/oauth/access_token?client_id=${appId}&client_secret=${appSecret}&code=${code}&redirect_uri=${encodeURIComponent(redirectUri)}`
+      `https://graph.facebook.com/v21.0/oauth/access_token?client_id=${appId}&client_secret=${appSecret}&code=${code}`
     );
     const shortData = await shortRes.json();
 
