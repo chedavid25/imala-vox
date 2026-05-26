@@ -13,7 +13,8 @@ export async function POST(req: NextRequest) {
 
     const appId = process.env.NEXT_PUBLIC_META_APP_ID;
     const appSecret = process.env.META_APP_SECRET;
-    const redirectUri = origin || process.env.NEXT_PUBLIC_APP_URL || 'https://imalavox.com';
+    // Para Embedded Signup utilizando el SDK de JavaScript, Meta requiere un string vacío como redirect_uri
+    const redirectUri = '';
 
     // 1. Intercambiar code por short-lived token
     const shortRes = await fetch(
