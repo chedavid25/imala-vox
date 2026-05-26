@@ -128,7 +128,7 @@ export default function CanalesPage() {
   const [waWabaId, setWaWabaId] = useState('');
   const [isConnectingWA, setIsConnectingWA] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const [showWAGuide, setShowWAGuide] = useState(false);
+  const [isWAHelpModalOpen, setIsWAHelpModalOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
   // Estado para la pestaña activa
@@ -562,6 +562,13 @@ export default function CanalesPage() {
                       >
                         ¿Configuración manual avanzada?
                       </button>
+                      <button
+                        onClick={() => setIsWAHelpModalOpen(true)}
+                        className="flex items-center justify-center gap-1.5 text-[9px] font-bold text-[#25D366]/70 hover:text-[#25D366] transition-colors text-center"
+                      >
+                        <HelpCircle className="w-3 h-3" />
+                        ¿Necesitás ayuda para conectar tu WhatsApp manualmente?
+                      </button>
                     </>
                   ) : activeTab === 'web' ? (
                     <Button 
@@ -700,7 +707,7 @@ export default function CanalesPage() {
 
       {/* Modal conexión WhatsApp */}
       <Dialog open={isWAModalOpen} onOpenChange={setIsWAModalOpen}>
-        <DialogContent className="max-w-md rounded-3xl p-8 border-none bg-white shadow-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-md rounded-3xl p-8 border-none bg-white shadow-2xl">
           <DialogHeader className="space-y-3">
             <DialogTitle className="text-2xl font-bold flex items-center gap-3">
               <MessageSquare className="w-6 h-6 text-[#25D366]" />
@@ -711,58 +718,7 @@ export default function CanalesPage() {
             </DialogDescription>
           </DialogHeader>
 
-          {/* Guía paso a paso */}
-          <button
-            onClick={() => setShowWAGuide(v => !v)}
-            className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-[#25D366]/8 border border-[#25D366]/20 hover:bg-[#25D366]/12 transition-colors mt-4"
-          >
-            <span className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-[#25D366]">
-              <HelpCircle className="w-4 h-4" />
-              ¿Cómo conseguir estos datos? Guía paso a paso
-            </span>
-            <ChevronDown className={cn("w-4 h-4 text-[#25D366] transition-transform", showWAGuide && "rotate-180")} />
-          </button>
-
-          {showWAGuide && (
-            <div className="rounded-2xl border border-slate-100 bg-slate-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-              <div className="px-5 py-4 space-y-5 text-[12px] max-h-72 overflow-y-auto">
-
-                <div className="space-y-2">
-                  <p className="font-black uppercase tracking-widest text-slate-700 text-[10px]">1 · Phone Number ID</p>
-                  <ol className="space-y-1.5 text-slate-600 font-medium list-none">
-                    <li className="flex gap-2"><span className="text-[#25D366] font-black shrink-0">→</span>Entrá a <span className="font-black text-slate-800">developers.facebook.com</span> e iniciá sesión.</li>
-                    <li className="flex gap-2"><span className="text-[#25D366] font-black shrink-0">→</span>Seleccioná tu app en "Mis apps".</li>
-                    <li className="flex gap-2"><span className="text-[#25D366] font-black shrink-0">→</span>En el menú izquierdo: <span className="font-black text-slate-800">WhatsApp → Configuración de la API</span>.</li>
-                    <li className="flex gap-2"><span className="text-[#25D366] font-black shrink-0">→</span>En la sección <span className="font-black text-slate-800">"Número de teléfono"</span>, copiá el número que dice <span className="font-mono bg-white border border-slate-200 px-1.5 rounded">ID del número de teléfono</span>.</li>
-                  </ol>
-                </div>
-
-                <div className="border-t border-slate-200 pt-4 space-y-2">
-                  <p className="font-black uppercase tracking-widest text-slate-700 text-[10px]">2 · Access Token permanente (System User)</p>
-                  <ol className="space-y-1.5 text-slate-600 font-medium list-none">
-                    <li className="flex gap-2"><span className="text-[#25D366] font-black shrink-0">→</span>Entrá a <span className="font-black text-slate-800">business.facebook.com</span> e iniciá sesión.</li>
-                    <li className="flex gap-2"><span className="text-[#25D366] font-black shrink-0">→</span>Andá a <span className="font-black text-slate-800">Configuración del negocio</span> (ícono de engranaje abajo a la izquierda).</li>
-                    <li className="flex gap-2"><span className="text-[#25D366] font-black shrink-0">→</span>En el menú izquierdo buscá <span className="font-black text-slate-800">Usuarios → Usuarios del sistema</span>.</li>
-                    <li className="flex gap-2"><span className="text-[#25D366] font-black shrink-0">→</span>Hacé clic en <span className="font-black text-slate-800">"Agregar"</span> y creá un usuario con rol <span className="font-black text-slate-800">Administrador</span>.</li>
-                    <li className="flex gap-2"><span className="text-[#25D366] font-black shrink-0">→</span>Con el usuario creado, clic en <span className="font-black text-slate-800">"Agregar activos"</span> → elegí <span className="font-black text-slate-800">Cuentas de WhatsApp Business</span> → seleccioná tu cuenta → activá <span className="font-black text-slate-800">Control total</span>.</li>
-                    <li className="flex gap-2"><span className="text-[#25D366] font-black shrink-0">→</span>Volvé al usuario, clic en <span className="font-black text-slate-800">"Generar nuevo token"</span> → seleccioná tu app → activá los permisos <span className="font-mono bg-white border border-slate-200 px-1 rounded text-[10px]">whatsapp_business_messaging</span> y <span className="font-mono bg-white border border-slate-200 px-1 rounded text-[10px]">whatsapp_business_management</span> → clic en <span className="font-black text-slate-800">"Generar token"</span>.</li>
-                    <li className="flex gap-2 text-amber-700"><span className="font-black shrink-0">⚠</span>Copiá el token en ese momento — no se vuelve a mostrar.</li>
-                  </ol>
-                </div>
-
-                <div className="border-t border-slate-200 pt-4 space-y-2">
-                  <p className="font-black uppercase tracking-widest text-slate-700 text-[10px]">3 · WABA ID (opcional pero recomendado)</p>
-                  <ol className="space-y-1.5 text-slate-600 font-medium list-none">
-                    <li className="flex gap-2"><span className="text-[#25D366] font-black shrink-0">→</span>En <span className="font-black text-slate-800">developers.facebook.com</span>, tu app → <span className="font-black text-slate-800">WhatsApp → Configuración de la API</span>.</li>
-                    <li className="flex gap-2"><span className="text-[#25D366] font-black shrink-0">→</span>Buscá la sección <span className="font-black text-slate-800">"Cuenta de WhatsApp Business"</span> y copiá el ID numérico.</li>
-                  </ol>
-                </div>
-
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-6 mt-2">
+          <div className="space-y-6 mt-6">
             <div className="space-y-2">
               <Label className="text-[10px] uppercase font-black text-[var(--text-tertiary-light)] ml-1">Phone Number ID *</Label>
               <Input
@@ -990,6 +946,203 @@ export default function CanalesPage() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal guía completa WhatsApp manual */}
+      <Dialog open={isWAHelpModalOpen} onOpenChange={setIsWAHelpModalOpen}>
+        <DialogContent className="max-w-3xl rounded-3xl border-none bg-white shadow-2xl max-h-[90vh] overflow-y-auto p-0">
+          {/* Header */}
+          <div className="sticky top-0 z-10 bg-white px-10 pt-8 pb-6 border-b border-slate-100">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-[#25D366]/10 flex items-center justify-center shrink-0">
+                <WhatsAppIcon className="w-6 h-6 text-[#25D366]" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl font-bold text-slate-900">Guía completa: conectar WhatsApp Business</DialogTitle>
+                <DialogDescription className="text-sm text-slate-500 mt-0.5">
+                  Seguí estos pasos desde cero. Tardás aproximadamente 15 minutos la primera vez.
+                </DialogDescription>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-10 py-8 space-y-10">
+
+            {/* Paso 0 */}
+            <section className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-7 h-7 rounded-full bg-slate-900 text-white text-[11px] font-black flex items-center justify-center shrink-0">0</div>
+                <h3 className="text-base font-bold text-slate-900">Qué necesitás antes de empezar</h3>
+              </div>
+              <div className="ml-10 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[
+                  "Una cuenta de Facebook personal (para acceder a Meta).",
+                  "Un número de teléfono que NO esté usando WhatsApp actualmente (puede ser un número nuevo o de VoIP).",
+                  "Acceso a internet desde una computadora.",
+                  "Aproximadamente 15-20 minutos disponibles.",
+                ].map((item, i) => (
+                  <div key={i} className="flex items-start gap-2.5 bg-slate-50 rounded-2xl px-4 py-3">
+                    <div className="w-4 h-4 rounded-full bg-emerald-100 border border-emerald-200 flex items-center justify-center shrink-0 mt-0.5">
+                      <Check className="w-2.5 h-2.5 text-emerald-600" />
+                    </div>
+                    <span className="text-[13px] text-slate-600 font-medium leading-relaxed">{item}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Paso 1 */}
+            <section className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-7 h-7 rounded-full bg-slate-900 text-white text-[11px] font-black flex items-center justify-center shrink-0">1</div>
+                <h3 className="text-base font-bold text-slate-900">Crear tu cuenta de desarrollador en Meta</h3>
+              </div>
+              <div className="ml-10 space-y-2.5">
+                <p className="text-[13px] text-slate-500 font-medium italic">Si ya tenés una cuenta de desarrollador en Meta, saltá al Paso 2.</p>
+                {[
+                  <>Abrí el navegador y entrá a <span className="font-mono text-[12px] bg-slate-100 px-2 py-0.5 rounded font-bold">developers.facebook.com</span>.</>,
+                  <>Hacé clic en <span className="font-black text-slate-900">"Iniciar sesión"</span> y usá tu cuenta de Facebook personal.</>,
+                  <>Si es la primera vez, Meta te pedirá que aceptes ser desarrollador. Hacé clic en <span className="font-black text-slate-900">"Registrarme"</span> o <span className="font-black text-slate-900">"Empezar"</span>.</>,
+                  <>Verificá tu cuenta con un número de teléfono si te lo pide.</>,
+                ].map((step, i) => (
+                  <div key={i} className="flex gap-3 text-[13px] text-slate-700">
+                    <span className="text-[#25D366] font-black shrink-0 mt-0.5">{i + 1}.</span>
+                    <span className="leading-relaxed font-medium">{step}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Paso 2 */}
+            <section className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-7 h-7 rounded-full bg-slate-900 text-white text-[11px] font-black flex items-center justify-center shrink-0">2</div>
+                <h3 className="text-base font-bold text-slate-900">Crear una app en Meta for Developers</h3>
+              </div>
+              <div className="ml-10 space-y-2.5">
+                <p className="text-[13px] text-slate-500 font-medium italic">Si ya tenés una app con WhatsApp habilitado, saltá al Paso 3.</p>
+                {[
+                  <>En el menú superior hacé clic en <span className="font-black text-slate-900">"Mis apps"</span> → luego en el botón <span className="font-black text-slate-900">"Crear app"</span>.</>,
+                  <>Cuando pregunte el tipo, elegí <span className="font-black text-slate-900">"Otro"</span> y luego <span className="font-black text-slate-900">"Negocios"</span>.</>,
+                  <>Poné un nombre (ej: <em>"Mi Empresa WA"</em>), tu email de contacto y hacé clic en <span className="font-black text-slate-900">"Crear app"</span>. Meta puede pedirte la contraseña de Facebook para confirmar.</>,
+                  <>Ya dentro del panel de tu nueva app, buscá el producto <span className="font-black text-slate-900">"WhatsApp"</span> en la lista y hacé clic en <span className="font-black text-slate-900">"Configurar"</span>.</>,
+                ].map((step, i) => (
+                  <div key={i} className="flex gap-3 text-[13px] text-slate-700">
+                    <span className="text-[#25D366] font-black shrink-0 mt-0.5">{i + 1}.</span>
+                    <span className="leading-relaxed font-medium">{step}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Paso 3 */}
+            <section className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-7 h-7 rounded-full bg-slate-900 text-white text-[11px] font-black flex items-center justify-center shrink-0">3</div>
+                <h3 className="text-base font-bold text-slate-900">Agregar y verificar tu número de teléfono</h3>
+              </div>
+              <div className="ml-10 space-y-2.5">
+                {[
+                  <>En el menú izquierdo andá a <span className="font-black text-slate-900">WhatsApp → Configuración de la API</span>.</>,
+                  <>En la sección <span className="font-black text-slate-900">"Número de teléfono"</span>, hacé clic en <span className="font-black text-slate-900">"Agregar número de teléfono"</span>.</>,
+                  <>Completá el nombre de tu empresa, la zona horaria y la categoría. Luego ingresá el número de teléfono que querés usar (con código de país, ej: <span className="font-mono text-[12px] bg-slate-100 px-1.5 rounded">+54911...</span>).</>,
+                  <>Meta te enviará un SMS o llamada para verificar el número. Ingresá el código de 6 dígitos que recibas.</>,
+                  <>Una vez verificado, el número aparece en la lista. Anotá el <span className="font-black text-slate-900">ID del número de teléfono</span> que aparece abajo del número — lo vas a necesitar después.</>,
+                ].map((step, i) => (
+                  <div key={i} className="flex gap-3 text-[13px] text-slate-700">
+                    <span className="text-[#25D366] font-black shrink-0 mt-0.5">{i + 1}.</span>
+                    <span className="leading-relaxed font-medium">{step}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Paso 4 */}
+            <section className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-7 h-7 rounded-full bg-slate-900 text-white text-[11px] font-black flex items-center justify-center shrink-0">4</div>
+                <h3 className="text-base font-bold text-slate-900">Generar un Access Token permanente</h3>
+              </div>
+              <div className="ml-10 space-y-2.5">
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-start gap-2.5 mb-3">
+                  <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                  <p className="text-[12px] text-amber-700 font-medium leading-relaxed">
+                    Este paso es el más importante. Un token temporal expira en 24 horas y tu WhatsApp dejará de funcionar. El token permanente no expira nunca.
+                  </p>
+                </div>
+                {[
+                  <>Abrí una nueva pestaña y entrá a <span className="font-mono text-[12px] bg-slate-100 px-2 py-0.5 rounded font-bold">business.facebook.com</span>.</>,
+                  <>En el menú izquierdo, abajo del todo, hacé clic en el ícono de engranaje (<span className="font-black text-slate-900">Configuración del negocio</span>).</>,
+                  <>En el menú izquierdo buscá <span className="font-black text-slate-900">Usuarios → Usuarios del sistema</span> y hacé clic ahí.</>,
+                  <>Hacé clic en <span className="font-black text-slate-900">"Agregar"</span>. Poné cualquier nombre (ej: "Bot Imala") y elegí el rol <span className="font-black text-slate-900">"Administrador"</span>. Luego <span className="font-black text-slate-900">"Crear usuario del sistema"</span>.</>,
+                  <>Con el usuario creado, hacé clic en <span className="font-black text-slate-900">"Agregar activos"</span>. En la ventana que aparece, elegí <span className="font-black text-slate-900">Cuentas de WhatsApp Business</span> en el menú izquierdo, seleccioná tu cuenta y activá el toggle de <span className="font-black text-slate-900">"Control total"</span>. Guardá.</>,
+                  <>Volvé al usuario y hacé clic en <span className="font-black text-slate-900">"Generar nuevo token"</span>. Seleccioná tu app de la lista. Marcá los permisos <span className="font-mono text-[11px] bg-slate-100 px-1.5 py-0.5 rounded">whatsapp_business_messaging</span> y <span className="font-mono text-[11px] bg-slate-100 px-1.5 py-0.5 rounded">whatsapp_business_management</span>. Hacé clic en <span className="font-black text-slate-900">"Generar token"</span>.</>,
+                  <>Se muestra el token solo esta vez. <span className="font-black text-slate-900">Copialo ahora</span> y guardalo en un lugar seguro (bloc de notas, etc.). Empieza con "EAA...".</>,
+                ].map((step, i) => (
+                  <div key={i} className="flex gap-3 text-[13px] text-slate-700">
+                    <span className="text-[#25D366] font-black shrink-0 mt-0.5">{i + 1}.</span>
+                    <span className="leading-relaxed font-medium">{step}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Paso 5 */}
+            <section className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-7 h-7 rounded-full bg-slate-900 text-white text-[11px] font-black flex items-center justify-center shrink-0">5</div>
+                <h3 className="text-base font-bold text-slate-900">Configurar el Webhook en Meta</h3>
+              </div>
+              <div className="ml-10 space-y-2.5">
+                {[
+                  <>Volvé a <span className="font-mono text-[12px] bg-slate-100 px-2 py-0.5 rounded font-bold">developers.facebook.com</span>, entrá a tu app y en el menú izquierdo andá a <span className="font-black text-slate-900">WhatsApp → Configuración</span>.</>,
+                  <>En la sección <span className="font-black text-slate-900">"Webhooks"</span>, hacé clic en <span className="font-black text-slate-900">"Editar"</span>.</>,
+                  <>En <span className="font-black text-slate-900">"URL de devolución de llamada"</span> pegá exactamente esto: <span className="font-mono text-[11px] bg-slate-100 px-2 py-0.5 rounded block mt-1 break-all">https://imala-vox.vercel.app/api/webhooks/meta</span></>,
+                  <>En <span className="font-black text-slate-900">"Verificar token"</span> poné exactamente: <span className="font-mono text-[11px] bg-slate-100 px-2 py-0.5 rounded">imala_vox_2024</span></>,
+                  <>Hacé clic en <span className="font-black text-slate-900">"Verificar y guardar"</span>. Si todo está bien, aparecerá una confirmación verde.</>,
+                  <>Bajá a la sección <span className="font-black text-slate-900">"Campos del webhook"</span> y buscá el campo <span className="font-mono text-[11px] bg-slate-100 px-1.5 py-0.5 rounded">messages</span>. Hacé clic en <span className="font-black text-slate-900">"Suscribirse"</span> en ese campo.</>,
+                ].map((step, i) => (
+                  <div key={i} className="flex gap-3 text-[13px] text-slate-700">
+                    <span className="text-[#25D366] font-black shrink-0 mt-0.5">{i + 1}.</span>
+                    <span className="leading-relaxed font-medium">{step}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Paso 6 - Conectar en Imala */}
+            <section className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-7 h-7 rounded-full bg-[#25D366] text-white text-[11px] font-black flex items-center justify-center shrink-0">✓</div>
+                <h3 className="text-base font-bold text-slate-900">Conectar en Imalá Vox</h3>
+              </div>
+              <div className="ml-10 space-y-2.5">
+                {[
+                  <>Volvé acá y hacé clic en <span className="font-black text-slate-900">"¿Configuración manual avanzada?"</span>.</>,
+                  <>En el campo <span className="font-black text-slate-900">Phone Number ID</span> pegá el ID que anotaste en el Paso 3.</>,
+                  <>En el campo <span className="font-black text-slate-900">Access Token permanente</span> pegá el token que guardaste en el Paso 4.</>,
+                  <>Opcionalmente, en el campo <span className="font-black text-slate-900">WABA ID</span> podés pegar el ID de tu cuenta de WhatsApp Business (lo encontrás en la misma pantalla de Configuración de la API, en la sección "Cuenta de WhatsApp Business").</>,
+                  <>Hacé clic en <span className="font-black text-slate-900">"Conectar WhatsApp"</span> y listo.</>,
+                ].map((step, i) => (
+                  <div key={i} className="flex gap-3 text-[13px] text-slate-700">
+                    <span className="text-[#25D366] font-black shrink-0 mt-0.5">{i + 1}.</span>
+                    <span className="leading-relaxed font-medium">{step}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Footer */}
+            <div className="border-t border-slate-100 pt-6">
+              <Button
+                onClick={() => { setIsWAHelpModalOpen(false); setIsWAModalOpen(true); }}
+                className="w-full h-12 rounded-2xl font-black text-[11px] uppercase tracking-widest bg-[#25D366] hover:bg-[#22c55e] text-white shadow-xl shadow-[#25D366]/20 transition-all active:scale-95"
+              >
+                Ya tengo los datos — Ir a conectar
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
