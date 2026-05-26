@@ -5,7 +5,7 @@ import { COLLECTIONS } from '@/lib/types/firestore';
 
 export async function POST(req: NextRequest) {
   try {
-    const { code, phoneNumberId, wabaId, wsId, redirectUri: clientRedirectUri } = await req.json();
+    const { code, phoneNumberId, wabaId, wsId } = await req.json();
 
     if (!code || !wsId) {
       return NextResponse.json({ error: 'Faltan parámetros requeridos' }, { status: 400 });
@@ -13,11 +13,11 @@ export async function POST(req: NextRequest) {
 
     const appId = process.env.NEXT_PUBLIC_META_APP_ID;
     const appSecret = process.env.META_APP_SECRET;
-    const redirectUri = clientRedirectUri || 'https://www.imalavox.com/api/auth/meta/whatsapp-embedded/callback';
 
-    // 1. Intercambiar code por short-lived token
+    // 1. Intercambiar code por short-lived token.
+    // El code viene de FB.login() (SDK), por lo que NO se envía redirect_uri.
     const shortRes = await fetch(
-      `https://graph.facebook.com/v21.0/oauth/access_token?client_id=${appId}&client_secret=${appSecret}&code=${code}&redirect_uri=${encodeURIComponent(redirectUri)}`
+      `https://graph.facebook.com/v21.0/oauth/access_token?client_id=${appId}&client_secret=${appSecret}&code=${code}`
     );
     const shortData = await shortRes.json();
 

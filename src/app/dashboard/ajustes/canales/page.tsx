@@ -123,8 +123,8 @@ export default function CanalesPage() {
   const [showHelp, setShowHelp] = useState(false);
   const [isWAHelpModalOpen, setIsWAHelpModalOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [isFbSdkReady, setIsFbSdkReady] = useState(false);
   const wabaDataRef = useRef<{ phoneNumberId?: string; wabaId?: string }>({});
-  const receivedCodeRef = useRef<string | null>(null);
   const isSubmittingRef = useRef<boolean>(false);
 
   // Estado para la pestaña activa
@@ -150,47 +150,33 @@ export default function CanalesPage() {
         xfbml: true,
         version: 'v21.0',
       });
+      setIsFbSdkReady(true);
+      console.log("[WA-DEBUG] FB SDK inicializado");
     };
 
     const handleMessage = (event: MessageEvent) => {
-      console.log("[WA-DEBUG] Mensaje recibido del origen:", event.origin, "Datos:", event.data);
-      // 1. Mensajes del popup de Meta (contienen los IDs de WABA y Teléfono)
-      if (event.origin === 'https://www.facebook.com') {
-        try {
-          const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-          console.log("[WA-DEBUG] Procesando datos de Meta:", data);
-          if (data?.type === 'WA_EMBEDDED_SIGNUP' && data?.event === 'FINISH') {
-            wabaDataRef.current = {
-              phoneNumberId: data.data?.phone_number_id,
-              wabaId: data.data?.waba_id,
-            };
-            console.log("[WA-DEBUG] IDs guardados:", wabaDataRef.current);
-            if (receivedCodeRef.current) {
-              console.log("[WA-DEBUG] Código ya recibido, iniciando registro en backend");
-              triggerBackendSignup(receivedCodeRef.current);
-            } else {
-              console.log("[WA-DEBUG] Esperando que llegue el código...");
-            }
-          }
-        } catch (err) {
-          console.error("[WA-DEBUG] Error al parsear datos de Meta:", err);
-        }
-        return;
-      }
-
-      // 2. Mensajes desde nuestro propio callback redirigido en el popup
-      if (event.origin === window.location.origin) {
-        console.log("[WA-DEBUG] Mensaje del mismo origen. Tipo:", event.data?.type);
-        if (event.data?.type === 'WA_SIGNUP_CODE') {
-          const code = event.data.code;
-          receivedCodeRef.current = code;
-          console.log("[WA-DEBUG] Código recibido:", code);
-          triggerBackendSignup(code);
-        } else if (event.data?.type === 'WA_SIGNUP_ERROR') {
-          console.error("[WA-DEBUG] Error recibido del callback:", event.data.error);
-          toast.error(`Error al conectar WhatsApp: ${event.data.error}`);
+      // Solo procesamos mensajes del popup oficial de Meta con datos del Embedded Signup
+      if (event.origin !== 'https://www.facebook.com' && event.origin !== 'https://web.facebook.com') return;
+      try {
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        if (data?.type !== 'WA_EMBEDDED_SIGNUP') return;
+        console.log("[WA-DEBUG] Evento Embedded Signup:", data);
+        if (data?.event === 'FINISH') {
+          wabaDataRef.current = {
+            phoneNumberId: data.data?.phone_number_id,
+            wabaId: data.data?.waba_id,
+          };
+          console.log("[WA-DEBUG] IDs capturados:", wabaDataRef.current);
+        } else if (data?.event === 'CANCEL') {
+          console.log("[WA-DEBUG] Usuario canceló el flujo");
+          setIsConnectingEmbedded(false);
+        } else if (data?.event === 'ERROR') {
+          console.error("[WA-DEBUG] Error en Embedded Signup:", data.data);
+          toast.error(`Error en el flujo: ${data.data?.error_message || 'desconocido'}`);
           setIsConnectingEmbedded(false);
         }
+      } catch (err) {
+        console.error("[WA-DEBUG] Error parseando mensaje de Meta:", err);
       }
     };
 
@@ -202,11 +188,14 @@ export default function CanalesPage() {
       script.src = 'https://connect.facebook.net/en_US/sdk.js';
       script.async = true;
       script.defer = true;
+      script.crossOrigin = 'anonymous';
       document.body.appendChild(script);
+    } else if ((window as any).FB) {
+      setIsFbSdkReady(true);
     }
 
     return () => window.removeEventListener('message', handleMessage);
-  }, [currentWorkspaceId]);
+  }, []);
 
   const ayudaCanales = {
     titulo: "¿Cómo conectar tus canales de atención?",
@@ -266,7 +255,6 @@ export default function CanalesPage() {
     if (!currentWorkspaceId) return;
     const { phoneNumberId, wabaId } = wabaDataRef.current;
 
-    // Evitar peticiones duplicadas
     if (isSubmittingRef.current) return;
     isSubmittingRef.current = true;
 
@@ -279,7 +267,6 @@ export default function CanalesPage() {
           phoneNumberId,
           wabaId,
           wsId: currentWorkspaceId,
-          redirectUri: `${window.location.origin}/api/auth/meta/whatsapp-embedded/callback`
         }),
       });
       const data = await res.json();
@@ -293,7 +280,6 @@ export default function CanalesPage() {
     } finally {
       setIsConnectingEmbedded(false);
       isSubmittingRef.current = false;
-      receivedCodeRef.current = null;
       wabaDataRef.current = {};
     }
   };
@@ -306,48 +292,37 @@ export default function CanalesPage() {
       return;
     }
 
+    const FB = (window as any).FB;
+    if (!FB || !isFbSdkReady) {
+      toast.error("El SDK de Facebook aún se está cargando. Esperá unos segundos y reintentá.");
+      return;
+    }
+
     wabaDataRef.current = {};
-    receivedCodeRef.current = null;
     isSubmittingRef.current = false;
     setIsConnectingEmbedded(true);
 
-    const appId = process.env.NEXT_PUBLIC_META_APP_ID;
-    const redirectUri = `${window.location.origin}/api/auth/meta/whatsapp-embedded/callback`;
-    
-    const oauthUrl = `https://www.facebook.com/v21.0/dialog/oauth?` +
-      `client_id=${appId}` +
-      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-      `&response_type=code` +
-      `&config_id=${configId}` +
-      `&override_default_response_type=true` +
-      `&extras=${encodeURIComponent(JSON.stringify({ setup: {}, featureType: '', sessionInfoVersion: '3' }))}`;
-
-    const width = 600;
-    const height = 650;
-    const left = window.screen.width / 2 - width / 2;
-    const top = window.screen.height / 2 - height / 2;
-
-    const popup = window.open(
-      oauthUrl,
-      'whatsapp_signup',
-      `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,status=yes`
-    );
-
-    if (popup) {
-      const timer = setInterval(() => {
-        if (popup.closed) {
-          clearInterval(timer);
-          setTimeout(() => {
-            if (!isSubmittingRef.current) {
-              setIsConnectingEmbedded(false);
-            }
-          }, 1500);
+    FB.login(
+      (response: any) => {
+        console.log("[WA-DEBUG] Respuesta FB.login:", response);
+        if (response.authResponse?.code) {
+          triggerBackendSignup(response.authResponse.code);
+        } else {
+          console.log("[WA-DEBUG] El usuario canceló o no autorizó el flujo");
+          setIsConnectingEmbedded(false);
         }
-      }, 500);
-    } else {
-      toast.error("El navegador bloqueó la ventana emergente. Permití los popups para este sitio.");
-      setIsConnectingEmbedded(false);
-    }
+      },
+      {
+        config_id: configId,
+        response_type: 'code',
+        override_default_response_type: true,
+        extras: {
+          setup: {},
+          featureType: '',
+          sessionInfoVersion: '3',
+        },
+      }
+    );
   };
 
   const handleOAuthConnect = () => {
