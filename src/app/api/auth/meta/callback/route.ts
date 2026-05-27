@@ -1,15 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
-import { Timestamp, FieldValue } from 'firebase-admin/firestore';
+import { Timestamp } from 'firebase-admin/firestore';
 import { COLLECTIONS } from '@/lib/types/firestore';
-import { guardarTokenCanal, sincronizarWebhooks } from '@/app/actions/channels';
+import crypto from 'crypto';
 
+/**
+ * Callback OAuth de Meta. Flujo de 2 pasos:
+ *  1. (Acá) Intercambia code → tokens, lista páginas y WABAs disponibles,
+ *     guarda todo en `_pendingConnections/{sessionId}` con TTL 10 min, y redirige
+ *     al selector para que el usuario elija qué conectar en ESTE workspace.
+ *  2. (En /seleccionar) El usuario tilda lo que quiere → `finalize-connection`
+ *     crea los canales y propaga el token a otros workspaces que ya tengan la
+ *     misma página conectada.
+ */
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get('code');
   const wsId = searchParams.get('state'); // wsId pasado en el state
 
-  console.log(`[DEBUG-OAUTH] Callback recibido - Code: ${code ? 'SÍ' : 'NO'}, State (wsId): ${wsId}`);
+  console.log(`[OAUTH-CALLBACK] Code: ${code ? 'SÍ' : 'NO'}, wsId: ${wsId}`);
 
   if (!code || !wsId) {
     return NextResponse.redirect(new URL('/dashboard/ajustes/canales?error=missing_params', req.url));
@@ -27,273 +36,121 @@ export async function GET(req: NextRequest) {
     const shortTokenData = await shortTokenRes.json();
 
     if (!shortTokenRes.ok) {
-      console.error('Meta OAuth Error (Short Token):', shortTokenData);
+      console.error('[OAUTH-CALLBACK] Error Short Token:', shortTokenData);
       throw new Error(shortTokenData.error?.message || 'Error al obtener token corto');
     }
 
     const shortToken = shortTokenData.access_token;
 
-    // 2. Intercambiar Short-Lived por Long-Lived User Token (60 días)
+    // 2. Intercambiar por Long-Lived User Token (60 días)
     const longTokenRes = await fetch(
       `https://graph.facebook.com/v19.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${appId}&client_secret=${appSecret}&fb_exchange_token=${shortToken}`
     );
     const longTokenData = await longTokenRes.json();
 
     if (!longTokenRes.ok) {
-      console.error('Meta OAuth Error (Long Token):', longTokenData);
+      console.error('[OAUTH-CALLBACK] Error Long Token:', longTokenData);
       throw new Error(longTokenData.error?.message || 'Error al obtener token largo');
     }
 
     const longLivedUserToken = longTokenData.access_token;
 
-    // 3. Obtener lista de Páginas de Facebook del usuario con sus cuentas de Instagram vinculadas
+    // 3. Fetch páginas + cuentas IG vinculadas
     const accountsRes = await fetch(
-      `https://graph.facebook.com/v19.0/me/accounts?fields=name,access_token,instagram_business_account&access_token=${longLivedUserToken}`
+      `https://graph.facebook.com/v19.0/me/accounts?fields=name,access_token,instagram_business_account{id,username,name}&access_token=${longLivedUserToken}`
     );
     const accountsData = await accountsRes.json();
 
     if (!accountsRes.ok) {
-      console.error('Meta Graph API Error (Accounts):', accountsData);
+      console.error('[OAUTH-CALLBACK] Error me/accounts:', accountsData);
       throw new Error(accountsData.error?.message || 'Error al obtener cuentas');
     }
 
-    const pages = accountsData.data || [];
+    const pages = (accountsData.data || []).map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      accessToken: p.access_token,
+      instagram: p.instagram_business_account
+        ? {
+            id: p.instagram_business_account.id,
+            username: p.instagram_business_account.username,
+            name: p.instagram_business_account.name,
+          }
+        : null,
+    }));
 
-    const workspaceRef = adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}`);
+    // 4. Fetch WABAs (búsqueda exhaustiva)
+    const wabas: any[] = [];
+    try {
+      const wabaRes = await fetch(
+        `https://graph.facebook.com/v19.0/me/whatsapp_business_accounts?fields=id,name&access_token=${longLivedUserToken}`
+      );
+      const wabaData = await wabaRes.json();
+      const directWabas = wabaData.data || [];
 
-    if (pages.length === 0) {
-      console.warn(`[WARN-OAUTH] No se encontraron páginas para el usuario. Verificando scopes...`);
-      // Consultar qué scopes tiene el token para depurar
-      const debugTokenRes = await fetch(`https://graph.facebook.com/debug_token?input_token=${longLivedUserToken}&access_token=${appId}|${appSecret}`);
-      const debugData = await debugTokenRes.json();
-      console.warn(`[WARN-OAUTH] Scopes activos del token:`, debugData.data?.scopes || []);
-      
-      // Guardar un log de depuración en Firestore para que el administrador pueda revisarlo
-      await workspaceRef.collection('system_logs').add({
-        tipo: 'meta_oauth_warning',
-        detalle: 'El inicio de sesión de Meta no retornó ninguna página de Facebook.',
-        scopesActivos: debugData.data?.scopes || [],
-        creadoEl: Timestamp.now(),
-      });
+      // También buscar WABAs a través de páginas (fallback)
+      for (const page of pages) {
+        const pageWabaRes = await fetch(
+          `https://graph.facebook.com/v19.0/${page.id}/whatsapp_business_accounts?access_token=${page.accessToken}`
+        );
+        const pageWabaData = await pageWabaRes.json();
+        if (pageWabaRes.ok && pageWabaData.data) {
+          for (const pw of pageWabaData.data) {
+            if (!directWabas.find((x: any) => x.id === pw.id)) directWabas.push(pw);
+          }
+        }
+      }
 
-      const msg = encodeURIComponent("No se encontraron páginas de Facebook seleccionadas o asociadas. Asegúrate de ser Administrador de la página y de seleccionarla durante el inicio de sesión.");
+      // Para cada WABA, traer los teléfonos
+      for (const waba of directWabas) {
+        const phoneRes = await fetch(
+          `https://graph.facebook.com/v19.0/${waba.id}/phone_numbers?fields=id,display_phone_number,verified_name&access_token=${longLivedUserToken}`
+        );
+        const phoneData = await phoneRes.json();
+        const phones = (phoneData.data || []).map((p: any) => ({
+          id: p.id,
+          displayPhone: p.display_phone_number,
+          verifiedName: p.verified_name,
+        }));
+        wabas.push({ id: waba.id, name: waba.name || `WABA ${waba.id}`, phones });
+      }
+    } catch (waErr) {
+      console.warn('[OAUTH-CALLBACK] Error buscando WABAs:', waErr);
+    }
+
+    // 5. Si no hay nada que mostrar, redirigir con error útil
+    if (pages.length === 0 && wabas.length === 0) {
+      const debugRes = await fetch(`https://graph.facebook.com/debug_token?input_token=${longLivedUserToken}&access_token=${appId}|${appSecret}`);
+      const debugData = await debugRes.json();
+      console.warn('[OAUTH-CALLBACK] No hay páginas ni WABAs. Scopes:', debugData.data?.scopes || []);
+      const msg = encodeURIComponent('No se detectaron páginas ni cuentas de WhatsApp. Verificá ser Administrador y haber seleccionado los activos en el dialog de Meta.');
       return NextResponse.redirect(new URL(`/dashboard/ajustes/canales?error=${msg}`, req.url));
     }
 
-    // 4. Iterar sobre las páginas y sincronizar
-    const newPageIds: string[] = [];
+    // 6. Guardar todo en sesión temporal (TTL ~10 min)
+    const sessionId = crypto.randomBytes(16).toString('hex');
+    const expiraEn = Timestamp.fromMillis(Date.now() + 10 * 60 * 1000); // 10 min
 
-    for (const page of pages) {
-      const { id: metaPageId, name: pageName, access_token: pageAccessToken } = page;
-
-      // Buscar si ya existe un canal de Facebook con este metaPageId en este wsId
-      const canalesSnap = await workspaceRef
-        .collection(COLLECTIONS.CANALES)
-        .where('tipo', '==', 'facebook')
-        .where('metaPageId', '==', metaPageId)
-        .limit(1)
-        .get();
-
-      let canalId: string;
-      const baseData = {
-        tipo: 'facebook',
-        nombre: pageName,
-        metaPageId: metaPageId,
-        status: 'connected' as const,
-        webhookVerified: false,
-        actualizadoEl: Timestamp.now(),
-      };
-
-      if (!canalesSnap.empty) {
-        // Actualizar canal existente
-        canalId = canalesSnap.docs[0].id;
-        await workspaceRef.collection(COLLECTIONS.CANALES).doc(canalId).update(baseData);
-      } else {
-        // Crear nuevo canal
-        const canalRef = await workspaceRef.collection(COLLECTIONS.CANALES).add({
-          ...baseData,
-          creadoEl: Timestamp.now(),
-        });
-        canalId = canalRef.id;
-      }
-
-      // Guardar el Page Access Token (que no expira) en secretos
-      await guardarTokenCanal(wsId, canalId, pageAccessToken);
-      
-      // Solo intentar sincronizar webhooks si tenemos los permisos necesarios para páginas
-      const tokenDebugRes = await fetch(`https://graph.facebook.com/debug_token?input_token=${pageAccessToken}&access_token=${appId}|${appSecret}`);
-      const tokenDebug = await tokenDebugRes.json();
-      const hasPagePerms = tokenDebug.data?.scopes?.includes('pages_messaging');
-      
-      if (hasPagePerms) {
-        await sincronizarWebhooks(wsId, canalId);
-      } else {
-        console.log(`[INFO] Omitiendo sincronización de webhooks para ${pageName} (falta pages_messaging)`);
-      }
-      
-      newPageIds.push(metaPageId);
-
-      // --- DETECTION DE INSTAGRAM VINCULADO ---
-      if (page.instagram_business_account) {
-        const igId = page.instagram_business_account.id;
-        
-        // Buscar si ya existe canal de Instagram
-        const igSnap = await workspaceRef
-          .collection(COLLECTIONS.CANALES)
-          .where('tipo', '==', 'instagram')
-          .where('metaInstagramId', '==', igId)
-          .limit(1)
-          .get();
-
-        const igData = {
-          tipo: 'instagram',
-          nombre: `Instagram - ${pageName}`,
-          cuenta: pageName,
-          metaPageId: metaPageId,
-          metaInstagramId: igId,
-          status: 'connected' as const,
-          webhookVerified: true, // Se asocia al webhook de la página
-          actualizadoEl: Timestamp.now(),
-        };
-
-        let igCanalId: string;
-        if (!igSnap.empty) {
-          igCanalId = igSnap.docs[0].id;
-          await workspaceRef.collection(COLLECTIONS.CANALES).doc(igCanalId).update(igData);
-        } else {
-          const igRef = await workspaceRef.collection(COLLECTIONS.CANALES).add({
-            ...igData,
-            creadoEl: Timestamp.now(),
-          });
-          igCanalId = igRef.id;
-        }
-
-        // Compartir el mismo token de la página para Instagram
-        await guardarTokenCanal(wsId, igCanalId, pageAccessToken);
-
-        // Suscribir la página a eventos de Instagram (comentarios y mensajes)
-        try {
-          const igSubUrl = new URL(`https://graph.facebook.com/v19.0/${metaPageId}/subscribed_apps`);
-          igSubUrl.searchParams.set('subscribed_fields', 'instagram_manage_comments,instagram_manage_messages,messages');
-          igSubUrl.searchParams.set('access_token', pageAccessToken);
-          const igSubRes = await fetch(igSubUrl.toString(), { method: 'POST' });
-          const igSubData = await igSubRes.json();
-          console.log(`[IG-SUBSCRIBE] Resultado suscripción Instagram para página ${metaPageId}:`, igSubData);
-        } catch (igSubErr) {
-          console.error('[IG-SUBSCRIBE] Error al suscribir webhooks de Instagram:', igSubErr);
-        }
-      }
-    }
-
-  // --- DETECTION DE WHATSAPP BUSINESS (Búsqueda Profunda) ---
-  try {
-      console.log(`[DEBUG-WA] Iniciando búsqueda profunda de WABAs...`);
-      
-      // 1. Intentar obtener WABAs directas del usuario
-      const wabaRes = await fetch(
-        `https://graph.facebook.com/v19.0/me/whatsapp_business_accounts?access_token=${longLivedUserToken}`
-      );
-      const wabaData = await wabaRes.json();
-      
-      let allWabas = [...(wabaData.data || [])];
-      console.log(`[DEBUG-WA] WABAs directas encontradas: ${allWabas.length}`);
-
-      // 3. Intentar obtener WABAs a través de las PÁGINAS (Nuevo Fallback)
-      if (pages.length > 0) {
-        console.log(`[DEBUG-WA] Buscando WABAs en ${pages.length} páginas...`);
-        for (const page of pages) {
-          const pageWabaRes = await fetch(
-            `https://graph.facebook.com/v19.0/${page.id}/whatsapp_business_accounts?access_token=${page.access_token}`
-          );
-          const pageWabaData = await pageWabaRes.json();
-          if (pageWabaRes.ok && pageWabaData.data) {
-            for (const pw of pageWabaData.data) {
-              if (!allWabas.find(x => x.id === pw.id)) {
-                console.log(`[DEBUG-WA] WABA encontrada a través de página ${page.name}: ${pw.id}`);
-                allWabas.push(pw);
-              }
-            }
-          }
-        }
-      }
-
-      console.log(`[DEBUG-WA] Total de WABAs tras búsqueda exhaustiva: ${allWabas.length}`);
-
-      if (allWabas.length > 0) {
-        for (const waba of allWabas) {
-          const wabaId = waba.id;
-          console.log(`[DEBUG-WA] Revisando WABA: ${wabaId} (${waba.name || 'Sin nombre'})`);
-          
-          const phoneRes = await fetch(
-            `https://graph.facebook.com/v19.0/${wabaId}/phone_numbers?access_token=${longLivedUserToken}`
-          );
-          const phoneData = await phoneRes.json();
-          console.log(`[DEBUG-WA] Números en WABA ${wabaId}:`, phoneData.data?.length || 0);
-
-          if (phoneRes.ok && phoneData.data) {
-            for (const phone of phoneData.data) {
-              const { id: phoneId, display_phone_number: phoneNumber, verified_name: verifiedName } = phone;
-              console.log(`[DEBUG-WA] Procesando número: ${phoneNumber} (ID: ${phoneId})`);
-
-              const waSnap = await workspaceRef
-                .collection(COLLECTIONS.CANALES)
-                .where('tipo', '==', 'whatsapp')
-                .where('metaPhoneNumberId', '==', phoneId)
-                .limit(1)
-                .get();
-
-              const waData = {
-                tipo: 'whatsapp',
-                nombre: verifiedName || `WhatsApp - ${phoneNumber}`,
-                cuenta: phoneNumber,
-                metaPhoneNumberId: phoneId,
-                wabaId: wabaId,
-                status: 'connected' as const,
-                webhookVerified: false,
-                actualizadoEl: Timestamp.now(),
-              };
-
-              let waCanalId: string;
-              if (!waSnap.empty) {
-                waCanalId = waSnap.docs[0].id;
-                await workspaceRef.collection(COLLECTIONS.CANALES).doc(waCanalId).update(waData);
-              } else {
-                const waRef = await workspaceRef.collection(COLLECTIONS.CANALES).add({
-                  ...waData,
-                  creadoEl: Timestamp.now(),
-                });
-                waCanalId = waRef.id;
-              }
-              await guardarTokenCanal(wsId, waCanalId, longLivedUserToken);
-            }
-          }
-        }
-      } else {
-        const debugToken = await fetch(`https://graph.facebook.com/debug_token?input_token=${longLivedUserToken}&access_token=${appId}|${appSecret}`);
-        const debugData = await debugToken.json();
-        console.warn(`[DEBUG-WA] No se encontraron WABAs. Debug del Token:`, JSON.stringify(debugData.data?.scopes || []));
-      }
-    } catch (waError) {
-      console.error('Error detectando WhatsApp accounts:', waError);
-    }
-    console.log(`[EXITO-FINAL] Proceso de sincronización terminado para wsId: ${wsId}`);
-
-    // 5. Actualizar canalesPageIds en el workspace
-    if (newPageIds.length > 0) {
-      await workspaceRef.update({
-        canalesPageIds: FieldValue.arrayUnion(...newPageIds),
-        actualizadoEl: Timestamp.now(),
+    await adminDb
+      .doc(`${COLLECTIONS.ESPACIOS}/${wsId}/_pendingConnections/${sessionId}`)
+      .set({
+        wsId,
+        userToken: longLivedUserToken,
+        pages,
+        wabas,
+        creadoEl: Timestamp.now(),
+        expiraEn,
       });
-    }
 
-    // 6. Redirigir al dashboard con éxito
-    // Usamos una URL relativa para evitar problemas de protocolo (http vs https) al saltar entre ngrok y localhost
-    const successUrl = new URL('/dashboard/ajustes/canales', req.url);
-    successUrl.searchParams.set('success', 'true');
-    return NextResponse.redirect(successUrl);
+    console.log(`[OAUTH-CALLBACK] Sesión ${sessionId} creada para wsId ${wsId}. Pages: ${pages.length}, WABAs: ${wabas.length}`);
+
+    // 7. Redirigir al selector
+    const selectorUrl = new URL('/dashboard/ajustes/canales/seleccionar', req.url);
+    selectorUrl.searchParams.set('session', sessionId);
+    return NextResponse.redirect(selectorUrl);
 
   } catch (error: any) {
-    console.error('Meta Auth Callback Error:', error);
+    console.error('[OAUTH-CALLBACK] Error:', error);
     const errorMsg = encodeURIComponent(error.message || 'Error desconocido');
     const errorUrl = new URL('/dashboard/ajustes/canales', req.url);
     errorUrl.searchParams.set('error', errorMsg);

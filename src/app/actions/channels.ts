@@ -691,3 +691,297 @@ export async function obtenerTokenCanal(wsId: string, canalId: string) {
     return { success: false, error: error.message };
   }
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// Selector post-OAuth: el callback guarda páginas/WABAs en _pendingConnections
+// y redirige al selector. Estas acciones leen la sesión y finalizan la conexión.
+// ────────────────────────────────────────────────────────────────────────────
+
+type PendingPage = {
+  id: string;
+  name: string;
+  accessToken: string;
+  instagram: { id: string; username: string; name?: string } | null;
+};
+
+type PendingWaba = {
+  id: string;
+  name: string;
+  phones: { id: string; displayPhone: string; verifiedName: string }[];
+};
+
+/**
+ * Lee la sesión temporal del OAuth y devuelve las opciones de conexión
+ * disponibles (sin exponer tokens al cliente).
+ */
+export async function obtenerPendingConnection(wsId: string, sessionId: string) {
+  try {
+    const docRef = adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}/_pendingConnections/${sessionId}`);
+    const snap = await docRef.get();
+    if (!snap.exists) return { success: false, error: 'Sesión no encontrada o expirada' };
+
+    const data = snap.data() as any;
+    const expira: number = data.expiraEn?.toMillis?.() || 0;
+    if (Date.now() > expira) {
+      await docRef.delete().catch(() => {});
+      return { success: false, error: 'La sesión expiró. Iniciá la conexión nuevamente.' };
+    }
+
+    return {
+      success: true,
+      pages: (data.pages || []).map((p: PendingPage) => ({
+        id: p.id,
+        name: p.name,
+        instagram: p.instagram, // no contiene token
+      })),
+      wabas: (data.wabas || []).map((w: PendingWaba) => ({
+        id: w.id,
+        name: w.name,
+        phones: w.phones,
+      })),
+    };
+  } catch (error: any) {
+    console.error('Error en obtenerPendingConnection:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Propaga un access token a TODOS los workspaces que ya tengan esa misma
+ * página/IG/teléfono conectado, sin modificar ningún otro campo del canal.
+ * Esto evita romper conexiones existentes cuando se reconecta en otro workspace.
+ */
+async function propagarTokenCrossWorkspace(
+  field: 'metaPageId' | 'metaInstagramId' | 'metaPhoneNumberId',
+  value: string,
+  newToken: string,
+  exceptWsId: string
+) {
+  try {
+    const snap = await adminDb
+      .collectionGroup(COLLECTIONS.CANALES)
+      .where(field, '==', value)
+      .get();
+
+    let count = 0;
+    for (const doc of snap.docs) {
+      const otherWsId = doc.ref.parent.parent?.id;
+      if (!otherWsId || otherWsId === exceptWsId) continue;
+      await adminDb
+        .doc(`${COLLECTIONS.ESPACIOS}/${otherWsId}/${COLLECTIONS.CANALES}/${doc.id}/secrets/config`)
+        .set({ metaAccessToken: newToken, actualizadoEl: Timestamp.now() }, { merge: true });
+      count++;
+    }
+    if (count > 0) {
+      console.log(`[TOKEN-PROPAGATE] ${field}=${value} → token actualizado en ${count} workspace(s) adicionales`);
+    }
+  } catch (err: any) {
+    console.error(`[TOKEN-PROPAGATE] Error propagando ${field}=${value}:`, err.message);
+  }
+}
+
+/**
+ * Suscribe la página a los webhooks de Meta (mensajes + leads si tiene scope).
+ * Versión interna usada al finalizar la conexión — no llama a revalidatePath.
+ */
+async function suscribirWebhooksPagina(metaPageId: string, pageAccessToken: string) {
+  try {
+    const appId = process.env.NEXT_PUBLIC_META_APP_ID;
+    const appSecret = process.env.META_APP_SECRET;
+    const debugRes = await fetch(`https://graph.facebook.com/debug_token?input_token=${pageAccessToken}&access_token=${appId}|${appSecret}`);
+    const debugData = await debugRes.json();
+    const scopes: string[] = debugData.data?.scopes || [];
+
+    const fields = ['messages', 'messaging_postbacks', 'messaging_optins', 'message_deliveries', 'message_reads'];
+    if (scopes.includes('leads_retrieval')) fields.push('leadgen');
+
+    const url = new URL(`https://graph.facebook.com/v19.0/${metaPageId}/subscribed_apps`);
+    url.searchParams.set('subscribed_fields', fields.join(','));
+    url.searchParams.set('access_token', pageAccessToken);
+    const res = await fetch(url.toString(), { method: 'POST' });
+    const data = await res.json();
+    return { success: !!data.success, hasLeadgen: fields.includes('leadgen') };
+  } catch (err: any) {
+    console.error('[suscribirWebhooksPagina] Error:', err.message);
+    return { success: false, hasLeadgen: false };
+  }
+}
+
+/**
+ * Finaliza la conexión: crea/actualiza solo los canales seleccionados,
+ * propaga tokens a otros workspaces, y elimina la sesión temporal.
+ */
+export async function finalizarConexion(
+  wsId: string,
+  sessionId: string,
+  selection: {
+    pageIds: string[];           // FB pages a conectar
+    instagramPageIds: string[];  // FB pages cuya IG también conectar
+    wabaPhoneIds: string[];      // ids de teléfono WABA a conectar
+  }
+) {
+  try {
+    const sessionRef = adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}/_pendingConnections/${sessionId}`);
+    const sessionSnap = await sessionRef.get();
+    if (!sessionSnap.exists) return { success: false, error: 'Sesión no encontrada o expirada' };
+
+    const sessionData = sessionSnap.data() as any;
+    const expira: number = sessionData.expiraEn?.toMillis?.() || 0;
+    if (Date.now() > expira) {
+      await sessionRef.delete().catch(() => {});
+      return { success: false, error: 'La sesión expiró. Iniciá la conexión nuevamente.' };
+    }
+
+    const pages: PendingPage[] = sessionData.pages || [];
+    const wabas: PendingWaba[] = sessionData.wabas || [];
+    const userToken: string = sessionData.userToken;
+
+    const workspaceRef = adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}`);
+    let conectadosCount = 0;
+    const errores: string[] = [];
+
+    // ─── Procesar Páginas FB seleccionadas ───
+    for (const pageId of selection.pageIds) {
+      const page = pages.find(p => p.id === pageId);
+      if (!page) continue;
+      try {
+        const existing = await workspaceRef
+          .collection(COLLECTIONS.CANALES)
+          .where('tipo', '==', 'facebook')
+          .where('metaPageId', '==', page.id)
+          .limit(1)
+          .get();
+
+        const baseData = {
+          tipo: 'facebook',
+          nombre: page.name,
+          metaPageId: page.id,
+          status: 'connected' as const,
+          webhookVerified: false,
+          actualizadoEl: Timestamp.now(),
+        };
+
+        let canalId: string;
+        if (!existing.empty) {
+          canalId = existing.docs[0].id;
+          await existing.docs[0].ref.update(baseData);
+        } else {
+          const ref = await workspaceRef.collection(COLLECTIONS.CANALES).add({ ...baseData, creadoEl: Timestamp.now() });
+          canalId = ref.id;
+        }
+
+        await guardarTokenCanal(wsId, canalId, page.accessToken);
+        await propagarTokenCrossWorkspace('metaPageId', page.id, page.accessToken, wsId);
+
+        const subRes = await suscribirWebhooksPagina(page.id, page.accessToken);
+        if (subRes.success) {
+          await workspaceRef.collection(COLLECTIONS.CANALES).doc(canalId).update({ webhookVerified: true });
+        }
+        conectadosCount++;
+      } catch (err: any) {
+        console.error(`[finalizarConexion] Error procesando página ${pageId}:`, err.message);
+        errores.push(`Página ${page.name}: ${err.message}`);
+      }
+
+      // ─── IG asociada (si el usuario tildó la sub-opción) ───
+      if (page.instagram && selection.instagramPageIds.includes(page.id)) {
+        try {
+          const igExisting = await workspaceRef
+            .collection(COLLECTIONS.CANALES)
+            .where('tipo', '==', 'instagram')
+            .where('metaInstagramId', '==', page.instagram.id)
+            .limit(1)
+            .get();
+
+          const igData = {
+            tipo: 'instagram',
+            nombre: `Instagram - ${page.instagram.username || page.name}`,
+            cuenta: page.name,
+            metaPageId: page.id,
+            metaInstagramId: page.instagram.id,
+            status: 'connected' as const,
+            webhookVerified: true,
+            actualizadoEl: Timestamp.now(),
+          };
+
+          let igCanalId: string;
+          if (!igExisting.empty) {
+            igCanalId = igExisting.docs[0].id;
+            await igExisting.docs[0].ref.update(igData);
+          } else {
+            const ref = await workspaceRef.collection(COLLECTIONS.CANALES).add({ ...igData, creadoEl: Timestamp.now() });
+            igCanalId = ref.id;
+          }
+          await guardarTokenCanal(wsId, igCanalId, page.accessToken);
+          await propagarTokenCrossWorkspace('metaInstagramId', page.instagram.id, page.accessToken, wsId);
+
+          // Suscribir IG fields al webhook de la página
+          try {
+            const igUrl = new URL(`https://graph.facebook.com/v19.0/${page.id}/subscribed_apps`);
+            igUrl.searchParams.set('subscribed_fields', 'instagram_manage_comments,instagram_manage_messages,messages');
+            igUrl.searchParams.set('access_token', page.accessToken);
+            await fetch(igUrl.toString(), { method: 'POST' });
+          } catch {}
+          conectadosCount++;
+        } catch (err: any) {
+          console.error(`[finalizarConexion] Error procesando IG de página ${pageId}:`, err.message);
+          errores.push(`Instagram de ${page.name}: ${err.message}`);
+        }
+      }
+    }
+
+    // ─── Procesar teléfonos WABA seleccionados ───
+    for (const phoneId of selection.wabaPhoneIds) {
+      const waba = wabas.find(w => w.phones.some(p => p.id === phoneId));
+      const phone = waba?.phones.find(p => p.id === phoneId);
+      if (!waba || !phone) continue;
+      try {
+        const existing = await workspaceRef
+          .collection(COLLECTIONS.CANALES)
+          .where('tipo', '==', 'whatsapp')
+          .where('metaPhoneNumberId', '==', phone.id)
+          .limit(1)
+          .get();
+
+        const waData = {
+          tipo: 'whatsapp',
+          nombre: phone.verifiedName || `WhatsApp - ${phone.displayPhone}`,
+          cuenta: phone.displayPhone,
+          metaPhoneNumberId: phone.id,
+          metaWABAId: waba.id,
+          status: 'connected' as const,
+          webhookVerified: false,
+          actualizadoEl: Timestamp.now(),
+        };
+
+        let waCanalId: string;
+        if (!existing.empty) {
+          waCanalId = existing.docs[0].id;
+          await existing.docs[0].ref.update(waData);
+        } else {
+          const ref = await workspaceRef.collection(COLLECTIONS.CANALES).add({ ...waData, creadoEl: Timestamp.now() });
+          waCanalId = ref.id;
+        }
+        await guardarTokenCanal(wsId, waCanalId, userToken);
+        await propagarTokenCrossWorkspace('metaPhoneNumberId', phone.id, userToken, wsId);
+        conectadosCount++;
+      } catch (err: any) {
+        console.error(`[finalizarConexion] Error procesando WABA phone ${phoneId}:`, err.message);
+        errores.push(`WhatsApp ${phone.displayPhone}: ${err.message}`);
+      }
+    }
+
+    // ─── Limpieza ───
+    await sessionRef.delete().catch(() => {});
+    revalidatePath('/dashboard/ajustes/canales');
+
+    return {
+      success: true,
+      conectados: conectadosCount,
+      errores: errores.length ? errores : null,
+    };
+  } catch (error: any) {
+    console.error('Error en finalizarConexion:', error);
+    return { success: false, error: error.message };
+  }
+}

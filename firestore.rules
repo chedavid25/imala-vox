@@ -45,6 +45,12 @@ service cloud.firestore {
       match /sesionesIA/{docId} {
         allow read, write: if false; // Solo accesible desde Admin SDK (backend)
       }
+
+      // Sesiones temporales del flujo OAuth (contienen tokens de Meta).
+      // Solo accesibles desde Admin SDK vía server actions.
+      match /_pendingConnections/{sessionId} {
+        allow read, write: if false;
+      }
     }
 
     // Reglas para consultas globales (Collection Groups)

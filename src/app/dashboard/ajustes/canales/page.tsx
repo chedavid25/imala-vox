@@ -735,7 +735,15 @@ export default function CanalesPage() {
                           <config.icon className="w-6 h-6" style={{ color: isConnected ? config.color : '#9ca3af' }} />
                         )}
                       </div>
-                      {isConnected ? (
+                      {(canal as any).healthStatus && (canal as any).healthStatus !== 'ok' ? (
+                        <div
+                          className="px-3 py-1.5 rounded-full bg-rose-50 border border-rose-200 text-rose-600 text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5"
+                          title={(canal as any).healthIssue || 'Hay un problema con este canal'}
+                        >
+                          <AlertCircle className="w-3 h-3" />
+                          Atención
+                        </div>
+                      ) : isConnected ? (
                         <div className="px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-600 text-[10px] font-black uppercase tracking-widest">
                           Activo
                         </div>

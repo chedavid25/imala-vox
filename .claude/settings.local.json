@@ -57,7 +57,14 @@
       "Bash(firebase --version)",
       "Bash(firebase projects:list)",
       "Bash(firebase firestore:indexes --project imala-vox)",
-      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Indices activos:', len\\(d['indexes']\\)\\); [print\\(f\\\\\"  {i+1}. {x['collectionGroup']}: {' + '.join\\([f['fieldPath'] for f in x['fields'] if f['fieldPath']!='__name__']\\)}\\\\\"\\) for i,x in enumerate\\(d['indexes']\\)]\")"
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Indices activos:', len\\(d['indexes']\\)\\); [print\\(f\\\\\"  {i+1}. {x['collectionGroup']}: {' + '.join\\([f['fieldPath'] for f in x['fields'] if f['fieldPath']!='__name__']\\)}\\\\\"\\) for i,x in enumerate\\(d['indexes']\\)]\")",
+      "Bash(node scripts/delete-canal.js XoOuVNi5pvfqkYFIGWdB TJy47gHVd719NZS3xusX)",
+      "Bash(node \"d:/Sistemas David/Imala-Vox/scripts/delete-canal.js\" XoOuVNi5pvfqkYFIGWdB TJy47gHVd719NZS3xusX)",
+      "Bash(node \"d:/Sistemas David/Imala-Vox/scripts/diagnose-meta-leads.js\" 658763697322371)",
+      "Bash(firebase functions:secrets:access META_APP_ID --project imala-vox)",
+      "Bash(firebase functions:secrets:access META_APP_SECRET --project imala-vox)",
+      "Bash(gcloud services *)",
+      "Bash(firebase functions:list --project imala-vox)"
     ]
   }
 }

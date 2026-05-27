@@ -11,6 +11,9 @@ import {
 
 admin.initializeApp();
 
+// Cron diario: health check de canales Meta (ver healthCheckCanales.ts)
+export { healthCheckCanales } from "./healthCheckCanales";
+
 /**
  * validarLimitesWorkspaceInternal
  * Helper interno para verificar límites sin necesidad de contexto de autenticación
