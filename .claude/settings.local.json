@@ -64,7 +64,8 @@
       "Bash(firebase functions:secrets:access META_APP_ID --project imala-vox)",
       "Bash(firebase functions:secrets:access META_APP_SECRET --project imala-vox)",
       "Bash(gcloud services *)",
-      "Bash(firebase functions:list --project imala-vox)"
+      "Bash(firebase functions:list --project imala-vox)",
+      "Bash(node \"d:/Sistemas David/Imala-Vox/scripts/diagnose-ig-dms.js\" 658763697322371)"
     ]
   }
 }
