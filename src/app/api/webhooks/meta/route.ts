@@ -175,25 +175,24 @@ async function debeContarSesion(wsId: string, contactoId: string): Promise<boole
 
 /**
  * Procesa un nuevo lead entrante de Meta Ads.
- * Utiliza búsqueda multi-tenant para encontrar el token del cliente.
+ * Replica el lead a TODOS los workspaces que tengan esa página conectada
+ * (soporte para agencias que comparten la misma página en múltiples workspaces).
  */
 async function procesarLeadMeta(leadData: any, pageId: string) {
   const leadId = leadData.leadgen_id;
   const formId = leadData.form_id;
 
   try {
-    // 1. Buscar en Firestore qué workspace tiene esa página conectada
-    console.log(`🔍 [LEAD ${leadId}] Buscando canal para pageId: ${pageId}`);
+    console.log(`🔍 [LEAD ${leadId}] Buscando canales facebook para pageId: ${pageId}`);
     let wsQuery;
     try {
       wsQuery = await adminDb
         .collectionGroup(COLLECTIONS.CANALES)
         .where('metaPageId', '==', pageId)
+        .where('tipo', '==', 'facebook')
         .where('status', '==', 'connected')
-        .limit(1)
         .get();
     } catch (indexErr: any) {
-      // Error típico cuando falta el índice compuesto en Firestore
       console.error(
         `❌ [LEAD ${leadId}] Fallo en collectionGroup query — probablemente falta índice en Firestore.`,
         `Código: ${indexErr.code || 'sin código'}`,
@@ -202,155 +201,160 @@ async function procesarLeadMeta(leadData: any, pageId: string) {
       return;
     }
 
-    if (wsQuery.empty) {
-      console.warn(`⚠️ [LEAD ${leadId}] No se encontró ningún canal con metaPageId="${pageId}" y status="connected". Verificá que la página esté conectada en la app.`);
+    const canalesValidos = wsQuery.docs;
+
+    if (canalesValidos.length === 0) {
+      console.warn(`⚠️ [LEAD ${leadId}] No se encontró ningún canal facebook con metaPageId="${pageId}" y status="connected".`);
       return;
     }
 
-    const canalDoc = wsQuery.docs[0];
-    const canalId = canalDoc.id;
-    const wsId = canalDoc.ref.parent.parent?.id;
+    console.log(`✅ [LEAD ${leadId}] ${canalesValidos.length} canal(es) facebook encontrado(s) — replicando lead a cada workspace`);
 
-    if (!wsId) {
-      console.error(`❌ [LEAD ${leadId}] No se pudo resolver el workspaceId desde la ruta del canal.`);
-      return;
-    }
+    // Obtener datos del lead desde Meta UNA SOLA VEZ usando el primer token disponible
+    let metaLead: any = null;
+    let formName: string = formId ? `Formulario (ID: ${formId})` : 'Formulario sin nombre';
+    let campaignName: string = 'Campaña de Meta Ads';
 
-    console.log(`✅ [LEAD ${leadId}] Canal encontrado: ${canalId} en workspace: ${wsId}`);
+    for (const canalDoc of canalesValidos) {
+      const canalId = canalDoc.id;
+      const wsId = canalDoc.ref.parent.parent?.id;
+      if (!wsId) {
+        console.error(`❌ [LEAD ${leadId}] No se pudo resolver wsId del canal ${canalId}`);
+        continue;
+      }
 
-    // 2. Obtener el token de acceso
-    const configPath = `${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CANALES}/${canalId}/secrets/config`;
-    console.log(`🔑 [LEAD ${leadId}] Obteniendo token de: ${configPath}`);
-    const secretSnap = await adminDb.doc(configPath).get();
+      try {
+        // Obtener token del canal
+        const configPath = `${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CANALES}/${canalId}/secrets/config`;
+        const secretSnap = await adminDb.doc(configPath).get();
+        const clienteToken = secretSnap.data()?.metaAccessToken;
 
-    if (!secretSnap.exists) {
-      console.error(`❌ [LEAD ${leadId}] El documento secrets/config no existe en la ruta: ${configPath}`);
-      return;
-    }
+        if (!clienteToken) {
+          console.error(`❌ [LEAD ${leadId}] Sin token en canal ${canalId} (ws ${wsId}). Saltando.`);
+          continue;
+        }
 
-    const clienteToken = secretSnap.data()?.metaAccessToken;
-    if (!clienteToken) {
-      console.error(`❌ [LEAD ${leadId}] El campo metaAccessToken está vacío en secrets/config del canal ${canalId}`);
-      return;
-    }
+        // Fetch del lead solo si aún no lo tenemos (reutilizamos entre workspaces)
+        if (!metaLead) {
+          const metaRes = await fetch(
+            `https://graph.facebook.com/v19.0/${leadId}?fields=field_data,ad_id,ad_name,campaign_name,form_id&access_token=${clienteToken}`
+          );
+          if (!metaRes.ok) {
+            const errorBody = await metaRes.text();
+            console.error(`❌ [LEAD ${leadId}] Meta Graph respondió ${metaRes.status} con token de ws ${wsId}:`, errorBody);
+            continue;
+          }
+          metaLead = await metaRes.json();
+          if (metaLead.error) {
+            console.error(`❌ [LEAD ${leadId}] Error Meta:`, JSON.stringify(metaLead.error));
+            metaLead = null;
+            continue;
+          }
+          console.log(`📋 [LEAD ${leadId}] Datos recibidos de Meta`);
 
-    // 3. Obtener datos del lead desde Meta
-    console.log(`📡 [LEAD ${leadId}] Consultando Meta Graph API...`);
-    const metaRes = await fetch(
-      `https://graph.facebook.com/v19.0/${leadId}?fields=field_data,ad_id,ad_name,campaign_name,form_id&access_token=${clienteToken}`
-    );
+          // Enriquecer nombres (también solo una vez)
+          campaignName = metaLead.ad_name || metaLead.campaign_name || campaignName;
+          const fId = formId || metaLead.form_id;
+          if (fId) {
+            try {
+              const formRes = await fetch(`https://graph.facebook.com/v19.0/${fId}?fields=name&access_token=${clienteToken}`);
+              if (formRes.ok) {
+                const formData = await formRes.json();
+                formName = formData.name || formName;
+              }
+            } catch {}
+          }
+          if (campaignName === 'Campaña de Meta Ads' && metaLead.ad_id) {
+            try {
+              const adRes = await fetch(`https://graph.facebook.com/v19.0/${metaLead.ad_id}?fields=campaign{name}&access_token=${clienteToken}`);
+              if (adRes.ok) {
+                const adData = await adRes.json();
+                campaignName = adData.campaign?.name || campaignName;
+              }
+            } catch {}
+          }
+        }
 
-    if (!metaRes.ok) {
-      const errorBody = await metaRes.text();
-      console.error(`❌ [LEAD ${leadId}] Meta Graph API respondió ${metaRes.status}. Respuesta:`, errorBody);
-      return;
-    }
+        // Mapear campos del formulario
+        const campos: Record<string, string> = {};
+        for (const field of metaLead.field_data || []) {
+          const cleanName = field.name.replace(/_/g, ' ').toUpperCase();
+          campos[cleanName] = field.values?.[0] || '';
+        }
 
-    const metaLead = await metaRes.json();
+        // Resolver etapa inicial del embudo en este workspace
+        const etapasSnap = await adminDb
+          .collection(COLLECTIONS.ESPACIOS).doc(wsId)
+          .collection(COLLECTIONS.ETAPAS_EMBUDO)
+          .orderBy('orden', 'asc')
+          .limit(1)
+          .get();
+        const defaultStageId = etapasSnap.empty ? 'sin_etapa' : etapasSnap.docs[0].id;
 
-    if (metaLead.error) {
-      console.error(`❌ [LEAD ${leadId}] Error en respuesta de Meta:`, JSON.stringify(metaLead.error));
-      return;
-    }
+        // Mapeo robusto de nombre
+        const first_name = campos['FIRST NAME'] || campos['FIRST_NAME'] || '';
+        const last_name = campos['LAST NAME'] || campos['LAST_NAME'] || '';
+        const full_name = campos['FULL NAME'] || campos['FULL_NAME'] || campos['NOMBRE'] || campos['NAME'] || '';
+        const nombreFinal = (first_name || last_name)
+          ? `${first_name} ${last_name}`.trim()
+          : (full_name || 'Nuevo Cliente Potencial');
 
-    console.log(`📋 [LEAD ${leadId}] Datos recibidos de Meta:`, JSON.stringify(metaLead));
+        // Deduplicación: usar el metaLeadId como doc ID — si llega 2 veces, sobrescribe (idempotente)
+        const docRef = adminDb
+          .collection(COLLECTIONS.ESPACIOS).doc(wsId)
+          .collection(COLLECTIONS.LEADS)
+          .doc(`meta_${leadId}`);
+        const existing = await docRef.get();
 
-    // --- ENRIQUECIMIENTO DE DATOS (Nombres de Formulario y Campaña) ---
-    let campaignName = metaLead.ad_name || metaLead.campaign_name || 'Campaña de Meta Ads';
-    const fId = formId || metaLead.form_id;
-    let formName = fId ? `Formulario (ID: ${fId})` : 'Formulario sin nombre';
-
-    try {
-      // 3.1 Obtener nombre real del formulario
-      if (fId) {
-        const formRes = await fetch(`https://graph.facebook.com/v19.0/${fId}?fields=name&access_token=${clienteToken}`);
-        if (formRes.ok) {
-          const formData = await formRes.json();
-          formName = formData.name || formName;
+        if (existing.exists) {
+          console.log(`⚠️ [LEAD ${leadId}] Ya existe en ws ${wsId} — actualizando timestamp solamente`);
+          await docRef.update({ actualizadoEl: Timestamp.now() });
         } else {
-          const errText = await formRes.text();
-          console.warn(`⚠️ [LEAD ${leadId}] No se pudo obtener el nombre real del formulario (ID: ${fId}). Status: ${formRes.status}. Respuesta:`, errText);
+          await docRef.set({
+            origen: 'meta_ads',
+            etapaId: defaultStageId,
+            temperatura: 'frio',
+            nombre: nombreFinal,
+            email: campos['EMAIL'] || campos['EMAIL ADDRESS'] || campos['CORREO'] || campos['CORREO ELECTRONICO'] || campos['MAIL'] || null,
+            telefono: campos['PHONE NUMBER'] || campos['FULL PHONE NUMBER'] || campos['TELEFONO'] || campos['PHONE'] || campos['TEL'] || campos['CELULAR'] || campos['MOVIL'] || campos['NUMERO DE TELEFONO'] || campos['NUMERO DE CELULAR'] || null,
+            camposFormulario: campos,
+            metaLeadId: leadId,
+            metaFormId: formId || metaLead.form_id || null,
+            metaPageId: pageId,
+            campana: campaignName,
+            formulario: formName,
+            notas: '',
+            convertidoAContacto: false,
+            contactoId: null,
+            creadoEl: Timestamp.now(),
+            actualizadoEl: Timestamp.now(),
+          });
+          console.log(`✅ [LEAD ${leadId}] Guardado en ws ${wsId}`);
         }
+
+        // Marcar canal con lastLeadAt (para health check)
+        await canalDoc.ref.update({ lastLeadAt: Timestamp.now() });
+      } catch (innerErr: any) {
+        console.error(`❌ [LEAD ${leadId}] Error procesando ws ${wsId}:`, innerErr.message);
       }
-
-      // 3.2 Si la campaña sigue siendo genérica, intentar buscarla por Ad ID
-      if (campaignName === 'Campaña de Meta Ads' && metaLead.ad_id) {
-        const adRes = await fetch(`https://graph.facebook.com/v19.0/${metaLead.ad_id}?fields=campaign{name}&access_token=${clienteToken}`);
-        if (adRes.ok) {
-          const adData = await adRes.json();
-          campaignName = adData.campaign?.name || campaignName;
-        }
-      }
-    } catch (enrichErr) {
-      console.warn(`⚠️ [LEAD ${leadId}] Error al enriquecer nombres, se usarán IDs.`, enrichErr);
     }
-
-    // 4. Mapear campos del formulario
-    const campos: Record<string, string> = {};
-    for (const field of metaLead.field_data || []) {
-      // Limpiamos el nombre del campo: guiones por espacios y mayúsculas
-      const cleanName = field.name.replace(/_/g, ' ').toUpperCase();
-      campos[cleanName] = field.values?.[0] || '';
-    }
-
-    // 5. Resolver Etapa del Embudo (dinámica para evitar IDs fantasmas)
-    const etapasSnap = await adminDb
-      .collection(COLLECTIONS.ESPACIOS)
-      .doc(wsId)
-      .collection(COLLECTIONS.ETAPAS_EMBUDO)
-      .orderBy('orden', 'asc')
-      .limit(1)
-      .get();
-
-    let defaultStageId: string;
-    if (!etapasSnap.empty) {
-      defaultStageId = etapasSnap.docs[0].id;
-      console.log(`🏷️ [LEAD ${leadId}] Etapa inicial: "${etapasSnap.docs[0].data().nombre}" (${defaultStageId})`);
-    } else {
-      defaultStageId = 'sin_etapa';
-      console.warn(`⚠️ [LEAD ${leadId}] No hay etapas de embudo en workspace ${wsId}. El lead se guardará con etapaId="sin_etapa". Creá al menos una etapa en la app.`);
-    }
-
-    // 6. Mapeo de nombre robusto (Meta usa varios nombres de campos)
-    // Nota: Como normalizamos las llaves a MAYÚSCULAS en el paso 4, buscamos en mayúsculas
-    const first_name = campos['FIRST NAME'] || campos['FIRST_NAME'] || '';
-    const last_name = campos['LAST NAME'] || campos['LAST_NAME'] || '';
-    const full_name = campos['FULL NAME'] || campos['FULL_NAME'] || campos['NOMBRE'] || campos['NAME'] || '';
-    
-    const nombreFinal = (first_name || last_name)
-      ? `${first_name} ${last_name}`.trim()
-      : (full_name || 'Nuevo Cliente Potencial');
-
-    // 7. Guardar en Firestore del Workspace
-    console.log(`💾 [LEAD ${leadId}] Guardando lead en Firestore para workspace ${wsId}...`);
-    const docRef = await adminDb
-      .collection(COLLECTIONS.ESPACIOS)
-      .doc(wsId)
-      .collection(COLLECTIONS.LEADS)
-      .add({
-        origen: 'meta_ads',
-        etapaId: defaultStageId,
-        temperatura: 'frio',
-        nombre: nombreFinal,
-        email: campos['EMAIL'] || campos['EMAIL ADDRESS'] || campos['CORREO'] || campos['CORREO ELECTRONICO'] || campos['MAIL'] || null,
-        telefono: campos['PHONE NUMBER'] || campos['FULL PHONE NUMBER'] || campos['TELEFONO'] || campos['PHONE'] || campos['TEL'] || campos['CELULAR'] || campos['MOVIL'] || campos['NUMERO DE TELEFONO'] || campos['NUMERO DE CELULAR'] || null,
-        camposFormulario: campos,
-        metaLeadId: leadId,
-        metaFormId: formId || metaLead.form_id || null,
-        metaPageId: pageId,
-        campana: campaignName,
-        formulario: formName,
-        notas: '',
-        convertidoAContacto: false,
-        contactoId: null,
-        creadoEl: Timestamp.now(),
-        actualizadoEl: Timestamp.now(),
-      });
-
-    console.log(`✅ [LEAD ${leadId}] Guardado exitosamente. Doc ID: ${docRef.id} en workspace ${wsId}`);
   } catch (err: any) {
     console.error(`❌ [LEAD ${leadId}] Error no controlado en procesarLeadMeta:`, err.message, err.stack);
   }
+}
+
+/**
+ * Cuando una misma página/cuenta está conectada en múltiples workspaces (caso de
+ * agencias o reconexiones), el canal "ganador" para procesar mensajes/comentarios
+ * es el que tenga el actualizadoEl más reciente. Esto evita respuestas IA duplicadas
+ * y respeta la última conexión activa del cliente.
+ */
+function pickMostRecentCanal(docs: FirebaseFirestore.QueryDocumentSnapshot[]) {
+  return docs.sort((a, b) => {
+    const aT = a.data().actualizadoEl?.toMillis?.() || 0;
+    const bT = b.data().actualizadoEl?.toMillis?.() || 0;
+    return bT - aT;
+  })[0];
 }
 
 /**
@@ -402,14 +406,14 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
 
     // 1. Identificar Workspace y Canal
     let canalType: 'whatsapp' | 'instagram' | 'facebook' = isInstagram ? 'instagram' : 'facebook';
-    
-    // Búsqueda robusta: Si es Instagram, intentamos por metaInstagramId, si no lo encontramos, probamos por metaPageId
+
+    // Búsqueda multi-workspace: si una página está conectada en varios espacios,
+    // procesamos en el de actualizadoEl más reciente (última conexión activa).
     let wsQuery = await adminDb
       .collectionGroup(COLLECTIONS.CANALES)
       .where(isInstagram ? 'metaInstagramId' : 'metaPageId', '==', pageId)
       .where('tipo', '==', canalType)
       .where('status', '==', 'connected')
-      .limit(1)
       .get();
 
     // Fallback para Instagram: A veces los mensajes de IG llegan con el Page ID en lugar del IG ID
@@ -419,7 +423,6 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
         .where('metaPageId', '==', pageId)
         .where('tipo', '==', 'instagram')
         .where('status', '==', 'connected')
-        .limit(1)
         .get();
     }
 
@@ -428,7 +431,10 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
       return;
     }
 
-    const canalDoc = wsQuery.docs[0];
+    if (wsQuery.docs.length > 1) {
+      console.log(`ℹ️ ${wsQuery.docs.length} canales encontrados para ${canalType}/${pageId} — usando el más reciente.`);
+    }
+    const canalDoc = pickMostRecentCanal(wsQuery.docs);
     const canalData = canalDoc.data() as any;
     const wsId = canalDoc.ref.parent.parent!.id;
     const canalId = canalDoc.id;
@@ -731,21 +737,23 @@ async function procesarMensajeWhatsapp(value: any, wabaId: string) {
     const text = message.text.body;
     const contactoNombreIncoming = contact?.profile?.name || senderId;
 
-    // 1. Identificar Workspace y Canal
+    // 1. Identificar Workspace y Canal (multi-workspace: usar el más reciente si hay duplicados)
     const wsQuery = await adminDb
       .collectionGroup(COLLECTIONS.CANALES)
       .where('metaPhoneNumberId', '==', value.metadata.phone_number_id)
       .where('tipo', '==', 'whatsapp')
       .where('status', '==', 'connected')
-      .limit(1)
       .get();
 
     if (wsQuery.empty) {
       console.warn(`❌ Mensaje de WA ${senderId} ignorado: Canal no encontrado para phone_number_id ${value.metadata.phone_number_id}. Asegúrate que el 'Phone Number ID' coincida en los ajustes del canal.`);
       return;
     }
-    
-    const canalDoc = wsQuery.docs[0];
+
+    if (wsQuery.docs.length > 1) {
+      console.log(`ℹ️ ${wsQuery.docs.length} canales WA encontrados para ${value.metadata.phone_number_id} — usando el más reciente.`);
+    }
+    const canalDoc = pickMostRecentCanal(wsQuery.docs);
     const canalId = canalDoc.id;
     const wsId = canalDoc.ref.parent.parent!.id;
     const canalData = canalDoc.data() as any;
@@ -987,13 +995,13 @@ async function procesarComentarioInstagram(commentData: any, pageId: string) {
 
     if (!commenterId || !commentText.trim()) return;
 
-    // Buscar canal Instagram por metaInstagramId o metaPageId
+    // Buscar canal Instagram por metaInstagramId o metaPageId (multi-workspace)
     let wsQuery = await adminDb
       .collectionGroup(COLLECTIONS.CANALES)
       .where('metaInstagramId', '==', pageId)
       .where('tipo', '==', 'instagram')
       .where('status', '==', 'connected')
-      .limit(1).get();
+      .get();
 
     if (wsQuery.empty) {
       wsQuery = await adminDb
@@ -1001,7 +1009,7 @@ async function procesarComentarioInstagram(commentData: any, pageId: string) {
         .where('metaPageId', '==', pageId)
         .where('tipo', '==', 'instagram')
         .where('status', '==', 'connected')
-        .limit(1).get();
+        .get();
     }
 
     if (wsQuery.empty) {
@@ -1009,7 +1017,10 @@ async function procesarComentarioInstagram(commentData: any, pageId: string) {
       return;
     }
 
-    const canalDoc = wsQuery.docs[0];
+    if (wsQuery.docs.length > 1) {
+      console.log(`[ig-comment] ${wsQuery.docs.length} canales encontrados — usando el más reciente.`);
+    }
+    const canalDoc = pickMostRecentCanal(wsQuery.docs);
     const canalId = canalDoc.id;
     const wsId = canalDoc.ref.parent.parent!.id;
 

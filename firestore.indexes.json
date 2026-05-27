@@ -4,7 +4,8 @@
       "collectionGroup": "canales",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
-        { "fieldPath": "metaPageId", "order": "ASCENDING" },
+        { "fieldPath": "metaPhoneNumberId", "order": "ASCENDING" },
+        { "fieldPath": "tipo", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" }
       ]
     },
@@ -27,12 +28,27 @@
       ]
     },
     {
-      "collectionGroup": "canales",
+      "collectionGroup": "conocimientoActivo",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
-        { "fieldPath": "metaPhoneNumberId", "order": "ASCENDING" },
-        { "fieldPath": "tipo", "order": "ASCENDING" },
-        { "fieldPath": "status", "order": "ASCENDING" }
+        { "fieldPath": "activo", "order": "ASCENDING" },
+        { "fieldPath": "recursoId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "tareasCRM",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "fecha", "order": "ASCENDING" },
+        { "fieldPath": "hora", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "leads",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "metaPageId", "order": "ASCENDING" },
+        { "fieldPath": "creadoEl", "order": "DESCENDING" }
       ]
     }
   ],
