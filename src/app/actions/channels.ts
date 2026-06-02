@@ -36,27 +36,45 @@ export async function conectarCanalManual(wsId: string, datos: {
   try {
     if (!wsId) throw new Error("ID de espacio de trabajo no proporcionado");
 
-    // 1. Verificar que el token es válido consultando Meta Graph API
-    // Usamos v19.0 como base estable
-    const verificacion = await fetch(
-      `https://graph.facebook.com/v19.0/me?access_token=${datos.accessToken}`
-    );
+    // 1. Validación específica por tipo: probar el endpoint correcto que CONFIRMA
+    //    que el token tiene acceso al recurso específico (no solo "es válido").
+    //    Para WhatsApp consultamos el phone number directamente; para FB/IG la página.
+    let verificacionUrl: string;
+    if (datos.tipo === 'whatsapp') {
+      if (!datos.metaPhoneNumberId) {
+        return { success: false, error: 'Falta el Phone Number ID' };
+      }
+      verificacionUrl = `https://graph.facebook.com/v19.0/${datos.metaPhoneNumberId}?fields=display_phone_number,verified_name&access_token=${datos.accessToken}`;
+    } else if (datos.metaPageId) {
+      verificacionUrl = `https://graph.facebook.com/v19.0/${datos.metaPageId}?fields=name&access_token=${datos.accessToken}`;
+    } else {
+      verificacionUrl = `https://graph.facebook.com/v19.0/me?access_token=${datos.accessToken}`;
+    }
 
+    const verificacion = await fetch(verificacionUrl);
     if (!verificacion.ok) {
       const errData = await verificacion.json().catch(() => ({}));
-      return { 
-        success: false, 
-        error: `El token de acceso no es válido. Meta respondió: ${errData.error?.message || 'Token inválido o expirado'}` 
+      const metaErr = errData.error?.message || 'Token inválido o sin acceso al recurso';
+      return {
+        success: false,
+        error: `${metaErr}. Verificá que el token sea válido y tenga acceso al ${datos.tipo === 'whatsapp' ? 'Phone Number ID' : 'recurso'} que ingresaste.`,
       };
     }
 
-    // 2. Buscar si ya existe un canal de este tipo en el workspace
-    const canalesSnap = await adminDb
+    // 2. Buscar canal existente por el ID específico (no por tipo solo),
+    //    para no sobreescribir otros canales WhatsApp/FB/IG ya conectados.
+    let query = adminDb
       .collection(COLLECTIONS.ESPACIOS).doc(wsId)
       .collection(COLLECTIONS.CANALES)
-      .where('tipo', '==', datos.tipo)
-      .limit(1)
-      .get();
+      .where('tipo', '==', datos.tipo);
+    if (datos.tipo === 'whatsapp' && datos.metaPhoneNumberId) {
+      query = query.where('metaPhoneNumberId', '==', datos.metaPhoneNumberId);
+    } else if (datos.tipo === 'facebook' && datos.metaPageId) {
+      query = query.where('metaPageId', '==', datos.metaPageId);
+    } else if (datos.tipo === 'instagram' && datos.metaInstagramId) {
+      query = query.where('metaInstagramId', '==', datos.metaInstagramId);
+    }
+    const canalesSnap = await query.limit(1).get();
 
     let canalId: string;
 
