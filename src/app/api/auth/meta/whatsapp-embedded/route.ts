@@ -30,14 +30,16 @@ export async function POST(req: NextRequest) {
 
     // Fallback: si falla con pageUrl, probar sin redirect_uri
     if (!shortRes.ok || shortData.error) {
-      console.warn('[whatsapp-embedded] Reintentando sin redirect_uri. Error previo:', shortData?.error?.message);
+      const firstError = shortData.error?.message || 'Error al obtener token de acceso';
+      console.warn('[whatsapp-embedded] Reintentando sin redirect_uri. Error previo:', firstError);
+      
       shortRes = await fetch(buildExchangeUrl());
       shortData = await shortRes.json();
-    }
-
-    if (!shortRes.ok || shortData.error) {
-      console.error('[whatsapp-embedded] Error short token:', shortData);
-      throw new Error(shortData.error?.message || 'Error al obtener token de acceso');
+      
+      if (!shortRes.ok || shortData.error) {
+        console.error('[whatsapp-embedded] Ambos intentos fallaron. Error segundo:', shortData?.error?.message);
+        throw new Error(firstError);
+      }
     }
 
     const shortToken = shortData.access_token;
