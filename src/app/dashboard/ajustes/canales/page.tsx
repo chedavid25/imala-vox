@@ -264,9 +264,7 @@ export default function CanalesPage() {
     isSubmittingRef.current = true;
 
     try {
-      // El SDK de Meta asocia el code a la URL donde se invocó FB.login().
-      // El backend debe usar exactamente esa URL al intercambiar el code.
-      const pageUrl = `${window.location.origin}${window.location.pathname}`;
+      const pageUrl = window.location.href.split('#')[0];
       const res = await fetch('/api/auth/meta/whatsapp-embedded', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
