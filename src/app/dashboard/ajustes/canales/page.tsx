@@ -340,37 +340,18 @@ export default function CanalesPage() {
       return;
     }
 
-    const FB = (window as any).FB;
-    if (!FB || !isFbSdkReady) {
-      toast.error("El SDK de Facebook aún se está cargando. Esperá unos segundos y reintentá.");
-      return;
-    }
+    const appId = process.env.NEXT_PUBLIC_META_APP_ID;
+    const redirectUri = `${window.location.origin}/api/auth/meta/callback`;
+    const scope = [
+      'whatsapp_business_management', 
+      'whatsapp_business_messaging', 
+      'business_management',
+      'pages_show_list',
+      'pages_read_engagement'
+    ].join(',');
 
-    wabaDataRef.current = {};
-    isSubmittingRef.current = false;
-    setIsConnectingEmbedded(true);
-
-    FB.login(
-      (response: any) => {
-        console.log("[WA-DEBUG] Respuesta FB.login:", response);
-        if (response.authResponse?.code) {
-          triggerBackendSignup(response.authResponse.code);
-        } else {
-          console.log("[WA-DEBUG] El usuario canceló o no autorizó el flujo");
-          setIsConnectingEmbedded(false);
-        }
-      },
-      {
-        config_id: configId,
-        response_type: 'code',
-        override_default_response_type: true,
-        extras: {
-          setup: {},
-          featureType: '',
-          sessionInfoVersion: '3',
-        },
-      }
-    );
+    const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&state=${currentWorkspaceId}&config_id=${configId}`;
+    window.location.href = authUrl;
   };
 
   const handleOAuthConnect = () => {
