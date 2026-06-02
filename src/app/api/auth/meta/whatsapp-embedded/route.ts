@@ -25,15 +25,15 @@ export async function POST(req: NextRequest) {
       `&code=${code}` +
       (redirect ? `&redirect_uri=${encodeURIComponent(redirect)}` : '');
 
-    let shortRes = await fetch(buildExchangeUrl(pageUrl));
+    let shortRes = await fetch(buildExchangeUrl());
     let shortData = await shortRes.json();
 
-    // Fallback: si falla con pageUrl, probar sin redirect_uri
+    // Fallback: si falla sin redirect_uri, probar con pageUrl
     if (!shortRes.ok || shortData.error) {
       const firstError = shortData.error?.message || 'Error al obtener token de acceso';
-      console.warn('[whatsapp-embedded] Reintentando sin redirect_uri. Error previo:', firstError);
+      console.warn('[whatsapp-embedded] Reintentando con pageUrl. Error previo:', firstError);
       
-      shortRes = await fetch(buildExchangeUrl());
+      shortRes = await fetch(buildExchangeUrl(pageUrl));
       shortData = await shortRes.json();
       
       if (!shortRes.ok || shortData.error) {
