@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     // por lo que el intercambio debe incluir ese mismo redirect_uri.
     // Si no llega pageUrl (compat), reintentamos sin redirect_uri.
     const buildExchangeUrl = (redirect?: string) =>
-      `https://graph.facebook.com/v21.0/oauth/access_token` +
+      `https://graph.facebook.com/v19.0/oauth/access_token` +
       `?client_id=${appId}` +
       `&client_secret=${appSecret}` +
       `&code=${code}` +
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
 
     // 2. Intercambiar por long-lived token (60 días)
     const longRes = await fetch(
-      `https://graph.facebook.com/v21.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${appId}&client_secret=${appSecret}&fb_exchange_token=${shortToken}`
+      `https://graph.facebook.com/v19.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${appId}&client_secret=${appSecret}&fb_exchange_token=${shortToken}`
     );
     const longData = await longRes.json();
     const accessToken = longData.access_token || shortToken;
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
 
     if (!finalPhoneNumberId && finalWabaId) {
       const phoneRes = await fetch(
-        `https://graph.facebook.com/v21.0/${finalWabaId}/phone_numbers?fields=id,display_phone_number,verified_name&access_token=${accessToken}`
+        `https://graph.facebook.com/v19.0/${finalWabaId}/phone_numbers?fields=id,display_phone_number,verified_name&access_token=${accessToken}`
       );
       if (phoneRes.ok) {
         const phoneData = await phoneRes.json();
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
     // Si tampoco tenemos WABA, buscar WABAs del usuario
     if (!finalPhoneNumberId) {
       const wabaRes = await fetch(
-        `https://graph.facebook.com/v21.0/me/whatsapp_business_accounts?access_token=${accessToken}`
+        `https://graph.facebook.com/v19.0/me/whatsapp_business_accounts?access_token=${accessToken}`
       );
       if (wabaRes.ok) {
         const wabaData = await wabaRes.json();
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
         if (firstWaba) {
           finalWabaId = firstWaba.id;
           const phoneRes2 = await fetch(
-            `https://graph.facebook.com/v21.0/${finalWabaId}/phone_numbers?fields=id,display_phone_number,verified_name&access_token=${accessToken}`
+            `https://graph.facebook.com/v19.0/${finalWabaId}/phone_numbers?fields=id,display_phone_number,verified_name&access_token=${accessToken}`
           );
           if (phoneRes2.ok) {
             const phoneData2 = await phoneRes2.json();

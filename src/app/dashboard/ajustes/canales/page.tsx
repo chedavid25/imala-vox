@@ -59,7 +59,8 @@ import {
   sincronizarWebhooksWhatsApp,
   configurarCanalIA,
   actualizarTokenAcceso,
-  obtenerTokenCanal
+  obtenerTokenCanal,
+  conectarCanalManual
 } from "@/app/actions/channels";
 
 const WhatsAppIcon = ({ className }: { className?: string }) => (
@@ -127,6 +128,13 @@ export default function CanalesPage() {
   const wabaDataRef = useRef<{ phoneNumberId?: string; wabaId?: string }>({});
   const isSubmittingRef = useRef<boolean>(false);
 
+  // Estados para el modal de conexión manual WhatsApp
+  const [isWAModalOpen, setIsWAModalOpen] = useState(false);
+  const [waPhoneNumberId, setWaPhoneNumberId] = useState('');
+  const [waAccessToken, setWaAccessToken] = useState('');
+  const [waDisplayName, setWaDisplayName] = useState('');
+  const [isConnectingWA, setIsConnectingWA] = useState(false);
+
   // Estado para la pestaña activa
   const [activeTab, setActiveTab] = useState<'whatsapp' | 'instagram' | 'facebook' | 'leads' | 'web'>('whatsapp');
 
@@ -148,7 +156,7 @@ export default function CanalesPage() {
         appId: process.env.NEXT_PUBLIC_META_APP_ID,
         autoLogAppEvents: true,
         xfbml: true,
-        version: 'v21.0',
+        version: 'v19.0',
       });
       setIsFbSdkReady(true);
       console.log("[WA-DEBUG] FB SDK inicializado");
@@ -288,6 +296,39 @@ export default function CanalesPage() {
       setIsConnectingEmbedded(false);
       isSubmittingRef.current = false;
       wabaDataRef.current = {};
+    }
+  };
+
+  const handleConnectWhatsApp = async () => {
+    if (!currentWorkspaceId) return;
+    if (!waPhoneNumberId.trim() || !waAccessToken.trim()) {
+      toast.error("El Phone Number ID y el Access Token son obligatorios");
+      return;
+    }
+
+    setIsConnectingWA(true);
+    try {
+      const res = await conectarCanalManual(currentWorkspaceId, {
+        tipo: 'whatsapp',
+        nombre: waDisplayName.trim() || 'WhatsApp Business',
+        cuenta: waPhoneNumberId.trim(),
+        metaPhoneNumberId: waPhoneNumberId.trim(),
+        accessToken: waAccessToken.trim(),
+      });
+
+      if (res.success) {
+        toast.success("Canal de WhatsApp conectado. Ahora verificá los webhooks desde 'Configurar'.");
+        setIsWAModalOpen(false);
+        setWaPhoneNumberId('');
+        setWaAccessToken('');
+        setWaDisplayName('');
+      } else {
+        toast.error(res.error || "No se pudo conectar el canal");
+      }
+    } catch (error) {
+      toast.error("Error de red al conectar WhatsApp");
+    } finally {
+      setIsConnectingWA(false);
     }
   };
 
@@ -665,6 +706,13 @@ export default function CanalesPage() {
                       >
                         <HelpCircle className="w-3 h-3" />
                         ¿Cómo funciona la conexión?
+                      </button>
+                      <button
+                        onClick={() => setIsWAModalOpen(true)}
+                        className="flex items-center justify-center gap-1.5 text-[9px] font-bold text-white/50 hover:text-white transition-colors text-center mt-1"
+                      >
+                        <Plus className="w-3 h-3" />
+                        Conexión manual (Ingresar Token y Phone ID)
                       </button>
                     </>
                   ) : activeTab === 'web' ? (
@@ -1112,6 +1160,73 @@ export default function CanalesPage() {
                 Entendido — Conectar ahora
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal conexión manual WhatsApp */}
+      <Dialog open={isWAModalOpen} onOpenChange={setIsWAModalOpen}>
+        <DialogContent className="max-w-md rounded-3xl p-8 border-none bg-white shadow-2xl">
+          <DialogHeader className="space-y-3">
+            <DialogTitle className="text-2xl font-bold flex items-center gap-3 text-slate-900">
+              <WhatsAppIcon className="w-6 h-6 text-[#25D366]" />
+              Conectar WhatsApp Business (Manual)
+            </DialogTitle>
+            <DialogDescription className="text-slate-600 text-sm">
+              Ingresá el Phone Number ID y el Token de Acceso Permanente que generaste en el panel de Meta for Developers para conectar de forma directa y manual.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5 mt-6">
+            <div className="space-y-2">
+              <Label className="text-[10px] uppercase font-bold text-slate-700">Phone Number ID *</Label>
+              <Input
+                placeholder="Ej: 123456789012345"
+                value={waPhoneNumberId}
+                onChange={(e) => setWaPhoneNumberId(e.target.value)}
+                className="h-11 rounded-xl text-slate-900"
+              />
+              <p className="text-[10px] text-slate-500">Encontralo en Meta for Developers → Tu App → WhatsApp → Configuración de la API</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-[10px] uppercase font-bold text-slate-700">Access Token permanente *</Label>
+              <Input
+                placeholder="EAAxxxxxx..."
+                value={waAccessToken}
+                onChange={(e) => setWaAccessToken(e.target.value)}
+                type="password"
+                className="h-11 rounded-xl text-slate-900"
+              />
+              <p className="text-[10px] text-slate-500">Generá un System User Token en Meta Business Suite → Configuración del negocio → Usuarios del sistema</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-[10px] uppercase font-bold text-slate-700">Nombre para mostrar (opcional)</Label>
+              <Input
+                placeholder="Ej: Soporte WhatsApp"
+                value={waDisplayName}
+                onChange={(e) => setWaDisplayName(e.target.value)}
+                className="h-11 rounded-xl text-slate-900"
+              />
+            </div>
+
+            <div className="p-4 rounded-2xl bg-amber-50 border border-amber-100 text-[11px] text-amber-800 space-y-1">
+              <p className="font-bold">Antes de conectar, asegurate que en Meta for Developers:</p>
+              <ol className="list-decimal list-inside space-y-0.5 text-amber-700">
+                <li>El Webhook URL esté configurado a: <code className="font-mono bg-amber-100 px-1 rounded">https://www.imalavox.com/api/webhooks/meta</code></li>
+                <li>El Verify Token sea: <code className="font-mono bg-amber-100 px-1 rounded">imala_vox_2024</code></li>
+                <li>El campo <code className="font-mono bg-amber-100 px-1 rounded">messages</code> esté suscripto en Webhooks</li>
+              </ol>
+            </div>
+
+            <Button
+              onClick={handleConnectWhatsApp}
+              disabled={isConnectingWA || !waPhoneNumberId.trim() || !waAccessToken.trim()}
+              className="w-full h-12 rounded-2xl font-bold bg-[#25D366] hover:bg-[#22c55e] text-white"
+            >
+              {isConnectingWA ? <Loader2 className="animate-spin w-5 h-5" /> : "Conectar WhatsApp"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
