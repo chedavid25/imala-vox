@@ -345,9 +345,7 @@ export default function CanalesPage() {
     const scope = [
       'whatsapp_business_management', 
       'whatsapp_business_messaging', 
-      'business_management',
-      'pages_show_list',
-      'pages_read_engagement'
+      'business_management'
     ].join(',');
 
     const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&state=${currentWorkspaceId}&config_id=${configId}`;
