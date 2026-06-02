@@ -25,13 +25,13 @@ export async function POST(req: NextRequest) {
       `&code=${code}` +
       (redirect ? `&redirect_uri=${encodeURIComponent(redirect)}` : '');
 
-    let shortRes = await fetch(buildExchangeUrl(pageUrl));
+    let shortRes = await fetch(buildExchangeUrl());
     let shortData = await shortRes.json();
 
-    // Fallback: si falla con pageUrl, probar sin redirect_uri (flujo embedded puro)
+    // Fallback: si falla sin redirect_uri, probar con pageUrl
     if (!shortRes.ok || shortData.error) {
-      console.warn('[whatsapp-embedded] Reintentando sin redirect_uri. Error previo:', shortData?.error?.message);
-      shortRes = await fetch(buildExchangeUrl());
+      console.warn('[whatsapp-embedded] Reintentando con redirect_uri. Error previo:', shortData?.error?.message);
+      shortRes = await fetch(buildExchangeUrl(pageUrl));
       shortData = await shortRes.json();
     }
 
