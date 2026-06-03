@@ -1,0 +1,221 @@
+Title: Live Content
+Description: Fetched live
+Source: https://docs.360dialog.com/docs/hub/embedded-signup/coexistence-onboarding
+---
+Coexistence Onboarding | Client Documentation
+⌘
+Ctrl
+k
+Get Started
+Status Page
+Partner Docs
+More
+GET STARTED
+Overview
+Pricing
+Payments
+Sandbox
+About
+Alphas and Betas
+Key Resources
+Meta Business Portfolio
+Phone Numbers
+WhatsApp Business Accounts
+Marketing Messages
+Utility Messages
+Authentication Messages
+Templates
+Meta Business Verification
+Government Agencies
+Architecture and Security
+Asset Sharing
+360Dialog Hub
+Overview
+Create account
+Numbers
+Users
+Embedded Signup
+Confirm Number details
+Coexistence Onboarding
+API Keys
+Templates
+Webhook URL
+Business Profiles
+Local Storage
+Insights
+Migrations
+Subscriptions
+Funds
+Billing
+Invoices
+Messaging
+Overview
+Message Types
+Webhooks
+Media
+Health Status
+Flows
+Catalogs
+Payments
+Calling
+Groups
+Conversational Components
+Messaging API
+API Reference
+WhatsApp Marketing
+Business Search
+Linking a WABA to a Facebook Page
+Linking a WABA to Google Message Ads
+Ads that Click to WhatsApp (CTWA)
+Support
+Get support
+Meta Business Manager Support
+Error Code Reference
+Status Pages
+Legal Information
+FAQ
+Guides
+Send And Receive Messages
+Maintain WABA Health
+Before sending a message
+Driving users to your WhatsApp account
+Business account locked
+WABA Status - Review in progress
+Troubleshoot login Issues
+Powered by GitBook
+ 
+On this page
+Copy
+On this page
+360Dialog Hub
+Embedded Signup
+Coexistence Onboarding
+This document describes how to connect a WhatsApp Business app account and phone number to the WhatsApp Business Platform (also known as WhatsApp Coexistence)
+This guide shows how to add a WhatsApp Business app account and phone number to the WhatsApp Business Platform with 360Dialog.
+Using the same phone number for both the WhatsApp Business App, and the WhatsApp Business Platform, is known as 
+Coexistence
+.
+Not using the WhatsApp Business App?
+If the business is not using the WhatsApp Business App, register the number through the standard 
+Embedded Signup
+ process, without enabling coexistence.
+R
+equirements
+Before onboarding a number to the WhatsApp Business Platform using Coexistence, make sure:
+The latest version of the WhatsApp Business app is installed on a smartphone with a camera (QR code needs to be scanned during signup).
+Profile picture updates are not supported after onboarding. Businesses should ensure that the profile picture is set correctly in the WhatsApp Business App before starting the onboarding process
+You can create a new Meta business portfolio, or connect to an existing one during the Embedded Signup process.
+Please choose your business portfolio carefully, since it can&#x27;t be changed after the number is registered. 
+ It is mandatory that the business portfolio is owned by the business who is sending messages. Adding users who do not belong to this company can cause your business portfolio to be blocked.
+You must add your information in the 
+Business Info
+ section of 
+Business Portfolio Settings
+. You need to include a legal name, an address, a website, and the business phone number you intend to use for messaging.
+S
+tep-by-Step Procedure
+1
+S
+tart Embedded Signup
+If you don&#x27;t have a 360Dialog Hub account, follow the link provided by your Integration Partner, or use our 
+sign up page
+.
+If you already have a 360Dialog Hub account, you can get started by signing into your account on the 
+360Dialog Hub
+.
+Open 360Dialog Hub and click the 
+Add number
+ button:
+If another number has previously been added, click the top-right corner and select 
+Add number
+.
+The 
+“Add Number”
+ button is 
+disabled
+ for 
+Partner-Paid accounts
+. If the button is grayed out, you may have a 
+Partner-Paid account
+. This guide should be followed by owners of 
+Direct-Paid accounts.
+If your account is a 
+Partner-Paid account,
+ refer to your partner&#x27;s documentation on adding a new phone number, or contact your partner for assistance.
+In the form that opens, select:
+No
+, this number is not connected to the WhatsApp Business API.
+Yes
+, this number is connected to the WhatsApp Business App.
+Click the 
+&quot;Confirm the number details&quot;
+ button.
+2
+C
+onnect the WhatsApp Business App
+Proceed with the 
+“Connect a WhatsApp Business App”
+ option.
+Enter the phone number again and verify.
+Open the 
+WhatsApp Business App
+ on your phone.
+Follow the in-app instructions:
+A 
+new WhatsApp message
+ will prompt you to 
+scan a QR code
+.
+Tap the message and scan the QR displayed on screen.
+3
+C
+onfirm Migration and History Sync
+Tapping the message button will:
+Inform the business that chat history can be migrated to 360Dialog.
+Enable history and contact sync (optional).
+Tapping 
+“Scan QR code”
+ will trigger:
+The 
+chat history sharing
+ with 360Dialog.
+The connection to the WhatsApp Business Platform.
+4
+F
+inish Embedded Signup
+Confirm or edit your 
+WhatsApp Business Account
+ information.
+Once completed:
+360Dialog will create the integration.
+The number will be 
+ready for use
+ on the WhatsApp Business API.
+Contacts and history sync
+ will begin, if chosen.
+Webhooks will be logged and available.
+Onboarding and synchronization can take several minutes, depending on a number of factors such as the size of the business&#x27;s messaging history, internet speed, etc. If you encounter any issues, please 
+reach out to our Support Team.
+360Dialog direct clients 
+don´t use a partner-configured webhook URL, so they can sync the history and then download it from the 360Dialog Hub. 
+Post-Onboarding Notes
+You may now:
+Set the phone number&#x27;s webhook.
+Start processing Coexistence-exclusive webhooks. See 
+Coexistence Events
+ for implementation details.
+Previous
+Confirm Number details
+Next
+API Keys
+Last updated 
+2 days ago
+Was this helpful?
+Requirements
+Step-by-Step Procedure
+Start Embedded Signup
+Connect the WhatsApp Business App
+Confirm Migration and History Sync
+Finish Embedded Signup
+Post-Onboarding Notes
+Was this helpful?
