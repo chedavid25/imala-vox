@@ -705,7 +705,7 @@ function esNotificacionSistemaWA(texto: string): boolean {
 /**
  * Procesa mensajes entrantes de WhatsApp Cloud API.
  */
-async function procesarMensajeWhatsapp(value: any, wabaId: string) {
+export async function procesarMensajeWhatsapp(value: any, wabaId: string) {
   try {
     // Ignorar status updates (delivered, read, failed) — no son mensajes entrantes
     if (value.statuses?.length && !value.messages?.length) return;

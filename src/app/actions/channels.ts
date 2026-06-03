@@ -131,6 +131,65 @@ export async function conectarCanalManual(wsId: string, datos: {
   }
 }
 
+export async function conectarCanal360dialog(wsId: string, datos: {
+  nombre: string;
+  metaPhoneNumberId: string;
+  accessToken: string;
+}) {
+  try {
+    if (!wsId) throw new Error("ID de espacio de trabajo no proporcionado");
+    if (!datos.metaPhoneNumberId || !datos.accessToken) {
+      return { success: false, error: 'Faltan parámetros obligatorios (Phone Number ID o API Key)' };
+    }
+
+    const canalesSnap = await adminDb
+      .collection(COLLECTIONS.ESPACIOS).doc(wsId)
+      .collection(COLLECTIONS.CANALES)
+      .where('tipo', '==', 'whatsapp')
+      .where('metaPhoneNumberId', '==', datos.metaPhoneNumberId)
+      .limit(1)
+      .get();
+
+    let canalId: string;
+
+    const baseData = {
+      tipo: 'whatsapp',
+      provider: '360dialog',
+      nombre: datos.nombre || 'WhatsApp 360dialog',
+      cuenta: datos.metaPhoneNumberId,
+      metaPhoneNumberId: datos.metaPhoneNumberId,
+      status: 'connected' as const,
+      webhookVerified: true,
+      actualizadoEl: Timestamp.now(),
+    };
+
+    if (!canalesSnap.empty) {
+      canalId = canalesSnap.docs[0].id;
+      await adminDb
+        .collection(COLLECTIONS.ESPACIOS).doc(wsId)
+        .collection(COLLECTIONS.CANALES).doc(canalId)
+        .update(baseData);
+    } else {
+      const canalRef = await adminDb
+        .collection(COLLECTIONS.ESPACIOS).doc(wsId)
+        .collection(COLLECTIONS.CANALES)
+        .add({
+          ...baseData,
+          creadoEl: Timestamp.now(),
+        });
+      canalId = canalRef.id;
+    }
+
+    await guardarTokenCanal(wsId, canalId, datos.accessToken);
+
+    revalidatePath('/dashboard/ajustes/canales');
+    return { success: true, canalId };
+  } catch (error: any) {
+    console.error('Error conectando canal 360dialog:', error);
+    return { success: false, error: error.message || "Error interno al conectar 360dialog" };
+  }
+}
+
 /**
  * Elimina físicamente un canal y sus secretos de la base de datos.
  * Esto permite limpiar el dashboard de conexiones fallidas o antiguas.
@@ -389,9 +448,13 @@ export async function enviarMensajeAccion(
     let body: any = {};
 
     if (canalData.tipo === 'whatsapp') {
-      const phoneNumberId = canalData.metaPhoneNumberId;
-      if (!phoneNumberId) throw new Error("ID de teléfono no configurado para WhatsApp");
-      url = `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`;
+      if (canalData.provider === '360dialog') {
+        url = `https://waba-v2.360dialog.io/messages`;
+      } else {
+        const phoneNumberId = canalData.metaPhoneNumberId;
+        if (!phoneNumberId) throw new Error("ID de teléfono no configurado para WhatsApp");
+        url = `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`;
+      }
       
       // Normalizar número argentino al formato legacy que usa la API de WhatsApp:
       // E.164 "5493513376865" (con 9) → legacy "54351153376865" (con 15)
@@ -464,12 +527,18 @@ export async function enviarMensajeAccion(
       }
     }
 
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json"
+    };
+    if (canalData.provider === '360dialog') {
+      headers["D360-API-KEY"] = metaAccessToken;
+    } else {
+      headers["Authorization"] = `Bearer ${metaAccessToken}`;
+    }
+
     const res = await fetch(url, {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${metaAccessToken}`,
-        "Content-Type": "application/json"
-      },
+      headers,
       body: JSON.stringify(body)
     });
 

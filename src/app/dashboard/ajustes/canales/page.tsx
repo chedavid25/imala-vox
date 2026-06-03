@@ -60,7 +60,8 @@ import {
   configurarCanalIA,
   actualizarTokenAcceso,
   obtenerTokenCanal,
-  conectarCanalManual
+  conectarCanalManual,
+  conectarCanal360dialog
 } from "@/app/actions/channels";
 
 const WhatsAppIcon = ({ className }: { className?: string }) => (
@@ -134,6 +135,13 @@ export default function CanalesPage() {
   const [waAccessToken, setWaAccessToken] = useState('');
   const [waDisplayName, setWaDisplayName] = useState('');
   const [isConnectingWA, setIsConnectingWA] = useState(false);
+
+  // Estados para el modal de conexión de 360dialog (Provisional)
+  const [is360ModalOpen, setIs360ModalOpen] = useState(false);
+  const [d360PhoneNumberId, setD360PhoneNumberId] = useState('');
+  const [d360ApiKey, setD360ApiKey] = useState('');
+  const [d360DisplayName, setD360DisplayName] = useState('');
+  const [isConnecting360, setIsConnecting360] = useState(false);
 
   // Estado para la pestaña activa
   const [activeTab, setActiveTab] = useState<'whatsapp' | 'instagram' | 'facebook' | 'leads' | 'web'>('whatsapp');
@@ -329,6 +337,37 @@ export default function CanalesPage() {
       toast.error("Error de red al conectar WhatsApp");
     } finally {
       setIsConnectingWA(false);
+    }
+  };
+
+  const handleConnect360dialog = async () => {
+    if (!currentWorkspaceId) return;
+    if (!d360PhoneNumberId.trim() || !d360ApiKey.trim()) {
+      toast.error("El Phone Number ID y el API Key son obligatorios");
+      return;
+    }
+
+    setIsConnecting360(true);
+    try {
+      const res = await conectarCanal360dialog(currentWorkspaceId, {
+        nombre: d360DisplayName.trim() || 'WhatsApp 360dialog',
+        metaPhoneNumberId: d360PhoneNumberId.trim(),
+        accessToken: d360ApiKey.trim(),
+      });
+
+      if (res.success) {
+        toast.success("Canal de 360dialog conectado exitosamente.");
+        setIs360ModalOpen(false);
+        setD360PhoneNumberId('');
+        setD360ApiKey('');
+        setD360DisplayName('');
+      } else {
+        toast.error(res.error || "No se pudo conectar el canal");
+      }
+    } catch (error) {
+      toast.error("Error de red al conectar con 360dialog");
+    } finally {
+      setIsConnecting360(false);
     }
   };
 
@@ -692,6 +731,13 @@ export default function CanalesPage() {
                       >
                         <Plus className="w-3 h-3" />
                         Conexión manual (Ingresar Token y Phone ID)
+                      </button>
+                      <button
+                        onClick={() => setIs360ModalOpen(true)}
+                        className="flex items-center justify-center gap-1.5 text-[9px] font-bold text-sky-400 hover:text-sky-300 transition-colors text-center mt-1"
+                      >
+                        <Zap className="w-3 h-3" />
+                        Conectar con 360dialog (Provisional)
                       </button>
                     </>
                   ) : activeTab === 'web' ? (
@@ -1205,6 +1251,74 @@ export default function CanalesPage() {
               className="w-full h-12 rounded-2xl font-bold bg-[#25D366] hover:bg-[#22c55e] text-white"
             >
               {isConnectingWA ? <Loader2 className="animate-spin w-5 h-5" /> : "Conectar WhatsApp"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal conexión 360dialog WhatsApp (Provisional) */}
+      <Dialog open={is360ModalOpen} onOpenChange={setIs360ModalOpen}>
+        <DialogContent className="max-w-md rounded-3xl p-8 border-none bg-white shadow-2xl text-slate-900">
+          <DialogHeader className="space-y-3">
+            <DialogTitle className="text-2xl font-bold flex items-center gap-3 text-slate-900">
+              <Zap className="w-6 h-6 text-sky-500" />
+              Conectar WhatsApp (360dialog)
+            </DialogTitle>
+            <DialogDescription className="text-slate-600 text-sm">
+              Ingresá los datos de tu cuenta de 360dialog para conectar provisionalmente.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5 mt-6 text-slate-900">
+            <div className="space-y-2">
+              <Label className="text-[10px] uppercase font-bold text-slate-700">Phone Number ID *</Label>
+              <Input
+                placeholder="Ej: 5493512345678"
+                value={d360PhoneNumberId}
+                onChange={(e) => setD360PhoneNumberId(e.target.value)}
+                className="h-11 rounded-xl text-slate-900"
+              />
+              <p className="text-[10px] text-slate-500">ID de teléfono / número de teléfono registrado en 360dialog.</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-[10px] uppercase font-bold text-slate-700">360dialog API Key *</Label>
+              <Input
+                placeholder="Ingresar API Key"
+                value={d360ApiKey}
+                onChange={(e) => setD360ApiKey(e.target.value)}
+                type="password"
+                className="h-11 rounded-xl text-slate-900"
+              />
+              <p className="text-[10px] text-slate-500">API Key provista por el panel de control de 360dialog.</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-[10px] uppercase font-bold text-slate-700">Nombre del canal (opcional)</Label>
+              <Input
+                placeholder="Ej: WhatsApp 360dialog Cliente"
+                value={d360DisplayName}
+                onChange={(e) => setD360DisplayName(e.target.value)}
+                className="h-11 rounded-xl text-slate-900"
+              />
+            </div>
+
+            <div className="p-4 rounded-2xl bg-sky-50 border border-sky-100 text-[11px] text-sky-800 space-y-1">
+              <p className="font-bold">Webhook en el portal de 360dialog:</p>
+              <p className="text-sky-700 leading-relaxed">
+                Asegurate de configurar el Webhook URL en tu portal de 360dialog a:<br />
+                <code className="font-mono bg-sky-100 px-1 rounded block mt-1 break-all select-all text-slate-900">
+                  {typeof window !== 'undefined' ? window.location.origin : 'https://www.imalavox.com'}/api/webhooks/whatsapp-360
+                </code>
+              </p>
+            </div>
+
+            <Button
+              onClick={handleConnect360dialog}
+              disabled={isConnecting360 || !d360PhoneNumberId.trim() || !d360ApiKey.trim()}
+              className="w-full h-12 rounded-2xl font-bold bg-sky-500 hover:bg-sky-600 text-white"
+            >
+              {isConnecting360 ? <Loader2 className="animate-spin w-5 h-5" /> : "Conectar 360dialog"}
             </Button>
           </div>
         </DialogContent>
