@@ -800,17 +800,19 @@ async function procesarMediaEntranteWA(
     // Descargar el archivo
     let dlRes: Response;
     if (directUrl) {
-      // 360dialog: el webhook entrega directUrl (un lookaside.fbsbx.com temporal).
-      // Para descargar de lookaside.fbsbx.com, se requiere Authorization Bearer con el token de Meta (que en 360dialog es su API key/token).
-      // Además, Meta exige User-Agent para no rechazar con 404/500/401.
-      console.log(`[WA-MEDIA] Descargando desde directUrl temporal de 360dialog: ${directUrl}`);
-      dlRes = await fetch(directUrl, {
+      // 360dialog: el webhook entrega directUrl (ej. lookaside.fbsbx.com temporal).
+      // La documentación oficial de 360dialog exige REEMPLAZAR la raíz "https://lookaside.fbsbx.com" 
+      // por "https://waba-v2.360dialog.io" y autenticarse con el header 'D360-API-KEY'.
+      const transformedUrl = directUrl.replace('https://lookaside.fbsbx.com', 'https://waba-v2.360dialog.io');
+      console.log(`[WA-MEDIA] Descargando desde URL transformada de 360dialog: ${transformedUrl}`);
+      
+      dlRes = await fetch(transformedUrl, {
         headers: { 
-          'Authorization': `Bearer ${accessToken}`,
+          'D360-API-KEY': accessToken,
           'User-Agent': 'curl/7.64.1'
         }
       });
-      console.log(`[WA-MEDIA] 360dialog directUrl status: ${dlRes.status}`);
+      console.log(`[WA-MEDIA] 360dialog transformedUrl status: ${dlRes.status}`);
 
       // Fallback: si dio error (ej. link lookaside expirado), intentar re-consultar la URL fresca usando GET /mediaId
       if (!dlRes.ok) {
@@ -821,10 +823,11 @@ async function procesarMediaEntranteWA(
         if (infoRes.ok) {
           const info = await infoRes.json() as { url?: string };
           if (info.url) {
-            console.log(`[WA-MEDIA] Nueva URL fresca de lookaside obtenida: ${info.url}`);
-            dlRes = await fetch(info.url, {
+            const freshTransformedUrl = info.url.replace('https://lookaside.fbsbx.com', 'https://waba-v2.360dialog.io');
+            console.log(`[WA-MEDIA] Nueva URL fresca y transformada de 360dialog: ${freshTransformedUrl}`);
+            dlRes = await fetch(freshTransformedUrl, {
               headers: { 
-                'Authorization': `Bearer ${accessToken}`,
+                'D360-API-KEY': accessToken,
                 'User-Agent': 'curl/7.64.1'
               }
             });
