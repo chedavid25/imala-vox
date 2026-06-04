@@ -64,14 +64,15 @@ import {
   addDoc,
   deleteDoc,
   getDocs,
-  where
+  where,
+  Timestamp
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { COLLECTIONS, Lead, EtapaEmbudo } from "@/lib/types/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { formatDistanceToNow, format } from "date-fns";
+import { formatDistanceToNow, format, addDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { PhoneActionMenu } from "@/components/crm/PhoneActionMenu";
 import { MetaLeadsImporter } from "@/components/crm/MetaLeadsImporter";
@@ -1318,6 +1319,50 @@ function LeadDetailContent({
   const [editingField, setEditingField] = useState<'telefono' | 'email' | null>(null);
   const [editFieldValue, setEditFieldValue] = useState("");
 
+  // Recordatorios rápidos
+  const [isCustomDateOpen, setIsCustomDateOpen] = useState(false);
+  const [customDateValue, setCustomDateValue] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [creandoRecordatorio, setCreandoRecordatorio] = useState(false);
+
+  const crearTareaRecordatorio = async (fechaString: string) => {
+    if (!currentWorkspaceId || !lead) return;
+    setCreandoRecordatorio(true);
+    const toastId = toast.loading("Agendando recordatorio de contacto...");
+    try {
+      const venceEl = new Date(fechaString + "T09:00:00");
+      const tasksRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, "tareasCRM");
+      await addDoc(tasksRef, {
+        titulo: `Seguimiento Lead: ${lead.nombre}`,
+        descripcion: `Tarea de seguimiento automática programada para el lead ${lead.nombre}. Teléfono: ${lead.telefono || 'No especificado'}. Email: ${lead.email || 'No especificado'}.`,
+        fecha: fechaString,
+        hora: "09:00",
+        prioridad: 'media',
+        completada: false,
+        estado: 'pendiente',
+        contactoId: lead.contactoId || null,
+        recurrencia: {
+          tipo: 'ninguna',
+          config: { diasSemana: [], intervaloDias: 1 }
+        },
+        venceEl: Timestamp.fromDate(venceEl),
+        creadoEl: Timestamp.now()
+      });
+      toast.success("Tarea de seguimiento agendada en la sección Tareas", { id: toastId });
+      setIsCustomDateOpen(false);
+    } catch (error) {
+      console.error("Error al crear tarea de recordatorio:", error);
+      toast.error("Error al agendar la tarea", { id: toastId });
+    } finally {
+      setCreandoRecordatorio(false);
+    }
+  };
+
+  const handleQuickReminder = async (dias: number) => {
+    const targetDate = addDays(new Date(), dias);
+    const dateString = format(targetDate, "yyyy-MM-dd");
+    await crearTareaRecordatorio(dateString);
+  };
+
   useEffect(() => {
     if (!currentWorkspaceId || !lead?.id) return;
     const notasRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.LEADS, lead.id, "notasLead");
@@ -1471,6 +1516,33 @@ function LeadDetailContent({
             }
             {lead.convertidoAContacto ? 'Ver en CRM' : 'Convertir'}
           </Button>
+        </div>
+
+        <div className="mt-3">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="outline"
+                  disabled={creandoRecordatorio}
+                  className="w-full h-11 border-slate-200 hover:bg-slate-50 font-semibold text-xs rounded-xl flex items-center justify-center gap-2"
+                >
+                  {creandoRecordatorio ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-amber-500" />
+                  ) : (
+                    <Clock className="w-4 h-4 text-amber-500" />
+                  )}
+                  Recordatorio de contacto
+                </Button>
+              }
+            />
+            <DropdownMenuContent className="w-[200px] rounded-xl p-1 bg-white border-slate-100 shadow-xl z-[150]">
+              <DropdownMenuItem className="rounded-lg py-2.5 text-xs font-semibold cursor-pointer" onClick={() => handleQuickReminder(0)}>Hoy</DropdownMenuItem>
+              <DropdownMenuItem className="rounded-lg py-2.5 text-xs font-semibold cursor-pointer" onClick={() => handleQuickReminder(1)}>Mañana</DropdownMenuItem>
+              <DropdownMenuItem className="rounded-lg py-2.5 text-xs font-semibold cursor-pointer" onClick={() => handleQuickReminder(3)}>En 3 días</DropdownMenuItem>
+              <DropdownMenuItem className="rounded-lg py-2.5 text-xs font-semibold cursor-pointer" onClick={() => setIsCustomDateOpen(true)}>Fecha personalizada...</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -1660,6 +1732,45 @@ function LeadDetailContent({
           </div>
         </Section>
       </div>
+
+      {/* Diálogo de Fecha Personalizada para Recordatorio */}
+      <Dialog open={isCustomDateOpen} onOpenChange={setIsCustomDateOpen}>
+        <DialogContent className="max-w-xs p-6 bg-white border-none shadow-2xl rounded-2xl z-[200]">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-bold tracking-tight">Recordatorio personalizado</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-3">
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Seleccionar fecha</Label>
+              <Input
+                type="date"
+                value={customDateValue}
+                min={format(new Date(), "yyyy-MM-dd")}
+                onChange={e => setCustomDateValue(e.target.value)}
+                className="h-10 rounded-xl"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                type="button"
+                onClick={() => setIsCustomDateOpen(false)}
+                className="flex-1 h-9 rounded-xl text-xs font-semibold text-slate-500"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                disabled={creandoRecordatorio}
+                onClick={() => crearTareaRecordatorio(customDateValue)}
+                className="flex-1 h-9 rounded-xl text-xs font-bold bg-[var(--accent)] text-[var(--accent-text)]"
+              >
+                {creandoRecordatorio ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Agendar"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
