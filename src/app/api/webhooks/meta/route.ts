@@ -597,6 +597,7 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
     };
     if (metaMsgMetadata) msgPayloadMeta.metadata = metaMsgMetadata;
 
+    let savedMsgIdMeta: string;
     if (metaMessageId) {
       const msgDocRef = convRef.doc(convId).collection(COLLECTIONS.MENSAJES).doc(metaMessageId);
       const msgDocSnap = await msgDocRef.get();
@@ -605,8 +606,10 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
         return;
       }
       await msgDocRef.set(msgPayloadMeta);
+      savedMsgIdMeta = metaMessageId;
     } else {
-      await convRef.doc(convId).collection(COLLECTIONS.MENSAJES).add(msgPayloadMeta);
+      const addedRef = await convRef.doc(convId).collection(COLLECTIONS.MENSAJES).add(msgPayloadMeta);
+      savedMsgIdMeta = addedRef.id;
     }
 
     // 5. Trigger IA si está habilitado
@@ -653,28 +656,14 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
       
       const isCopiloto = convData?.modoIA === 'copiloto' || modoAgenteDefault === 'copiloto';
 
-      // DEBOUNCE: siempre activo (mínimo 1s) para agrupar mensajes rápidos del mismo usuario
+      // DEBOUNCE: esperar sin escribir nada en Firestore para evitar race conditions
       if (!isCopiloto) {
         const esperaMs = Math.max(delayRespuesta, 1) * 1000;
-        const ahoraMs = Date.now();
-        await convRef.doc(convId).update({
-          ultimaActividadClienteEl: ahoraMs
-        });
-
-        console.log(`[DEBOUNCE-META] Iniciando espera de ${esperaMs / 1000}s para la conversación ${convId}...`);
+        console.log(`[DEBOUNCE-META] Esperando ${esperaMs / 1000}s para conversación ${convId}...`);
         await new Promise(resolve => setTimeout(resolve, esperaMs));
-
-        const freshConvDoc = await convRef.doc(convId).get();
-        const freshConvData = freshConvDoc.data();
-
-        if (freshConvData?.ultimaActividadClienteEl !== ahoraMs) {
-          console.log(`[DEBOUNCE-META] Cancelando respuesta para este hilo en ${convId}. Llegó otro mensaje posterior.`);
-          return;
-        }
-        console.log(`[DEBOUNCE-META] Tiempo cumplido. Es el último mensaje. Procesando...`);
       }
 
-      // Obtener mensajes de historial actualizados
+      // Leer historial actualizado (usado para debounce check y agrupación)
       const historialSnap = await convRef.doc(convId)
           .collection(COLLECTIONS.MENSAJES)
           .orderBy('creadoEl', 'desc')
@@ -683,7 +672,17 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
 
       const msgDocs = historialSnap.docs.reverse();
 
-      // AGRUPACIÓN INTELIGENTE: agrupar mensajes consecutivos del usuario al final de la conversación
+      // DEBOUNCE CHECK: si llegó un mensaje más reciente, este hilo cancela
+      if (!isCopiloto) {
+        const ultimoMsgUsuario = [...msgDocs].reverse().find(d => d.data().from === 'user');
+        if (!ultimoMsgUsuario || ultimoMsgUsuario.id !== savedMsgIdMeta) {
+          console.log(`[DEBOUNCE-META] Cancelando hilo ${savedMsgIdMeta}. El último mensaje es ${ultimoMsgUsuario?.id}.`);
+          return;
+        }
+        console.log(`[DEBOUNCE-META] Confirmado último mensaje. Procesando...`);
+      }
+
+      // AGRUPACIÓN INTELIGENTE: agrupar mensajes consecutivos del usuario al final
       let textoProcesar = textoMensajeMeta;
 
       if (!isCopiloto) {
@@ -1096,6 +1095,7 @@ export async function procesarMensajeWhatsapp(value: any, wabaId: string) {
     };
     if (mensajeMetadata) msgPayloadWA.metadata = mensajeMetadata;
 
+    let savedMsgIdWA: string;
     if (metaMessageId) {
       const msgDocRef = convRef.doc(convId).collection(COLLECTIONS.MENSAJES).doc(metaMessageId);
       const msgDocSnap = await msgDocRef.get();
@@ -1104,8 +1104,10 @@ export async function procesarMensajeWhatsapp(value: any, wabaId: string) {
         return;
       }
       await msgDocRef.set(msgPayloadWA);
+      savedMsgIdWA = metaMessageId;
     } else {
-      await convRef.doc(convId).collection(COLLECTIONS.MENSAJES).add(msgPayloadWA);
+      const addedRef = await convRef.doc(convId).collection(COLLECTIONS.MENSAJES).add(msgPayloadWA);
+      savedMsgIdWA = addedRef.id;
     }
 
     // 5. Trigger IA
@@ -1149,28 +1151,14 @@ export async function procesarMensajeWhatsapp(value: any, wabaId: string) {
 
       const isCopiloto = convData?.modoIA === 'copiloto' || modoAgenteDefault === 'copiloto';
 
-      // DEBOUNCE: siempre activo (mínimo 1s) para agrupar mensajes rápidos del mismo usuario
+      // DEBOUNCE: esperar sin escribir nada en Firestore para evitar race conditions
       if (!isCopiloto) {
         const esperaMs = Math.max(delayRespuesta, 1) * 1000;
-        const ahoraMs = Date.now();
-        await convRef.doc(convId).update({
-          ultimaActividadClienteEl: ahoraMs
-        });
-
-        console.log(`[DEBOUNCE-WA] Iniciando espera de ${esperaMs / 1000}s para la conversación WA ${convId}...`);
+        console.log(`[DEBOUNCE-WA] Esperando ${esperaMs / 1000}s para conversación WA ${convId}...`);
         await new Promise(resolve => setTimeout(resolve, esperaMs));
-
-        const freshConvDoc = await convRef.doc(convId).get();
-        const freshConvData = freshConvDoc.data();
-
-        if (freshConvData?.ultimaActividadClienteEl !== ahoraMs) {
-          console.log(`[DEBOUNCE-WA] Cancelando respuesta para este hilo en ${convId}. Llegó otro mensaje posterior.`);
-          return;
-        }
-        console.log(`[DEBOUNCE-WA] Tiempo cumplido. Es el último mensaje. Procesando...`);
       }
 
-      // Obtener mensajes de historial actualizados
+      // Leer historial actualizado (usado para debounce check y agrupación)
       const historialSnap = await convRef.doc(convId)
         .collection(COLLECTIONS.MENSAJES)
         .orderBy('creadoEl', 'desc')
@@ -1179,7 +1167,17 @@ export async function procesarMensajeWhatsapp(value: any, wabaId: string) {
 
       const msgDocs = historialSnap.docs.reverse();
 
-      // AGRUPACIÓN INTELIGENTE: agrupar mensajes consecutivos del usuario al final de la conversación
+      // DEBOUNCE CHECK: si llegó un mensaje más reciente, este hilo cancela
+      if (!isCopiloto) {
+        const ultimoMsgUsuario = [...msgDocs].reverse().find(d => d.data().from === 'user');
+        if (!ultimoMsgUsuario || ultimoMsgUsuario.id !== savedMsgIdWA) {
+          console.log(`[DEBOUNCE-WA] Cancelando hilo ${savedMsgIdWA}. El último mensaje es ${ultimoMsgUsuario?.id}.`);
+          return;
+        }
+        console.log(`[DEBOUNCE-WA] Confirmado último mensaje. Procesando...`);
+      }
+
+      // AGRUPACIÓN INTELIGENTE: agrupar mensajes consecutivos del usuario al final
       let textoProcesar = textoMensaje;
 
       if (!isCopiloto) {
