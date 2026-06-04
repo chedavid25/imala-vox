@@ -116,11 +116,13 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recursos, setRecursos] = useState<(RecursoConocimiento & { id: string })[]>([]);
-  
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const pendingRef = useRef(0);
+  const messagesRef = useRef<Message[]>([]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -142,6 +144,10 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
     });
     return () => unsub();
   }, [wsId]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   // Auto-scroll al final cuando hay mensajes nuevos
   useEffect(() => {
@@ -180,113 +186,80 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
     reader.onerror = error => reject(error);
   });
 
-  const handleSend = async (e?: React.FormEvent) => {
+  const handleSend = async (e?: React.FormEvent<HTMLFormElement>) => {
     e?.preventDefault();
     if (!input.trim() && !selectedFile) return;
 
     const userMessage = input.trim();
+    const historySnapshot = messagesRef.current;
+
     setInput("");
     setError(null);
 
-    let fileAttach = undefined;
-    let localMsgAttachment = undefined;
+    let fileAttach: { name: string; type: string; base64: string } | undefined;
+    let localMsgAttachment: Message["attachment"] | undefined;
 
     if (selectedFile) {
       try {
         const base64 = await toBase64(selectedFile);
-        fileAttach = {
-          name: selectedFile.name,
-          type: selectedFile.type,
-          base64: base64
-        };
-        localMsgAttachment = {
-          name: selectedFile.name,
-          type: selectedFile.type,
-          base64: base64,
-          previewUrl: filePreviewUrl || undefined
-        };
-      } catch (err) {
+        fileAttach = { name: selectedFile.name, type: selectedFile.type, base64 };
+        localMsgAttachment = { name: selectedFile.name, type: selectedFile.type, base64, previewUrl: filePreviewUrl || undefined };
+      } catch {
         toast.error("Error al procesar el archivo adjunto.");
         return;
       }
     }
 
-    // Limpiar estado de archivo
     setSelectedFile(null);
     setFilePreviewUrl(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
-    
-    // Enfocar input inmediatamente para poder seguir escribiendo sin interrupciones
-    setTimeout(() => {
-      inputRef.current?.focus();
-    }, 50);
+    setTimeout(() => inputRef.current?.focus(), 50);
 
     const newMsg: Message = { role: "user", content: userMessage, attachment: localMsgAttachment };
-    
-    // Usar callback funcional para asegurar la correcta lectura del historial actualizado
-    setMessages((prev) => {
-      const updatedMessages = [...prev, newMsg];
-      
-      // Lanzar el procesamiento en segundo plano con el historial más actual
-      (async () => {
-        setIsTyping(true);
-        try {
-          const mappedHistory = prev.map(({ role, content, attachment }) => {
-            const isImage = attachment?.type.startsWith("image/");
-            return {
-              role,
-              content,
-              attachment: attachment ? {
-                name: attachment.name,
-                type: attachment.type,
-                base64: isImage ? attachment.base64 : ""
-              } : undefined
-            };
-          });
+    setMessages((prev) => [...prev, newMsg]);
 
-          const result = await chatPlaygroundAction(
-            wsId,
-            agentId,
-            userMessage,
-            mappedHistory.slice(-10),
-            fileAttach
-          );
+    pendingRef.current++;
+    setIsTyping(true);
 
-          if (result.success && result.reply) {
-            if (result.userMessageConsolidated) {
-              setMessages((prevAll) => {
-                const updated = [...prevAll];
-                const lastUserIdx = updated.findLastIndex((m) => m.role === "user" && m.content === userMessage);
-                if (lastUserIdx !== -1) {
-                  updated[lastUserIdx] = {
-                    ...updated[lastUserIdx],
-                    content: result.userMessageConsolidated!,
-                    attachment: updated[lastUserIdx].attachment
-                      ? {
-                          ...updated[lastUserIdx].attachment!,
-                          base64: "" // Limpiar base64 en local una vez procesado
-                        }
-                      : undefined
-                  };
-                }
-                return [...updated, { role: "assistant", content: result.reply! }];
-              });
-            } else {
-              setMessages((prevAll) => [...prevAll, { role: "assistant", content: result.reply! }]);
+    try {
+      const mappedHistory = historySnapshot.map(({ role, content, attachment }) => {
+        const isImage = attachment?.type.startsWith("image/");
+        return {
+          role,
+          content,
+          attachment: attachment ? { name: attachment.name, type: attachment.type, base64: isImage ? attachment.base64 : "" } : undefined
+        };
+      });
+
+      const result = await chatPlaygroundAction(wsId, agentId, userMessage, mappedHistory.slice(-10), fileAttach);
+
+      if (result.success && result.reply) {
+        if (result.userMessageConsolidated) {
+          setMessages((prevAll) => {
+            const updated = [...prevAll];
+            const lastUserIdx = updated.findLastIndex((m) => m.role === "user" && m.content === userMessage);
+            if (lastUserIdx !== -1) {
+              updated[lastUserIdx] = {
+                ...updated[lastUserIdx],
+                content: result.userMessageConsolidated!,
+                attachment: updated[lastUserIdx].attachment ? { ...updated[lastUserIdx].attachment!, base64: "" } : undefined
+              };
             }
-          } else {
-            setError(result.error || "La IA no pudo responder.");
-          }
-        } catch (err: any) {
-          console.error("Error al enviar mensaje a la IA:", err);
-          setError(`Error de conexión con el motor de IA: ${err?.message || String(err)}`);
-        } finally {
-          setIsTyping(false);
+            return [...updated, { role: "assistant", content: result.reply! }];
+          });
+        } else {
+          setMessages((prevAll) => [...prevAll, { role: "assistant", content: result.reply! }]);
         }
-      })();
-
-      return updatedMessages;
-    });
+      } else {
+        setError(result.error || "La IA no pudo responder.");
+      }
+    } catch (err: any) {
+      console.error("Error al enviar mensaje a la IA:", err);
+      setError(`Error de conexión con el motor de IA: ${err?.message || String(err)}`);
+    } finally {
+      pendingRef.current--;
+      if (pendingRef.current === 0) setIsTyping(false);
+    }
   };
 
   const clearChat = () => {
