@@ -801,12 +801,12 @@ async function procesarMediaEntranteWA(
     let dlRes: Response;
     if (directUrl) {
       // 360dialog: el webhook entrega directUrl (un lookaside.fbsbx.com temporal).
-      // Para descargarlo, debemos autenticarnos contra Meta usando la D360-API-KEY del workspace,
-      // enviando el token en el header 'D360-API-KEY'. Además, Meta exige User-Agent para no rechazar con 404/500.
+      // Para descargar de lookaside.fbsbx.com, se requiere Authorization Bearer con el token de Meta (que en 360dialog es su API key/token).
+      // Además, Meta exige User-Agent para no rechazar con 404/500/401.
       console.log(`[WA-MEDIA] Descargando desde directUrl temporal de 360dialog: ${directUrl}`);
       dlRes = await fetch(directUrl, {
         headers: { 
-          'D360-API-KEY': accessToken,
+          'Authorization': `Bearer ${accessToken}`,
           'User-Agent': 'curl/7.64.1'
         }
       });
@@ -824,7 +824,7 @@ async function procesarMediaEntranteWA(
             console.log(`[WA-MEDIA] Nueva URL fresca de lookaside obtenida: ${info.url}`);
             dlRes = await fetch(info.url, {
               headers: { 
-                'D360-API-KEY': accessToken,
+                'Authorization': `Bearer ${accessToken}`,
                 'User-Agent': 'curl/7.64.1'
               }
             });
