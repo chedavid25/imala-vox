@@ -12,11 +12,13 @@ interface MobileTaskListProps {
   onUpdate: (taskId: string, updates: Partial<TareaCRM>) => void;
   onEdit: (task: TareaCRM) => void;
   onNewTask: () => void;
+  leads?: any[];
+  onOpenLeadDetail?: (leadId: string) => void;
 }
 
 type FilterType = 'hoy' | 'semana' | 'atrasadas' | 'completadas' | 'todas';
 
-export function MobileTaskList({ tareas, onUpdate, onEdit, onNewTask }: MobileTaskListProps) {
+export function MobileTaskList({ tareas, onUpdate, onEdit, onNewTask, leads = [], onOpenLeadDetail }: MobileTaskListProps) {
   const { contactos } = useContactos();
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterType>("hoy");
@@ -55,7 +57,8 @@ export function MobileTaskList({ tareas, onUpdate, onEdit, onNewTask }: MobileTa
   const TaskItem = ({ task }: { task: TareaCRM }) => {
     const isOverdue = isBefore(new Date(`${task.fecha}T${task.hora || '00:00'}:00`), now) && task.estado !== 'completada';
     const associatedContact = task.contactoId ? contactos.find(c => c.id === task.contactoId) : null;
-    
+    const associatedLead = leads.find(l => l.id === task.leadId || (task.contactoId && l.contactoId === task.contactoId));
+
     return (
       <div 
         onClick={() => onEdit(task)}
@@ -122,14 +125,25 @@ export function MobileTaskList({ tareas, onUpdate, onEdit, onNewTask }: MobileTa
              </div>
           </div>
 
-          {associatedContact && (
+          {associatedLead ? (
+            <div className="flex items-center gap-2 pt-1 border-t border-slate-50 mt-1">
+              <button 
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onOpenLeadDetail?.(associatedLead.id); }}
+                className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 bg-emerald-50/50 px-2 py-1 rounded-lg hover:underline cursor-pointer"
+              >
+                <User size={12} className="shrink-0 text-emerald-500" />
+                <span className="truncate">{associatedLead.nombre} (Lead)</span>
+              </button>
+            </div>
+          ) : associatedContact ? (
             <div className="flex items-center gap-2 pt-1 border-t border-slate-50 mt-1">
               <div className="flex items-center gap-1.5 text-[10px] font-bold text-indigo-600 bg-indigo-50/50 px-2 py-1 rounded-lg">
                 <User size={12} className="shrink-0" />
                 <span className="truncate">{associatedContact.nombre}</span>
               </div>
             </div>
-          )}
+          ) : null}
         </div>
 
         <button className="p-1 text-slate-300 mt-0.5">

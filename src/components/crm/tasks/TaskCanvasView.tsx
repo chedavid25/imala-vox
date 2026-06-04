@@ -30,6 +30,8 @@ interface TaskCanvasViewProps {
   onTaskUpdate: (taskId: string, updates: Partial<TareaCRM>) => void;
   onEdit: (task: TareaCRM) => void;
   onDelete: (id: string) => void;
+  leads?: any[];
+  onOpenLeadDetail?: (leadId: string) => void;
 }
 
 interface ColumnProps {
@@ -41,6 +43,8 @@ interface ColumnProps {
   onEdit: (task: TareaCRM) => void;
   onDelete: (id: string) => void;
   color: string;
+  leads?: any[];
+  onOpenLeadDetail?: (leadId: string) => void;
 }
 
 function SortableTaskCard(props: any) {
@@ -71,7 +75,7 @@ function SortableTaskCard(props: any) {
   );
 }
 
-function KanbanColumn({ id, title, tasks, contactos, onUpdate, onEdit, onDelete, color }: ColumnProps) {
+function KanbanColumn({ id, title, tasks, contactos, onUpdate, onEdit, onDelete, color, leads, onOpenLeadDetail }: ColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id });
 
   return (
@@ -102,6 +106,8 @@ function KanbanColumn({ id, title, tasks, contactos, onUpdate, onEdit, onDelete,
               onUpdate={onUpdate}
               onEdit={onEdit}
               onDelete={onDelete}
+              leads={leads}
+              onOpenLeadDetail={onOpenLeadDetail}
             />
           ))}
           {tasks.length === 0 && (
@@ -121,7 +127,9 @@ export function TaskCanvasView({
   grouping, 
   onTaskUpdate, 
   onEdit, 
-  onDelete 
+  onDelete,
+  leads = [],
+  onOpenLeadDetail
 }: TaskCanvasViewProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
 
@@ -235,6 +243,8 @@ export function TaskCanvasView({
                 onUpdate={onTaskUpdate}
                 onEdit={onEdit}
                 onDelete={onDelete}
+                leads={leads}
+                onOpenLeadDetail={onOpenLeadDetail}
               />
           ))}
         </div>
@@ -254,6 +264,8 @@ export function TaskCanvasView({
               onEdit={() => {}} 
               onDelete={() => {}} 
               compact 
+              leads={leads}
+              onOpenLeadDetail={onOpenLeadDetail}
             />
           </div>
         ) : null}

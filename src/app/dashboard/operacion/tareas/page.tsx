@@ -16,9 +16,11 @@ import {
   getDoc,
   setDoc,
   Timestamp, 
-  deleteDoc 
+  deleteDoc,
+  serverTimestamp,
+  getDocs
 } from "firebase/firestore";
-import { COLLECTIONS, TareaCRM, Contacto } from "@/lib/types/firestore";
+import { COLLECTIONS, TareaCRM, Contacto, Lead, EtapaEmbudo } from "@/lib/types/firestore";
 import { 
   Plus, 
   Search, 
@@ -75,6 +77,8 @@ import { TaskCalendarView } from "@/components/crm/tasks/TaskCalendarView";
 import { ModalNuevaTarea } from "@/components/crm/tasks/ModalNuevaTarea";
 import { useMobileLayout } from "@/hooks/useMobileLayout";
 import { MobileTaskList } from "@/components/mobile/crm/MobileTaskList";
+import { useRouter } from "next/navigation";
+import { LeadDetailContent } from "../leads/page";
 
 type FilterType = 'hoy' | 'semana' | 'mes' | 'atrasadas' | 'completadas' | 'todas';
 
@@ -93,6 +97,123 @@ export default function TareasPage() {
   const [canvasGrouping, setCanvasGrouping] = useState<'prioridad' | 'estado'>('estado');
   const [calendarView, setCalendarView] = useState<'month' | 'week' | 'day'>('month');
   
+  const router = useRouter();
+  const [leads, setLeads] = useState<(Lead & { id: string })[]>([]);
+  const [etapas, setEtapas] = useState<(EtapaEmbudo & { id: string })[]>([]);
+  const [categorias, setCategorias] = useState<any[]>([]);
+  const [todasEtiquetas, setTodasEtiquetas] = useState<any[]>([]);
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [converting, setConverting] = useState(false);
+  const [duplicateModal, setDuplicateModal] = useState<any>(null);
+
+  // Lead seleccionado derivado (para reactividad total)
+  const selectedLead = useMemo(() => 
+    leads.find(l => l.id === selectedLeadId) || null,
+  [leads, selectedLeadId]);
+
+  // Cargar colecciones secundarias de Leads
+  useEffect(() => {
+    if (!currentWorkspaceId) return;
+
+    const unsubLeads = onSnapshot(
+      collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.LEADS),
+      (snap) => setLeads(snap.docs.map(d => ({ id: d.id, ...d.data() }) as any))
+    );
+
+    const unsubEtapas = onSnapshot(
+      collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.ETAPAS_EMBUDO),
+      (snap) => setEtapas(snap.docs.map(d => ({ id: d.id, ...d.data() }) as any).sort((a: any, b: any) => a.orden - b.orden))
+    );
+
+    const unsubCats = onSnapshot(
+      collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CATEGORIAS_CRM),
+      (snap) => setCategorias(snap.docs.map(d => ({ id: d.id, ...d.data() }) as any).sort((a: any, b: any) => a.orden - b.orden))
+    );
+
+    const unsubTags = onSnapshot(
+      collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.ETIQUETAS_CRM),
+      (snap) => setTodasEtiquetas(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    );
+
+    return () => { unsubLeads(); unsubEtapas(); unsubCats(); unsubTags(); };
+  }, [currentWorkspaceId]);
+
+  // Funciones de interacción con leads
+  const handleUpdateLeadField = async (leadId: string, field: string, value: any) => {
+    if (!currentWorkspaceId) return;
+    try {
+      const leadRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.LEADS, leadId);
+      await updateDoc(leadRef, {
+        [field]: value,
+        actualizadoEl: serverTimestamp()
+      });
+    } catch (err) {
+      toast.error("Error al guardar cambios del lead");
+    }
+  };
+
+  const handleConvertLead = async (lead: Lead & { id: string }) => {
+    if (!currentWorkspaceId || converting) return;
+    setConverting(true);
+    const toastId = toast.loading("Convirtiendo lead a contacto CRM...");
+    try {
+      const contactoRef = await addDoc(
+        collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS),
+        {
+          nombre: lead.nombre,
+          email: lead.email,
+          telefono: lead.telefono,
+          etiquetas: lead.origen === 'meta_ads' ? ['lead-meta-ads'] : ['lead-organico'],
+          leadOrigenId: lead.id,
+          origenCampana: lead.campana || null,
+          origenFormulario: lead.formulario || null,
+          camposFormulario: lead.camposFormulario || {},
+          notas: lead.notas || '',
+          creadoEl: serverTimestamp(),
+        }
+      );
+      await updateDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.LEADS, lead.id), {
+        convertidoAContacto: true,
+        contactoId: contactoRef.id,
+        actualizadoEl: serverTimestamp()
+      });
+      toast.success("Lead convertido a contacto CRM", {
+        id: toastId,
+        action: { label: "Ver contacto →", onClick: () => router.push(`/dashboard/operacion/contactos`) },
+        duration: 6000,
+      });
+      setSelectedLeadId(null);
+    } catch (err) {
+      console.error("Error al convertir lead:", err);
+      toast.error("Error al convertir el lead", { id: toastId });
+    } finally {
+      setConverting(false);
+    }
+  };
+
+  const handleStartWhatsApp = (lead: Lead) => {
+    if (!lead.telefono) {
+      toast.error("Este lead no tiene número de teléfono");
+      return;
+    }
+    if (lead.contactoId) {
+      window.location.href = `/dashboard/operacion/inbox?contactoId=${lead.contactoId}`;
+    } else {
+      toast.info("Primero debes convertir el lead a contacto para iniciar una conversación.");
+    }
+  };
+
+  const handleDeleteLead = async (leadId: string) => {
+    if (!currentWorkspaceId || !confirm("¿Estás seguro de que deseas eliminar este lead?")) return;
+    try {
+      await deleteDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.LEADS, leadId));
+      toast.success("Lead eliminado correctamente");
+      setSelectedLeadId(null);
+    } catch (err) {
+      toast.error("Error al eliminar el lead");
+    }
+  };
+
   // Estado para nueva tarea / edición
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [editingTask, setEditingTask] = useState<TareaCRM | null>(null);
@@ -186,6 +307,8 @@ export default function TareasPage() {
       {isMobile ? (
         <MobileTaskList 
           tareas={tareas}
+          leads={leads}
+          onOpenLeadDetail={setSelectedLeadId}
           onUpdate={handleQuickUpdate}
           onEdit={(t) => { setEditingTask(t); setIsAddingTask(true); }}
           onNewTask={() => { setEditingTask(null); setIsAddingTask(true); }}
@@ -319,6 +442,8 @@ export default function TareasPage() {
                           onUpdate={handleQuickUpdate}
                           onEdit={(t) => { setEditingTask(t); setIsAddingTask(true); }}
                           onDelete={handleDelete}
+                          leads={leads}
+                          onOpenLeadDetail={setSelectedLeadId}
                         />
                       ))
                     ) : (
@@ -339,6 +464,8 @@ export default function TareasPage() {
                   onTaskUpdate={handleQuickUpdate}
                   onEdit={(t) => { setEditingTask(t); setIsAddingTask(true); }}
                   onDelete={handleDelete}
+                  leads={leads}
+                  onOpenLeadDetail={setSelectedLeadId}
                 />
               ) : (
                 <TaskCalendarView 
@@ -366,6 +493,32 @@ export default function TareasPage() {
         initialDate={initialDate}
         onSuccess={() => setInitialDate(undefined)}
       />
+
+      {/* PANEL DE DETALLE DE LEAD */}
+      {selectedLeadId && (
+        <div className="fixed inset-0 z-[100] flex justify-end">
+          <div 
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300" 
+            onClick={() => setSelectedLeadId(null)}
+          />
+          <div className="relative w-full max-w-[480px] h-full bg-white shadow-2xl animate-in slide-in-from-right duration-500 overflow-y-auto custom-scrollbar">
+            {selectedLead && (
+              <LeadDetailContent 
+                lead={selectedLead} 
+                etapas={etapas} 
+                categorias={categorias}
+                todasEtiquetas={todasEtiquetas}
+                onClose={() => setSelectedLeadId(null)}
+                onConvert={() => handleConvertLead(selectedLead)}
+                onWhatsApp={() => handleStartWhatsApp(selectedLead)}
+                onUpdateField={(field: string, val: any) => selectedLead && handleUpdateLeadField(selectedLead.id, field, val)}
+                onDelete={() => selectedLead && handleDeleteLead(selectedLead.id)}
+                converting={converting}
+              />
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 }

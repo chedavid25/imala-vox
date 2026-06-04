@@ -33,6 +33,8 @@ interface TaskCardProps {
   onEdit: (task: TareaCRM) => void;
   onDelete: (id: string) => void;
   compact?: boolean;
+  leads?: any[];
+  onOpenLeadDetail?: (leadId: string) => void;
   // Props para DND
   dragHandleProps?: {
     attributes?: any;
@@ -47,9 +49,12 @@ export function TaskCard({
   onEdit, 
   onDelete,
   compact = false,
+  leads = [],
+  onOpenLeadDetail,
   dragHandleProps
 }: TaskCardProps) {
   const linkedContact = contactos.find(c => (c.id === task.contactoId || (c as any).id === task.contactoId));
+  const linkedLead = leads.find(l => l.id === task.leadId || (task.contactoId && l.contactoId === task.contactoId));
   
   // Lógica de atraso por fecha y HORA
   const now = new Date();
@@ -144,12 +149,21 @@ export function TaskCard({
                     {task.hora}
                  </div>
                )}
-               {linkedContact && (
+               {linkedLead ? (
+                 <button
+                   type="button"
+                   onClick={(e) => { e.stopPropagation(); onOpenLeadDetail?.(linkedLead.id); }}
+                   className="flex items-center gap-1.5 border-l border-[var(--border-light)] pl-3 text-emerald-600 font-bold hover:underline cursor-pointer truncate max-w-[120px]"
+                 >
+                    <User className="size-3.5 opacity-60 text-emerald-500" />
+                    {linkedLead.nombre.split(' ')[0]} (Lead)
+                 </button>
+               ) : linkedContact ? (
                  <div className="flex items-center gap-1.5 border-l border-[var(--border-light)] pl-3 text-indigo-600 font-bold truncate max-w-[120px]">
                     <User className="size-3.5 opacity-60" />
                     {linkedContact.nombre.split(' ')[0]}
                  </div>
-               )}
+               ) : null}
             </div>
           )}
        </div>

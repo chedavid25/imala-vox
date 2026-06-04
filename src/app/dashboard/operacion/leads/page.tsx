@@ -1295,7 +1295,7 @@ function LeadCard({ lead, onClick }: { lead: Lead & { id: string }, onClick: () 
   );
 }
 
-function LeadDetailContent({ 
+export function LeadDetailContent({ 
   lead, 
   etapas, 
   categorias, 
@@ -1340,6 +1340,7 @@ function LeadDetailContent({
         completada: false,
         estado: 'pendiente',
         contactoId: lead.contactoId || null,
+        leadId: lead.id || null,
         recurrencia: {
           tipo: 'ninguna',
           config: { diasSemana: [], intervaloDias: 1 }

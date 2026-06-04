@@ -100,6 +100,7 @@ export interface TareaCRM {
   completada: boolean;
   estado?: 'pendiente' | 'proceso' | 'completada'; // Nuevo sistema de estados
   contactoId?: string | null;      // Opcional
+  leadId?: string | null;          // Opcional
   recurrencia?: {
     tipo: 'diaria' | 'semanal' | 'intervalo' | 'ninguna';
     config?: {
