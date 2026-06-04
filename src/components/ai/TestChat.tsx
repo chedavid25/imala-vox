@@ -181,7 +181,7 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
 
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if ((!input.trim() && !selectedFile) || isTyping) return;
+    if (!input.trim() && !selectedFile) return;
 
     const userMessage = input.trim();
     setInput("");
@@ -216,62 +216,71 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
     if (fileInputRef.current) fileInputRef.current.value = "";
 
     const newMsg: Message = { role: "user", content: userMessage, attachment: localMsgAttachment };
-    setMessages((prev) => [...prev, newMsg]);
-    setIsTyping(true);
-
-    try {
-      const mappedHistory = messages.map(({ role, content, attachment }) => {
-        const isImage = attachment?.type.startsWith("image/");
-        return {
-          role,
-          content,
-          attachment: attachment ? {
-            name: attachment.name,
-            type: attachment.type,
-            base64: isImage ? attachment.base64 : ""
-          } : undefined
-        };
-      });
-
-      const result = await chatPlaygroundAction(
-        wsId,
-        agentId,
-        userMessage,
-        mappedHistory.slice(-10),
-        fileAttach
-      );
-
-      if (result.success && result.reply) {
-        if (result.userMessageConsolidated) {
-          setMessages((prev) => {
-            const updated = [...prev];
-            const lastUserIdx = updated.findLastIndex((m) => m.role === "user");
-            if (lastUserIdx !== -1) {
-              updated[lastUserIdx] = {
-                ...updated[lastUserIdx],
-                content: result.userMessageConsolidated!,
-                attachment: updated[lastUserIdx].attachment
-                  ? {
-                      ...updated[lastUserIdx].attachment!,
-                      base64: "" // Limpiar base64 en local una vez procesado
-                    }
-                  : undefined
-              };
-            }
-            return [...updated, { role: "assistant", content: result.reply! }];
+    
+    // Usar callback funcional para asegurar la correcta lectura del historial actualizado
+    setMessages((prev) => {
+      const updatedMessages = [...prev, newMsg];
+      
+      // Lanzar el procesamiento en segundo plano con el historial más actual
+      (async () => {
+        setIsTyping(true);
+        try {
+          const mappedHistory = prev.map(({ role, content, attachment }) => {
+            const isImage = attachment?.type.startsWith("image/");
+            return {
+              role,
+              content,
+              attachment: attachment ? {
+                name: attachment.name,
+                type: attachment.type,
+                base64: isImage ? attachment.base64 : ""
+              } : undefined
+            };
           });
-        } else {
-          setMessages((prev) => [...prev, { role: "assistant", content: result.reply! }]);
+
+          const result = await chatPlaygroundAction(
+            wsId,
+            agentId,
+            userMessage,
+            mappedHistory.slice(-10),
+            fileAttach
+          );
+
+          if (result.success && result.reply) {
+            if (result.userMessageConsolidated) {
+              setMessages((prevAll) => {
+                const updated = [...prevAll];
+                const lastUserIdx = updated.findLastIndex((m) => m.role === "user" && m.content === userMessage);
+                if (lastUserIdx !== -1) {
+                  updated[lastUserIdx] = {
+                    ...updated[lastUserIdx],
+                    content: result.userMessageConsolidated!,
+                    attachment: updated[lastUserIdx].attachment
+                      ? {
+                          ...updated[lastUserIdx].attachment!,
+                          base64: "" // Limpiar base64 en local una vez procesado
+                        }
+                      : undefined
+                  };
+                }
+                return [...updated, { role: "assistant", content: result.reply! }];
+              });
+            } else {
+              setMessages((prevAll) => [...prevAll, { role: "assistant", content: result.reply! }]);
+            }
+          } else {
+            setError(result.error || "La IA no pudo responder.");
+          }
+        } catch (err: any) {
+          console.error("Error al enviar mensaje a la IA:", err);
+          setError(`Error de conexión con el motor de IA: ${err?.message || String(err)}`);
+        } finally {
+          setIsTyping(false);
         }
-      } else {
-        setError(result.error || "La IA no pudo responder.");
-      }
-    } catch (err: any) {
-      console.error("Error al enviar mensaje a la IA:", err);
-      setError(`Error de conexión con el motor de IA: ${err?.message || String(err)}`);
-    } finally {
-      setIsTyping(false);
-    }
+      })();
+
+      return updatedMessages;
+    });
   };
 
   const clearChat = () => {
@@ -439,7 +448,6 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
             variant="ghost"
             size="icon"
             onClick={() => fileInputRef.current?.click()}
-            disabled={isTyping}
             className="w-11 h-11 rounded-xl text-[var(--text-tertiary-light)] hover:text-[var(--text-primary-light)] hover:bg-[var(--bg-input)] shrink-0 transition-all border border-[var(--border-light)]"
           >
             <Paperclip className="w-4 h-4" />
@@ -448,17 +456,16 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
           <Input 
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            disabled={isTyping}
             placeholder={selectedFile ? "Añadir un mensaje sobre el archivo..." : "Haz una pregunta técnica..."}
             className="flex-1 bg-[var(--bg-input)] border-none rounded-2xl h-12 pr-12 focus-visible:ring-1 focus-visible:ring-[var(--accent)]/50 transition-all shadow-inner"
           />
           <Button 
-            disabled={(!input.trim() && !selectedFile) || isTyping}
+            disabled={!input.trim() && !selectedFile}
             type="submit"
             size="icon"
             className="absolute right-1 w-10 h-10 rounded-xl bg-[var(--accent)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)] transition-all shadow-lg shadow-[var(--accent)]/20"
           >
-            {isTyping ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            <Send className="w-4 h-4" />
           </Button>
         </form>
       </div>
