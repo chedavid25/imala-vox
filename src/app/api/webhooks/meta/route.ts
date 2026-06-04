@@ -653,18 +653,17 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
       
       const isCopiloto = convData?.modoIA === 'copiloto' || modoAgenteDefault === 'copiloto';
 
-      // SI DELAY > 0 Y NO ES COPILOTO -> DEBOUNCE
-      if (delayRespuesta > 0 && !isCopiloto) {
+      // DEBOUNCE: siempre activo (mínimo 1s) para agrupar mensajes rápidos del mismo usuario
+      if (!isCopiloto) {
+        const esperaMs = Math.max(delayRespuesta, 1) * 1000;
         const ahoraMs = Date.now();
-        // Guardar el timestamp actual en el documento de la conversación para el control del Debounce
         await convRef.doc(convId).update({
           ultimaActividadClienteEl: ahoraMs
         });
 
-        console.log(`[DEBOUNCE-META] Iniciando espera de ${delayRespuesta} segundos para la conversación ${convId}...`);
-        await new Promise(resolve => setTimeout(resolve, delayRespuesta * 1000));
+        console.log(`[DEBOUNCE-META] Iniciando espera de ${esperaMs / 1000}s para la conversación ${convId}...`);
+        await new Promise(resolve => setTimeout(resolve, esperaMs));
 
-        // Re-leer conversación
         const freshConvDoc = await convRef.doc(convId).get();
         const freshConvData = freshConvDoc.data();
 
@@ -681,21 +680,19 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
           .orderBy('creadoEl', 'desc')
           .limit(30)
           .get();
-          
+
       const msgDocs = historialSnap.docs.reverse();
 
-      // AGRUPACIÓN INTELIGENTE: Si delayRespuesta > 0 y no es copiloto, agrupar todos los mensajes consecutivos del usuario al final de la conversación
+      // AGRUPACIÓN INTELIGENTE: agrupar mensajes consecutivos del usuario al final de la conversación
       let textoProcesar = textoMensajeMeta;
-      
-      if (delayRespuesta > 0 && !isCopiloto) {
+
+      if (!isCopiloto) {
         const mensajesUsuarioConsecutivos: string[] = [];
-        // Recorrer de atrás hacia adelante para encontrar los mensajes consecutivos de 'user'
         for (let i = msgDocs.length - 1; i >= 0; i--) {
           const mData = msgDocs[i].data();
           if (mData.from === 'user') {
             mensajesUsuarioConsecutivos.unshift(mData.text || '');
           } else {
-            // Encontró una respuesta de la IA o un agente, frenar agrupación
             break;
           }
         }
@@ -1152,18 +1149,17 @@ export async function procesarMensajeWhatsapp(value: any, wabaId: string) {
 
       const isCopiloto = convData?.modoIA === 'copiloto' || modoAgenteDefault === 'copiloto';
 
-      // SI DELAY > 0 Y NO ES COPILOTO -> DEBOUNCE
-      if (delayRespuesta > 0 && !isCopiloto) {
+      // DEBOUNCE: siempre activo (mínimo 1s) para agrupar mensajes rápidos del mismo usuario
+      if (!isCopiloto) {
+        const esperaMs = Math.max(delayRespuesta, 1) * 1000;
         const ahoraMs = Date.now();
-        // Guardar el timestamp actual en el documento de la conversación para el control del Debounce
         await convRef.doc(convId).update({
           ultimaActividadClienteEl: ahoraMs
         });
 
-        console.log(`[DEBOUNCE-WA] Iniciando espera de ${delayRespuesta} segundos para la conversación WA ${convId}...`);
-        await new Promise(resolve => setTimeout(resolve, delayRespuesta * 1000));
+        console.log(`[DEBOUNCE-WA] Iniciando espera de ${esperaMs / 1000}s para la conversación WA ${convId}...`);
+        await new Promise(resolve => setTimeout(resolve, esperaMs));
 
-        // Re-leer conversación
         const freshConvDoc = await convRef.doc(convId).get();
         const freshConvData = freshConvDoc.data();
 
@@ -1183,18 +1179,16 @@ export async function procesarMensajeWhatsapp(value: any, wabaId: string) {
 
       const msgDocs = historialSnap.docs.reverse();
 
-      // AGRUPACIÓN INTELIGENTE: Si delayRespuesta > 0 y no es copiloto, agrupar todos los mensajes consecutivos del usuario al final de la conversación
+      // AGRUPACIÓN INTELIGENTE: agrupar mensajes consecutivos del usuario al final de la conversación
       let textoProcesar = textoMensaje;
-      
-      if (delayRespuesta > 0 && !isCopiloto) {
+
+      if (!isCopiloto) {
         const mensajesUsuarioConsecutivos: string[] = [];
-        // Recorrer de atrás hacia adelante para encontrar los mensajes consecutivos de 'user'
         for (let i = msgDocs.length - 1; i >= 0; i--) {
           const mData = msgDocs[i].data();
           if (mData.from === 'user') {
             mensajesUsuarioConsecutivos.unshift(mData.text || '');
           } else {
-            // Encontró una respuesta de la IA o un agente, frenar agrupación
             break;
           }
         }

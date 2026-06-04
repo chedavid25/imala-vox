@@ -123,6 +123,9 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const pendingRef = useRef(0);
   const messagesRef = useRef<Message[]>([]);
+  const pendingQueueRef = useRef<Array<{ content: string; fileAttach?: { name: string; type: string; base64: string } }>>([]);
+  const historyForBatchRef = useRef<Message[]>([]);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -186,13 +189,83 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
     reader.onerror = error => reject(error);
   });
 
-  const handleSend = async (e?: React.FormEvent<HTMLFormElement>) => {
+  const procesarCola = async () => {
+    const cola = [...pendingQueueRef.current];
+    pendingQueueRef.current = [];
+    debounceTimerRef.current = null;
+
+    if (cola.length === 0) return;
+
+    // Historia anterior al batch actual + mensajes intermedios (todos menos el último)
+    const historyBeforeBatch = historyForBatchRef.current;
+    const lastItem = cola[cola.length - 1];
+    const middleItems = cola.slice(0, -1);
+
+    const fullHistory = [
+      ...historyBeforeBatch,
+      ...middleItems.map((item) => ({ role: "user" as const, content: item.content, attachment: undefined })),
+    ];
+
+    pendingRef.current++;
+    setIsTyping(true);
+
+    try {
+      const mappedHistory = fullHistory.map(({ role, content, attachment }) => {
+        const att = attachment as Message["attachment"] | undefined;
+        const isImage = att?.type?.startsWith("image/");
+        return {
+          role,
+          content,
+          attachment: att ? { name: att.name, type: att.type, base64: isImage ? att.base64 : "" } : undefined,
+        };
+      });
+
+      const result = await chatPlaygroundAction(wsId, agentId, lastItem.content, mappedHistory.slice(-10), lastItem.fileAttach);
+
+      if (result.success) {
+        if (result.reply) {
+          if (result.userMessageConsolidated) {
+            // El servidor consolidó los mensajes del usuario: limpiar las burbujas intermedias
+            setMessages((prevAll) => {
+              const cleanMessages: Message[] = [];
+              let groupingActive = false;
+
+              for (let i = 0; i < prevAll.length; i++) {
+                if (prevAll[i].role === "user") {
+                  if (!groupingActive) {
+                    groupingActive = true;
+                    cleanMessages.push({ ...prevAll[i], content: result.userMessageConsolidated! });
+                  }
+                  // mensajes de usuario subsecuentes del mismo batch: omitir (ya consolidados)
+                } else {
+                  groupingActive = false;
+                  cleanMessages.push(prevAll[i]);
+                }
+              }
+              return [...cleanMessages, { role: "assistant", content: result.reply! }];
+            });
+          } else {
+            setMessages((prevAll) => [...prevAll, { role: "assistant", content: result.reply! }]);
+          }
+        }
+        // reply === null → cancelado por debounce del servidor, ignorar silenciosamente
+      } else {
+        setError(result.error || "La IA no pudo responder.");
+      }
+    } catch (err: any) {
+      console.error("Error al enviar mensaje a la IA:", err);
+      setError(`Error de conexión con el motor de IA: ${err?.message || String(err)}`);
+    } finally {
+      pendingRef.current--;
+      if (pendingRef.current === 0) setIsTyping(false);
+    }
+  };
+
+  const handleSend = async (e?: { preventDefault(): void }) => {
     e?.preventDefault();
     if (!input.trim() && !selectedFile) return;
 
     const userMessage = input.trim();
-    const historySnapshot = messagesRef.current;
-
     setInput("");
     setError(null);
 
@@ -215,73 +288,30 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
     if (fileInputRef.current) fileInputRef.current.value = "";
     setTimeout(() => inputRef.current?.focus(), 50);
 
+    // Agregar mensaje a la UI inmediatamente
     const newMsg: Message = { role: "user", content: userMessage, attachment: localMsgAttachment };
     setMessages((prev) => [...prev, newMsg]);
 
-    pendingRef.current++;
-    setIsTyping(true);
-
-    try {
-      const mappedHistory = historySnapshot.map(({ role, content, attachment }) => {
-        const isImage = attachment?.type.startsWith("image/");
-        return {
-          role,
-          content,
-          attachment: attachment ? { name: attachment.name, type: attachment.type, base64: isImage ? attachment.base64 : "" } : undefined
-        };
-      });
-
-      const result = await chatPlaygroundAction(wsId, agentId, userMessage, mappedHistory.slice(-10), fileAttach);
-
-      if (result.success) {
-        if (result.reply) {
-          if (result.userMessageConsolidated) {
-            setMessages((prevAll) => {
-              const updated = [...prevAll];
-              // Consolidar todos los mensajes consecutivos del usuario eliminando los anteriores que fueron unificados
-              let firstUserIdx = -1;
-              const cleanMessages: Message[] = [];
-              
-              for (let i = 0; i < updated.length; i++) {
-                if (updated[i].role === "user") {
-                  if (firstUserIdx === -1) {
-                    firstUserIdx = cleanMessages.length;
-                    cleanMessages.push({
-                      ...updated[i],
-                      content: result.userMessageConsolidated!
-                    });
-                  }
-                  // Los mensajes subsecuentes del usuario que se unificaron no se añaden individuales
-                } else {
-                  cleanMessages.push(updated[i]);
-                  // Si hay una respuesta de asistente, reseteamos el agrupador para futuros mensajes
-                  firstUserIdx = -1;
-                }
-              }
-              return [...cleanMessages, { role: "assistant", content: result.reply! }];
-            });
-          } else {
-            setMessages((prevAll) => [...prevAll, { role: "assistant", content: result.reply! }]);
-          }
-        } else {
-          // Fue cancelado por debounce, no hacemos nada ya que el hilo posterior responderá
-          console.log("[PLAYGROUND-CHAT] Hilo de mensaje cancelado por debounce.");
-        }
-      } else {
-        setError(result.error || "La IA no pudo responder.");
-      }
-    } catch (err: any) {
-      console.error("Error al enviar mensaje a la IA:", err);
-      setError(`Error de conexión con el motor de IA: ${err?.message || String(err)}`);
-    } finally {
-      pendingRef.current--;
-      if (pendingRef.current === 0) setIsTyping(false);
+    // Si es el primer mensaje del batch, capturar el historial previo
+    if (pendingQueueRef.current.length === 0) {
+      historyForBatchRef.current = messagesRef.current;
     }
+    pendingQueueRef.current.push({ content: userMessage, fileAttach });
+
+    // Reiniciar el timer: esperar 1s sin mensajes nuevos antes de llamar a la IA
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(procesarCola, 1000);
   };
 
   const clearChat = () => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = null;
+    pendingQueueRef.current = [];
+    historyForBatchRef.current = [];
     setMessages([]);
     setError(null);
+    setIsTyping(false);
+    pendingRef.current = 0;
     setSelectedFile(null);
     setFilePreviewUrl(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
