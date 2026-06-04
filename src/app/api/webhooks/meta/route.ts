@@ -757,8 +757,8 @@ const EXT_MAP: Record<string, string> = {
 };
 
 /**
- * Descarga un adjunto de WhatsApp Cloud API y lo sube a Firebase Storage.
- * Devuelve la URL permanente y metadata, o null si falla.
+ * Descarga un adjunto de WhatsApp y lo sube a Firebase Storage.
+ * Soporta Meta Cloud API (requiere Graph API) y 360dialog (URL ya en el payload).
  */
 async function procesarMediaEntranteWA(
   mediaId: string,
@@ -766,27 +766,47 @@ async function procesarMediaEntranteWA(
   mediaType: string,
   caption: string | undefined,
   wsId: string,
-  convId: string
+  convId: string,
+  directUrl?: string,      // URL ya incluida en el payload (ej: 360dialog)
+  knownMimeType?: string   // mime_type ya incluido en el payload
 ): Promise<{ text: string; metadata: { mediaUrl: string; mediaType: string; fileName: string } } | null> {
   try {
-    // 1. Obtener URL temporal del media desde Meta Graph API
-    const infoRes = await fetch(
-      `https://graph.facebook.com/v19.0/${mediaId}?access_token=${accessToken}`
-    );
-    if (!infoRes.ok) {
-      console.error(`[WA-MEDIA] Error obteniendo info de ${mediaId}: ${infoRes.status}`);
-      return null;
-    }
-    const info = await infoRes.json() as { url?: string; mime_type?: string };
-    if (!info.url) {
-      console.error(`[WA-MEDIA] Sin URL para media ${mediaId}`);
-      return null;
+    let downloadUrl: string;
+    let mimeTypeFromApi: string | undefined;
+
+    if (directUrl) {
+      // 360dialog y proveedores que ya incluyen la URL en el webhook
+      downloadUrl = directUrl;
+      mimeTypeFromApi = knownMimeType;
+      console.log(`[WA-MEDIA] Usando URL directa del payload para media ${mediaId}`);
+    } else {
+      // Meta Cloud API: obtener URL temporal desde Graph API
+      const infoRes = await fetch(
+        `https://graph.facebook.com/v19.0/${mediaId}?access_token=${accessToken}`
+      );
+      if (!infoRes.ok) {
+        console.error(`[WA-MEDIA] Error obteniendo info de ${mediaId}: ${infoRes.status}`);
+        return null;
+      }
+      const info = await infoRes.json() as { url?: string; mime_type?: string };
+      if (!info.url) {
+        console.error(`[WA-MEDIA] Sin URL para media ${mediaId}`);
+        return null;
+      }
+      downloadUrl = info.url;
+      mimeTypeFromApi = info.mime_type;
     }
 
-    // 2. Descargar el archivo desde Meta CDN
-    const dlRes = await fetch(info.url, {
+    // Descargar el archivo — intentar con Bearer primero, luego sin prefijo (360dialog)
+    let dlRes = await fetch(downloadUrl, {
       headers: { Authorization: `Bearer ${accessToken}` }
     });
+    if (!dlRes.ok && directUrl) {
+      // 360dialog usa la API key sin "Bearer"
+      dlRes = await fetch(downloadUrl, {
+        headers: { Authorization: accessToken }
+      });
+    }
     if (!dlRes.ok) {
       console.error(`[WA-MEDIA] Error descargando ${mediaId}: ${dlRes.status}`);
       return null;
@@ -794,7 +814,7 @@ async function procesarMediaEntranteWA(
     const buffer = Buffer.from(await dlRes.arrayBuffer());
 
     // 3. Determinar extensión y tipo normalizado
-    const mimeType = info.mime_type || 'application/octet-stream';
+    const mimeType = mimeTypeFromApi || dlRes.headers.get('content-type')?.split(';')[0].trim() || 'application/octet-stream';
     const ext = EXT_MAP[mimeType] || 'bin';
     const normalizedType = ['image', 'video', 'audio'].includes(mediaType) ? mediaType : 'document';
     const fileName = `${mediaId}.${ext}`;
@@ -962,10 +982,12 @@ export async function procesarMensajeWhatsapp(value: any, wabaId: string) {
         .get();
       const waAccessToken = secretSnap.data()?.metaAccessToken;
       if (waAccessToken) {
-        const mediaObj = message[message.type] as { id?: string; caption?: string } | undefined;
+        const mediaObj = message[message.type] as { id?: string; caption?: string; url?: string; mime_type?: string } | undefined;
         if (mediaObj?.id) {
           const resultado = await procesarMediaEntranteWA(
-            mediaObj.id, waAccessToken, message.type, mediaObj.caption, wsId, convId
+            mediaObj.id, waAccessToken, message.type, mediaObj.caption, wsId, convId,
+            mediaObj.url,       // URL directa si el proveedor (ej: 360dialog) la incluye
+            mediaObj.mime_type  // mime_type si ya viene en el payload
           );
           if (resultado) {
             textoMensaje = resultado.text;
