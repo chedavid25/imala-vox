@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { ContactTable } from "@/components/crm/ContactTable";
 import { CSVImporter } from "@/components/crm/CSVImporter";
 import { VCFImporter } from "@/components/crm/VCFImporter";
@@ -41,6 +41,9 @@ export default function ContactosPage() {
   const isMobile = useMobileLayout();
   const { contactos, loading: loadingContacts } = useContactos();
   const { currentWorkspaceId } = useWorkspaceStore();
+  
+  const csvInputRef = useRef<HTMLInputElement>(null);
+  const vcfInputRef = useRef<HTMLInputElement>(null);
   
   const [categories, setCategories] = useState<CategoriaCRM[]>([]);
   const [tags, setTags] = useState<EtiquetaCRM[]>([]);
@@ -172,24 +175,26 @@ export default function ContactosPage() {
             <DropdownMenuContent align="end" className="w-[280px] bg-white border-slate-100 shadow-xl p-2 rounded-2xl z-[100]">
               <DropdownMenuLabel className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-2 py-1.5">Método de Importación</DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-slate-50" />
-              <CSVImporter 
-                onImport={handleBulkImport} 
-                triggerButton={
-                  <DropdownMenuItem className="text-[12px] font-bold py-2.5 rounded-xl cursor-pointer hover:bg-slate-50 transition-all flex items-center gap-3 select-none outline-none">
-                    📄 Google Contacts / WooCommerce (CSV)
-                  </DropdownMenuItem>
-                }
-              />
-              <VCFImporter 
-                onImport={handleBulkImport} 
-                triggerButton={
-                  <DropdownMenuItem className="text-[12px] font-bold py-2.5 rounded-xl cursor-pointer hover:bg-slate-50 transition-all flex items-center gap-3 select-none outline-none">
-                    🍏 iCloud Contacts (vCard .vcf)
-                  </DropdownMenuItem>
-                }
-              />
+              
+              <DropdownMenuItem 
+                onClick={() => csvInputRef.current?.click()}
+                className="text-[12px] font-bold py-2.5 rounded-xl cursor-pointer hover:bg-slate-50 transition-all flex items-center gap-3 select-none outline-none"
+              >
+                📄 Google Contacts / WooCommerce (CSV)
+              </DropdownMenuItem>
+
+              <DropdownMenuItem 
+                onClick={() => vcfInputRef.current?.click()}
+                className="text-[12px] font-bold py-2.5 rounded-xl cursor-pointer hover:bg-slate-50 transition-all flex items-center gap-3 select-none outline-none"
+              >
+                🍏 iCloud Contacts (vCard .vcf)
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* Componentes de Importación Invisibles */}
+          <CSVImporter onImport={handleBulkImport} inputRef={csvInputRef} />
+          <VCFImporter onImport={handleBulkImport} inputRef={vcfInputRef} />
           
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-11 px-6 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-[var(--accent)]/20 transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center">

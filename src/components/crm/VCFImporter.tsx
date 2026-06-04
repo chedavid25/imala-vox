@@ -1,17 +1,13 @@
-import React, { useRef } from "react";
-import { Button } from "@/components/ui/button";
-import { Upload } from "lucide-react";
+import React from "react";
 import { Contacto } from "@/lib/types/firestore";
 import { Timestamp } from "firebase/firestore";
 
 interface VCFImporterProps {
   onImport: (contactos: Partial<Contacto>[]) => void;
-  triggerButton?: React.ReactNode;
+  inputRef: React.RefObject<HTMLInputElement | null>;
 }
 
-export function VCFImporter({ onImport, triggerButton }: VCFImporterProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
+export function VCFImporter({ onImport, inputRef }: VCFImporterProps) {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -69,34 +65,19 @@ export function VCFImporter({ onImport, triggerButton }: VCFImporterProps) {
       });
 
       onImport(mappedContacts);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (inputRef.current) inputRef.current.value = "";
     };
 
     reader.readAsText(file);
   };
 
   return (
-    <div>
-      <input
-        type="file"
-        accept=".vcf"
-        className="hidden"
-        ref={fileInputRef}
-        onChange={handleFileChange}
-      />
-      {triggerButton ? (
-        <div onClick={() => fileInputRef.current?.click()}>{triggerButton}</div>
-      ) : (
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-9 border-[var(--border-light)] text-[var(--text-secondary-light)] hover:text-[var(--text-primary-light)]"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <Upload className="w-4 h-4 mr-2" />
-          Importar vCard (iCloud)
-        </Button>
-      )}
-    </div>
+    <input
+      type="file"
+      accept=".vcf"
+      className="hidden"
+      ref={inputRef}
+      onChange={handleFileChange}
+    />
   );
 }
