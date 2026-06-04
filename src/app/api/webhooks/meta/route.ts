@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase-admin';
+import { adminDb, adminStorage } from '@/lib/firebase-admin';
 import { Timestamp } from 'firebase-admin/firestore';
 import { COLLECTIONS } from '@/lib/types/firestore';
 import { PLAN_LIMITS } from '@/lib/planLimits';
@@ -395,14 +395,13 @@ async function fetchMetaProfile(senderId: string, accessToken: string, isInstagr
 async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagram: boolean) {
   try {
     const senderId = messagingItem.sender.id;
-    const text = messagingItem.message?.text;
-
-    if (!text) return; // Ignorar si no es texto por ahora
+    const text = messagingItem.message?.text as string | undefined;
+    const attachments = messagingItem.message?.attachments as Array<{ type: string; payload?: { url?: string } }> | undefined;
 
     // Bloquear los "echoes" (mensajes que el propio sistema/bot acaba de enviar)
-    if (messagingItem.message?.is_echo) {
-      return;
-    }
+    if (messagingItem.message?.is_echo) return;
+
+    if (!text && (!attachments || attachments.length === 0)) return;
 
     // 1. Identificar Workspace y Canal
     let canalType: 'whatsapp' | 'instagram' | 'facebook' = isInstagram ? 'instagram' : 'facebook';
@@ -511,6 +510,10 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
     const convExistente = convSnap.docs.find(d => d.data().canalId === canalId)
       || convSnap.docs[0]; // fallback: misma persona en cualquier canal
 
+    // Preview de texto para la conversación (antes de procesar adjuntos)
+    const att0 = attachments?.[0];
+    const textoPreviewMeta = text || `📎 ${att0?.type === 'image' ? 'Imagen' : att0?.type === 'video' ? 'Video' : att0?.type === 'audio' ? 'Audio' : 'Archivo'}`;
+
     if (!convExistente) {
       convId = `conv_${contactoId}_${canalId}`;
       await convRef.doc(convId).set({
@@ -519,7 +522,7 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
         canal: canalType,
         canalId,
         agenteId: canalData.agenteId || null,
-        ultimoMensaje: text,
+        ultimoMensaje: textoPreviewMeta,
         ultimaActividad: Timestamp.now(),
         unreadCount: 1,
         modoIA: 'auto',
@@ -530,7 +533,7 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
       convId = convExistente.id;
       console.log(`💬 Conversación existente: ${convId}`);
       await convRef.doc(convId).update({
-        ultimoMensaje: text,
+        ultimoMensaje: textoPreviewMeta,
         contactoNombre,
         canal: canalType,
         ultimaActividad: Timestamp.now(),
@@ -538,8 +541,53 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
       });
     }
 
-    // 4. Guardar mensaje y evitar duplicados
+    // 4. Procesar adjunto si no hay texto
+    let textoMensajeMeta = text || '';
+    let metaMsgMetadata: { mediaUrl: string; mediaType: string; fileName: string } | undefined;
+
+    if (!text && att0?.payload?.url) {
+      try {
+        const attType = att0.type === 'image' ? 'image' : att0.type === 'video' ? 'video' : att0.type === 'audio' ? 'audio' : 'document';
+        const dlRes = await fetch(att0.payload.url);
+        if (dlRes.ok) {
+          const buffer = Buffer.from(await dlRes.arrayBuffer());
+          const rawMime = (dlRes.headers.get('content-type') || 'application/octet-stream').split(';')[0].trim();
+          const ext = EXT_MAP[rawMime] || 'bin';
+          const fileName = `meta_${Date.now()}.${ext}`;
+          const token = crypto.randomUUID();
+          const bucket = adminStorage.bucket();
+          const storagePath = `workspaces/${wsId}/inbox-media/${convId}/${fileName}`;
+          await bucket.file(storagePath).save(buffer, {
+            metadata: { contentType: rawMime, metadata: { firebaseStorageDownloadTokens: token } },
+            resumable: false
+          });
+          const encodedPath = encodeURIComponent(storagePath);
+          const mediaUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodedPath}?alt=media&token=${token}`;
+          const label = attType === 'image' ? 'Imagen' : attType === 'video' ? 'Video' : attType === 'audio' ? 'Audio' : 'Archivo';
+          textoMensajeMeta = `[${label}]`;
+          metaMsgMetadata = { mediaUrl, mediaType: attType, fileName };
+          console.log(`[META-MEDIA] Adjunto ${attType} guardado: ${storagePath}`);
+        } else {
+          textoMensajeMeta = `[${att0.type}]`;
+        }
+      } catch (err) {
+        console.error('[META-MEDIA] Error procesando adjunto:', err);
+        textoMensajeMeta = `[${att0.type}]`;
+      }
+    }
+
+    if (!textoMensajeMeta) return;
+
+    // 5. Guardar mensaje y evitar duplicados
     const metaMessageId = messagingItem.message?.mid;
+    const msgPayloadMeta: Record<string, unknown> = {
+      text: textoMensajeMeta,
+      from: 'user',
+      creadoEl: Timestamp.now(),
+      visto: false
+    };
+    if (metaMsgMetadata) msgPayloadMeta.metadata = metaMsgMetadata;
+
     if (metaMessageId) {
       const msgDocRef = convRef.doc(convId).collection(COLLECTIONS.MENSAJES).doc(metaMessageId);
       const msgDocSnap = await msgDocRef.get();
@@ -547,19 +595,9 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
         console.log(`⚠️ Mensaje duplicado de Meta ignorado: ${metaMessageId}`);
         return;
       }
-      await msgDocRef.set({
-        text,
-        from: 'user',
-        creadoEl: Timestamp.now(),
-        visto: false
-      });
+      await msgDocRef.set(msgPayloadMeta);
     } else {
-      await convRef.doc(convId).collection(COLLECTIONS.MENSAJES).add({
-        text,
-        from: 'user',
-        creadoEl: Timestamp.now(),
-        visto: false
-      });
+      await convRef.doc(convId).collection(COLLECTIONS.MENSAJES).add(msgPayloadMeta);
     }
 
     // 5. Trigger IA si está habilitado
@@ -632,7 +670,7 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
            wsId,
            agenteId: canalData.agenteId,
            conversacionId: convId,
-           textoUsuario: text,
+           textoUsuario: textoMensajeMeta,
            historial,
            isCopiloto,
            contactoNombre
@@ -702,6 +740,85 @@ function esNotificacionSistemaWA(texto: string): boolean {
   return patrones.some(p => t.includes(p));
 }
 
+const EXT_MAP: Record<string, string> = {
+  'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif',
+  'video/mp4': 'mp4', 'video/3gpp': '3gp',
+  'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/aac': 'aac', 'audio/opus': 'opus',
+  'application/pdf': 'pdf',
+  'application/msword': 'doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  'application/vnd.ms-excel': 'xls',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+};
+
+/**
+ * Descarga un adjunto de WhatsApp Cloud API y lo sube a Firebase Storage.
+ * Devuelve la URL permanente y metadata, o null si falla.
+ */
+async function procesarMediaEntranteWA(
+  mediaId: string,
+  accessToken: string,
+  mediaType: string,
+  caption: string | undefined,
+  wsId: string,
+  convId: string
+): Promise<{ text: string; metadata: { mediaUrl: string; mediaType: string; fileName: string } } | null> {
+  try {
+    // 1. Obtener URL temporal del media desde Meta Graph API
+    const infoRes = await fetch(
+      `https://graph.facebook.com/v19.0/${mediaId}?access_token=${accessToken}`
+    );
+    if (!infoRes.ok) {
+      console.error(`[WA-MEDIA] Error obteniendo info de ${mediaId}: ${infoRes.status}`);
+      return null;
+    }
+    const info = await infoRes.json() as { url?: string; mime_type?: string };
+    if (!info.url) {
+      console.error(`[WA-MEDIA] Sin URL para media ${mediaId}`);
+      return null;
+    }
+
+    // 2. Descargar el archivo desde Meta CDN
+    const dlRes = await fetch(info.url, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    if (!dlRes.ok) {
+      console.error(`[WA-MEDIA] Error descargando ${mediaId}: ${dlRes.status}`);
+      return null;
+    }
+    const buffer = Buffer.from(await dlRes.arrayBuffer());
+
+    // 3. Determinar extensión y tipo normalizado
+    const mimeType = info.mime_type || 'application/octet-stream';
+    const ext = EXT_MAP[mimeType] || 'bin';
+    const normalizedType = ['image', 'video', 'audio'].includes(mediaType) ? mediaType : 'document';
+    const fileName = `${mediaId}.${ext}`;
+
+    // 4. Subir a Firebase Storage con token de descarga permanente
+    const token = crypto.randomUUID();
+    const bucket = adminStorage.bucket();
+    const storagePath = `workspaces/${wsId}/inbox-media/${convId}/${fileName}`;
+    await bucket.file(storagePath).save(buffer, {
+      metadata: {
+        contentType: mimeType,
+        metadata: { firebaseStorageDownloadTokens: token }
+      },
+      resumable: false
+    });
+    const encodedPath = encodeURIComponent(storagePath);
+    const mediaUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodedPath}?alt=media&token=${token}`;
+
+    const label = normalizedType === 'image' ? 'Imagen' : normalizedType === 'video' ? 'Video' : normalizedType === 'audio' ? 'Audio' : 'Archivo';
+    const text = caption?.trim() || `[${label}]`;
+
+    console.log(`[WA-MEDIA] Media ${normalizedType} guardado: ${storagePath}`);
+    return { text, metadata: { mediaUrl, mediaType: normalizedType, fileName } };
+  } catch (err) {
+    console.error('[WA-MEDIA] Error procesando media entrante:', err);
+    return null;
+  }
+}
+
 /**
  * Procesa mensajes entrantes de WhatsApp Cloud API.
  */
@@ -721,21 +838,27 @@ export async function procesarMensajeWhatsapp(value: any, wabaId: string) {
       return;
     }
 
-    // Solo procesar mensajes de texto con contenido real
-    if (message.type !== 'text' || !message.text?.body?.trim()) {
-      console.log(`[WA] Mensaje tipo '${message.type}' ignorado (no es texto o está vacío).`);
-      return;
-    }
+    const TIPOS_MEDIA_WA = ['image', 'video', 'document', 'audio', 'sticker'];
+    const esMedia = TIPOS_MEDIA_WA.includes(message.type);
 
-    // Ignorar textos que son notificaciones del sistema de WhatsApp
-    if (esNotificacionSistemaWA(message.text.body)) {
-      console.log(`[WA] Texto de notificación del sistema ignorado: "${message.text.body.slice(0, 80)}..."`);
+    if (message.type === 'text') {
+      if (!message.text?.body?.trim()) return;
+      if (esNotificacionSistemaWA(message.text.body)) {
+        console.log(`[WA] Texto de notificación del sistema ignorado: "${message.text.body.slice(0, 80)}..."`);
+        return;
+      }
+    } else if (!esMedia) {
+      console.log(`[WA] Mensaje tipo '${message.type}' ignorado.`);
       return;
     }
 
     const senderId = message.from;
-    const text = message.text.body;
     const contactoNombreIncoming = contact?.profile?.name || senderId;
+
+    // Preview de texto para mostrar en la lista de conversaciones
+    const textoPreview = message.type === 'text'
+      ? message.text.body
+      : `📎 ${message.type === 'image' ? 'Imagen' : message.type === 'video' ? 'Video' : message.type === 'audio' ? 'Audio' : message.type === 'sticker' ? 'Sticker' : 'Archivo'}`;
 
     // 1. Identificar Workspace y Canal (multi-workspace: usar el más reciente si hay duplicados)
     const wsQuery = await adminDb
@@ -802,7 +925,7 @@ export async function procesarMensajeWhatsapp(value: any, wabaId: string) {
         canal: 'whatsapp',
         canalId,
         agenteId: canalData.agenteId || null,
-        ultimoMensaje: text,
+        ultimoMensaje: textoPreview,
         ultimaActividad: Timestamp.now(),
         ultimoMensajeCliente: Timestamp.now(),
         unreadCount: 1,
@@ -814,7 +937,7 @@ export async function procesarMensajeWhatsapp(value: any, wabaId: string) {
       convId = convExistente.id;
       console.log(`💬 Conversación WA existente: ${convId}`);
       await convRef.doc(convId).update({
-        ultimoMensaje: text,
+        ultimoMensaje: textoPreview,
         contactoNombre,
         ultimaActividad: Timestamp.now(),
         ultimoMensajeCliente: Timestamp.now(),
@@ -822,8 +945,41 @@ export async function procesarMensajeWhatsapp(value: any, wabaId: string) {
       });
     }
 
-    // 4. Guardar mensaje y evitar duplicados
+    // 4. Descargar media si el mensaje tiene adjunto
+    let textoMensaje = message.type === 'text' ? message.text.body : textoPreview;
+    let mensajeMetadata: { mediaUrl: string; mediaType: string; fileName: string } | undefined;
+
+    if (esMedia) {
+      const secretSnap = await adminDb
+        .doc(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CANALES}/${canalId}/secrets/config`)
+        .get();
+      const waAccessToken = secretSnap.data()?.metaAccessToken;
+      if (waAccessToken) {
+        const mediaObj = message[message.type] as { id?: string; caption?: string } | undefined;
+        if (mediaObj?.id) {
+          const resultado = await procesarMediaEntranteWA(
+            mediaObj.id, waAccessToken, message.type, mediaObj.caption, wsId, convId
+          );
+          if (resultado) {
+            textoMensaje = resultado.text;
+            mensajeMetadata = resultado.metadata;
+          }
+        }
+      } else {
+        console.warn(`[WA-MEDIA] Sin token de acceso para canal ${canalId}, guardando sin URL de media`);
+      }
+    }
+
+    // 5. Guardar mensaje y evitar duplicados
     const metaMessageId = message.id;
+    const msgPayloadWA: Record<string, unknown> = {
+      text: textoMensaje,
+      from: 'user',
+      creadoEl: Timestamp.now(),
+      visto: false
+    };
+    if (mensajeMetadata) msgPayloadWA.metadata = mensajeMetadata;
+
     if (metaMessageId) {
       const msgDocRef = convRef.doc(convId).collection(COLLECTIONS.MENSAJES).doc(metaMessageId);
       const msgDocSnap = await msgDocRef.get();
@@ -831,19 +987,9 @@ export async function procesarMensajeWhatsapp(value: any, wabaId: string) {
         console.log(`⚠️ Mensaje duplicado de WhatsApp ignorado: ${metaMessageId}`);
         return;
       }
-      await msgDocRef.set({
-        text,
-        from: 'user',
-        creadoEl: Timestamp.now(),
-        visto: false
-      });
+      await msgDocRef.set(msgPayloadWA);
     } else {
-      await convRef.doc(convId).collection(COLLECTIONS.MENSAJES).add({
-        text,
-        from: 'user',
-        creadoEl: Timestamp.now(),
-        visto: false
-      });
+      await convRef.doc(convId).collection(COLLECTIONS.MENSAJES).add(msgPayloadWA);
     }
 
     // 5. Trigger IA
@@ -906,7 +1052,7 @@ export async function procesarMensajeWhatsapp(value: any, wabaId: string) {
           wsId,
           agenteId: canalData.agenteId,
           conversacionId: convId,
-          textoUsuario: text,
+          textoUsuario: textoMensaje,
           historial,
           isCopiloto,
           contactoNombre

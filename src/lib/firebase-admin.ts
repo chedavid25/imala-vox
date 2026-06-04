@@ -10,6 +10,7 @@
  */
 import { initializeApp, getApps, cert, App } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 
 function initAdminApp(): App {
   if (getApps().length > 0) {
@@ -40,6 +41,7 @@ function initAdminApp(): App {
 
     return initializeApp({
       credential: cert(serviceAccount),
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
     });
   } catch (error: any) {
     console.error("❌ Error CRÍTICO al inicializar Firebase Admin:", error.message);
@@ -49,3 +51,4 @@ function initAdminApp(): App {
 
 const adminApp = initAdminApp();
 export const adminDb = getFirestore(adminApp);
+export const adminStorage = getStorage(adminApp);
