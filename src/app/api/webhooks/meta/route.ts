@@ -800,15 +800,45 @@ async function procesarMediaEntranteWA(
     // Descargar el archivo
     let dlRes: Response;
     if (directUrl) {
-      // 360dialog: usar su API v2 con D360-API-KEY (igual que enviarMensajeAccion)
-      dlRes = await fetch(`https://waba-v2.360dialog.io/media/${mediaId}`, {
-        headers: { 'D360-API-KEY': accessToken }
+      // 360dialog: el webhook entrega directUrl (un lookaside.fbsbx.com temporal).
+      // Para descargarlo, debemos autenticarnos contra Meta usando la D360-API-KEY del workspace,
+      // enviando el token en el header 'D360-API-KEY'. Además, Meta exige User-Agent para no rechazar con 404/500.
+      console.log(`[WA-MEDIA] Descargando desde directUrl temporal de 360dialog: ${directUrl}`);
+      dlRes = await fetch(directUrl, {
+        headers: { 
+          'D360-API-KEY': accessToken,
+          'User-Agent': 'curl/7.64.1'
+        }
       });
-      console.log(`[WA-MEDIA] 360dialog media API: ${dlRes.status}`);
+      console.log(`[WA-MEDIA] 360dialog directUrl status: ${dlRes.status}`);
+
+      // Fallback: si dio error (ej. link lookaside expirado), intentar re-consultar la URL fresca usando GET /mediaId
+      if (!dlRes.ok) {
+        console.warn(`[WA-MEDIA] Falló descarga directa (${dlRes.status}). Intentando obtener URL fresca desde API 360dialog...`);
+        const infoRes = await fetch(`https://waba-v2.360dialog.io/${mediaId}`, {
+          headers: { 'D360-API-KEY': accessToken }
+        });
+        if (infoRes.ok) {
+          const info = await infoRes.json() as { url?: string };
+          if (info.url) {
+            console.log(`[WA-MEDIA] Nueva URL fresca de lookaside obtenida: ${info.url}`);
+            dlRes = await fetch(info.url, {
+              headers: { 
+                'D360-API-KEY': accessToken,
+                'User-Agent': 'curl/7.64.1'
+              }
+            });
+            console.log(`[WA-MEDIA] Descarga con URL fresca status: ${dlRes.status}`);
+          }
+        }
+      }
     } else {
       // Meta Cloud API
       dlRes = await fetch(downloadUrl, {
-        headers: { Authorization: `Bearer ${accessToken}` }
+        headers: { 
+          Authorization: `Bearer ${accessToken}`,
+          'User-Agent': 'curl/7.64.1'
+        }
       });
     }
     if (!dlRes.ok) {

@@ -255,7 +255,10 @@ export const recibirMensajeWhatsApp = functions.https.onRequest(async (req: func
                 console.log(`Descargando media de WhatsApp: ${mediaId} (${type})`);
                 const metaMediaUrl = `https://graph.facebook.com/v18.0/${mediaId}`;
                 const metaRes = await fetch(metaMediaUrl, {
-                  headers: { 'Authorization': `Bearer ${accessToken}` }
+                  headers: { 
+                    'Authorization': `Bearer ${accessToken}`,
+                    'User-Agent': 'curl/7.64.1'
+                  }
                 });
                 
                 if (metaRes.ok) {
@@ -264,7 +267,10 @@ export const recibirMensajeWhatsApp = functions.https.onRequest(async (req: func
                   
                   if (downloadUrlMeta) {
                     const mediaRes = await fetch(downloadUrlMeta, {
-                      headers: { 'Authorization': `Bearer ${accessToken}` }
+                      headers: { 
+                        'Authorization': `Bearer ${accessToken}`,
+                        'User-Agent': 'curl/7.64.1'
+                      }
                     });
                     
                     if (mediaRes.ok) {
