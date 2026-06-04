@@ -14,11 +14,12 @@ interface MobileTaskListProps {
   onNewTask: () => void;
   leads?: any[];
   onOpenLeadDetail?: (leadId: string) => void;
+  onOpenContactDetail?: (contactId: string) => void;
 }
 
 type FilterType = 'hoy' | 'semana' | 'atrasadas' | 'completadas' | 'todas';
 
-export function MobileTaskList({ tareas, onUpdate, onEdit, onNewTask, leads = [], onOpenLeadDetail }: MobileTaskListProps) {
+export function MobileTaskList({ tareas, onUpdate, onEdit, onNewTask, leads = [], onOpenLeadDetail, onOpenContactDetail }: MobileTaskListProps) {
   const { contactos } = useContactos();
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterType>("hoy");
@@ -74,7 +75,7 @@ export function MobileTaskList({ tareas, onUpdate, onEdit, onNewTask, leads = []
             "size-6 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all duration-300",
             task.estado === 'completada' 
               ? "bg-emerald-500 border-emerald-500 text-white" 
-              : task.prioridad === 'alta' ? "border-rose-400 bg-rose-50/30" : "border-slate-200 bg-white"
+               : task.prioridad === 'alta' ? "border-rose-400 bg-rose-50/30" : "border-slate-200 bg-white"
           )}
         >
           {task.estado === 'completada' && <Check size={14} strokeWidth={4} />}
@@ -110,8 +111,8 @@ export function MobileTaskList({ tareas, onUpdate, onEdit, onNewTask, leads = []
                "bg-slate-100 border-slate-200 text-slate-500"
              )}>
                 {task.estado === 'completada' ? 'Completada' : 
-                 task.estado === 'proceso' ? 'En Proceso' : 
-                 isOverdue ? 'Atrasado' : 'Pendiente'}
+                  task.estado === 'proceso' ? 'En Proceso' : 
+                  isOverdue ? 'Atrasado' : 'Pendiente'}
              </div>
 
              {/* Info de tiempo */}
@@ -138,10 +139,14 @@ export function MobileTaskList({ tareas, onUpdate, onEdit, onNewTask, leads = []
             </div>
           ) : associatedContact ? (
             <div className="flex items-center gap-2 pt-1 border-t border-slate-50 mt-1">
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-indigo-600 bg-indigo-50/50 px-2 py-1 rounded-lg">
+              <button 
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onOpenContactDetail?.(task.contactoId!); }}
+                className="flex items-center gap-1.5 text-[10px] font-bold text-indigo-600 bg-indigo-50/50 px-2 py-1 rounded-lg hover:underline cursor-pointer"
+              >
                 <User size={12} className="shrink-0" />
                 <span className="truncate">{associatedContact.nombre}</span>
-              </div>
+              </button>
             </div>
           ) : null}
         </div>

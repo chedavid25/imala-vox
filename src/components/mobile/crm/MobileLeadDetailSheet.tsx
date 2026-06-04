@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { BottomSheet } from "../shared/BottomSheet";
-import { User, Mail, Phone, Flame, Calendar, MessageCircle, ArrowRightLeft, Trash2, Hash, FileText, Edit2, Check, X, StickyNote, Loader2 } from "lucide-react";
+import { User, Mail, Phone, Flame, Calendar, MessageCircle, ArrowRightLeft, Trash2, Hash, FileText, Edit2, Check, X, StickyNote, Loader2, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,21 @@ import { doc, updateDoc, Timestamp, collection, query, orderBy, onSnapshot, addD
 import { COLLECTIONS } from "@/lib/types/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { toast } from "sonner";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger,
+  DropdownMenuPortal
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { format, addDays } from "date-fns";
 
 interface MobileLeadDetailSheetProps {
   lead: any;
@@ -30,6 +45,51 @@ export function MobileLeadDetailSheet({ lead, open, onClose, onConvert, onWhatsA
   const [notasHistorial, setNotasHistorial] = useState<any[]>([]);
   const [nuevaNota, setNuevaNota] = useState("");
   const [guardandoNota, setGuardandoNota] = useState(false);
+
+  // Recordatorios rápidos
+  const [isCustomDateOpen, setIsCustomDateOpen] = useState(false);
+  const [customDateValue, setCustomDateValue] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [creandoRecordatorio, setCreandoRecordatorio] = useState(false);
+
+  const crearTareaRecordatorio = async (fechaString: string) => {
+    if (!currentWorkspaceId || !lead) return;
+    setCreandoRecordatorio(true);
+    const toastId = toast.loading("Agendando recordatorio de contacto...");
+    try {
+      const venceEl = new Date(fechaString + "T09:00:00");
+      const tasksRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, "tareasCRM");
+      await addDoc(tasksRef, {
+        titulo: `Seguimiento Lead: ${lead.nombre}`,
+        descripcion: `Tarea de seguimiento automática programada para el lead ${lead.nombre}. Teléfono: ${lead.telefono || 'No especificado'}. Email: ${lead.email || 'No especificado'}.`,
+        fecha: fechaString,
+        hora: "09:00",
+        prioridad: 'media',
+        completada: false,
+        estado: 'pendiente',
+        contactoId: lead.contactoId || null,
+        leadId: lead.id || null,
+        recurrencia: {
+          tipo: 'ninguna',
+          config: { diasSemana: [], intervaloDias: 1 }
+        },
+        venceEl: Timestamp.fromDate(venceEl),
+        creadoEl: Timestamp.now()
+      });
+      toast.success("Tarea de seguimiento agendada en la sección Tareas", { id: toastId });
+      setIsCustomDateOpen(false);
+    } catch (error) {
+      console.error("Error al crear tarea de recordatorio:", error);
+      toast.error("Error al agendar la tarea", { id: toastId });
+    } finally {
+      setCreandoRecordatorio(false);
+    }
+  };
+
+  const handleQuickReminder = async (dias: number) => {
+    const targetDate = addDays(new Date(), dias);
+    const dateString = format(targetDate, "yyyy-MM-dd");
+    await crearTareaRecordatorio(dateString);
+  };
 
   // Cargar historial de notas
   React.useEffect(() => {
@@ -372,6 +432,34 @@ export function MobileLeadDetailSheet({ lead, open, onClose, onConvert, onWhatsA
                 <MessageCircle size={20} strokeWidth={2} /> WhatsApp
               </button>
             </div>
+
+            {/* Recordatorio de Contacto */}
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <button
+                    type="button"
+                    disabled={creandoRecordatorio}
+                    className="w-full h-14 bg-white hover:bg-slate-50 border-2 border-slate-100 rounded-2xl flex items-center justify-center gap-2 font-bold text-sm text-slate-800 shadow-sm active:scale-95 transition-all"
+                  >
+                    {creandoRecordatorio ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-amber-500" />
+                    ) : (
+                      <Clock className="w-5 h-5 text-amber-500" />
+                    )}
+                    Recordatorio de contacto
+                  </button>
+                }
+              />
+              <DropdownMenuPortal>
+                <DropdownMenuContent className="w-[200px] rounded-xl p-1 bg-white border border-slate-100 shadow-xl z-[300]">
+                  <DropdownMenuItem className="rounded-lg py-2.5 text-xs font-semibold cursor-pointer focus:bg-slate-50" onClick={() => handleQuickReminder(0)}>Hoy</DropdownMenuItem>
+                  <DropdownMenuItem className="rounded-lg py-2.5 text-xs font-semibold cursor-pointer" onClick={() => handleQuickReminder(1)}>Mañana</DropdownMenuItem>
+                  <DropdownMenuItem className="rounded-lg py-2.5 text-xs font-semibold cursor-pointer" onClick={() => handleQuickReminder(3)}>En 3 días</DropdownMenuItem>
+                  <DropdownMenuItem className="rounded-lg py-2.5 text-xs font-semibold cursor-pointer" onClick={() => setIsCustomDateOpen(true)}>Fecha personalizada...</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenuPortal>
+            </DropdownMenu>
             
             <button 
               onClick={onConvert}
@@ -386,6 +474,45 @@ export function MobileLeadDetailSheet({ lead, open, onClose, onConvert, onWhatsA
           </div>
         )}
       </div>
+
+      {/* Diálogo de Fecha Personalizada para Recordatorio */}
+      <Dialog open={isCustomDateOpen} onOpenChange={setIsCustomDateOpen}>
+        <DialogContent className="max-w-xs p-6 bg-white border-none shadow-2xl rounded-2xl z-[350]">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-bold tracking-tight">Recordatorio personalizado</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-3">
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Seleccionar fecha</Label>
+              <Input
+                type="date"
+                value={customDateValue}
+                min={format(new Date(), "yyyy-MM-dd")}
+                onChange={e => setCustomDateValue(e.target.value)}
+                className="h-10 rounded-xl bg-slate-50 border-none px-3"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                type="button"
+                onClick={() => setIsCustomDateOpen(false)}
+                className="flex-1 h-9 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-50"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                disabled={creandoRecordatorio}
+                onClick={() => crearTareaRecordatorio(customDateValue)}
+                className="flex-1 h-9 rounded-xl text-xs font-bold bg-[var(--accent)] text-[var(--accent-text)] hover:opacity-90"
+              >
+                {creandoRecordatorio ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Agendar"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </BottomSheet>
   );
 }

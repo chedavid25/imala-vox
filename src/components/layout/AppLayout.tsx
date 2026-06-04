@@ -26,7 +26,7 @@ interface AppLayoutProps {
 export default function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { setWorkspace, setWorkspaceId, currentWorkspaceId, currentAgentName, setCurrentAgentName, setIsAdmin, isAdmin } = useWorkspaceStore();
+  const { setWorkspace, setWorkspaceId, currentWorkspaceId, currentAgentName, setCurrentAgentName, setIsAdmin, isAdmin, selectedContactId } = useWorkspaceStore();
   const [isSessionLoading, setIsSessionLoading] = useState(true);
   const isMobile = useMobileLayout();
   const adminJwtSetRef = useRef(false);
@@ -213,7 +213,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   };
 
   const breadcrumbs = getBreadcrumbs();
-  const showContextPanel = pathname.includes('/contactos');
+  const showContextPanel = pathname.includes('/contactos') || (pathname.includes('/tareas') && !!selectedContactId);
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-[var(--bg-main)]">

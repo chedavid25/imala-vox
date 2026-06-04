@@ -32,6 +32,7 @@ interface TaskCanvasViewProps {
   onDelete: (id: string) => void;
   leads?: any[];
   onOpenLeadDetail?: (leadId: string) => void;
+  onOpenContactDetail?: (contactId: string) => void;
 }
 
 interface ColumnProps {
@@ -45,6 +46,7 @@ interface ColumnProps {
   color: string;
   leads?: any[];
   onOpenLeadDetail?: (leadId: string) => void;
+  onOpenContactDetail?: (contactId: string) => void;
 }
 
 function SortableTaskCard(props: any) {
@@ -75,7 +77,7 @@ function SortableTaskCard(props: any) {
   );
 }
 
-function KanbanColumn({ id, title, tasks, contactos, onUpdate, onEdit, onDelete, color, leads, onOpenLeadDetail }: ColumnProps) {
+function KanbanColumn({ id, title, tasks, contactos, onUpdate, onEdit, onDelete, color, leads, onOpenLeadDetail, onOpenContactDetail }: ColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id });
 
   return (
@@ -108,6 +110,7 @@ function KanbanColumn({ id, title, tasks, contactos, onUpdate, onEdit, onDelete,
               onDelete={onDelete}
               leads={leads}
               onOpenLeadDetail={onOpenLeadDetail}
+              onOpenContactDetail={onOpenContactDetail}
             />
           ))}
           {tasks.length === 0 && (
@@ -129,7 +132,8 @@ export function TaskCanvasView({
   onEdit, 
   onDelete,
   leads = [],
-  onOpenLeadDetail
+  onOpenLeadDetail,
+  onOpenContactDetail
 }: TaskCanvasViewProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
 
@@ -245,6 +249,7 @@ export function TaskCanvasView({
                 onDelete={onDelete}
                 leads={leads}
                 onOpenLeadDetail={onOpenLeadDetail}
+                onOpenContactDetail={onOpenContactDetail}
               />
           ))}
         </div>

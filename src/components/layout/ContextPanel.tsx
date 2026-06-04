@@ -59,7 +59,7 @@ import { ModalNuevaTarea } from "@/components/crm/tasks/ModalNuevaTarea";
 
 export function ContextPanel({ onSendMessage }: { onSendMessage?: (text: string) => Promise<any> | void }) {
   const router = useRouter();
-  const { selectedContactId, currentWorkspaceId, selectedChatId } = useWorkspaceStore();
+  const { selectedContactId, setSelectedContactId, currentWorkspaceId, selectedChatId } = useWorkspaceStore();
   const { contactos } = useContactos();
   
   const [activeTab, setActiveTab] = useState("perfil");
@@ -377,7 +377,13 @@ export function ContextPanel({ onSendMessage }: { onSendMessage?: (text: string)
     <aside className="w-[var(--context-panel-width,350px)] h-full bg-[var(--bg-card)] flex flex-col overflow-hidden shrink-0 border-l border-[var(--border-light)] hidden xl:flex">
       
       {/* Header Perfil */}
-      <div className="p-6 border-b border-[var(--border-light)]">
+      <div className="p-6 border-b border-[var(--border-light)] relative">
+        <button 
+          onClick={() => setSelectedContactId(null)}
+          className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+        >
+          <X className="size-4" />
+        </button>
         <div className="flex flex-col items-center text-center space-y-3">
           <Avatar 
             src={selectedContact?.avatarUrl} 

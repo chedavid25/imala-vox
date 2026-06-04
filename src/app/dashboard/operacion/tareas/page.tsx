@@ -79,11 +79,12 @@ import { useMobileLayout } from "@/hooks/useMobileLayout";
 import { MobileTaskList } from "@/components/mobile/crm/MobileTaskList";
 import { useRouter } from "next/navigation";
 import { LeadDetailContent } from "../leads/page";
+import { MobileContactSheet } from "@/components/mobile/inbox/MobileContactSheet";
 
 type FilterType = 'hoy' | 'semana' | 'mes' | 'atrasadas' | 'completadas' | 'todas';
 
 export default function TareasPage() {
-  const { currentWorkspaceId } = useWorkspaceStore();
+  const { currentWorkspaceId, selectedContactId, setSelectedContactId } = useWorkspaceStore();
   const { contactos } = useContactos();
   const isMobile = useMobileLayout();
   
@@ -309,6 +310,7 @@ export default function TareasPage() {
           tareas={tareas}
           leads={leads}
           onOpenLeadDetail={setSelectedLeadId}
+          onOpenContactDetail={setSelectedContactId}
           onUpdate={handleQuickUpdate}
           onEdit={(t) => { setEditingTask(t); setIsAddingTask(true); }}
           onNewTask={() => { setEditingTask(null); setIsAddingTask(true); }}
@@ -444,6 +446,7 @@ export default function TareasPage() {
                           onDelete={handleDelete}
                           leads={leads}
                           onOpenLeadDetail={setSelectedLeadId}
+                          onOpenContactDetail={setSelectedContactId}
                         />
                       ))
                     ) : (
@@ -466,6 +469,7 @@ export default function TareasPage() {
                   onDelete={handleDelete}
                   leads={leads}
                   onOpenLeadDetail={setSelectedLeadId}
+                  onOpenContactDetail={setSelectedContactId}
                 />
               ) : (
                 <TaskCalendarView 
@@ -518,6 +522,14 @@ export default function TareasPage() {
             )}
           </div>
         </div>
+      )}
+      {/* Detalle de Contacto Mobile */}
+      {selectedContactId && isMobile && (
+        <MobileContactSheet
+          open={!!selectedContactId}
+          onClose={() => setSelectedContactId(null)}
+          contactoId={selectedContactId}
+        />
       )}
     </>
   );
