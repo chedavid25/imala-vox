@@ -173,22 +173,24 @@ export default function ContactosPage() {
               <Upload className="w-4 h-4 mr-2" /> Importar Contactos
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-[280px] bg-white border-slate-100 shadow-xl p-2 rounded-2xl z-[100]">
-              <DropdownMenuLabel className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-2 py-1.5">Método de Importación</DropdownMenuLabel>
-              <DropdownMenuSeparator className="bg-slate-50" />
-              
-              <DropdownMenuItem 
-                onClick={() => csvInputRef.current?.click()}
-                className="text-[12px] font-bold py-2.5 rounded-xl cursor-pointer hover:bg-slate-50 transition-all flex items-center gap-3 select-none outline-none"
-              >
-                📄 Google Contacts / WooCommerce (CSV)
-              </DropdownMenuItem>
+              <DropdownMenuGroup>
+                <DropdownMenuLabel className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-2 py-1.5">Método de Importación</DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-slate-50" />
+                
+                <DropdownMenuItem 
+                  onClick={() => csvInputRef.current?.click()}
+                  className="text-[12px] font-bold py-2.5 rounded-xl cursor-pointer hover:bg-slate-50 transition-all flex items-center gap-3 select-none outline-none"
+                >
+                  📄 Google Contacts / WooCommerce (CSV)
+                </DropdownMenuItem>
 
-              <DropdownMenuItem 
-                onClick={() => vcfInputRef.current?.click()}
-                className="text-[12px] font-bold py-2.5 rounded-xl cursor-pointer hover:bg-slate-50 transition-all flex items-center gap-3 select-none outline-none"
-              >
-                🍏 iCloud Contacts (vCard .vcf)
-              </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => vcfInputRef.current?.click()}
+                  className="text-[12px] font-bold py-2.5 rounded-xl cursor-pointer hover:bg-slate-50 transition-all flex items-center gap-3 select-none outline-none"
+                >
+                  🍏 iCloud Contacts (vCard .vcf)
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
 
