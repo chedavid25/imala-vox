@@ -643,24 +643,73 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
       }
       
       let modoAgenteDefault = 'auto';
+      let delayRespuesta = 0;
       const agenteDoc = await adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.AGENTES}/${canalData.agenteId}`).get();
       if (agenteDoc.exists) {
-         modoAgenteDefault = agenteDoc.data()?.modoDefault || 'auto';
+         const agData = agenteDoc.data();
+         modoAgenteDefault = agData?.modoDefault || 'auto';
+         delayRespuesta = agData?.delayRespuesta || 0;
       }
       
       const isCopiloto = convData?.modoIA === 'copiloto' || modoAgenteDefault === 'copiloto';
 
+      // SI DELAY > 0 Y NO ES COPILOTO -> DEBOUNCE
+      if (delayRespuesta > 0 && !isCopiloto) {
+        const ahoraMs = Date.now();
+        // Guardar el timestamp actual en el documento de la conversación para el control del Debounce
+        await convRef.doc(convId).update({
+          ultimaActividadClienteEl: ahoraMs
+        });
+
+        console.log(`[DEBOUNCE-META] Iniciando espera de ${delayRespuesta} segundos para la conversación ${convId}...`);
+        await new Promise(resolve => setTimeout(resolve, delayRespuesta * 1000));
+
+        // Re-leer conversación
+        const freshConvDoc = await convRef.doc(convId).get();
+        const freshConvData = freshConvDoc.data();
+
+        if (freshConvData?.ultimaActividadClienteEl !== ahoraMs) {
+          console.log(`[DEBOUNCE-META] Cancelando respuesta para este hilo en ${convId}. Llegó otro mensaje posterior.`);
+          return;
+        }
+        console.log(`[DEBOUNCE-META] Tiempo cumplido. Es el último mensaje. Procesando...`);
+      }
+
+      // Obtener mensajes de historial actualizados
       const historialSnap = await convRef.doc(convId)
           .collection(COLLECTIONS.MENSAJES)
           .orderBy('creadoEl', 'desc')
           .limit(30)
           .get();
           
-      const historial = historialSnap.docs.reverse().map(d => ({
+      const msgDocs = historialSnap.docs.reverse();
+
+      // AGRUPACIÓN INTELIGENTE: Si delayRespuesta > 0 y no es copiloto, agrupar todos los mensajes consecutivos del usuario al final de la conversación
+      let textoProcesar = textoMensajeMeta;
+      
+      if (delayRespuesta > 0 && !isCopiloto) {
+        const mensajesUsuarioConsecutivos: string[] = [];
+        // Recorrer de atrás hacia adelante para encontrar los mensajes consecutivos de 'user'
+        for (let i = msgDocs.length - 1; i >= 0; i--) {
+          const mData = msgDocs[i].data();
+          if (mData.from === 'user') {
+            mensajesUsuarioConsecutivos.unshift(mData.text || '');
+          } else {
+            // Encontró una respuesta de la IA o un agente, frenar agrupación
+            break;
+          }
+        }
+        if (mensajesUsuarioConsecutivos.length > 1) {
+          textoProcesar = mensajesUsuarioConsecutivos.join('\n');
+          console.log(`[DEBOUNCE-META] Agrupados ${mensajesUsuarioConsecutivos.length} mensajes: "${textoProcesar.replace(/\n/g, ' | ')}"`);
+        }
+      }
+
+      const historial = msgDocs.map(d => ({
          from: d.data().from,
          text: d.data().text
       }));
-      // Remover último msg (es el actual) para no duplicarlo en el context
+      // Remover último msg (es el actual o el bloque que vamos a responder) del historial de contexto de la IA
       if (historial.length > 0) historial.pop(); 
       
       const { procesarMensajeConIA } = await import('@/lib/ai/engine');
@@ -679,7 +728,7 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
            wsId,
            agenteId: canalData.agenteId,
            conversacionId: convId,
-           textoUsuario: textoMensajeMeta,
+           textoUsuario: textoProcesar,
            historial,
            isCopiloto,
            contactoNombre
@@ -1093,20 +1142,69 @@ export async function procesarMensajeWhatsapp(value: any, wabaId: string) {
       }
 
       let modoAgenteDefault = 'auto';
+      let delayRespuesta = 0;
       const agenteDoc = await adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.AGENTES}/${canalData.agenteId}`).get();
       if (agenteDoc.exists) {
-        modoAgenteDefault = agenteDoc.data()?.modoDefault || 'auto';
+        const agData = agenteDoc.data();
+        modoAgenteDefault = agData?.modoDefault || 'auto';
+        delayRespuesta = agData?.delayRespuesta || 0;
       }
 
       const isCopiloto = convData?.modoIA === 'copiloto' || modoAgenteDefault === 'copiloto';
 
+      // SI DELAY > 0 Y NO ES COPILOTO -> DEBOUNCE
+      if (delayRespuesta > 0 && !isCopiloto) {
+        const ahoraMs = Date.now();
+        // Guardar el timestamp actual en el documento de la conversación para el control del Debounce
+        await convRef.doc(convId).update({
+          ultimaActividadClienteEl: ahoraMs
+        });
+
+        console.log(`[DEBOUNCE-WA] Iniciando espera de ${delayRespuesta} segundos para la conversación WA ${convId}...`);
+        await new Promise(resolve => setTimeout(resolve, delayRespuesta * 1000));
+
+        // Re-leer conversación
+        const freshConvDoc = await convRef.doc(convId).get();
+        const freshConvData = freshConvDoc.data();
+
+        if (freshConvData?.ultimaActividadClienteEl !== ahoraMs) {
+          console.log(`[DEBOUNCE-WA] Cancelando respuesta para este hilo en ${convId}. Llegó otro mensaje posterior.`);
+          return;
+        }
+        console.log(`[DEBOUNCE-WA] Tiempo cumplido. Es el último mensaje. Procesando...`);
+      }
+
+      // Obtener mensajes de historial actualizados
       const historialSnap = await convRef.doc(convId)
         .collection(COLLECTIONS.MENSAJES)
         .orderBy('creadoEl', 'desc')
         .limit(30)
         .get();
 
-      const historial = historialSnap.docs.reverse().map(d => ({
+      const msgDocs = historialSnap.docs.reverse();
+
+      // AGRUPACIÓN INTELIGENTE: Si delayRespuesta > 0 y no es copiloto, agrupar todos los mensajes consecutivos del usuario al final de la conversación
+      let textoProcesar = textoMensaje;
+      
+      if (delayRespuesta > 0 && !isCopiloto) {
+        const mensajesUsuarioConsecutivos: string[] = [];
+        // Recorrer de atrás hacia adelante para encontrar los mensajes consecutivos de 'user'
+        for (let i = msgDocs.length - 1; i >= 0; i--) {
+          const mData = msgDocs[i].data();
+          if (mData.from === 'user') {
+            mensajesUsuarioConsecutivos.unshift(mData.text || '');
+          } else {
+            // Encontró una respuesta de la IA o un agente, frenar agrupación
+            break;
+          }
+        }
+        if (mensajesUsuarioConsecutivos.length > 1) {
+          textoProcesar = mensajesUsuarioConsecutivos.join('\n');
+          console.log(`[DEBOUNCE-WA] Agrupados ${mensajesUsuarioConsecutivos.length} mensajes WA: "${textoProcesar.replace(/\n/g, ' | ')}"`);
+        }
+      }
+
+      const historial = msgDocs.map(d => ({
         from: d.data().from,
         text: d.data().text
       }));
@@ -1122,7 +1220,7 @@ export async function procesarMensajeWhatsapp(value: any, wabaId: string) {
           wsId,
           agenteId: canalData.agenteId,
           conversacionId: convId,
-          textoUsuario: textoMensaje,
+          textoUsuario: textoProcesar,
           historial,
           isCopiloto,
           contactoNombre

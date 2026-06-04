@@ -245,6 +245,7 @@ export interface Agente {
   };
 
   configuracionVersion: number;    // Para invalidar caché de Claude
+  delayRespuesta?: number;         // Delay de respuesta en segundos (0-15s)
   creadoEl: Timestamp;
   actualizadoEl: Timestamp;
 }

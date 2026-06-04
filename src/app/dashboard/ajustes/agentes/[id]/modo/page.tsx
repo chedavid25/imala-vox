@@ -155,6 +155,37 @@ export default function AgenteModoEscaladaPage() {
             </button>
           </div>
 
+          {/* TEMPORIZADOR / DELAY DE RESPUESTA INTELIGENTE */}
+          {data.modoDefault === 'auto' && (
+            <div className="p-6 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-3xl space-y-4 animate-in slide-in-from-top-2 duration-200">
+               <div className="space-y-2">
+                 <div className="flex justify-between items-center">
+                   <Label className="text-sm font-bold text-[var(--text-primary-light)]">Delay Inteligente (Debounce)</Label>
+                   <span className="text-xs font-bold text-[var(--accent)] bg-[var(--accent)]/10 px-2.5 py-1 rounded-full">
+                     {data.delayRespuesta || 0} segundos
+                   </span>
+                 </div>
+                 <p className="text-[11px] text-[var(--text-tertiary-light)] leading-relaxed font-medium">
+                   Si el cliente escribe varios mensajes seguidos, la IA esperará este tiempo para responderlos todos juntos en una sola respuesta.
+                 </p>
+               </div>
+               <div className="pt-2">
+                 <input 
+                   type="range" 
+                   min="0" 
+                   max="15" 
+                   value={data.delayRespuesta || 0} 
+                   onChange={e => setData({ ...data, delayRespuesta: parseInt(e.target.value) })}
+                   className="w-full h-1.5 bg-[var(--border-light)] rounded-lg appearance-none cursor-pointer accent-[var(--accent)]"
+                 />
+                 <div className="flex justify-between text-[9px] text-[var(--text-tertiary-light)] px-1 mt-1 font-medium">
+                   <span>Responder al instante (0s)</span>
+                   <span>15 segundos máx</span>
+                 </div>
+               </div>
+            </div>
+          )}
+
           {/* MODO ESTRICTO */}
           <div className="p-6 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-3xl space-y-4">
              <div className="flex items-center justify-between">
