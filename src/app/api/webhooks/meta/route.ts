@@ -800,16 +800,11 @@ async function procesarMediaEntranteWA(
     // Descargar el archivo
     let dlRes: Response;
     if (directUrl) {
-      // La URL de lookaside.fbsbx.com ya viene firmada (hash+ext) — intentar sin headers
-      dlRes = await fetch(downloadUrl);
-      if (!dlRes.ok) {
-        console.warn(`[WA-MEDIA] Sin auth dio ${dlRes.status}, intentando con D360-API-KEY`);
-        dlRes = await fetch(downloadUrl, { headers: { 'D360-API-KEY': accessToken } });
-      }
-      if (!dlRes.ok) {
-        console.warn(`[WA-MEDIA] D360-API-KEY dio ${dlRes.status}, intentando Bearer`);
-        dlRes = await fetch(downloadUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
-      }
+      // 360dialog: usar su API v2 con D360-API-KEY (igual que enviarMensajeAccion)
+      dlRes = await fetch(`https://waba-v2.360dialog.io/media/${mediaId}`, {
+        headers: { 'D360-API-KEY': accessToken }
+      });
+      console.log(`[WA-MEDIA] 360dialog media API: ${dlRes.status}`);
     } else {
       // Meta Cloud API
       dlRes = await fetch(downloadUrl, {
