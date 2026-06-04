@@ -120,6 +120,7 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -214,6 +215,11 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
     setSelectedFile(null);
     setFilePreviewUrl(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
+    
+    // Enfocar input inmediatamente para poder seguir escribiendo sin interrupciones
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 50);
 
     const newMsg: Message = { role: "user", content: userMessage, attachment: localMsgAttachment };
     
@@ -454,6 +460,7 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
           </Button>
 
           <Input 
+            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={selectedFile ? "Añadir un mensaje sobre el archivo..." : "Haz una pregunta técnica..."}
