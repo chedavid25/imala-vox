@@ -61,6 +61,18 @@ export async function chatPlaygroundAction(
 ) {
   try {
     if (!wsId || !agenteId) throw new Error("Faltan parámetros de identificación.");
+    
+    // Obtener configuración del agente para aplicar el delay en el playground si tiene delayRespuesta
+    let delayRespuesta = 0;
+    const agenteDoc = await adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.AGENTES}/${agenteId}`).get();
+    if (agenteDoc.exists) {
+      delayRespuesta = agenteDoc.data()?.delayRespuesta || 0;
+    }
+
+    if (delayRespuesta > 0) {
+      console.log(`[PLAYGROUND-DELAY] Aplicando delay de ${delayRespuesta} segundos...`);
+      await new Promise((resolve) => setTimeout(resolve, delayRespuesta * 1000));
+    }
 
     // 1. Construir el prompt del sistema (RAG: Base de Conocimiento activa)
     const systemPrompt = await construirSystemPrompt(wsId, agenteId);
