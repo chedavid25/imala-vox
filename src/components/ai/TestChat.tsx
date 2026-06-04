@@ -235,29 +235,7 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
 
       if (result.success) {
         if (result.reply) {
-          if (result.userMessageConsolidated) {
-            // El servidor consolidó los mensajes del usuario: limpiar las burbujas intermedias
-            setMessages((prevAll) => {
-              const cleanMessages: Message[] = [];
-              let groupingActive = false;
-
-              for (let i = 0; i < prevAll.length; i++) {
-                if (prevAll[i].role === "user") {
-                  if (!groupingActive) {
-                    groupingActive = true;
-                    cleanMessages.push({ ...prevAll[i], content: result.userMessageConsolidated! });
-                  }
-                  // mensajes de usuario subsecuentes del mismo batch: omitir (ya consolidados)
-                } else {
-                  groupingActive = false;
-                  cleanMessages.push(prevAll[i]);
-                }
-              }
-              return [...cleanMessages, { role: "assistant", content: result.reply! }];
-            });
-          } else {
-            setMessages((prevAll) => [...prevAll, { role: "assistant", content: result.reply! }]);
-          }
+          setMessages((prevAll) => [...prevAll, { role: "assistant", content: result.reply! }]);
         }
         // reply === null → cancelado por debounce del servidor, ignorar silenciosamente
       } else {
