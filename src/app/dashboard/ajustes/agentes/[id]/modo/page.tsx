@@ -161,9 +161,9 @@ export default function AgenteModoEscaladaPage() {
                <div className="space-y-2">
                  <div className="flex justify-between items-center">
                    <Label className="text-sm font-bold text-[var(--text-primary-light)]">Delay Inteligente (Debounce)</Label>
-                   <span className="text-xs font-bold text-[var(--accent)] bg-[var(--accent)]/10 px-2.5 py-1 rounded-full">
-                     {data.delayRespuesta || 0} segundos
-                   </span>
+                    <span className="text-xs font-bold text-[var(--accent-text)] bg-[var(--accent)] px-3 py-1 rounded-full shadow-sm">
+                      {data.delayRespuesta || 0} segundos
+                    </span>
                  </div>
                  <p className="text-[11px] text-[var(--text-tertiary-light)] leading-relaxed font-medium">
                    Si el cliente escribe varios mensajes seguidos, la IA esperará este tiempo para responderlos todos juntos en una sola respuesta.
