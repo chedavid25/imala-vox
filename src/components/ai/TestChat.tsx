@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { chatPlaygroundAction } from "@/app/actions/ai";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, doc, query, where, onSnapshot } from "firebase/firestore";
 import { COLLECTIONS, RecursoConocimiento } from "@/lib/types/firestore";
 import { toast } from "sonner";
 
@@ -126,6 +126,7 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
   const pendingQueueRef = useRef<Array<{ content: string; fileAttach?: { name: string; type: string; base64: string } }>>([]);
   const historyForBatchRef = useRef<Message[]>([]);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const delayRespuestaRef = useRef(0);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -134,6 +135,16 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
       if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
     };
   }, [filePreviewUrl]);
+
+  // Cargar delayRespuesta del agente para usar como ventana de debounce
+  useEffect(() => {
+    if (!wsId || !agentId) return;
+    const agentRef = doc(db, COLLECTIONS.ESPACIOS, wsId, COLLECTIONS.AGENTES, agentId);
+    const unsub = onSnapshot(agentRef, (snap) => {
+      delayRespuestaRef.current = snap.data()?.delayRespuesta || 0;
+    });
+    return () => unsub();
+  }, [wsId, agentId]);
 
   // Cargar recursos multimedia del workspace para parsear links en el chat
   useEffect(() => {
@@ -300,7 +311,8 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
 
     // Reiniciar el timer: esperar 1s sin mensajes nuevos antes de llamar a la IA
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    debounceTimerRef.current = setTimeout(procesarCola, 1000);
+    const debounceMs = delayRespuestaRef.current > 0 ? delayRespuestaRef.current * 1000 : 600;
+    debounceTimerRef.current = setTimeout(procesarCola, debounceMs);
   };
 
   const clearChat = () => {
