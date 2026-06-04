@@ -181,7 +181,7 @@ export default function ContactosPage() {
                   onClick={() => csvInputRef.current?.click()}
                   className="text-[12px] font-bold py-2.5 rounded-xl cursor-pointer hover:bg-slate-50 transition-all flex items-center gap-3 select-none outline-none"
                 >
-                  📄 Google Contacts / WooCommerce (CSV)
+                  📄 Google Contacts (CSV)
                 </DropdownMenuItem>
 
                 <DropdownMenuItem 

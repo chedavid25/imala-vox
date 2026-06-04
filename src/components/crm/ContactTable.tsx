@@ -230,10 +230,10 @@ export function ContactTable({ contactos, tags, categories }: ContactTableProps)
                 {selectedIds.size > 0 && selectedIds.size < sortedContactos.length && <div className="w-2 h-0.5 bg-[var(--accent)] rounded-full" />}
               </div>
             </TableHead>
-            <TableHead className="w-[200px] text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-tertiary-light)] cursor-pointer py-5" onClick={() => requestSort("nombre")}>Nombre</TableHead>
-            <TableHead className="w-[140px] text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-tertiary-light)] py-5">Salud Relacional</TableHead>
-            <TableHead className="w-[250px] text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-tertiary-light)] py-5">Categorías y Etiquetas</TableHead>
-            <TableHead className="w-[120px] text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-tertiary-light)] py-5">IA</TableHead>
+            <TableHead className="w-[280px] text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-tertiary-light)] cursor-pointer py-5" onClick={() => requestSort("nombre")}>Nombre</TableHead>
+            <TableHead className="w-[120px] text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-tertiary-light)] py-5">Salud Relacional</TableHead>
+            <TableHead className="w-[220px] text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-tertiary-light)] py-5">Categorías y Etiquetas</TableHead>
+            <TableHead className="w-[100px] text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-tertiary-light)] py-5">IA</TableHead>
             <TableHead className="w-[80px] text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-tertiary-light)] text-right py-5">Acciones</TableHead>
           </TableRow>
         </TableHeader>
@@ -265,7 +265,7 @@ export function ContactTable({ contactos, tags, categories }: ContactTableProps)
                 </TableCell>
                 <TableCell className="py-4">
                   <div className="flex flex-col gap-1">
-                    <span className="text-[13px] font-semibold text-[var(--text-primary-light)]">{contacto.nombre}</span>
+                    <span className="text-[13px] font-semibold text-[var(--text-primary-light)] break-words whitespace-normal block">{contacto.nombre}</span>
                     <div onClick={(e) => e.stopPropagation()}>
                       <PhoneActionMenu
                         phoneNumber={contacto.telefono}

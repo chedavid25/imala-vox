@@ -558,14 +558,51 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
                 isMe ? "items-end" : "items-start"
               )}>
                 <div className={cn(
-                  "p-3.5 rounded-2xl text-[13.5px] leading-relaxed shadow-sm",
+                  "p-3.5 rounded-2xl text-[13.5px] leading-relaxed shadow-sm flex flex-col gap-2",
                   isNote 
                     ? "bg-[#FEFCE8] border border-yellow-200 text-yellow-800 rounded-2xl" 
                     : isMe 
                       ? "bg-[var(--accent)] text-[var(--accent-text)] font-semibold rounded-2xl rounded-tr-none" 
                       : "bg-[var(--bg-card)] border border-[var(--border-light)] text-[var(--text-primary-light)] rounded-2xl rounded-tl-none"
                 )}>
-                  {renderMessage(msg.text)}
+                  {msg.metadata?.mediaUrl && (
+                    <div className="w-full">
+                      {msg.metadata.mediaType === "image" && (
+                        <img 
+                          src={msg.metadata.mediaUrl} 
+                          alt={msg.metadata.fileName || "Imagen"} 
+                          className="max-w-xs max-h-60 rounded-xl object-cover cursor-pointer hover:opacity-95 active:scale-98 transition-all"
+                          onClick={() => window.open(msg.metadata.mediaUrl, "_blank")}
+                        />
+                      )}
+                      {msg.metadata.mediaType === "video" && (
+                        <video 
+                          src={msg.metadata.mediaUrl} 
+                          controls 
+                          className="max-w-xs rounded-xl shadow-sm"
+                        />
+                      )}
+                      {(msg.metadata.mediaType === "document" || msg.metadata.mediaType === "audio") && (
+                        <a 
+                          href={msg.metadata.mediaUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className={cn(
+                            "flex items-center gap-2.5 p-3 rounded-xl border transition-all text-xs font-semibold select-none",
+                            isMe 
+                              ? "bg-white/10 hover:bg-white/20 border-white/20 text-white" 
+                              : "bg-[var(--bg-input)] hover:bg-[var(--bg-main)] border-[var(--border-light)] text-[var(--text-primary-light)]"
+                          )}
+                        >
+                          <FileText className="size-5 shrink-0" />
+                          <span className="truncate max-w-[200px]">{msg.metadata.fileName || "Descargar archivo"}</span>
+                        </a>
+                      )}
+                    </div>
+                  )}
+                  {(!msg.metadata?.mediaUrl || (msg.text && !msg.text.startsWith(`[${msg.metadata.mediaType === 'image' ? 'Imagen' : msg.metadata.mediaType === 'video' ? 'Video' : 'Archivo'}:`))) && (
+                    <span>{renderMessage(msg.text)}</span>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 px-1 text-[10px] font-semibold text-[var(--text-tertiary-light)] tabular-nums uppercase tracking-wider">
                   {isNote ? "NOTA INTERNA" : isMe ? "AGENTE IMALÁ" : "CLIENTE"}

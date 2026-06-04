@@ -191,7 +191,7 @@ Analiza el mensaje del usuario y responde estrictamente en este formato JSON:
   await db.doc(`espaciosDeTrabajo/${wsId}/conversaciones/${conversacionId}`).update({
     ultimoMensaje: respuestaTexto,
     ultimaActividad: admin.firestore.FieldValue.serverTimestamp(),
-    unreadCount: admin.firestore.FieldValue.increment(1)
+    unreadCount: 0
   });
 
   return respuestaTexto;

@@ -113,18 +113,54 @@ export const recibirMensajeWhatsApp = functions.https.onRequest(async (req: func
         const changes = entry?.changes?.[0];
         const value = changes?.value;
         const message = value?.messages?.[0];
+        const status = value?.statuses?.[0];
         // Obtener el phoneNumberId del metadata del webhook
         const phoneNumberId = value?.metadata?.phone_number_id;
 
+        // Si es una actualización de estado de un mensaje saliente (enviado por la empresa)
+        if (status && phoneNumberId) {
+          const from = status.recipient_id;
+          if (from) {
+            const db = admin.firestore();
+            const canalSnap = await db
+              .collectionGroup('canales')
+              .where('metaPhoneNumberId', '==', phoneNumberId)
+              .where('tipo', '==', 'whatsapp')
+              .limit(1).get();
+
+            if (!canalSnap.empty) {
+              const canalDoc = canalSnap.docs[0];
+              const workspaceId = canalDoc.ref.path.split('/')[1];
+              
+              const contactoSnap = await db
+                .collection(`espaciosDeTrabajo/${workspaceId}/contactos`)
+                .where("telefono", "==", from)
+                .limit(1).get();
+
+              if (!contactoSnap.empty) {
+                const contactoId = contactoSnap.docs[0].id;
+                
+                const convSnap = await db
+                  .collection(`espaciosDeTrabajo/${workspaceId}/conversaciones`)
+                  .where("contactoId", "==", contactoId)
+                  .where("canalId", "==", canalDoc.id)
+                  .limit(1).get();
+
+                if (!convSnap.empty) {
+                  await convSnap.docs[0].ref.update({
+                    unreadCount: 0,
+                    ultimaActividad: admin.firestore.FieldValue.serverTimestamp()
+                  });
+                  console.log(`💬 Conversación ${convSnap.docs[0].id} marcada como leída por mensaje saliente a ${from}`);
+                }
+              }
+            }
+          }
+        }
+
         if (message && phoneNumberId) {
           const from = message.from;
-          const text = message.text?.body;
-
-          // Solo procesar mensajes de texto (por ahora)
-          if (!text) {
-            console.log("Mensaje sin texto (imagen/audio), ignorando.");
-            res.sendStatus(200); return;
-          }
+          let text = message.text?.body || "";
 
           // ── Buscar workspace por phoneNumberId ──
           const canalSnap = await admin.firestore()
@@ -169,29 +205,14 @@ export const recibirMensajeWhatsApp = functions.https.onRequest(async (req: func
             res.sendStatus(200); return;
           }
 
-          // ── 2. Verificar aiBlocked ──
-          if (contactoData.aiBlocked === true) {
-            console.log(`Contacto ${from} bloqueado para IA. Sin respuesta automática.`);
-            res.sendStatus(200); return;
-          }
-
-          // ── 2. Verificar configuración de IA del canal ──
-          if (!canalData.aiEnabled) {
-            console.log(`IA desactivada para el canal ${canalId}. Solo guardando mensaje.`);
-            // Procedemos solo a guardar el mensaje abajo
-          }
-
           // ── 3. Obtener agente asignado o activo ──
           let agenteId = canalData.agenteId;
-          
           if (!agenteId) {
-            // Fallback a agente activo si no hay uno fijo asignado
             const agentesSnap = await admin.firestore()
               .collection(`espaciosDeTrabajo/${workspaceId}/agentes`)
               .where('activo', '==', true)
               .limit(1)
               .get();
-            
             if (!agentesSnap.empty) {
               agenteId = agentesSnap.docs[0].id;
             }
@@ -216,21 +237,108 @@ export const recibirMensajeWhatsApp = functions.https.onRequest(async (req: func
           const convId = convDoc.id;
           const convData = convDoc.data()!;
 
-          // ── 5. Verificar modo ──
-          if (convData.modoIA === 'pausado') {
-            console.log(`Conversación ${convId} pausada, sin respuesta IA.`);
+          // ── 5. Procesar Media (si aplica) y descargar archivo desde Meta ──
+          const type = message.type;
+          let mediaMetadata: any = null;
+          
+          if (type === "image" || type === "document" || type === "video" || type === "audio") {
+            const mediaData = message[type];
+            const mediaId = mediaData?.id;
+            const mimeType = mediaData?.mime_type || "";
+            const fileName = mediaData?.filename || (type === "image" ? "image.jpg" : "file");
+            
+            if (mediaId && accessToken) {
+              try {
+                console.log(`Descargando media de WhatsApp: ${mediaId} (${type})`);
+                const metaMediaUrl = `https://graph.facebook.com/v18.0/${mediaId}`;
+                const metaRes = await fetch(metaMediaUrl, {
+                  headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                
+                if (metaRes.ok) {
+                  const metaJSON = await metaRes.json();
+                  const downloadUrlMeta = metaJSON.url;
+                  
+                  if (downloadUrlMeta) {
+                    const mediaRes = await fetch(downloadUrlMeta, {
+                      headers: { 'Authorization': `Bearer ${accessToken}` }
+                    });
+                    
+                    if (mediaRes.ok) {
+                      const arrayBuffer = await mediaRes.arrayBuffer();
+                      const buffer = Buffer.from(arrayBuffer);
+                      
+                      const bucket = admin.storage().bucket();
+                      const storagePath = `workspaces/${workspaceId}/chat-media/${convId}/${mediaId}_${fileName}`;
+                      const storageFile = bucket.file(storagePath);
+                      
+                      await storageFile.save(buffer, {
+                        metadata: { contentType: mimeType }
+                      });
+                      
+                      const downloadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(storagePath)}?alt=media`;
+                      
+                      mediaMetadata = {
+                        mediaUrl: downloadUrl,
+                        mediaType: type,
+                        fileName: fileName
+                      };
+                      
+                      text = text || `[${type === 'image' ? 'Imagen' : type === 'video' ? 'Video' : 'Archivo'}: ${fileName}]`;
+                      console.log(`✅ Media subida a Storage: ${downloadUrl}`);
+                    }
+                  }
+                }
+              } catch (mediaErr) {
+                console.error("Error procesando media de WhatsApp:", mediaErr);
+              }
+            }
+          }
+
+          if (!text && !mediaMetadata) {
+            console.log("Mensaje sin texto ni media procesable, ignorando.");
             res.sendStatus(200); return;
           }
 
-          // ── 6. Guardar mensaje entrante ──
+          // ── 6. Guardar mensaje entrante en Firestore ──
           await admin.firestore()
             .collection(`espaciosDeTrabajo/${workspaceId}/conversaciones/${convId}/mensajes`)
             .add({
               text,
               from: 'user',
               creadoEl: admin.firestore.Timestamp.now(),
-              visto: false
+              visto: false,
+              ...(mediaMetadata ? { metadata: mediaMetadata } : {})
             });
+
+          // Actualizar datos de la conversación
+          const convRef = admin.firestore().doc(`espaciosDeTrabajo/${workspaceId}/conversaciones/${convId}`);
+          const seraRespondidoPorIA = canalData.aiEnabled && 
+                                     contactoData.aiBlocked !== true && 
+                                     convData.modoIA !== 'pausado';
+
+          await convRef.update({
+            ultimoMensaje: text,
+            ultimaActividad: admin.firestore.FieldValue.serverTimestamp(),
+            ultimoMensajeCliente: admin.firestore.FieldValue.serverTimestamp(),
+            ...(!seraRespondidoPorIA ? { unreadCount: admin.firestore.FieldValue.increment(1) } : {})
+          });
+
+          // ── 7. Retornos tempranos para flujo de la IA ──
+          if (contactoData.aiBlocked === true) {
+            console.log(`Contacto ${from} bloqueado para IA. Solo guardado.`);
+            res.sendStatus(200); return;
+          }
+
+          if (!canalData.aiEnabled) {
+            console.log(`IA desactivada para el canal ${canalId}. Solo guardando mensaje.`);
+            res.sendStatus(200); return;
+          }
+
+          if (convData.modoIA === 'pausado') {
+            console.log(`Conversación ${convId} pausada, sin respuesta IA. Solo guardado.`);
+            res.sendStatus(200); return;
+          }
 
           // ── 7. Historial para contexto ──
           const histSnap = await admin.firestore()

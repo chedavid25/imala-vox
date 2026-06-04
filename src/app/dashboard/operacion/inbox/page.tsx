@@ -308,7 +308,8 @@ function InboxContent() {
       await updateDoc(convRef, {
         ultimoMensaje: text,
         ultimaActividad: Timestamp.now(),
-        modoIA: 'pausado' // Pausar IA al intervenir humano
+        modoIA: 'pausado', // Pausar IA al intervenir humano
+        unreadCount: 0
       });
 
     } catch (error: any) {
