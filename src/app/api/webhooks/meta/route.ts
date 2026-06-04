@@ -72,6 +72,10 @@ export async function POST(request: NextRequest) {
               console.log("🟢 Procesando mensaje de WhatsApp...");
               await procesarMensajeWhatsapp(change.value, pageId);
             }
+            if (change.field === 'smb_message_echoes') {
+              console.log("🔁 Procesando eco de mensaje saliente de WhatsApp (celular)...");
+              await procesarEcoMensajeWhatsapp(change.value, pageId);
+            }
           }
         }
 
@@ -1311,5 +1315,127 @@ async function procesarComentarioInstagram(commentData: any, pageId: string) {
     }
   } catch (err) {
     console.error('[ig-comment] Error procesando comentario:', err);
+  }
+}
+
+/**
+ * Procesa mensajes de eco (respuestas enviadas desde la app de WhatsApp Business en el celular).
+ */
+export async function procesarEcoMensajeWhatsapp(value: any, wabaId: string) {
+  try {
+    const echo = value.smb_message_echoes || value.messages?.[0]; // 360dialog / Meta wrapper
+    if (!echo) return;
+
+    // Solo procesar texto en este paso inicial (se puede expandir para media en el futuro)
+    const text = echo.text?.body;
+    if (!text?.trim()) return;
+
+    const recipientId = echo.to; // El número de teléfono del cliente que recibió nuestro mensaje
+    const messageId = echo.message_id || echo.id;
+
+    if (!recipientId) {
+      console.warn("⚠️ Eco WA ignorado: No se encontró recipientId (campo 'to')");
+      return;
+    }
+
+    // 1. Identificar Workspace y Canal buscando por el phone_number_id de los metadatos
+    const wsQuery = await adminDb
+      .collectionGroup(COLLECTIONS.CANALES)
+      .where('metaPhoneNumberId', '==', value.metadata.phone_number_id)
+      .where('tipo', '==', 'whatsapp')
+      .where('status', '==', 'connected')
+      .get();
+
+    if (wsQuery.empty) {
+      console.warn(`❌ Eco WA ignorado: Canal no encontrado para phone_number_id ${value.metadata.phone_number_id}`);
+      return;
+    }
+
+    const canalDoc = pickMostRecentCanal(wsQuery.docs);
+    const canalId = canalDoc.id;
+    const wsId = canalDoc.ref.parent.parent!.id;
+
+    // 2. Obtener o crear contacto
+    const contactosRef = adminDb.collection(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CONTACTOS}`);
+    let contactoId = "";
+    let contactoNombre = recipientId;
+
+    const contactSnap = await contactosRef.where('telefono', '==', recipientId).limit(1).get();
+
+    if (contactSnap.empty) {
+      contactoId = `wa_${recipientId}`;
+      await contactosRef.doc(contactoId).set({
+        nombre: contactoNombre,
+        telefono: recipientId,
+        canalOrigen: 'whatsapp',
+        aiBlocked: false,
+        esContactoCRM: false,
+        creadoEl: Timestamp.now()
+      }, { merge: true });
+    } else {
+      const cDoc = contactSnap.docs[0];
+      contactoId = cDoc.id;
+      contactoNombre = cDoc.data().nombre || contactoNombre;
+    }
+
+    // 3. Obtener o crear conversación
+    const convRef = adminDb.collection(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.CONVERSACIONES}`);
+    let convId = "";
+    const convSnap = await convRef
+      .where('contactoId', '==', contactoId)
+      .limit(10)
+      .get();
+
+    const convExistente = convSnap.docs.find(d => d.data().canalId === canalId)
+      || convSnap.docs[0];
+
+    if (!convExistente) {
+      convId = `conv_${contactoId}_${canalId}`;
+      await convRef.doc(convId).set({
+        contactoId,
+        contactoNombre,
+        canal: 'whatsapp',
+        canalId,
+        ultimoMensaje: text,
+        ultimaActividad: Timestamp.now(),
+        unreadCount: 0, // Al responder nosotros, los no leídos quedan en cero
+        modoIA: 'auto',
+        creadoEl: Timestamp.now()
+      }, { merge: true });
+    } else {
+      convId = convExistente.id;
+      await convRef.doc(convId).update({
+        ultimoMensaje: text,
+        ultimaActividad: Timestamp.now(),
+        unreadCount: 0 // Resetear no leídos ya que respondimos
+      });
+    }
+
+    // 4. Guardar mensaje enviado (from: 'agent') para reflejarlo en la interfaz
+    if (messageId) {
+      const msgDocRef = convRef.doc(convId).collection(COLLECTIONS.MENSAJES).doc(messageId);
+      const msgDocSnap = await msgDocRef.get();
+      if (msgDocSnap.exists) {
+        console.log(`⚠️ Eco de mensaje duplicado ignorado: ${messageId}`);
+        return;
+      }
+      await msgDocRef.set({
+        text,
+        from: 'agent', // Guardado como agente para mostrar a la derecha
+        creadoEl: Timestamp.now(),
+        visto: true
+      });
+    } else {
+      await convRef.doc(convId).collection(COLLECTIONS.MENSAJES).add({
+        text,
+        from: 'agent',
+        creadoEl: Timestamp.now(),
+        visto: true
+      });
+    }
+
+    console.log(`🔁 Eco de mensaje guardado exitosamente en conv ${convId}`);
+  } catch (error) {
+    console.error("❌ Error procesando eco de WhatsApp:", error);
   }
 }
