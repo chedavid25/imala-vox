@@ -233,22 +233,39 @@ export function TestChat({ wsId, agentId }: TestChatProps) {
 
       const result = await chatPlaygroundAction(wsId, agentId, userMessage, mappedHistory.slice(-10), fileAttach);
 
-      if (result.success && result.reply) {
-        if (result.userMessageConsolidated) {
-          setMessages((prevAll) => {
-            const updated = [...prevAll];
-            const lastUserIdx = updated.findLastIndex((m) => m.role === "user" && m.content === userMessage);
-            if (lastUserIdx !== -1) {
-              updated[lastUserIdx] = {
-                ...updated[lastUserIdx],
-                content: result.userMessageConsolidated!,
-                attachment: updated[lastUserIdx].attachment ? { ...updated[lastUserIdx].attachment!, base64: "" } : undefined
-              };
-            }
-            return [...updated, { role: "assistant", content: result.reply! }];
-          });
+      if (result.success) {
+        if (result.reply) {
+          if (result.userMessageConsolidated) {
+            setMessages((prevAll) => {
+              const updated = [...prevAll];
+              // Consolidar todos los mensajes consecutivos del usuario eliminando los anteriores que fueron unificados
+              let firstUserIdx = -1;
+              const cleanMessages: Message[] = [];
+              
+              for (let i = 0; i < updated.length; i++) {
+                if (updated[i].role === "user") {
+                  if (firstUserIdx === -1) {
+                    firstUserIdx = cleanMessages.length;
+                    cleanMessages.push({
+                      ...updated[i],
+                      content: result.userMessageConsolidated!
+                    });
+                  }
+                  // Los mensajes subsecuentes del usuario que se unificaron no se añaden individuales
+                } else {
+                  cleanMessages.push(updated[i]);
+                  // Si hay una respuesta de asistente, reseteamos el agrupador para futuros mensajes
+                  firstUserIdx = -1;
+                }
+              }
+              return [...cleanMessages, { role: "assistant", content: result.reply! }];
+            });
+          } else {
+            setMessages((prevAll) => [...prevAll, { role: "assistant", content: result.reply! }]);
+          }
         } else {
-          setMessages((prevAll) => [...prevAll, { role: "assistant", content: result.reply! }]);
+          // Fue cancelado por debounce, no hacemos nada ya que el hilo posterior responderá
+          console.log("[PLAYGROUND-CHAT] Hilo de mensaje cancelado por debounce.");
         }
       } else {
         setError(result.error || "La IA no pudo responder.");

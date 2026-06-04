@@ -64,14 +64,59 @@ export async function chatPlaygroundAction(
     
     // Obtener configuración del agente para aplicar el delay en el playground si tiene delayRespuesta
     let delayRespuesta = 0;
-    const agenteDoc = await adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.AGENTES}/${agenteId}`).get();
+    const agenteRef = adminDb.doc(`${COLLECTIONS.ESPACIOS}/${wsId}/${COLLECTIONS.AGENTES}/${agenteId}`);
+    const agenteDoc = await agenteRef.get();
     if (agenteDoc.exists) {
       delayRespuesta = agenteDoc.data()?.delayRespuesta || 0;
     }
 
+    const ahoraMs = Date.now();
+
     if (delayRespuesta > 0) {
+      // Registrar en el documento del agente el timestamp del último mensaje de prueba enviado
+      await agenteRef.update({
+        ultimoMensajePruebaEl: ahoraMs
+      });
+
       console.log(`[PLAYGROUND-DELAY] Aplicando delay de ${delayRespuesta} segundos...`);
       await new Promise((resolve) => setTimeout(resolve, delayRespuesta * 1000));
+
+      // Verificar si después de la espera llegó otro mensaje
+      const freshAgenteDoc = await agenteRef.get();
+      if (freshAgenteDoc.data()?.ultimoMensajePruebaEl !== ahoraMs) {
+        console.log(`[PLAYGROUND-DELAY] Cancelando este hilo de respuesta. Llegó otro mensaje posterior.`);
+        return {
+          success: true,
+          reply: null, // Indicador de que fue cancelado por debounce
+          userMessageConsolidated: null
+        };
+      }
+    }
+
+    // Agrupación de mensajes en el historial para el Playground:
+    // Si hay un delay y se acumularon múltiples mensajes consecutivos del usuario al final del historial, los consolidamos.
+    let userMessageProcesar = userMessage;
+    let finalHistory = history;
+
+    if (delayRespuesta > 0 && history.length > 0) {
+      const mensajesUsuarioConsecutivos: string[] = [];
+      let i = history.length - 1;
+      
+      // Retroceder en el historial buscando mensajes de 'user'
+      while (i >= 0 && history[i].role === "user") {
+        mensajesUsuarioConsecutivos.unshift(history[i].content);
+        i--;
+      }
+
+      // Añadir el mensaje actual que acaba de enviar
+      mensajesUsuarioConsecutivos.push(userMessage);
+
+      if (mensajesUsuarioConsecutivos.length > 1) {
+        userMessageProcesar = mensajesUsuarioConsecutivos.join("\n");
+        // Recortar del historial los mensajes del usuario que ahora están consolidados en el mensaje principal
+        finalHistory = history.slice(0, i + 1);
+        console.log(`[PLAYGROUND-DEBOUNCE] Consolidando ${mensajesUsuarioConsecutivos.length} mensajes en el chat de pruebas.`);
+      }
     }
 
     // 1. Construir el prompt del sistema (RAG: Base de Conocimiento activa)
@@ -79,7 +124,7 @@ export async function chatPlaygroundAction(
 
     // 2. Formatear mensajes históricos para Gemini (roles: 'user' o 'model')
     const formattedHistory = await Promise.all(
-      history.map(async (msg) => {
+      finalHistory.map(async (msg) => {
         const parts: Part[] = [];
 
         if (msg.attachment) {
@@ -150,7 +195,7 @@ export async function chatPlaygroundAction(
             mimeType: mediaType,
           },
         });
-        currentParts.push({ text: userMessage || "Aquí está la imagen." });
+        currentParts.push({ text: userMessageProcesar || "Aquí está la imagen." });
       } else {
         let docText = "";
         try {
@@ -158,13 +203,16 @@ export async function chatPlaygroundAction(
         } catch (e: any) {
           docText = `[Error al extraer texto: ${e.message}]`;
         }
-        userMessageConsolidated = `[Archivo adjunto: ${attachment.name}]\n--- CONTENIDO DEL ARCHIVO ---\n${docText}\n----------------------------\n\n${userMessage}`;
+        userMessageConsolidated = `[Archivo adjunto: ${attachment.name}]\n--- CONTENIDO DEL ARCHIVO ---\n${docText}\n----------------------------\n\n${userMessageProcesar}`;
         currentParts.push({
           text: userMessageConsolidated,
         });
       }
     } else {
-      currentParts.push({ text: userMessage });
+      currentParts.push({ text: userMessageProcesar });
+      if (userMessageProcesar !== userMessage) {
+        userMessageConsolidated = userMessageProcesar;
+      }
     }
 
     // 4. Inicializar modelo de Gemini con prompt de sistema
