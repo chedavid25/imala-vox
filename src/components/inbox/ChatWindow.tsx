@@ -600,7 +600,7 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
                       )}
                     </div>
                   )}
-                  {(!msg.metadata?.mediaUrl || (msg.text && !msg.text.startsWith(`[${msg.metadata.mediaType === 'image' ? 'Imagen' : msg.metadata.mediaType === 'video' ? 'Video' : 'Archivo'}:`))) && (
+                  {(!msg.metadata?.mediaUrl && msg.text) && (
                     <span>{renderMessage(msg.text)}</span>
                   )}
                 </div>

@@ -554,15 +554,20 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
           const rawMime = (dlRes.headers.get('content-type') || 'application/octet-stream').split(';')[0].trim();
           const ext = EXT_MAP[rawMime] || 'bin';
           const fileName = `meta_${Date.now()}.${ext}`;
+          const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+          if (!bucketName) {
+            console.error('[META-MEDIA] NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET no configurado');
+            textoMensajeMeta = `[${att0.type}]`;
+            throw new Error('bucket-not-configured');
+          }
           const token = crypto.randomUUID();
-          const bucket = adminStorage.bucket();
+          const bucket = adminStorage.bucket(bucketName);
           const storagePath = `workspaces/${wsId}/inbox-media/${convId}/${fileName}`;
-          await bucket.file(storagePath).save(buffer, {
-            metadata: { contentType: rawMime, metadata: { firebaseStorageDownloadTokens: token } },
-            resumable: false
-          });
+          const fileRefMeta = bucket.file(storagePath);
+          await fileRefMeta.save(buffer, { metadata: { contentType: rawMime }, resumable: false });
+          await fileRefMeta.setMetadata({ metadata: { firebaseStorageDownloadTokens: token } });
           const encodedPath = encodeURIComponent(storagePath);
-          const mediaUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodedPath}?alt=media&token=${token}`;
+          const mediaUrl = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodedPath}?alt=media&token=${token}`;
           const label = attType === 'image' ? 'Imagen' : attType === 'video' ? 'Video' : attType === 'audio' ? 'Audio' : 'Archivo';
           textoMensajeMeta = `[${label}]`;
           metaMsgMetadata = { mediaUrl, mediaType: attType, fileName };
@@ -795,18 +800,20 @@ async function procesarMediaEntranteWA(
     const fileName = `${mediaId}.${ext}`;
 
     // 4. Subir a Firebase Storage con token de descarga permanente
+    const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+    if (!bucketName) {
+      console.error('[WA-MEDIA] NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET no configurado');
+      return null;
+    }
     const token = crypto.randomUUID();
-    const bucket = adminStorage.bucket();
+    const bucket = adminStorage.bucket(bucketName);
     const storagePath = `workspaces/${wsId}/inbox-media/${convId}/${fileName}`;
-    await bucket.file(storagePath).save(buffer, {
-      metadata: {
-        contentType: mimeType,
-        metadata: { firebaseStorageDownloadTokens: token }
-      },
-      resumable: false
-    });
+    console.log(`[WA-MEDIA] Subiendo a bucket=${bucketName}, path=${storagePath}`);
+    const fileRef = bucket.file(storagePath);
+    await fileRef.save(buffer, { metadata: { contentType: mimeType }, resumable: false });
+    await fileRef.setMetadata({ metadata: { firebaseStorageDownloadTokens: token } });
     const encodedPath = encodeURIComponent(storagePath);
-    const mediaUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodedPath}?alt=media&token=${token}`;
+    const mediaUrl = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodedPath}?alt=media&token=${token}`;
 
     const label = normalizedType === 'image' ? 'Imagen' : normalizedType === 'video' ? 'Video' : normalizedType === 'audio' ? 'Audio' : 'Archivo';
     const text = caption?.trim() || `[${label}]`;
