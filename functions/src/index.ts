@@ -247,6 +247,9 @@ export const recibirMensajeWhatsApp = functions.https.onRequest(async (req: func
             const mimeType = mediaData?.mime_type || "";
             const fileName = mediaData?.filename || (type === "image" ? "image.jpg" : "file");
             
+            // Asignar texto de respaldo inmediatamente para que el mensaje no se pierda si falla la descarga
+            text = text || `[${type === 'image' ? 'Imagen' : type === 'video' ? 'Video' : 'Archivo'}: ${fileName}]`;
+
             if (mediaId && accessToken) {
               try {
                 console.log(`Descargando media de WhatsApp: ${mediaId} (${type})`);
