@@ -797,14 +797,24 @@ async function procesarMediaEntranteWA(
       mimeTypeFromApi = info.mime_type;
     }
 
-    // Descargar el archivo — intentar con Bearer primero, luego sin prefijo (360dialog)
-    let dlRes = await fetch(downloadUrl, {
-      headers: { Authorization: `Bearer ${accessToken}` }
-    });
-    if (!dlRes.ok && directUrl) {
-      // 360dialog usa la API key sin "Bearer"
+    // Descargar el archivo
+    let dlRes: Response;
+    if (directUrl) {
+      // 360dialog requiere D360-API-KEY como header
       dlRes = await fetch(downloadUrl, {
-        headers: { Authorization: accessToken }
+        headers: { 'D360-API-KEY': accessToken }
+      });
+      if (!dlRes.ok) {
+        // Fallback: endpoint de media de 360dialog
+        console.warn(`[WA-MEDIA] URL directa dio ${dlRes.status}, intentando endpoint de media 360dialog`);
+        dlRes = await fetch(`https://waba.360dialog.io/v1/media/${mediaId}`, {
+          headers: { 'D360-API-KEY': accessToken }
+        });
+      }
+    } else {
+      // Meta Cloud API
+      dlRes = await fetch(downloadUrl, {
+        headers: { Authorization: `Bearer ${accessToken}` }
       });
     }
     if (!dlRes.ok) {
