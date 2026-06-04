@@ -3,8 +3,9 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { ContactTable } from "@/components/crm/ContactTable";
 import { CSVImporter } from "@/components/crm/CSVImporter";
+import { VCFImporter } from "@/components/crm/VCFImporter";
 import { useContactos } from "@/hooks/useContactos";
-import { Plus, Search, Loader2, Filter, X, ChevronDown, Check } from "lucide-react";
+import { Plus, Search, Loader2, Filter, X, ChevronDown, Check, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { db } from "@/lib/firebase";
@@ -27,7 +28,8 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuGroup
+  DropdownMenuGroup,
+  DropdownMenuItem
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -115,6 +117,7 @@ export default function ContactosPage() {
       const contactsRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS);
       await addDoc(contactsRef, {
         ...newContact,
+        telefono: newContact.telefono.replace(/\D/g, ""),
         esContactoCRM: true,
         ultimaInteraccion: Timestamp.now(),
         creadoEl: Timestamp.now()
@@ -162,7 +165,31 @@ export default function ContactosPage() {
           <p className="text-[13px] text-[var(--text-secondary-light)] font-medium">Gestiona tu red de contactos y salud relacional.</p>
         </div>
         <div className="flex items-center gap-3">
-          <CSVImporter onImport={handleBulkImport} />
+          <DropdownMenu>
+            <DropdownMenuTrigger className="bg-white hover:bg-slate-50 border border-[var(--border-light)] text-[var(--text-secondary-light)] hover:text-[var(--text-primary-light)] h-11 px-5 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-sm flex items-center justify-center transition-all select-none outline-none">
+              <Upload className="w-4 h-4 mr-2" /> Importar Contactos
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[280px] bg-white border-slate-100 shadow-xl p-2 rounded-2xl z-[100]">
+              <DropdownMenuLabel className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-2 py-1.5">Método de Importación</DropdownMenuLabel>
+              <DropdownMenuSeparator className="bg-slate-50" />
+              <CSVImporter 
+                onImport={handleBulkImport} 
+                triggerButton={
+                  <DropdownMenuItem className="text-[12px] font-bold py-2.5 rounded-xl cursor-pointer hover:bg-slate-50 transition-all flex items-center gap-3 select-none outline-none">
+                    📄 Google Contacts / WooCommerce (CSV)
+                  </DropdownMenuItem>
+                }
+              />
+              <VCFImporter 
+                onImport={handleBulkImport} 
+                triggerButton={
+                  <DropdownMenuItem className="text-[12px] font-bold py-2.5 rounded-xl cursor-pointer hover:bg-slate-50 transition-all flex items-center gap-3 select-none outline-none">
+                    🍏 iCloud Contacts (vCard .vcf)
+                  </DropdownMenuItem>
+                }
+              />
+            </DropdownMenuContent>
+          </DropdownMenu>
           
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] h-11 px-6 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-[var(--accent)]/20 transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center">

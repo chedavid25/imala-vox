@@ -73,6 +73,7 @@ export function MobileAddContactSheet({ open, onClose }: MobileAddContactSheetPr
       const contactsRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS);
       await addDoc(contactsRef, {
         ...newContact,
+        telefono: newContact.telefono.replace(/\D/g, ""),
         esContactoCRM: true,
         creadoEl: Timestamp.now(),
         ultimaInteraccion: Timestamp.now(),

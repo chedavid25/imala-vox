@@ -7,9 +7,10 @@ import { Timestamp } from "firebase/firestore";
 
 interface CSVImporterProps {
   onImport: (contactos: Partial<Contacto>[]) => void;
+  triggerButton?: React.ReactNode;
 }
 
-export function CSVImporter({ onImport }: CSVImporterProps) {
+export function CSVImporter({ onImport, triggerButton }: CSVImporterProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -36,10 +37,12 @@ export function CSVImporter({ onImport }: CSVImporterProps) {
           
           const nombre = nombreDirecto || nombreParticionado || "Sin Nombre";
 
-          const telefono = getValue([
+          const rawTelefono = getValue([
             "Mobile", "Phone", "Teléfono", "Celular", 
             "Phone 1 - Value", "Mobile Phone", "Primary Phone"
           ]) || "";
+          const telefono = String(rawTelefono).replace(/\D/g, "");
+
 
           const email = getValue([
             "Email", "E-mail", "Correo", "Correo electrónico", 
@@ -74,15 +77,19 @@ export function CSVImporter({ onImport }: CSVImporterProps) {
         ref={fileInputRef}
         onChange={handleFileChange}
       />
-      <Button 
-        variant="outline" 
-        size="sm" 
-        className="h-9 border-[var(--border-light)] text-[var(--text-secondary-light)] hover:text-[var(--text-primary-light)]"
-        onClick={() => fileInputRef.current?.click()}
-      >
-        <Upload className="w-4 h-4 mr-2" />
-        Importar CSV
-      </Button>
+      {triggerButton ? (
+        <div onClick={() => fileInputRef.current?.click()}>{triggerButton}</div>
+      ) : (
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="h-9 border-[var(--border-light)] text-[var(--text-secondary-light)] hover:text-[var(--text-primary-light)]"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <Upload className="w-4 h-4 mr-2" />
+          Importar CSV
+        </Button>
+      )}
     </div>
   );
 }
