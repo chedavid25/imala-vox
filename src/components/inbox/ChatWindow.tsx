@@ -696,11 +696,12 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
                           />
                         )}
                         {msg.metadata.mediaType === "audio" && (
-                          <audio 
-                            src={msg.metadata.mediaUrl} 
-                            controls 
-                            className="max-w-xs rounded-xl shadow-sm"
-                          />
+                          <audio controls className="max-w-xs rounded-xl shadow-sm">
+                            <source src={msg.metadata.mediaUrl} type="audio/ogg" />
+                            <source src={msg.metadata.mediaUrl} type="audio/mpeg" />
+                            <source src={msg.metadata.mediaUrl} type="audio/wav" />
+                            Tu navegador no soporta el elemento de audio.
+                          </audio>
                         )}
                         {msg.metadata.mediaType === "document" && (
                           <a 
@@ -720,7 +721,7 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
                         )}
                       </div>
                     )}
-                    {(!msg.metadata?.mediaUrl && msg.text) && (
+                    {msg.text && (
                       <span>{renderMessage(msg.text)}</span>
                     )}
                   </div>

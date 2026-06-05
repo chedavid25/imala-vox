@@ -46,6 +46,22 @@ export function MobileConversationView({
   const [allConversaciones, setAllConversaciones] = useState<any[]>([]);
   const [isForwarding, setIsForwarding] = useState(false);
 
+  const renderMessage = (text: string) => {
+    if (!text) return null;
+    const lines = text.split('\n');
+    return lines.map((line, i) => {
+      let processed = line;
+      processed = processed.replace(/\*(.*?)\*/g, '<strong>$1</strong>');
+      processed = processed.replace(/_(.*?)_/g, '<em>$1</em>');
+      return (
+        <span key={i}>
+          <span dangerouslySetInnerHTML={{ __html: processed }} />
+          {i < lines.length - 1 && <br />}
+        </span>
+      );
+    });
+  };
+
   const handleTogglePendiente = async () => {
     if (!currentWorkspaceId || !conversacion?.id) return;
     const nuevoEstado = !conversacion.pendiente;
@@ -260,11 +276,12 @@ export function MobileConversationView({
                         />
                       )}
                       {msg.metadata.mediaType === "audio" && (
-                        <audio 
-                          src={msg.metadata.mediaUrl} 
-                          controls 
-                          className="max-w-full rounded-xl shadow-sm"
-                        />
+                        <audio controls className="max-w-full rounded-xl shadow-sm">
+                          <source src={msg.metadata.mediaUrl} type="audio/ogg" />
+                          <source src={msg.metadata.mediaUrl} type="audio/mpeg" />
+                          <source src={msg.metadata.mediaUrl} type="audio/wav" />
+                          Tu navegador no soporta el elemento de audio.
+                        </audio>
                       )}
                       {msg.metadata.mediaType === "document" && (
                         <a 
@@ -285,8 +302,8 @@ export function MobileConversationView({
                     </div>
                   )}
 
-                  {(!msg.metadata?.mediaUrl && msg.text) && (
-                    <p className="text-[14px] leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                  {msg.text && (
+                    <p className="text-[14px] leading-relaxed whitespace-pre-wrap">{renderMessage(msg.text)}</p>
                   )}
                   <div className="flex justify-end mt-1">
                     <span className="text-[9px] font-semibold text-slate-400 tabular-nums uppercase tracking-tighter">
