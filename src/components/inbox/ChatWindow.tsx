@@ -206,6 +206,21 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
     }
   };
 
+  const handleTogglePendiente = async () => {
+    if (!currentWorkspaceId || !conversacion?.id) return;
+    const nuevoEstado = !conversacion.pendiente;
+    try {
+      const convRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES, conversacion.id);
+      await updateDoc(convRef, { 
+        pendiente: nuevoEstado,
+        actualizadoEl: Timestamp.now()
+      });
+      toast.success(nuevoEstado ? "Conversación marcada como pendiente" : "Conversación desmarcada como pendiente");
+    } catch (error) {
+      toast.error("Error al actualizar estado pendiente");
+    }
+  };
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (
@@ -460,6 +475,20 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            onClick={handleTogglePendiente}
+            className={cn(
+              "h-8 gap-1.5 font-black text-[10px] transition-all duration-300 rounded-xl",
+              conversacion.pendiente
+                ? "bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
+                : "bg-amber-50 text-amber-600 border border-amber-200 hover:bg-amber-100"
+            )}
+          >
+            <Clock className="w-3.5 h-3.5" />
+            {conversacion.pendiente ? "PENDIENTE" : "MARCAR PENDIENTE"}
+          </Button>
+
           {(conversacion.modoIA !== 'auto' && conversacion.modoIA !== 'copiloto') && (
             <Button
               size="sm"

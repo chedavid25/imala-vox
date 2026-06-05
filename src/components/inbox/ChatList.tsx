@@ -244,10 +244,15 @@ export function ChatList({ conversaciones, selectedId, onSelect }: ChatListProps
                 <div className="flex-1 min-w-0 space-y-0.5">
                   <div className="flex justify-between items-center gap-1">
                     <span className={cn(
-                      "text-[13.5px] truncate font-bold tracking-tight",
+                      "text-[13.5px] truncate font-bold tracking-tight flex items-center gap-1.5",
                       selectedId === chat.id ? "text-[var(--text-primary-dark)]" : "text-[var(--text-primary-light)]"
                     )}>
                       {contactInfo.nombre}
+                      {chat.pendiente && (
+                        <span className="bg-amber-100 text-amber-800 text-[9px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wide border border-amber-200">
+                          Pendiente
+                        </span>
+                      )}
                     </span>
                     <div className="flex items-center gap-1 shrink-0">
                       {isResolved && <CheckCircle2 className="w-3 h-3 text-green-500" />}

@@ -166,10 +166,15 @@ export function MobileConversationList({ conversaciones, onSelect }: MobileConve
                 <div className="flex-1 min-w-0 py-0.5">
                   <div className="flex justify-between items-baseline mb-1">
                     <h3 className={cn(
-                      "text-[15px] truncate tracking-tight transition-all",
+                      "text-[15px] truncate tracking-tight transition-all flex items-center gap-1.5",
                       hasUnread ? "font-bold text-slate-900" : "font-semibold text-slate-700"
                     )}>
                       {info.nombre}
+                      {chat.pendiente && (
+                        <span className="bg-amber-100 text-amber-800 text-[8px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wide border border-amber-200 shrink-0">
+                          Pendiente
+                        </span>
+                      )}
                     </h3>
                     <span className={cn(
                       "text-[9px] font-semibold tabular-nums uppercase tracking-tighter",

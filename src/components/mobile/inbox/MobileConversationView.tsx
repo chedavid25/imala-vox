@@ -5,15 +5,16 @@ import { CanalBadge } from "@/components/ui/CanalBadge";
 import { useContactos } from "@/hooks/useContactos";
 import { IndicadorIA } from "@/components/ui/IndicadorIA";
 import { cn } from "@/lib/utils";
-import { Send, Sparkles, ChevronLeft, Info, Plus, Paperclip, Smile, Loader2 } from "lucide-react";
+import { Send, Sparkles, ChevronLeft, Info, Plus, Paperclip, Smile, Loader2, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar } from "@/components/ui/Avatar";
 import { MobileContactSheet } from "./MobileContactSheet";
 import { db } from "@/lib/firebase";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc, Timestamp } from "firebase/firestore";
 import { COLLECTIONS } from "@/lib/types/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
+import { toast } from "sonner";
 
 interface MobileConversationViewProps {
   conversacion: any;
@@ -37,6 +38,21 @@ export function MobileConversationView({
   const [inputText, setInputText] = useState("");
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const handleTogglePendiente = async () => {
+    if (!currentWorkspaceId || !conversacion?.id) return;
+    const nuevoEstado = !conversacion.pendiente;
+    try {
+      const convRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES, conversacion.id);
+      await updateDoc(convRef, { 
+        pendiente: nuevoEstado,
+        actualizadoEl: Timestamp.now()
+      });
+      toast.success(nuevoEstado ? "Marcada como pendiente" : "Desmarcada como pendiente");
+    } catch (error) {
+      toast.error("Error al actualizar pendiente");
+    }
+  };
 
   const handleDiscardSuggestion = async () => {
     if (!currentWorkspaceId || !conversacion?.id) return;
@@ -107,6 +123,15 @@ export function MobileConversationView({
         </div>
 
         <div className="flex items-center gap-1">
+          <button 
+            onClick={handleTogglePendiente} 
+            className={cn(
+              "p-2 rounded-full transition-colors active:scale-95",
+              conversacion.pendiente ? "text-amber-400 bg-amber-400/10" : "text-white/75"
+            )}
+          >
+            <Clock size={20} />
+          </button>
           <button onClick={() => setIsSheetOpen(true)} className="p-2 text-white/70 active:text-[var(--accent)] transition-colors">
             <Info size={20} />
           </button>

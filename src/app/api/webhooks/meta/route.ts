@@ -974,20 +974,43 @@ export async function procesarMensajeWhatsapp(value: any, wabaId: string) {
       : `📎 ${message.type === 'image' ? 'Imagen' : message.type === 'video' ? 'Video' : message.type === 'audio' ? 'Audio' : message.type === 'sticker' ? 'Sticker' : 'Archivo'}`;
 
     // 1. Identificar Workspace y Canal (multi-workspace: usar el más reciente si hay duplicados)
-    const wsQuery = await adminDb
+    let wsQuery = await adminDb
       .collectionGroup(COLLECTIONS.CANALES)
-      .where('metaPhoneNumberId', '==', value.metadata.phone_number_id)
+      .where('metaPhoneNumberId', '==', value.metadata?.phone_number_id || '')
       .where('tipo', '==', 'whatsapp')
       .where('status', '==', 'connected')
       .get();
 
+    // Fallback para 360dialog: Si no hay canal con el phone_number_id, buscar por metaWABAId o cuenta
+    if (wsQuery.empty && wabaId) {
+      console.log(`[WA] Buscando canal alternativo para 360dialog usando wabaId: ${wabaId}`);
+      wsQuery = await adminDb
+        .collectionGroup(COLLECTIONS.CANALES)
+        .where('metaWABAId', '==', wabaId)
+        .where('tipo', '==', 'whatsapp')
+        .where('status', '==', 'connected')
+        .get();
+    }
+
+    if (wsQuery.empty && value.metadata?.display_phone_number) {
+      // Intentar también buscar por el número de cuenta formateado
+      const rawDisplayNumber = value.metadata.display_phone_number.replace(/\D/g, '');
+      console.log(`[WA] Buscando canal alternativo por número de cuenta: ${rawDisplayNumber}`);
+      wsQuery = await adminDb
+        .collectionGroup(COLLECTIONS.CANALES)
+        .where('cuenta', '==', rawDisplayNumber)
+        .where('tipo', '==', 'whatsapp')
+        .where('status', '==', 'connected')
+        .get();
+    }
+
     if (wsQuery.empty) {
-      console.warn(`❌ Mensaje de WA ${senderId} ignorado: Canal no encontrado para phone_number_id ${value.metadata.phone_number_id}. Asegúrate que el 'Phone Number ID' coincida en los ajustes del canal.`);
+      console.warn(`❌ Mensaje de WA ${senderId} ignorado: Canal no encontrado para phone_number_id: ${value.metadata?.phone_number_id}, wabaId: ${wabaId}. Asegúrate que el 'Phone Number ID' o el 'WABA ID' coincida en los ajustes del canal.`);
       return;
     }
 
     if (wsQuery.docs.length > 1) {
-      console.log(`ℹ️ ${wsQuery.docs.length} canales WA encontrados para ${value.metadata.phone_number_id} — usando el más reciente.`);
+      console.log(`ℹ️ ${wsQuery.docs.length} canales WA encontrados — usando el más reciente.`);
     }
     const canalDoc = pickMostRecentCanal(wsQuery.docs);
     const canalId = canalDoc.id;
