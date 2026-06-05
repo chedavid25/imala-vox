@@ -9,6 +9,11 @@ service firebase.storage {
       allow read, write: if request.auth != null;
     }
 
+    // Ruta utilizada por la aplicación para archivos de chat/media
+    match /workspaces/{wsId}/{allPaths=**} {
+      allow read, write: if request.auth != null;
+    }
+
     // Denegar todo lo demás por defecto
     match /{allPaths=**} {
       allow read, write: if false;
