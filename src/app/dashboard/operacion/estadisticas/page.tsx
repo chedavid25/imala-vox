@@ -79,9 +79,16 @@ export default function EstadisticasPage() {
   useEffect(() => {
     if (!currentWorkspaceId) return;
 
+    const handleSubscriptionError = (err: any) => {
+      if (err.code !== 'permission-denied') {
+        console.error("Error en suscripción de estadísticas de Firestore:", err);
+      }
+    };
+
     const unsubEtapas = onSnapshot(
       query(collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.ETAPAS_EMBUDO), orderBy("orden", "asc")),
-      (snap) => setEtapas(snap.docs.map(d => ({ ...d.data(), id: d.id })) as any)
+      (snap) => setEtapas(snap.docs.map(d => ({ ...d.data(), id: d.id })) as any),
+      handleSubscriptionError
     );
 
     const unsubLeads = onSnapshot(
@@ -89,27 +96,32 @@ export default function EstadisticasPage() {
       (snap) => {
         setLeads(snap.docs.map(d => ({ ...d.data(), id: d.id })) as any);
         setLoading(false);
-      }
+      },
+      handleSubscriptionError
     );
 
     const unsubConv = onSnapshot(
       query(collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES), orderBy("ultimaActividad", "desc"), limit(2000)),
-      (snap) => setConversaciones(snap.docs.map(d => ({ ...d.data(), id: d.id })) as any)
+      (snap) => setConversaciones(snap.docs.map(d => ({ ...d.data(), id: d.id })) as any),
+      handleSubscriptionError
     );
 
     const unsubTareas = onSnapshot(
       query(collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, "tareasCRM"), orderBy("creadoEl", "desc")),
-      (snap) => setTareas(snap.docs.map(d => ({ ...d.data(), id: d.id })) as any)
+      (snap) => setTareas(snap.docs.map(d => ({ ...d.data(), id: d.id })) as any),
+      handleSubscriptionError
     );
 
     const unsubCont = onSnapshot(
       query(collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS), orderBy("creadoEl", "desc"), limit(2000)),
-      (snap) => setContactos(snap.docs.map(d => ({ ...d.data(), id: d.id })) as any)
+      (snap) => setContactos(snap.docs.map(d => ({ ...d.data(), id: d.id })) as any),
+      handleSubscriptionError
     );
 
     const unsubAgentes = onSnapshot(
       query(collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.AGENTES)),
-      (snap) => setAgentes(snap.docs.map(d => ({ ...d.data(), id: d.id })) as any)
+      (snap) => setAgentes(snap.docs.map(d => ({ ...d.data(), id: d.id })) as any),
+      handleSubscriptionError
     );
 
     return () => {

@@ -26,15 +26,23 @@ export function useMensajes(conversationId: string | null) {
       limit(50)
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const msgs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })).reverse(); // Ordenamos cronológicamente para la vista
-      
-      setMensajes(msgs);
-      setLoading(false);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const msgs = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })).reverse(); // Ordenamos cronológicamente para la vista
+        
+        setMensajes(msgs);
+        setLoading(false);
+      },
+      (err) => {
+        if (err.code !== 'permission-denied') {
+          console.error("Error en Snapshot de mensajes:", err);
+        }
+      }
+    );
 
     return () => unsubscribe();
   }, [currentWorkspaceId, conversationId]);
