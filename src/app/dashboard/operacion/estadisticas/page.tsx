@@ -281,7 +281,7 @@ export default function EstadisticasPage() {
       return `${horas}h ${mins}m`;
     };
 
-    const convAI = convAct.filter(c => c.modoIA === 'auto').length;
+    const convAI = resolucionIA;
     const convManual = convAct.length - convAI;
     const chatSourceData = [
       { name: 'IA Auto', value: convAI, color: 'var(--accent-active)' },
