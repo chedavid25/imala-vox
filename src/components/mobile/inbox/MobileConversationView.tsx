@@ -275,7 +275,7 @@ export function MobileConversationView({
                           className="max-w-full rounded-xl shadow-sm"
                         />
                       )}
-                      {msg.metadata.mediaType === "audio" && (
+                      {(msg.metadata.mediaType === "audio" || (msg.metadata.fileName && (msg.metadata.fileName.endsWith('.bin') || msg.metadata.fileName.endsWith('.ogg') || msg.metadata.fileName.endsWith('.opus') || msg.metadata.fileName.endsWith('.aac') || msg.metadata.fileName.endsWith('.mp3')) && msg.text === '[Audio]')) && (
                         <audio controls className="max-w-full rounded-xl shadow-sm">
                           <source src={msg.metadata.mediaUrl} type="audio/ogg" />
                           <source src={msg.metadata.mediaUrl} type="audio/mpeg" />
@@ -283,7 +283,7 @@ export function MobileConversationView({
                           Tu navegador no soporta el elemento de audio.
                         </audio>
                       )}
-                      {msg.metadata.mediaType === "document" && (
+                      {msg.metadata.mediaType === "document" && !(msg.metadata.fileName && (msg.metadata.fileName.endsWith('.bin') || msg.metadata.fileName.endsWith('.ogg') || msg.metadata.fileName.endsWith('.opus') || msg.metadata.fileName.endsWith('.aac') || msg.metadata.fileName.endsWith('.mp3')) && msg.text === '[Audio]') && (
                         <a 
                           href={msg.metadata.mediaUrl} 
                           target="_blank" 
