@@ -53,7 +53,7 @@ import {
   where 
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { COLLECTIONS, Lead, EtapaEmbudo, TareaCRM, Contacto, Conversacion, Agente } from "@/lib/types/firestore";
+import { COLLECTIONS, Lead, EtapaEmbudo, TareaCRM, Contacto, Conversacion, Agente, CategoriaCRM, EtiquetaCRM } from "@/lib/types/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { subDays, format, isAfter, startOfDay, endOfDay, isBefore } from "date-fns";
 import { es } from "date-fns/locale";
@@ -74,6 +74,8 @@ export default function EstadisticasPage() {
   const [tareas, setTareas] = useState<(TareaCRM & { id: string })[]>([]);
   const [contactos, setContactos] = useState<(Contacto & { id: string })[]>([]);
   const [agentes, setAgentes] = useState<(Agente & { id: string })[]>([]);
+  const [categorias, setCategorias] = useState<(CategoriaCRM & { id: string })[]>([]);
+  const [etiquetas, setEtiquetas] = useState<(EtiquetaCRM & { id: string })[]>([]);
 
   // 1. Suscripciones a Firestore
   useEffect(() => {
@@ -124,6 +126,18 @@ export default function EstadisticasPage() {
       handleSubscriptionError
     );
 
+    const unsubCategorias = onSnapshot(
+      query(collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CATEGORIAS_CRM), orderBy("orden", "asc")),
+      (snap) => setCategorias(snap.docs.map(d => ({ ...d.data(), id: d.id })) as any),
+      handleSubscriptionError
+    );
+
+    const unsubEtiquetas = onSnapshot(
+      query(collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.ETIQUETAS_CRM)),
+      (snap) => setEtiquetas(snap.docs.map(d => ({ ...d.data(), id: d.id })) as any),
+      handleSubscriptionError
+    );
+
     return () => {
       unsubEtapas();
       unsubLeads();
@@ -131,6 +145,8 @@ export default function EstadisticasPage() {
       unsubTareas();
       unsubCont();
       unsubAgentes();
+      unsubCategorias();
+      unsubEtiquetas();
     };
   }, [currentWorkspaceId]);
 
@@ -337,6 +353,50 @@ export default function EstadisticasPage() {
       };
     }).sort((a, b) => b.total - a.total);
 
+    // F. Demanda por Etiqueta y Categoría
+    const contactMap = new Map(contactos.map(c => [c.id, c]));
+    const etiquetaCounts: Record<string, number> = {};
+    const categoriaCounts: Record<string, number> = {};
+
+    convAct.forEach(c => {
+      const contacto = contactMap.get(c.contactoId);
+      if (contacto && contacto.etiquetas) {
+        contacto.etiquetas.forEach(tId => {
+          etiquetaCounts[tId] = (etiquetaCounts[tId] || 0) + 1;
+        });
+      }
+    });
+
+    const demandEtiquetasData = Object.entries(etiquetaCounts)
+      .map(([tId, count]) => {
+        const tag = etiquetas.find(t => t.id === tId);
+        return {
+          name: tag?.nombre || 'Desconocida',
+          value: count,
+          color: tag?.colorBg || '#3b82f6'
+        };
+      })
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+
+    Object.entries(etiquetaCounts).forEach(([tId, count]) => {
+      const tag = etiquetas.find(t => t.id === tId);
+      if (tag && tag.categoriaId) {
+        categoriaCounts[tag.categoriaId] = (categoriaCounts[tag.categoriaId] || 0) + count;
+      }
+    });
+
+    const demandCategoriasData = Object.entries(categoriaCounts)
+      .map(([catId, count]) => {
+        const cat = categorias.find(c => c.id === catId);
+        return {
+          name: cat?.nombre || 'Sin Categoría',
+          value: count,
+          color: cat?.tipo === 'exclusiva' ? 'var(--accent-active)' : '#8b5cf6'
+        };
+      })
+      .sort((a, b) => b.value - a.value);
+
     return {
       overview: {
         leads: { val: leadsAct.length, change: calcChange(leadsAct.length, leadsPrev.length), trend: leadsAct.length >= leadsPrev.length ? 'up' : 'down' },
@@ -376,10 +436,12 @@ export default function EstadisticasPage() {
           { name: '5-15 min', value: rangosPrimeraRespuesta.moderado, color: '#f59e0b' },
           { name: '15-60 min', value: rangosPrimeraRespuesta.lento, color: '#ef4444' },
           { name: '> 60 min', value: rangosPrimeraRespuesta.muyLento, color: '#7c2d12' }
-        ]
+        ],
+        demandEtiquetasData,
+        demandCategoriasData
       }
     };
-  }, [leads, etapas, conversaciones, tareas, contactos, agentes, loading, dateRange]);
+  }, [leads, etapas, conversaciones, tareas, contactos, agentes, categorias, etiquetas, loading, dateRange]);
 
   const handleExportCSV = () => {
     if (!metrics) return;
@@ -479,8 +541,8 @@ export default function EstadisticasPage() {
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: 'var(--text-tertiary-light)', fontSize: 10, fontWeight: 700}} dy={10} />
                 <YAxis axisLine={false} tickLine={false} tick={{fill: 'var(--text-tertiary-light)', fontSize: 10, fontWeight: 700}} />
                 <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)' }} />
-                <Area type="monotone" dataKey="leads" stroke="var(--accent-active)" strokeWidth={3} fill="url(#colorL)" />
-                <Area type="monotone" dataKey="contactos" stroke="#8b5cf6" strokeWidth={3} fill="url(#colorC)" />
+                <Area type="monotone" dataKey="leads" name="Leads" stroke="var(--accent-active)" strokeWidth={3} fill="url(#colorL)" />
+                <Area type="monotone" dataKey="contactos" name="Contactos" stroke="#8b5cf6" strokeWidth={3} fill="url(#colorC)" />
               </AreaChart>
             </ChartContainer>
 
@@ -558,7 +620,7 @@ export default function EstadisticasPage() {
                 >
                   {data.chatAdvanced.chatResolutionData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                 </Pie>
-                <Tooltip />
+                <Tooltip formatter={(value: any) => [value, "Conversaciones"]} />
                 <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px' }} />
               </PieChart>
             </ChartContainer>
@@ -568,11 +630,56 @@ export default function EstadisticasPage() {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10}} />
                 <YAxis axisLine={false} tickLine={false} />
-                <Tooltip cursor={{fill: 'transparent'}} />
-                <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                <Tooltip cursor={{fill: 'transparent'}} formatter={(value: any) => [value, "Conversaciones"]} />
+                <Bar dataKey="value" name="Conversaciones" radius={[8, 8, 0, 0]}>
                   {data.chatAdvanced.desgloseTiempos.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                 </Bar>
               </BarChart>
+            </ChartContainer>
+          </div>
+
+          {/* Gráficos de Demanda por Etiqueta y Categoría */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <ChartContainer title="Demanda por Etiqueta" subtitle="Top 10 etiquetas con más chats" className="lg:col-span-2">
+              {data.chatAdvanced.demandEtiquetasData.length > 0 ? (
+                <BarChart data={data.chatAdvanced.demandEtiquetasData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
+                  <XAxis type="number" hide />
+                  <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700}} width={100} />
+                  <Tooltip cursor={{fill: 'rgba(0,0,0,0.02)'}} formatter={(value: any) => [value, "Conversaciones"]} />
+                  <Bar dataKey="value" name="Conversaciones" radius={[0, 8, 8, 0]} label={{ position: 'right', fontSize: 11, fontWeight: 'bold' }}>
+                    {data.chatAdvanced.demandEtiquetasData.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                  </Bar>
+                </BarChart>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-[var(--text-tertiary-light)]">
+                  <Inbox className="w-12 h-12 mb-4 opacity-20" />
+                  <p className="text-[10px] font-black uppercase tracking-widest">Sin etiquetas en este rango</p>
+                </div>
+              )}
+            </ChartContainer>
+
+            <ChartContainer title="Demanda por Categoría" subtitle="Chats agrupados por categoría" className="lg:col-span-1">
+              {data.chatAdvanced.demandCategoriasData.length > 0 ? (
+                <PieChart>
+                  <Pie 
+                    data={data.chatAdvanced.demandCategoriasData} 
+                    innerRadius={65} 
+                    outerRadius={90} 
+                    paddingAngle={5} 
+                    dataKey="value"
+                  >
+                    {data.chatAdvanced.demandCategoriasData.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                  </Pie>
+                  <Tooltip formatter={(value: any) => [value, "Conversaciones"]} />
+                  <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px' }} />
+                </PieChart>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-[var(--text-tertiary-light)]">
+                  <Inbox className="w-12 h-12 mb-4 opacity-20" />
+                  <p className="text-[10px] font-black uppercase tracking-widest">Sin categorías en este rango</p>
+                </div>
+              )}
             </ChartContainer>
           </div>
 
@@ -686,7 +793,7 @@ export default function EstadisticasPage() {
                   <Pie data={data.leadSourceData} innerRadius={60} outerRadius={90} paddingAngle={5} dataKey="value" label={({name, value}: any) => `${name}: ${value}`}>
                     {data.leadSourceData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip formatter={(value: any) => [value, "Leads"]} />
                 </PieChart>
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-[var(--text-tertiary-light)]">
@@ -782,7 +889,7 @@ export default function EstadisticasPage() {
                 >
                   {data.tareasStatusData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                 </Pie>
-                <Tooltip />
+                <Tooltip formatter={(value: any) => [value, "Tareas"]} />
                 <Legend verticalAlign="bottom" height={36}/>
               </PieChart>
             </ChartContainer>
@@ -791,8 +898,8 @@ export default function EstadisticasPage() {
               <BarChart data={data.tareasPriorityData} layout="vertical">
                 <XAxis type="number" hide />
                 <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700}} width={70} />
-                <Tooltip cursor={{fill: 'rgba(0,0,0,0.02)'}} />
-                <Bar dataKey="value" radius={[0, 10, 10, 0]} label={{ position: 'right', fontSize: 12, fontWeight: 'bold' }}>
+                <Tooltip cursor={{fill: 'rgba(0,0,0,0.02)'}} formatter={(value: any) => [value, "Tareas"]} />
+                <Bar dataKey="value" name="Tareas" radius={[0, 10, 10, 0]} label={{ position: 'right', fontSize: 12, fontWeight: 'bold' }}>
                   {data.tareasPriorityData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                 </Bar>
               </BarChart>
@@ -809,10 +916,11 @@ export default function EstadisticasPage() {
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
               <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10}} />
               <YAxis axisLine={false} tickLine={false} />
-              <Tooltip />
+              <Tooltip formatter={(value: any) => [value, "Contactos"]} />
               <Area 
                 type="monotone" 
                 dataKey="contactos" 
+                name="Contactos"
                 stroke="#8b5cf6" 
                 strokeWidth={4} 
                 fill="url(#colorContacts)"
