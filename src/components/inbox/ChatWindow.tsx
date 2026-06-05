@@ -695,7 +695,14 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
                             className="max-w-xs rounded-xl shadow-sm"
                           />
                         )}
-                        {(msg.metadata.mediaType === "document" || msg.metadata.mediaType === "audio") && (
+                        {msg.metadata.mediaType === "audio" && (
+                          <audio 
+                            src={msg.metadata.mediaUrl} 
+                            controls 
+                            className="max-w-xs rounded-xl shadow-sm"
+                          />
+                        )}
+                        {msg.metadata.mediaType === "document" && (
                           <a 
                             href={msg.metadata.mediaUrl} 
                             target="_blank" 

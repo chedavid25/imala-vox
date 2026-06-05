@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Send, Sparkles, ChevronLeft, Info, Plus, Paperclip, Smile, Loader2, Clock, CornerUpRight, Search as SearchIcon } from "lucide-react";
+import { Send, Sparkles, ChevronLeft, Info, Plus, Paperclip, Smile, Loader2, Clock, CornerUpRight, Search as SearchIcon, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar } from "@/components/ui/Avatar";
@@ -235,14 +235,59 @@ export function MobileConversationView({
                 )}
 
                 <div className={cn(
-                  "rounded-2xl p-3 shadow-sm relative",
+                  "rounded-2xl p-3 shadow-sm relative flex flex-col gap-2",
                   isNote 
                     ? "bg-amber-50 border border-amber-100 text-amber-900 mx-auto text-center text-xs italic" 
                     : isMe 
                       ? "bg-[#D9FDD3] text-slate-800 rounded-tr-none after:absolute after:top-0 after:-right-2 after:w-3 after:h-4 after:bg-[#D9FDD3] after:[clip-path:polygon(0_0,0_100%,100%_0)]" 
                       : "bg-white text-slate-800 rounded-tl-none after:absolute after:top-0 after:-left-2 after:w-3 after:h-4 after:bg-white after:[clip-path:polygon(100%_0,100%_100%,0_0)]"
                 )}>
-                  <p className="text-[14px] leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                  {msg.metadata?.mediaUrl && (
+                    <div className="w-full">
+                      {msg.metadata.mediaType === "image" && (
+                        <img 
+                          src={msg.metadata.mediaUrl} 
+                          alt={msg.metadata.fileName || "Imagen"} 
+                          className="max-w-full max-h-60 rounded-xl object-cover cursor-pointer hover:opacity-95 active:scale-98 transition-all"
+                          onClick={() => window.open(msg.metadata.mediaUrl, "_blank")}
+                        />
+                      )}
+                      {msg.metadata.mediaType === "video" && (
+                        <video 
+                          src={msg.metadata.mediaUrl} 
+                          controls 
+                          className="max-w-full rounded-xl shadow-sm"
+                        />
+                      )}
+                      {msg.metadata.mediaType === "audio" && (
+                        <audio 
+                          src={msg.metadata.mediaUrl} 
+                          controls 
+                          className="max-w-full rounded-xl shadow-sm"
+                        />
+                      )}
+                      {msg.metadata.mediaType === "document" && (
+                        <a 
+                          href={msg.metadata.mediaUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className={cn(
+                            "flex items-center gap-2.5 p-3 rounded-xl border transition-all text-xs font-semibold select-none",
+                            isMe 
+                              ? "bg-black/5 hover:bg-black/10 border-black/10 text-slate-800" 
+                              : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800"
+                          )}
+                        >
+                          <FileText className="size-5 shrink-0 text-slate-500" />
+                          <span className="truncate max-w-[150px]">{msg.metadata.fileName || "Descargar archivo"}</span>
+                        </a>
+                      )}
+                    </div>
+                  )}
+
+                  {(!msg.metadata?.mediaUrl && msg.text) && (
+                    <p className="text-[14px] leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                  )}
                   <div className="flex justify-end mt-1">
                     <span className="text-[9px] font-semibold text-slate-400 tabular-nums uppercase tracking-tighter">
                       {msg.creadoEl ? new Date(msg.creadoEl.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
