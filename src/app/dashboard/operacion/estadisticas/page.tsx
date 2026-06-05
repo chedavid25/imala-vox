@@ -551,11 +551,10 @@ export default function EstadisticasPage() {
               <PieChart>
                 <Pie 
                   data={data.chatAdvanced.chatResolutionData} 
-                  innerRadius={70} 
-                  outerRadius={95} 
+                  innerRadius={65} 
+                  outerRadius={90} 
                   paddingAngle={5} 
                   dataKey="value"
-                  label={({name, percent}: any) => `${name}: ${Math.round(percent * 100)}%`}
                 >
                   {data.chatAdvanced.chatResolutionData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                 </Pie>
