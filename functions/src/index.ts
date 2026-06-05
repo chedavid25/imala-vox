@@ -326,12 +326,25 @@ export const recibirMensajeWhatsApp = functions.https.onRequest(async (req: func
                                      contactoData.aiBlocked !== true && 
                                      convData.modoIA !== 'pausado';
 
-          await convRef.update({
+          const timeNow = admin.firestore.Timestamp.now();
+          const updates: any = {
             ultimoMensaje: text,
             ultimaActividad: admin.firestore.FieldValue.serverTimestamp(),
             ultimoMensajeCliente: admin.firestore.FieldValue.serverTimestamp(),
+            ultimoMensajeClienteEl: timeNow,
             ...(!seraRespondidoPorIA ? { unreadCount: admin.firestore.FieldValue.increment(1) } : {})
-          });
+          };
+
+          // Determinar si es un nuevo ciclo de mensajes del cliente
+          const ultimoMsgFueCliente = convData.ultimoMensajeClienteEl && 
+            convData.ultimaActividad && 
+            convData.ultimoMensajeClienteEl.seconds >= convData.ultimaActividad.seconds;
+
+          if (!ultimoMsgFueCliente) {
+            updates.primerMensajeClienteEl = timeNow;
+          }
+
+          await convRef.update(updates);
 
           // ── 7. Retornos tempranos para flujo de la IA ──
           if (contactoData.aiBlocked === true) {
@@ -1154,3 +1167,71 @@ export const mercadopagoWebhook = functions.https.onRequest(async (req, res) => 
     console.error("[mp-webhook] Error procesando notificación:", err);
   }
 });
+
+/**
+ * onMensajeCreado
+ * Disparador: Cuando se crea un mensaje en cualquier conversación
+ * Responsabilidad: Calcular y acumular tiempos de respuesta y estadísticas de resolución
+ */
+export const onMensajeCreado = functions.firestore
+  .document('espaciosDeTrabajo/{wsId}/conversaciones/{convId}/mensajes/{msgId}')
+  .onCreate(async (snap, context) => {
+    const { wsId, convId } = context.params;
+    const msgData = snap.data();
+    if (!msgData) return;
+
+    const db = admin.firestore();
+    const convRef = db.doc(`espaciosDeTrabajo/${wsId}/conversaciones/${convId}`);
+    
+    try {
+      const convSnap = await convRef.get();
+      if (!convSnap.exists) return;
+      const convData = convSnap.data()!;
+
+      const timeNow = msgData.creadoEl || admin.firestore.Timestamp.now();
+
+      if (msgData.from === 'user') {
+        // Mensaje entrante del cliente
+        const updates: any = {
+          ultimoMensajeClienteEl: timeNow,
+          actualizadoEl: admin.firestore.FieldValue.serverTimestamp()
+        };
+
+        // Si es un nuevo ciclo de mensajes del cliente
+        const ultimoMsgFueCliente = convData.ultimoMensajeClienteEl && 
+          convData.ultimaActividad && 
+          convData.ultimoMensajeClienteEl.seconds >= convData.ultimaActividad.seconds;
+
+        if (!ultimoMsgFueCliente) {
+          updates.primerMensajeClienteEl = timeNow;
+        }
+
+        await convRef.update(updates);
+      } else if (msgData.from === 'operator' || msgData.from === 'bot') {
+        // Respuesta del operador o de la IA
+        const updates: any = {};
+
+        if (convData.ultimoMensajeClienteEl) {
+          const diffSegundos = Math.max(0, timeNow.seconds - convData.ultimoMensajeClienteEl.seconds);
+
+          if (msgData.from === 'bot') {
+            updates.respuestasIAContador = admin.firestore.FieldValue.increment(1);
+            updates.tiempoRespuestaIAAcumulado = admin.firestore.FieldValue.increment(diffSegundos);
+          } else {
+            updates.respuestasHumanoContador = admin.firestore.FieldValue.increment(1);
+            updates.tiempoRespuestaHumanoAcumulado = admin.firestore.FieldValue.increment(diffSegundos);
+          }
+
+          // Registrar tiempo de primera respuesta si corresponde
+          if (convData.primerMensajeClienteEl && !convData.tiempoPrimeraRespuesta) {
+            const diffPrimera = Math.max(0, timeNow.seconds - convData.primerMensajeClienteEl.seconds);
+            updates.tiempoPrimeraRespuesta = diffPrimera;
+          }
+        }
+
+        await convRef.update(updates);
+      }
+    } catch (error) {
+      console.error("Error en trigger onMensajeCreado:", error);
+    }
+  });

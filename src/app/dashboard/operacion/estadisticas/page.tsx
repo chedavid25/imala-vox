@@ -26,7 +26,8 @@ import {
   PieChart as PieChartIcon,
   Download,
   FileSpreadsheet,
-  FileText
+  FileText,
+  HelpCircle
 } from 'lucide-react';
 import { 
   AreaChart, 
@@ -186,11 +187,99 @@ export default function EstadisticasPage() {
     });
 
     // B. Chats Stats
+    let totalPrimeraRespuesta = 0;
+    let primeraRespuestaCount = 0;
+    let totalRespuestaIA = 0;
+    let respuestasIACount = 0;
+    let totalRespuestaHumano = 0;
+    let respuestasHumanoCount = 0;
+
+    let resolucionIA = 0;
+    let derivacionHumano = 0;
+    let sinIntervencion = 0;
+
+    // Mapa de calor (Lunes=0 a Domingo=6, 6 bloques de 4 horas: 00-04, 04-08, 08-12, 12-16, 16-20, 20-00)
+    const heatMapData = Array.from({ length: 7 }, () => Array(6).fill(0));
+
+    // Rangos de primera respuesta
+    const rangosPrimeraRespuesta = {
+      rapido: 0,    // < 1 min
+      medio: 0,     // 1-5 min
+      moderado: 0,  // 5-15 min
+      lento: 0,     // 15-60 min
+      muyLento: 0   // > 60 min
+    };
+
+    convAct.forEach(c => {
+      // Tiempos de respuesta
+      if (c.tiempoPrimeraRespuesta !== undefined && c.tiempoPrimeraRespuesta !== null) {
+        totalPrimeraRespuesta += c.tiempoPrimeraRespuesta;
+        primeraRespuestaCount++;
+
+        const minutos = c.tiempoPrimeraRespuesta / 60;
+        if (minutos < 1) rangosPrimeraRespuesta.rapido++;
+        else if (minutos < 5) rangosPrimeraRespuesta.medio++;
+        else if (minutos < 15) rangosPrimeraRespuesta.moderado++;
+        else if (minutos < 60) rangosPrimeraRespuesta.lento++;
+        else rangosPrimeraRespuesta.muyLento++;
+      }
+
+      if (c.tiempoRespuestaIAAcumulado && c.respuestasIAContador) {
+        totalRespuestaIA += c.tiempoRespuestaIAAcumulado;
+        respuestasIACount += c.respuestasIAContador;
+      }
+
+      if (c.tiempoRespuestaHumanoAcumulado && c.respuestasHumanoContador) {
+        totalRespuestaHumano += c.tiempoRespuestaHumanoAcumulado;
+        respuestasHumanoCount += c.respuestasHumanoContador;
+      }
+
+      // Resolución
+      if (c.necesitaHumano === true) {
+        derivacionHumano++;
+      } else if (c.respuestasIAContador && c.respuestasIAContador > 0) {
+        resolucionIA++;
+      } else {
+        sinIntervencion++;
+      }
+
+      // Mapa de calor (Día de la semana y Bloque de hora)
+      if (c.ultimaActividad) {
+        const fecha = c.ultimaActividad.toDate();
+        // Convertir Sunday=0 to index 6, Monday=1 to index 0, etc.
+        const dia = fecha.getDay() === 0 ? 6 : fecha.getDay() - 1;
+        const hora = fecha.getHours();
+        const bloque = Math.floor(hora / 4);
+        heatMapData[dia][bloque]++;
+      }
+    });
+
+    const promedioPrimeraRespuesta = primeraRespuestaCount > 0 ? Math.round(totalPrimeraRespuesta / primeraRespuestaCount) : 0;
+    const promedioRespuestaIA = respuestasIACount > 0 ? Math.round(totalRespuestaIA / respuestasIACount) : 0;
+    const promedioRespuestaHumano = respuestasHumanoCount > 0 ? Math.round(totalRespuestaHumano / respuestasHumanoCount) : 0;
+
+    const formatDuration = (segundos: number) => {
+      if (!segundos) return "0s";
+      if (segundos < 60) return `${segundos}s`;
+      const minutos = Math.floor(segundos / 60);
+      const segs = segundos % 60;
+      if (minutos < 60) return `${minutos}m ${segs}s`;
+      const horas = Math.floor(minutos / 60);
+      const mins = minutos % 60;
+      return `${horas}h ${mins}m`;
+    };
+
     const convAI = convAct.filter(c => c.modoIA === 'auto').length;
     const convManual = convAct.length - convAI;
     const chatSourceData = [
       { name: 'IA Auto', value: convAI, color: 'var(--accent-active)' },
       { name: 'Manual', value: convManual, color: '#94a3b8' }
+    ].filter(s => s.value > 0);
+
+    const chatResolutionData = [
+      { name: 'Resuelto IA', value: resolucionIA, color: '#10b981' },
+      { name: 'Derivado Humano', value: derivacionHumano, color: '#f59e0b' },
+      { name: 'Sin Intervención', value: sinIntervencion, color: '#94a3b8' }
     ].filter(s => s.value > 0);
 
     // C. Tareas Stats
@@ -260,7 +349,23 @@ export default function EstadisticasPage() {
         stage: e.nombre,
         count: leadsAct.filter(l => l.etapaId === e.id).length,
         color: e.color || '#3b82f6'
-      }))
+      })),
+      chatAdvanced: {
+        promedioPrimeraRespuesta: formatDuration(promedioPrimeraRespuesta),
+        promedioRespuestaIA: formatDuration(promedioRespuestaIA),
+        promedioRespuestaHumano: formatDuration(promedioRespuestaHumano),
+        tasaIA: convAct.length > 0 ? Math.round((resolucionIA / convAct.length) * 100) : 0,
+        tasaHumano: convAct.length > 0 ? Math.round((derivacionHumano / convAct.length) * 100) : 0,
+        chatResolutionData,
+        heatMapData,
+        desgloseTiempos: [
+          { name: '< 1 min', value: rangosPrimeraRespuesta.rapido, color: '#10b981' },
+          { name: '1-5 min', value: rangosPrimeraRespuesta.medio, color: '#3b82f6' },
+          { name: '5-15 min', value: rangosPrimeraRespuesta.moderado, color: '#f59e0b' },
+          { name: '15-60 min', value: rangosPrimeraRespuesta.lento, color: '#ef4444' },
+          { name: '> 60 min', value: rangosPrimeraRespuesta.muyLento, color: '#7c2d12' }
+        ]
+      }
     };
   }, [leads, etapas, conversaciones, tareas, contactos, agentes, loading, dateRange]);
 
@@ -389,35 +494,134 @@ export default function EstadisticasPage() {
         </TabsContent>
 
         <TabsContent value="chats" className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <ChartContainer title="Segmentación de Respuestas" subtitle="IA vs Humano">
+          {/* KPIs Avanzados de Chats */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <StatsCard 
+              title="Primer Respuesta Promedio" 
+              value={data.chatAdvanced.promedioPrimeraRespuesta} 
+              change="General" 
+              trend="up" 
+              icon={<Clock className="w-5 h-5" />} 
+              color="blue" 
+              tooltip="Tiempo promedio que transcurre desde que el cliente envía su primer mensaje hasta que recibe una respuesta de la IA o de un operador."
+            />
+            <StatsCard 
+              title="Tasa de Resolución IA" 
+              value={`${data.chatAdvanced.tasaIA}%`} 
+              change="Autónomo" 
+              trend="up" 
+              icon={<Zap className="w-5 h-5" />} 
+              color="emerald" 
+              tooltip="Porcentaje de conversaciones gestionadas y resueltas exclusivamente por la IA sin requerir intervención humana."
+            />
+            <StatsCard 
+              title="Respuesta Promedio IA" 
+              value={data.chatAdvanced.promedioRespuestaIA} 
+              change="IA" 
+              trend="up" 
+              icon={<Bot className="w-5 h-5" />} 
+              color="purple" 
+              tooltip="Tiempo promedio que tarda la IA en responder a los mensajes individuales del cliente."
+            />
+            <StatsCard 
+              title="Respuesta Promedio Humano" 
+              value={data.chatAdvanced.promedioRespuestaHumano} 
+              change="Soporte" 
+              trend="up" 
+              icon={<Users className="w-5 h-5" />} 
+              color="amber" 
+              tooltip="Tiempo promedio que tardan los operadores humanos en responder tras la intervención o asignación del chat."
+            />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <ChartContainer title="Resolución de Chats" subtitle="IA vs Derivaciones a Humano" className="lg:col-span-1">
               <PieChart>
                 <Pie 
-                  data={data.chatSourceData} 
-                  innerRadius={80} 
-                  outerRadius={110} 
-                  paddingAngle={8} 
+                  data={data.chatAdvanced.chatResolutionData} 
+                  innerRadius={70} 
+                  outerRadius={95} 
+                  paddingAngle={5} 
                   dataKey="value"
-                  label={({name, value, percent}: any) => `${name}: ${value} (${Math.round(percent * 100)}%)`}
+                  label={({name, percent}: any) => `${name}: ${Math.round(percent * 100)}%`}
                 >
-                  {data.chatSourceData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                  {data.chatAdvanced.chatResolutionData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                 </Pie>
                 <Tooltip />
-                <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
+                <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px' }} />
               </PieChart>
             </ChartContainer>
-            
-            <ChartContainer title="Mensajes por Canal" subtitle="Volumen de entrada">
-              <BarChart data={data.leadSourceData}>
+
+            <ChartContainer title="Distribución de Tiempos" subtitle="Tiempo de primera respuesta" className="lg:col-span-2">
+              <BarChart data={data.chatAdvanced.desgloseTiempos}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10}} />
                 <YAxis axisLine={false} tickLine={false} />
                 <Tooltip cursor={{fill: 'transparent'}} />
-                <Bar dataKey="value" radius={[10, 10, 0, 0]}>
-                  {data.leadSourceData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                  {data.chatAdvanced.desgloseTiempos.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                 </Bar>
               </BarChart>
             </ChartContainer>
+          </div>
+
+          {/* Mapa de Calor de Actividad de Chats */}
+          <div className="bg-[var(--bg-card)] rounded-[32px] p-8 border border-[var(--border-light)] shadow-sm">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-bold text-[var(--text-primary-light)] tracking-tight">Mapa de Calor de Conversaciones</h3>
+                <p className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest mt-1">Volumen de actividad según Día y Franja Horaria</p>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-[var(--text-tertiary-light)]">
+                <span>Menos</span>
+                <div className="w-3.5 h-3.5 bg-emerald-50 rounded" />
+                <div className="w-3.5 h-3.5 bg-emerald-200 rounded" />
+                <div className="w-3.5 h-3.5 bg-emerald-400 rounded" />
+                <div className="w-3.5 h-3.5 bg-emerald-600 rounded" />
+                <span>Más</span>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <div className="min-w-[700px] space-y-2">
+                {/* Cabecera de horas */}
+                <div className="grid grid-cols-7 gap-2 text-center text-[9px] font-black uppercase text-[var(--text-tertiary-light)] tracking-widest pl-[100px]">
+                  <div>Madrugada<span className="block text-[8px] font-medium font-mono text-gray-400">00:00 - 04:00</span></div>
+                  <div>Mañana Temp.<span className="block text-[8px] font-medium font-mono text-gray-400">04:00 - 08:00</span></div>
+                  <div>Mañana/Mediodía<span className="block text-[8px] font-medium font-mono text-gray-400">08:00 - 12:00</span></div>
+                  <div>Tarde Temprana<span className="block text-[8px] font-medium font-mono text-gray-400">12:00 - 16:00</span></div>
+                  <div>Tarde/Noche<span className="block text-[8px] font-medium font-mono text-gray-400">16:00 - 20:00</span></div>
+                  <div>Noche Tardía<span className="block text-[8px] font-medium font-mono text-gray-400">20:00 - 00:00</span></div>
+                </div>
+
+                {/* Filas de días */}
+                {['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'].map((diaLabel, diaIdx) => (
+                  <div key={diaLabel} className="flex items-center gap-2">
+                    <div className="w-[100px] text-xs font-bold text-[var(--text-secondary-light)]">{diaLabel}</div>
+                    <div className="grid grid-cols-7 gap-2 flex-1">
+                      {Array.from({ length: 6 }).map((_, bloqueIdx) => {
+                        const valor = data.chatAdvanced.heatMapData[diaIdx]?.[bloqueIdx] || 0;
+                        // Calcular color basado en la intensidad
+                        let colorBg = 'bg-emerald-50 text-emerald-700';
+                        if (valor > 10) colorBg = 'bg-emerald-600 text-white font-bold';
+                        else if (valor > 5) colorBg = 'bg-emerald-400 text-emerald-950 font-bold';
+                        else if (valor > 0) colorBg = 'bg-emerald-200 text-emerald-900';
+
+                        return (
+                          <div 
+                            key={bloqueIdx} 
+                            className={`h-11 rounded-xl flex items-center justify-center text-xs transition-all hover:scale-105 cursor-default ${colorBg}`}
+                            title={`${valor} chats en esta franja`}
+                          >
+                            {valor}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </TabsContent>
 
@@ -613,7 +817,7 @@ export default function EstadisticasPage() {
 
 // --- COMPONENTES AUXILIARES ---
 
-function StatsCard({ title, value, change, trend, icon, color }: any) {
+function StatsCard({ title, value, change, trend, icon, color, tooltip }: any) {
   const isUp = trend === 'up';
   const colorMap: any = {
     blue: 'bg-blue-50 text-blue-600 border-blue-100',
@@ -623,14 +827,25 @@ function StatsCard({ title, value, change, trend, icon, color }: any) {
   };
 
   return (
-    <div className="bg-[var(--bg-card)] rounded-[32px] p-6 border border-[var(--border-light)] hover:border-[var(--border-light-strong)] transition-all group shadow-sm">
+    <div className="bg-[var(--bg-card)] rounded-[32px] p-6 border border-[var(--border-light)] hover:border-[var(--border-light-strong)] transition-all group shadow-sm relative">
       <div className="flex items-start justify-between mb-4">
         <div className={`w-10 h-10 rounded-xl ${colorMap[color]} border flex items-center justify-center transition-transform group-hover:scale-110`}>
           {icon}
         </div>
-        <div className={`flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-lg ${isUp ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
-          {isUp ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-          {change}
+        <div className="flex items-center gap-2">
+          {tooltip && (
+            <div className="relative group/tooltip">
+              <HelpCircle className="w-4 h-4 text-[var(--text-tertiary-light)] hover:text-[var(--text-secondary-light)] cursor-help transition-colors" />
+              <div className="absolute bottom-full right-0 mb-2 w-64 bg-slate-900 text-white text-[11px] p-3 rounded-xl shadow-xl opacity-0 group-hover/tooltip:opacity-100 pointer-events-none transition-all duration-300 z-50 leading-relaxed font-normal">
+                {tooltip}
+                <div className="absolute top-full right-2 border-4 border-transparent border-t-slate-900" />
+              </div>
+            </div>
+          )}
+          <div className={`flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-lg ${isUp ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
+            {isUp ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+            {change}
+          </div>
         </div>
       </div>
       <div>

@@ -279,6 +279,15 @@ export interface Conversacion {
   modoIA: 'auto' | 'copiloto';     // Puede heredar del agente o ser forzado aquí
   statusIA: 'thinking' | 'idle' | 'warning';
   necesitaHumano?: boolean;        // Si la IA delegó la conversación
+
+  // ESTADÍSTICAS Y TIEMPOS DE RESPUESTA
+  tiempoPrimeraRespuesta?: number | null;
+  primerMensajeClienteEl?: Timestamp | null;
+  ultimoMensajeClienteEl?: Timestamp | null;
+  respuestasHumanoContador?: number;
+  tiempoRespuestaHumanoAcumulado?: number;
+  respuestasIAContador?: number;
+  tiempoRespuestaIAAcumulado?: number;
 }
 
 export interface Mensaje {
