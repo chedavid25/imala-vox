@@ -727,7 +727,8 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
            textoUsuario: textoProcesar,
            historial,
            isCopiloto,
-           contactoNombre
+           contactoNombre,
+           metadata: metaMsgMetadata
         });
 
         if (!isCopiloto && respuestaIA) {
@@ -900,7 +901,9 @@ async function procesarMediaEntranteWA(
     const buffer = Buffer.from(await dlRes.arrayBuffer());
 
     // 3. Determinar extensión y tipo normalizado
-    const mimeType = mimeTypeFromApi || dlRes.headers.get('content-type')?.split(';')[0].trim() || 'application/octet-stream';
+    // Limpiamos el MIME antes de lookup: 360dialog envía "audio/ogg; codecs=opus" que no está en EXT_MAP
+    const rawMime = mimeTypeFromApi || dlRes.headers.get('content-type') || 'application/octet-stream';
+    const mimeType = rawMime.split(';')[0].trim();
     const ext = EXT_MAP[mimeType] || 'bin';
     const normalizedType = ['image', 'video', 'audio'].includes(mediaType) ? mediaType : 'document';
     const fileName = `${mediaId}.${ext}`;
@@ -1238,7 +1241,8 @@ export async function procesarMensajeWhatsapp(value: any, wabaId: string) {
           textoUsuario: textoProcesar,
           historial,
           isCopiloto,
-          contactoNombre
+          contactoNombre,
+          metadata: mensajeMetadata
         });
 
         if (!isCopiloto && respuestaIA) {

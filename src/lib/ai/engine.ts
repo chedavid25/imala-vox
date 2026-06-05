@@ -12,6 +12,11 @@ interface MensajeProcesar {
   historial?: any[]; // Últimos mensajes para contexto
   isCopiloto?: boolean;
   contactoNombre?: string;
+  metadata?: {
+    mediaUrl?: string;
+    mediaType?: string;
+    fileName?: string;
+  };
 }
 
 /**
@@ -24,7 +29,8 @@ export async function procesarMensajeConIA({
   textoUsuario,
   historial = [],
   isCopiloto = false,
-  contactoNombre = "Desconocido"
+  contactoNombre = "Desconocido",
+  metadata
 }: MensajeProcesar) {
   try {
     // 1. Clasificación de Intención (Modelo Gemini 2.5 Flash-Lite - Ultra eficiente)
@@ -44,6 +50,30 @@ export async function procesarMensajeConIA({
       systemPrompt + `\n\n--- INFORMACIÓN EN TIEMPO REAL ---\nEl cliente con el que estás hablando en este momento se llama: ${contactoNombre}. Dirígete por su nombre si es apropiado.`
     );
 
+    // 3.5 Descargar y procesar archivos adjuntos para Gemini si existen
+    const contentParts: any[] = [textoUsuario];
+    if (metadata?.mediaUrl && (metadata.mediaType === "image" || metadata.mediaType === "audio")) {
+      try {
+        console.log(`[IA-MULTIMODAL] Descargando adjunto para Gemini: ${metadata.mediaUrl}`);
+        const mediaRes = await fetch(metadata.mediaUrl);
+        if (mediaRes.ok) {
+          const mediaBuffer = await mediaRes.arrayBuffer();
+          const base64Data = Buffer.from(mediaBuffer).toString("base64");
+          const mimeType = mediaRes.headers.get("content-type") || (metadata.mediaType === "image" ? "image/jpeg" : "audio/ogg");
+          
+          contentParts.push({
+            inlineData: {
+              data: base64Data,
+              mimeType: mimeType.split(";")[0].trim()
+            }
+          });
+          console.log(`[IA-MULTIMODAL] Adjunto de tipo ${mimeType} inyectado exitosamente en Gemini.`);
+        }
+      } catch (mediaErr) {
+        console.error("[IA-MULTIMODAL] Error al descargar/procesar el archivo para Gemini:", mediaErr);
+      }
+    }
+
     const chat = model.startChat({
       history: historial.map(m => ({
         role: (m.from === 'user' ? 'user' : 'model') as 'user' | 'model',
@@ -51,7 +81,7 @@ export async function procesarMensajeConIA({
       }))
     });
 
-    const result = await chat.sendMessage(textoUsuario);
+    const result = await chat.sendMessage(contentParts);
     let respuestaTexto = result.response.text();
 
     // Extraer y ocultar etiquetas [ETIQUETA: Nombre]
