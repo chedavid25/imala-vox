@@ -5,11 +5,11 @@ import { CanalBadge } from "@/components/ui/CanalBadge";
 import { useContactos } from "@/hooks/useContactos";
 import { IndicadorIA } from "@/components/ui/IndicadorIA";
 import { cn } from "@/lib/utils";
-import { Send, Paperclip, Smile, Sparkles, CheckCircle2, UserPlus, MoreVertical, MessageCircle, ChevronDown, CheckCircle, Clock, AlertTriangle, FileText, ChevronRight, ImageIcon, X } from "lucide-react";
+import { Send, Paperclip, Smile, Sparkles, CheckCircle2, UserPlus, MoreVertical, MessageCircle, ChevronDown, CheckCircle, Clock, AlertTriangle, FileText, ChevronRight, ImageIcon, X, CornerUpRight, Search as SearchIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { db, storage } from "@/lib/firebase";
-import { doc, updateDoc, collection, onSnapshot, query, Timestamp, addDoc } from "firebase/firestore";
+import { doc, updateDoc, collection, onSnapshot, query, Timestamp, addDoc, getDocs } from "firebase/firestore";
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { COLLECTIONS, Agente } from "@/lib/types/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
@@ -30,6 +30,8 @@ import { getDoc } from "firebase/firestore";
 import { Contacto } from "@/lib/types/firestore";
 import { Loader2 } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 interface ChatWindowProps {
   conversacion: any;
@@ -43,6 +45,10 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
   const [mode, setMode] = useState<'public' | 'internal'>('public');
   const [miembros, setMiembros] = useState<any[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [forwardMsg, setForwardMsg] = useState<any | null>(null);
+  const [forwardSearch, setForwardSearch] = useState("");
+  const [allConversaciones, setAllConversaciones] = useState<any[]>([]);
+  const [isForwarding, setIsForwarding] = useState(false);
   const { currentWorkspaceId } = useWorkspaceStore();
   const [isRequestingSuggestion, setIsRequestingSuggestion] = useState(false);
   const [plantillas, setPlantillas] = useState<PlantillaWA[]>([]);
@@ -220,6 +226,64 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
       toast.error("Error al actualizar estado pendiente");
     }
   };
+
+  const handleForwardMessage = async (destConv: any) => {
+    if (!currentWorkspaceId || !forwardMsg) return;
+    setIsForwarding(true);
+    try {
+      const destId = destConv.id;
+      const text = forwardMsg.text || "";
+      const isInternal = false;
+      const metadata = forwardMsg.metadata 
+        ? { ...forwardMsg.metadata, isForwarded: true } 
+        : { isForwarded: true };
+
+      // Guardar el mensaje en la base de datos de la conversación destino
+      const messagesRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES, destId, COLLECTIONS.MENSAJES);
+      await addDoc(messagesRef, {
+        text,
+        from: 'operator',
+        creadoEl: Timestamp.now(),
+        metadata
+      });
+
+      // Actualizar la última actividad en la conversación destino
+      const convRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES, destId);
+      await updateDoc(convRef, {
+        ultimoMensaje: text || (metadata.mediaType === 'image' ? '📎 Imagen' : '📎 Archivo'),
+        ultimaActividad: Timestamp.now()
+      });
+
+      // Si es WhatsApp o similar y tiene destinatario mapeado en el contacto
+      const contactSnap = await getDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS, destConv.contactoId));
+      if (contactSnap.exists()) {
+        const contactData = contactSnap.data() as Contacto;
+        const destinatario = (contactData as any).metaId || contactData.telefono;
+        if (destinatario && !metadata.isInternalNote) {
+          const mediaObj = metadata.mediaUrl ? { tipo: metadata.mediaType as 'image' | 'video' | 'document', url: metadata.mediaUrl } : undefined;
+          await enviarMensajeAccion(currentWorkspaceId, destConv.canalId, destinatario, text || undefined, mediaObj);
+        }
+      }
+
+      toast.success("Mensaje reenviado con éxito");
+      setForwardMsg(null);
+    } catch (error: any) {
+      console.error("Error reenviando mensaje:", error);
+      toast.error("No se pudo reenviar el mensaje");
+    } finally {
+      setIsForwarding(false);
+    }
+  };
+
+  useEffect(() => {
+    if (forwardMsg && currentWorkspaceId) {
+      // Cargar todas las conversaciones para listar en el modal de reenvío
+      const convsRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES);
+      getDocs(query(convsRef)).then(snap => {
+        setAllConversaciones(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+    }
+  }, [forwardMsg, currentWorkspaceId]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -579,60 +643,92 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
           
           return (
             <div key={msg.id || idx} className={cn(
-              "flex w-full",
+              "flex w-full group/msg",
               isMe ? "justify-end" : "justify-start"
             )}>
               <div className={cn(
-                "max-w-[70%] space-y-1",
+                "max-w-[70%] space-y-1 relative flex flex-col",
                 isMe ? "items-end" : "items-start"
               )}>
-                <div className={cn(
-                  "p-3.5 rounded-2xl text-[13.5px] leading-relaxed shadow-sm flex flex-col gap-2",
-                  isNote 
-                    ? "bg-[#FEFCE8] border border-yellow-200 text-yellow-800 rounded-2xl" 
-                    : isMe 
-                      ? "bg-[var(--accent)] text-[var(--accent-text)] font-semibold rounded-2xl rounded-tr-none" 
-                      : "bg-[var(--bg-card)] border border-[var(--border-light)] text-[var(--text-primary-light)] rounded-2xl rounded-tl-none"
-                )}>
-                  {msg.metadata?.mediaUrl && (
-                    <div className="w-full">
-                      {msg.metadata.mediaType === "image" && (
-                        <img 
-                          src={msg.metadata.mediaUrl} 
-                          alt={msg.metadata.fileName || "Imagen"} 
-                          className="max-w-xs max-h-60 rounded-xl object-cover cursor-pointer hover:opacity-95 active:scale-98 transition-all"
-                          onClick={() => window.open(msg.metadata.mediaUrl, "_blank")}
-                        />
-                      )}
-                      {msg.metadata.mediaType === "video" && (
-                        <video 
-                          src={msg.metadata.mediaUrl} 
-                          controls 
-                          className="max-w-xs rounded-xl shadow-sm"
-                        />
-                      )}
-                      {(msg.metadata.mediaType === "document" || msg.metadata.mediaType === "audio") && (
-                        <a 
-                          href={msg.metadata.mediaUrl} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className={cn(
-                            "flex items-center gap-2.5 p-3 rounded-xl border transition-all text-xs font-semibold select-none",
-                            isMe 
-                              ? "bg-white/10 hover:bg-white/20 border-white/20 text-white" 
-                              : "bg-[var(--bg-input)] hover:bg-[var(--bg-main)] border-[var(--border-light)] text-[var(--text-primary-light)]"
-                          )}
-                        >
-                          <FileText className="size-5 shrink-0" />
-                          <span className="truncate max-w-[200px]">{msg.metadata.fileName || "Descargar archivo"}</span>
-                        </a>
-                      )}
-                    </div>
+                {/* Indicador de Reenviado */}
+                {msg.metadata?.isForwarded && (
+                  <span className="flex items-center gap-1 text-[10px] italic text-[var(--text-tertiary-light)] px-1 mb-0.5">
+                    <CornerUpRight className="w-3 h-3 text-[var(--text-tertiary-light)]" />
+                    Reenviado
+                  </span>
+                )}
+                
+                <div className="relative flex items-center gap-2 w-full">
+                  {/* Botón Reenviar en Hover (Antes del mensaje para operador, después para cliente) */}
+                  {!isMe && !isNote && (
+                    <button
+                      onClick={() => setForwardMsg(msg)}
+                      className="opacity-0 group-hover/msg:opacity-100 transition-opacity p-1.5 hover:bg-[var(--bg-input)] rounded-full text-[var(--text-tertiary-light)] hover:text-[var(--accent)]"
+                      title="Reenviar mensaje"
+                    >
+                      <CornerUpRight className="w-4 h-4" />
+                    </button>
                   )}
-                  {(!msg.metadata?.mediaUrl && msg.text) && (
-                    <span>{renderMessage(msg.text)}</span>
+
+                  <div className={cn(
+                    "p-3.5 rounded-2xl text-[13.5px] leading-relaxed shadow-sm flex flex-col gap-2",
+                    isNote 
+                      ? "bg-[#FEFCE8] border border-yellow-200 text-yellow-800 rounded-2xl" 
+                      : isMe 
+                        ? "bg-[var(--accent)] text-[var(--accent-text)] font-semibold rounded-2xl rounded-tr-none" 
+                        : "bg-[var(--bg-card)] border border-[var(--border-light)] text-[var(--text-primary-light)] rounded-2xl rounded-tl-none"
+                  )}>
+                    {msg.metadata?.mediaUrl && (
+                      <div className="w-full">
+                        {msg.metadata.mediaType === "image" && (
+                          <img 
+                            src={msg.metadata.mediaUrl} 
+                            alt={msg.metadata.fileName || "Imagen"} 
+                            className="max-w-xs max-h-60 rounded-xl object-cover cursor-pointer hover:opacity-95 active:scale-98 transition-all"
+                            onClick={() => window.open(msg.metadata.mediaUrl, "_blank")}
+                          />
+                        )}
+                        {msg.metadata.mediaType === "video" && (
+                          <video 
+                            src={msg.metadata.mediaUrl} 
+                            controls 
+                            className="max-w-xs rounded-xl shadow-sm"
+                          />
+                        )}
+                        {(msg.metadata.mediaType === "document" || msg.metadata.mediaType === "audio") && (
+                          <a 
+                            href={msg.metadata.mediaUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className={cn(
+                              "flex items-center gap-2.5 p-3 rounded-xl border transition-all text-xs font-semibold select-none",
+                              isMe 
+                                ? "bg-white/10 hover:bg-white/20 border-white/20 text-white" 
+                                : "bg-[var(--bg-input)] hover:bg-[var(--bg-main)] border-[var(--border-light)] text-[var(--text-primary-light)]"
+                            )}
+                          >
+                            <FileText className="size-5 shrink-0" />
+                            <span className="truncate max-w-[200px]">{msg.metadata.fileName || "Descargar archivo"}</span>
+                          </a>
+                        )}
+                      </div>
+                    )}
+                    {(!msg.metadata?.mediaUrl && msg.text) && (
+                      <span>{renderMessage(msg.text)}</span>
+                    )}
+                  </div>
+
+                  {isMe && !isNote && (
+                    <button
+                      onClick={() => setForwardMsg(msg)}
+                      className="opacity-0 group-hover/msg:opacity-100 transition-opacity p-1.5 hover:bg-[var(--bg-input)] rounded-full text-[var(--text-tertiary-light)] hover:text-[var(--accent)]"
+                      title="Reenviar mensaje"
+                    >
+                      <CornerUpRight className="w-4 h-4" />
+                    </button>
                   )}
                 </div>
+
                 <div className="flex items-center gap-2 px-1 text-[10px] font-semibold text-[var(--text-tertiary-light)] tabular-nums uppercase tracking-wider">
                   {isNote ? "NOTA INTERNA" : isMe ? "AGENTE IMALÁ" : "CLIENTE"}
                   <span>•</span>
@@ -938,6 +1034,60 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
           </div>
         )}
       </div>
+
+      {/* Modal de Reenvío de Mensaje */}
+      <Dialog open={!!forwardMsg} onOpenChange={(open) => !open && setForwardMsg(null)}>
+        <DialogContent className="max-w-md bg-[var(--bg-card)] border-[var(--border-light)] rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-[var(--text-primary-light)]">Reenviar mensaje a...</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-3">
+            <div className="relative">
+              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-tertiary-light)]" />
+              <Input
+                placeholder="Buscar conversación o contacto..."
+                className="pl-9 bg-[var(--bg-input)] border-transparent focus:border-[var(--accent)] text-sm h-10 rounded-xl"
+                value={forwardSearch}
+                onChange={(e) => setForwardSearch(e.target.value)}
+              />
+            </div>
+            
+            <div className="space-y-1.5 max-h-[300px] overflow-y-auto no-scrollbar">
+              {allConversaciones
+                .filter(c => {
+                  const contact = contactos.find(cnt => cnt.id === c.contactoId);
+                  const name = contact?.nombre || c.contactoNombre || "";
+                  return name.toLowerCase().includes(forwardSearch.toLowerCase());
+                })
+                .map(c => {
+                  const contact = contactos.find(cnt => cnt.id === c.contactoId);
+                  const name = contact?.nombre || c.contactoNombre || "Desconocido";
+                  const avatar = contact?.avatarUrl || null;
+                  
+                  return (
+                    <div key={c.id} className="flex items-center justify-between p-2 hover:bg-[var(--bg-input)] rounded-xl transition-all">
+                      <div className="flex items-center gap-3">
+                        <Avatar src={avatar} name={name} size="sm" className="w-9 h-9" />
+                        <span className="text-sm font-bold text-[var(--text-primary-light)]">{name}</span>
+                      </div>
+                      <Button
+                        size="sm"
+                        disabled={isForwarding}
+                        onClick={() => handleForwardMessage(c)}
+                        className="h-8 px-3 text-xs bg-[var(--accent)] text-[var(--accent-text)] rounded-lg hover:bg-[var(--accent-hover)]"
+                      >
+                        Enviar
+                      </Button>
+                    </div>
+                  );
+                })}
+              {allConversaciones.length === 0 && (
+                <p className="text-xs text-[var(--text-tertiary-light)] text-center py-4 italic">No hay conversaciones activas</p>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

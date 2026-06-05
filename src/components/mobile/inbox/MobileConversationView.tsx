@@ -1,20 +1,23 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { CanalBadge } from "@/components/ui/CanalBadge";
-import { useContactos } from "@/hooks/useContactos";
-import { IndicadorIA } from "@/components/ui/IndicadorIA";
-import { cn } from "@/lib/utils";
-import { Send, Sparkles, ChevronLeft, Info, Plus, Paperclip, Smile, Loader2, Clock } from "lucide-react";
+import { Send, Sparkles, ChevronLeft, Info, Plus, Paperclip, Smile, Loader2, Clock, CornerUpRight, Search as SearchIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar } from "@/components/ui/Avatar";
 import { MobileContactSheet } from "./MobileContactSheet";
 import { db } from "@/lib/firebase";
-import { doc, updateDoc, Timestamp } from "firebase/firestore";
-import { COLLECTIONS } from "@/lib/types/firestore";
+import { doc, updateDoc, Timestamp, collection, addDoc, getDocs, query } from "firebase/firestore";
+import { COLLECTIONS, Contacto } from "@/lib/types/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { enviarMensajeAccion } from "@/app/actions/channels";
+import { getDoc } from "firebase/firestore";
+import { useContactos } from "@/hooks/useContactos";
+import { CanalBadge } from "@/components/ui/CanalBadge";
+import { cn } from "@/lib/utils";
 
 interface MobileConversationViewProps {
   conversacion: any;
@@ -38,6 +41,10 @@ export function MobileConversationView({
   const [inputText, setInputText] = useState("");
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [forwardMsg, setForwardMsg] = useState<any | null>(null);
+  const [forwardSearch, setForwardSearch] = useState("");
+  const [allConversaciones, setAllConversaciones] = useState<any[]>([]);
+  const [isForwarding, setIsForwarding] = useState(false);
 
   const handleTogglePendiente = async () => {
     if (!currentWorkspaceId || !conversacion?.id) return;
@@ -63,6 +70,62 @@ export function MobileConversationView({
       console.warn('[MobileInbox] Error al descartar sugerencia', e);
     }
   };
+
+  const handleForwardMessage = async (destConv: any) => {
+    if (!currentWorkspaceId || !forwardMsg) return;
+    setIsForwarding(true);
+    try {
+      const destId = destConv.id;
+      const text = forwardMsg.text || "";
+      const metadata = forwardMsg.metadata 
+        ? { ...forwardMsg.metadata, isForwarded: true } 
+        : { isForwarded: true };
+
+      // Guardar el mensaje en la base de datos de la conversación destino
+      const messagesRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES, destId, COLLECTIONS.MENSAJES);
+      await addDoc(messagesRef, {
+        text,
+        from: 'operator',
+        creadoEl: Timestamp.now(),
+        metadata
+      });
+
+      // Actualizar la última actividad en la conversación destino
+      const convRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES, destId);
+      await updateDoc(convRef, {
+        ultimoMensaje: text || (metadata.mediaType === 'image' ? '📎 Imagen' : '📎 Archivo'),
+        ultimaActividad: Timestamp.now()
+      });
+
+      // Si es WhatsApp o similar y tiene destinatario mapeado en el contacto
+      const contactSnap = await getDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONTACTOS, destConv.contactoId));
+      if (contactSnap.exists()) {
+        const contactData = contactSnap.data() as any;
+        const destinatario = contactData.metaId || contactData.telefono;
+        if (destinatario && !metadata.isInternalNote) {
+          const mediaObj = metadata.mediaUrl ? { tipo: metadata.mediaType as 'image' | 'video' | 'document', url: metadata.mediaUrl } : undefined;
+          await enviarMensajeAccion(currentWorkspaceId, destConv.canalId, destinatario, text || undefined, mediaObj);
+        }
+      }
+
+      toast.success("Mensaje reenviado con éxito");
+      setForwardMsg(null);
+    } catch (error: any) {
+      console.error("Error reenviando mensaje:", error);
+      toast.error("No se pudo reenviar el mensaje");
+    } finally {
+      setIsForwarding(false);
+    }
+  };
+
+  useEffect(() => {
+    if (forwardMsg && currentWorkspaceId) {
+      const convsRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES);
+      getDocs(query(convsRef)).then(snap => {
+        setAllConversaciones(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+    }
+  }, [forwardMsg, currentWorkspaceId]);
 
   const selectedContact = contactos.find(c => c.id === conversacion?.contactoId);
   const contactName = selectedContact?.nombre || conversacion?.contactoNombre || "Desconocido";
@@ -149,23 +212,52 @@ export function MobileConversationView({
 
           return (
             <div key={msg.id || idx} className={cn(
-              "flex w-full",
-              isMe ? "justify-end" : "justify-start"
+              "flex w-full flex-col",
+              isMe ? "items-end" : "items-start"
             )}>
-              <div className={cn(
-                "max-w-[85%] rounded-2xl p-3 shadow-sm relative",
-                isNote 
-                  ? "bg-amber-50 border border-amber-100 text-amber-900 mx-auto text-center text-xs italic" 
-                  : isMe 
-                    ? "bg-[#D9FDD3] text-slate-800 rounded-tr-none after:absolute after:top-0 after:-right-2 after:w-3 after:h-4 after:bg-[#D9FDD3] after:[clip-path:polygon(0_0,0_100%,100%_0)]" 
-                    : "bg-white text-slate-800 rounded-tl-none after:absolute after:top-0 after:-left-2 after:w-3 after:h-4 after:bg-white after:[clip-path:polygon(100%_0,100%_100%,0_0)]"
-              )}>
-                <p className="text-[14px] leading-relaxed whitespace-pre-wrap">{msg.text}</p>
-                <div className="flex justify-end mt-1">
-                  <span className="text-[9px] font-semibold text-slate-400 tabular-nums uppercase tracking-tighter">
-                    {msg.creadoEl ? new Date(msg.creadoEl.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                  </span>
+              {/* Indicador Reenviado */}
+              {msg.metadata?.isForwarded && (
+                <span className="flex items-center gap-0.5 text-[9px] italic text-slate-400 mb-0.5 px-2">
+                  <CornerUpRight size={10} className="text-slate-400" />
+                  Reenviado
+                </span>
+              )}
+
+              <div className="flex items-center gap-1.5 group max-w-[85%]">
+                {/* Botón Reenviar en Celular (Antes para el cliente, después para el operador) */}
+                {!isMe && !isNote && (
+                  <button 
+                    onClick={() => setForwardMsg(msg)}
+                    className="p-1 active:bg-slate-200/50 rounded-full text-slate-400"
+                  >
+                    <CornerUpRight size={16} />
+                  </button>
+                )}
+
+                <div className={cn(
+                  "rounded-2xl p-3 shadow-sm relative",
+                  isNote 
+                    ? "bg-amber-50 border border-amber-100 text-amber-900 mx-auto text-center text-xs italic" 
+                    : isMe 
+                      ? "bg-[#D9FDD3] text-slate-800 rounded-tr-none after:absolute after:top-0 after:-right-2 after:w-3 after:h-4 after:bg-[#D9FDD3] after:[clip-path:polygon(0_0,0_100%,100%_0)]" 
+                      : "bg-white text-slate-800 rounded-tl-none after:absolute after:top-0 after:-left-2 after:w-3 after:h-4 after:bg-white after:[clip-path:polygon(100%_0,100%_100%,0_0)]"
+                )}>
+                  <p className="text-[14px] leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                  <div className="flex justify-end mt-1">
+                    <span className="text-[9px] font-semibold text-slate-400 tabular-nums uppercase tracking-tighter">
+                      {msg.creadoEl ? new Date(msg.creadoEl.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                    </span>
+                  </div>
                 </div>
+
+                {isMe && !isNote && (
+                  <button 
+                    onClick={() => setForwardMsg(msg)}
+                    className="p-1 active:bg-slate-200/50 rounded-full text-slate-400"
+                  >
+                    <CornerUpRight size={16} />
+                  </button>
+                )}
               </div>
             </div>
           );
@@ -206,26 +298,26 @@ export function MobileConversationView({
           <div className="flex-1 bg-white rounded-[24px] px-4 py-2 flex items-end gap-2 shadow-sm border border-slate-200">
              <button className="p-1.5 text-slate-400 hover:text-slate-600">
                <Plus size={24} />
-             </button>
-             <Textarea 
-               value={inputText}
-               onChange={(e) => setInputText(e.target.value)}
-               placeholder="Escribe un mensaje"
-               rows={1}
-               className="flex-1 border-none bg-transparent focus-visible:ring-0 resize-none min-h-[40px] max-h-[120px] p-2 text-sm leading-tight no-scrollbar"
-               onKeyDown={(e) => {
-                 if (e.key === 'Enter' && !e.shiftKey) {
-                   e.preventDefault();
-                   handleSend();
-                 }
-               }}
-             />
-             <button 
-               onClick={onOpenIAAssistant}
-               className="p-1.5 text-slate-400 hover:text-[var(--accent)]"
-             >
-               {isRequestingSuggestion ? <Loader2 className="size-5 animate-spin" /> : <Sparkles size={22} />}
-             </button>
+              </button>
+              <Textarea 
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                placeholder="Escribe un mensaje"
+                rows={1}
+                className="flex-1 border-none bg-transparent focus-visible:ring-0 resize-none min-h-[40px] max-h-[120px] p-2 text-sm leading-tight no-scrollbar"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+              />
+              <button 
+                onClick={onOpenIAAssistant}
+                className="p-1.5 text-slate-400 hover:text-[var(--accent)]"
+              >
+                {isRequestingSuggestion ? <Loader2 className="size-5 animate-spin" /> : <Sparkles size={22} />}
+              </button>
           </div>
 
           <button 
@@ -250,6 +342,60 @@ export function MobileConversationView({
         onClose={() => setIsSheetOpen(false)} 
         contactoId={conversacion.contactoId} 
       />
+
+      {/* Modal de Reenvío Móvil */}
+      <Dialog open={!!forwardMsg} onOpenChange={(open) => !open && setForwardMsg(null)}>
+        <DialogContent className="max-w-xs bg-white rounded-2xl p-5 border-none shadow-2xl z-[300]">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-bold text-slate-900">Reenviar mensaje a...</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="relative">
+              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input
+                placeholder="Buscar contacto..."
+                className="pl-9 bg-slate-50 border-none text-xs h-9 rounded-xl focus:bg-white transition-all"
+                value={forwardSearch}
+                onChange={(e) => setForwardSearch(e.target.value)}
+              />
+            </div>
+            
+            <div className="space-y-1.5 max-h-[240px] overflow-y-auto no-scrollbar">
+              {allConversaciones
+                .filter(c => {
+                  const contact = contactos.find(cnt => cnt.id === c.contactoId);
+                  const name = contact?.nombre || c.contactoNombre || "";
+                  return name.toLowerCase().includes(forwardSearch.toLowerCase());
+                })
+                .map(c => {
+                  const contact = contactos.find(cnt => cnt.id === c.contactoId);
+                  const name = contact?.nombre || c.contactoNombre || "Desconocido";
+                  const avatar = contact?.avatarUrl || null;
+                  
+                  return (
+                    <div key={c.id} className="flex items-center justify-between p-2 active:bg-slate-50 rounded-xl transition-all">
+                      <div className="flex items-center gap-2.5">
+                        <Avatar src={avatar} name={name} size="sm" className="w-8 h-8" />
+                        <span className="text-xs font-bold text-slate-700">{name}</span>
+                      </div>
+                      <Button
+                        size="sm"
+                        disabled={isForwarding}
+                        onClick={() => handleForwardMessage(c)}
+                        className="h-7 px-3 text-[10px] bg-slate-900 text-white hover:bg-slate-800 rounded-lg"
+                      >
+                        Enviar
+                      </Button>
+                    </div>
+                  );
+                })}
+              {allConversaciones.length === 0 && (
+                <p className="text-[10px] text-slate-400 text-center py-4 italic">No hay conversaciones activas</p>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
