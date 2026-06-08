@@ -144,7 +144,8 @@ export default function CanalesPage() {
   const [isConnecting360, setIsConnecting360] = useState(false);
 
   // Estado para la pestaña activa
-  const [activeTab, setActiveTab] = useState<'whatsapp' | 'instagram' | 'facebook' | 'leads' | 'web'>('whatsapp');
+  // 'meta' = login unificado (Messenger + Instagram + Leads). WhatsApp y Web aparte.
+  const [activeTab, setActiveTab] = useState<'meta' | 'whatsapp' | 'web'>('meta');
 
   // Estados para actualización de token
   const [isUpdatingToken, setIsUpdatingToken] = useState(false);
@@ -391,52 +392,53 @@ export default function CanalesPage() {
     window.location.href = authUrl;
   };
 
+  // Login UNIFICADO de Meta (Facebook Login for Business):
+  // un solo consentimiento cubre Messenger + Instagram (DM y comentarios) + Leads de campañas.
+  // WhatsApp NO va acá — usa su propio Embedded Signup (handleEmbeddedSignup).
+  //
+  // Permisos según documentación oficial de Meta (Instagram API con Facebook Login):
+  //  · Páginas/identidad:  pages_show_list, pages_read_engagement, pages_manage_metadata
+  //  · Messenger:          pages_messaging
+  //  · Instagram:          instagram_basic, instagram_manage_messages, instagram_manage_comments,
+  //                        instagram_manage_insights
+  //  · Leads de campañas:  leads_retrieval, pages_manage_ads (prerrequisito), ads_read, business_management
+  const META_LOGIN_SCOPES = [
+    'pages_show_list',
+    'pages_read_engagement',
+    'pages_manage_metadata',
+    'pages_messaging',
+    'instagram_basic',
+    'instagram_manage_messages',
+    'instagram_manage_comments',
+    'instagram_manage_insights',
+    'leads_retrieval',
+    'pages_manage_ads',
+    'ads_read',
+    'business_management',
+  ];
+
   const handleOAuthConnect = () => {
+    if (!currentWorkspaceId) return;
     const appId = process.env.NEXT_PUBLIC_META_APP_ID;
     const redirectUri = `${window.location.origin}/api/auth/meta/callback`;
-    
-    // Scopes base necesarios para identificar páginas
-    const baseScopes = ['pages_show_list', 'pages_read_engagement'];
-    
-    // Scopes específicos según la pestaña activa
-    let specificScopes: string[] = [];
-    
-    if (activeTab === 'instagram') {
-      specificScopes = [
-        'instagram_basic', 
-        'instagram_manage_messages', 
-        'instagram_manage_insights',
-        'pages_messaging',
-        'pages_manage_metadata'
-      ];
-    } else if (activeTab === 'facebook') {
-      specificScopes = ['pages_messaging', 'pages_manage_metadata'];
-    } else if (activeTab === 'whatsapp') {
-      specificScopes = [
-        'whatsapp_business_management', 
-        'whatsapp_business_messaging', 
-        'business_management',
-        'pages_show_list',
-        'pages_read_engagement'
-      ];
-    } else if (activeTab === 'leads') {
-      specificScopes = [
-        'leads_retrieval', 
-        'ads_read', 
-        'ads_management', 
-        'pages_show_list', 
-        'pages_manage_metadata', 
-        'pages_read_engagement',
-        'business_management'
-      ];
+
+    // Si existe una "configuración" de Facebook Login for Business creada en el panel
+    // de Meta, la usamos (experiencia tipo Embedded Signup, permisos definidos por la config).
+    // Si no, caemos al flujo clásico pidiendo el scope completo.
+    const loginConfigId = process.env.NEXT_PUBLIC_META_LOGIN_CONFIG_ID;
+
+    let authUrl =
+      `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appId}` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      `&response_type=code&state=${currentWorkspaceId}`;
+
+    if (loginConfigId) {
+      authUrl += `&config_id=${loginConfigId}`;
     } else {
-      // Por si acaso, si no hay pestaña específica (o 'all'), pedimos los básicos de mensajería
-      specificScopes = ['pages_messaging', 'instagram_manage_messages'];
+      const scope = [...new Set(META_LOGIN_SCOPES)].join(',');
+      authUrl += `&scope=${scope}&auth_type=rerequest`;
     }
 
-    const scope = [...new Set([...baseScopes, ...specificScopes])].join(',');
-
-    const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&state=${currentWorkspaceId}&auth_type=rerequest`;
     window.location.href = authUrl;
   };
 
@@ -531,9 +533,10 @@ export default function CanalesPage() {
     }
   };
 
-  // Filtrar canales según la pestaña activa
+  // Filtrar canales según la pestaña activa.
+  // La pestaña 'meta' agrupa Facebook (Messenger + Leads) e Instagram.
   const canalesFiltrados = canales.filter(c => {
-    if (activeTab === 'leads') return c.tipo === 'facebook'; // Leads vive dentro de la página de FB
+    if (activeTab === 'meta') return c.tipo === 'facebook' || c.tipo === 'instagram';
     return c.tipo === activeTab;
   });
 
@@ -571,10 +574,8 @@ export default function CanalesPage() {
         {/* Sistema de Tabs */}
         <div className="flex items-center gap-1.5 p-1.5 bg-[var(--bg-input)] rounded-2xl border border-[var(--border-light)]/50 shadow-inner">
           {[
+            { id: 'meta', label: 'Meta', icon: MetaIcon, color: '#0668E1' },
             { id: 'whatsapp', label: 'WhatsApp', icon: WhatsAppIcon, color: '#25D366' },
-            { id: 'instagram', label: 'Instagram', icon: Instagram, color: '#E1306C' },
-            { id: 'facebook', label: 'Messenger', icon: MessengerIcon, color: '#1877F2' },
-            { id: 'leads', label: 'Meta Ads', icon: MetaIcon, color: '#0668E1' },
             { id: 'web', label: 'Chat Web', icon: Globe, color: '#3B82F6' },
           ].map((tab) => (
             <button
@@ -589,7 +590,7 @@ export default function CanalesPage() {
             >
               <tab.icon className="w-4 h-4" style={{ color: activeTab === tab.id ? tab.color : 'currentColor' }} />
               {tab.label}
-              {canales.filter(c => tab.id === 'leads' ? c.tipo === 'facebook' : c.tipo === tab.id).length > 0 && (
+              {canales.filter(c => tab.id === 'meta' ? (c.tipo === 'facebook' || c.tipo === 'instagram') : c.tipo === tab.id).length > 0 && (
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
               )}
             </button>
@@ -665,19 +666,11 @@ export default function CanalesPage() {
                     "Un número de teléfono disponible para verificar (puede ser el que ya usás en WhatsApp Business).",
                     "El número no puede estar registrado en WhatsApp personal — solo en WhatsApp Business.",
                     "Imalá Vox no afecta tu app de WhatsApp Business del celular."
-                  ] : activeTab === 'instagram' ? [
-                    "Usar una cuenta de Instagram de tipo Empresa o Creador.",
-                    "Tener la cuenta vinculada a una Página de Facebook.",
-                    "Activar 'Permitir acceso a mensajes' en los ajustes de Instagram.",
-                    "Ser Administrador de la página de Facebook vinculada."
-                  ] : activeTab === 'facebook' ? [
-                    "Ser Administrador de la Página de Facebook.",
-                    "La página debe estar publicada y ser visible para todos.",
-                    "Tener la mensajería activada en la configuración de la página."
-                  ] : activeTab === 'leads' ? [
-                    "Debes tener formularios de clientes potenciales activos.",
-                    "Ser Administrador de la cuenta comercial (Business Manager).",
-                    "Tu página de Facebook debe estar vinculada a dicha cuenta."
+                  ] : activeTab === 'meta' ? [
+                    "Ser Administrador de la Página de Facebook que querés conectar.",
+                    "Para Instagram: cuenta de tipo Empresa o Creador, vinculada a esa Página.",
+                    "Para Leads: tener formularios de clientes potenciales activos en tus campañas.",
+                    "Con un solo login de Meta conectás Messenger, Instagram y los Leads de tus campañas."
                   ] : [
                     "Tener acceso para insertar código en tu sitio web.",
                     "Configurar los dominios autorizados para el chat.",
@@ -697,7 +690,7 @@ export default function CanalesPage() {
                 <div className="space-y-3">
                   <p className="text-[10px] font-black uppercase tracking-widest text-[var(--accent)] opacity-70">¿Todo listo?</p>
                   <h4 className="text-lg font-bold text-white tracking-tight leading-tight">
-                    {activeTab === 'leads' ? 'Empieza a recibir prospectos hoy mismo.' : 
+                    {activeTab === 'meta' ? 'Conectá Messenger, Instagram y Leads en un solo paso.' :
                      activeTab === 'web' ? 'Instala el widget en tu web en segundos.' :
                      'Dale vida a tu atención al cliente con IA.'}
                   </h4>
@@ -748,11 +741,11 @@ export default function CanalesPage() {
                       Configurar Widget Ahora
                     </Button>
                   ) : (
-                    <Button 
-                      onClick={handleOAuthConnect} 
-                      className="w-full rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-black text-[11px] uppercase tracking-widest h-12 shadow-xl shadow-[var(--accent)]/20 transition-all active:scale-95"
+                    <Button
+                      onClick={handleOAuthConnect}
+                      className="w-full rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-black text-[11px] uppercase tracking-widest h-12 shadow-xl shadow-[var(--accent)]/20 transition-all active:scale-95 flex items-center justify-center gap-2"
                     >
-                      <Plus className="w-4 h-4 mr-2" /> Vincular con Meta
+                      <MetaIcon className="w-4 h-4" /> Conectar con Meta
                     </Button>
                   )}
                 </div>
@@ -772,9 +765,7 @@ export default function CanalesPage() {
               <div className="col-span-full p-20 text-center border-2 border-dashed border-[var(--border-light)] rounded-3xl space-y-4 bg-white/50">
                 <div className="w-16 h-16 rounded-full bg-[var(--bg-input)] flex items-center justify-center mx-auto mb-4 border border-[var(--border-light)]">
                    {activeTab === 'whatsapp' ? <WhatsAppIcon className="w-8 h-8 text-slate-300" /> :
-                    activeTab === 'instagram' ? <Instagram className="w-8 h-8 text-slate-300" /> :
-                    activeTab === 'leads' ? <MetaIcon className="w-8 h-8 text-slate-300" /> :
-                    activeTab === 'facebook' ? <MessengerIcon className="w-8 h-8 text-slate-300" /> :
+                    activeTab === 'meta' ? <MetaIcon className="w-8 h-8 text-slate-300" /> :
                     <Globe className="w-8 h-8 text-slate-300" />}
                 </div>
                 <p className="text-sm font-bold text-[var(--text-secondary-light)]">No hay conexiones en esta pestaña.</p>
@@ -796,15 +787,11 @@ export default function CanalesPage() {
                     )}
                   >
                     <div className="flex justify-between items-start mb-6">
-                      <div 
+                      <div
                         className="p-3.5 rounded-2xl shadow-sm border border-white"
-                        style={{ backgroundColor: isConnected ? (activeTab === 'leads' ? '#0668E110' : `${config.color}10`) : '#f3f4f6' }}
+                        style={{ backgroundColor: isConnected ? `${config.color}10` : '#f3f4f6' }}
                       >
-                        {activeTab === 'leads' ? (
-                          <MetaIcon className="w-6 h-6 text-[#0668E1]" />
-                        ) : (
-                          <config.icon className="w-6 h-6" style={{ color: isConnected ? config.color : '#9ca3af' }} />
-                        )}
+                        <config.icon className="w-6 h-6" style={{ color: isConnected ? config.color : '#9ca3af' }} />
                       </div>
                       {(canal as any).healthStatus && (canal as any).healthStatus !== 'ok' ? (
                         <div
@@ -827,7 +814,7 @@ export default function CanalesPage() {
 
                     <div className="flex-1 space-y-2 mb-8">
                       <h3 className="font-bold text-[16px] text-[var(--text-primary-light)] tracking-tight">
-                        {activeTab === 'leads' ? `Leads: ${canal.nombre}` : (canal.nombre || config.nombre)}
+                        {canal.nombre || config.nombre}
                       </h3>
                       <div className="space-y-1.5">
                         <p className="text-[11px] text-[var(--text-tertiary-light)] font-bold uppercase tracking-widest truncate opacity-70">
@@ -838,7 +825,7 @@ export default function CanalesPage() {
                           <span className="text-[9px] font-black text-[var(--text-tertiary-light)] uppercase tracking-wider">
                              {canal.webhookVerified ? "Webhooks OK" : "Sincro Pendiente"}
                           </span>
-                          {canal.aiEnabled && activeTab !== 'leads' && (
+                          {canal.aiEnabled && (
                             <div className="ml-auto bg-[var(--accent)] text-[var(--accent-text)] px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-tighter">
                               IA ON
                             </div>
