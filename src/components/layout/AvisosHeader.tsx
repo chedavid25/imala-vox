@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { COLLECTIONS, TareaCRM } from "@/lib/types/firestore";
 import { Bell, Clock, AlertCircle, ChevronRight, CheckCircle2, Zap } from "lucide-react";
@@ -25,7 +25,7 @@ export function AvisosHeader() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!currentWorkspaceId) return;
+    if (!currentWorkspaceId || !auth.currentUser) return;
 
     const tareasRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, "tareasCRM");
     const q = query(tareasRef, where("completada", "==", false));
@@ -45,7 +45,7 @@ export function AvisosHeader() {
     });
 
     return () => unsubscribe();
-  }, [currentWorkspaceId]);
+  }, [currentWorkspaceId, auth.currentUser]);
 
   const badgeCount = Math.max(0, tareasPendientes.length - viewedCount);
 

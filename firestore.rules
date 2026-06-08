@@ -31,6 +31,7 @@ service cloud.firestore {
       match /{allPaths=**} {
         allow read, write: if isSuperAdmin() || (
           request.auth != null && 
+          exists(/databases/$(database)/documents/espaciosDeTrabajo/$(wsId)) &&
           (
             get(/databases/$(database)/documents/espaciosDeTrabajo/$(wsId)).data.propietarioUid == request.auth.uid ||
             exists(/databases/$(database)/documents/espaciosDeTrabajo/$(wsId)/miembros/$(request.auth.uid))
@@ -51,6 +52,11 @@ service cloud.firestore {
       match /_pendingConnections/{sessionId} {
         allow read, write: if false;
       }
+    }
+
+    // Permitir leer el propio documento de miembro en cualquier workspace (necesario para query de collectionGroup)
+    match /{path=**}/miembros/{miembroId} {
+      allow read: if request.auth != null && (request.auth.uid == miembroId || isSuperAdmin());
     }
 
     // Reglas para consultas globales (Collection Groups)

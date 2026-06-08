@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Send, Sparkles, ChevronLeft, Info, Plus, Paperclip, Smile, Loader2, Clock, CornerUpRight, Search as SearchIcon, FileText } from "lucide-react";
+import { Send, Sparkles, ChevronLeft, Info, Plus, Paperclip, Smile, Loader2, Clock, CornerUpRight, Search as SearchIcon, FileText, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar } from "@/components/ui/Avatar";
@@ -18,6 +18,13 @@ import { getDoc } from "firebase/firestore";
 import { useContactos } from "@/hooks/useContactos";
 import { CanalBadge } from "@/components/ui/CanalBadge";
 import { cn } from "@/lib/utils";
+
+const shouldShowText = (text: string, mediaType?: string) => {
+  if (!text) return false;
+  if (mediaType === 'audio' && text === '[Audio]') return false;
+  const isLabel = /^\[(Imagen|Video|Audio|Archivo|Sticker)(:\s*.*)?\]$/i.test(text.trim());
+  return !isLabel;
+};
 
 interface MobileConversationViewProps {
   conversacion: any;
@@ -261,19 +268,45 @@ export function MobileConversationView({
                   {msg.metadata?.mediaUrl && (
                     <div className="w-full">
                       {msg.metadata.mediaType === "image" && (
-                        <img 
-                          src={msg.metadata.mediaUrl} 
-                          alt={msg.metadata.fileName || "Imagen"} 
-                          className="max-w-full max-h-60 rounded-xl object-cover cursor-pointer hover:opacity-95 active:scale-98 transition-all"
-                          onClick={() => window.open(msg.metadata.mediaUrl, "_blank")}
-                        />
+                        <div className="relative inline-block">
+                          <img 
+                            src={msg.metadata.mediaUrl} 
+                            alt={msg.metadata.fileName || "Imagen"} 
+                            className="max-w-full max-h-60 rounded-xl object-cover cursor-pointer hover:opacity-95 active:scale-98 transition-all"
+                            onClick={() => window.open(msg.metadata.mediaUrl, "_blank")}
+                          />
+                          <a
+                            href={`/api/download?url=${encodeURIComponent(msg.metadata.mediaUrl)}&filename=${encodeURIComponent(msg.metadata.fileName || "imagen")}`}
+                            download={msg.metadata.fileName || "imagen"}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="absolute top-2 right-2 p-2 bg-black/60 active:bg-black/80 text-white rounded-lg shadow-lg flex items-center justify-center"
+                            title="Descargar imagen"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Download size={16} />
+                          </a>
+                        </div>
                       )}
                       {msg.metadata.mediaType === "video" && (
-                        <video 
-                          src={msg.metadata.mediaUrl} 
-                          controls 
-                          className="max-w-full rounded-xl shadow-sm"
-                        />
+                        <div className="relative inline-block">
+                          <video 
+                            src={msg.metadata.mediaUrl} 
+                            controls 
+                            className="max-w-full rounded-xl shadow-sm"
+                          />
+                          <a
+                            href={`/api/download?url=${encodeURIComponent(msg.metadata.mediaUrl)}&filename=${encodeURIComponent(msg.metadata.fileName || "video.mp4")}`}
+                            download={msg.metadata.fileName || "video.mp4"}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="absolute top-2 right-2 p-2 bg-black/60 active:bg-black/80 text-white rounded-lg shadow-lg flex items-center justify-center z-10"
+                            title="Descargar video"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Download size={16} />
+                          </a>
+                        </div>
                       )}
                       {(msg.metadata.mediaType === "audio" || (msg.metadata.fileName && (msg.metadata.fileName.endsWith('.bin') || msg.metadata.fileName.endsWith('.ogg') || msg.metadata.fileName.endsWith('.opus') || msg.metadata.fileName.endsWith('.aac') || msg.metadata.fileName.endsWith('.mp3')) && msg.text === '[Audio]')) && (
                         <audio controls className="max-w-full rounded-xl shadow-sm">
@@ -284,25 +317,43 @@ export function MobileConversationView({
                         </audio>
                       )}
                       {msg.metadata.mediaType === "document" && !(msg.metadata.fileName && (msg.metadata.fileName.endsWith('.bin') || msg.metadata.fileName.endsWith('.ogg') || msg.metadata.fileName.endsWith('.opus') || msg.metadata.fileName.endsWith('.aac') || msg.metadata.fileName.endsWith('.mp3')) && msg.text === '[Audio]') && (
-                        <a 
-                          href={msg.metadata.mediaUrl} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className={cn(
-                            "flex items-center gap-2.5 p-3 rounded-xl border transition-all text-xs font-semibold select-none",
-                            isMe 
-                              ? "bg-black/5 hover:bg-black/10 border-black/10 text-slate-800" 
-                              : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800"
-                          )}
-                        >
-                          <FileText className="size-5 shrink-0 text-slate-500" />
-                          <span className="truncate max-w-[150px]">{msg.metadata.fileName || "Descargar archivo"}</span>
-                        </a>
+                        <div className="relative w-full">
+                          <a 
+                            href={msg.metadata.mediaUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className={cn(
+                              "flex items-center gap-2.5 p-3 pr-10 rounded-xl border transition-all text-xs font-semibold select-none",
+                              isMe 
+                                ? "bg-black/5 hover:bg-black/10 border-black/10 text-slate-800" 
+                                : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800"
+                            )}
+                          >
+                            <FileText className="size-5 shrink-0 text-slate-500" />
+                            <span className="truncate max-w-[130px]">{msg.metadata.fileName || "Descargar archivo"}</span>
+                          </a>
+                          <a
+                            href={`/api/download?url=${encodeURIComponent(msg.metadata.mediaUrl)}&filename=${encodeURIComponent(msg.metadata.fileName || "archivo")}`}
+                            download={msg.metadata.fileName || "archivo"}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={cn(
+                              "absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg shadow-sm flex items-center justify-center",
+                              isMe 
+                                ? "bg-black/10 active:bg-black/20 text-slate-700" 
+                                : "bg-slate-200 active:bg-slate-300 text-slate-700"
+                            )}
+                            title="Descargar archivo"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Download size={14} />
+                          </a>
+                        </div>
                       )}
                     </div>
                   )}
 
-                  {msg.text && (
+                  {msg.text && (!msg.metadata?.mediaUrl || shouldShowText(msg.text, msg.metadata?.mediaType)) && (
                     <p className="text-[14px] leading-relaxed whitespace-pre-wrap">{renderMessage(msg.text)}</p>
                   )}
                   <div className="flex justify-end mt-1">

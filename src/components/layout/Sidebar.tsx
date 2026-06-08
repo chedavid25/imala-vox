@@ -82,7 +82,7 @@ export function Sidebar() {
   }, [currentWorkspaceId, agentId, currentAgentName, setCurrentAgentName]);
 
   useEffect(() => {
-    if (!currentWorkspaceId) return;
+    if (!currentWorkspaceId || !auth.currentUser) return;
     const q = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES);
     const unsub = onSnapshot(q, (snap) => {
       const total = snap.docs.reduce((sum, doc) => {
@@ -93,7 +93,7 @@ export function Sidebar() {
       setTotalUnread(total);
     });
     return () => unsub();
-  }, [currentWorkspaceId]);
+  }, [currentWorkspaceId, auth.currentUser]);
 
   const sidebarStyle: React.CSSProperties = {
     width: sidebarCollapsed ? 'var(--sidebar-collapsed)' : 'var(--sidebar-width)',

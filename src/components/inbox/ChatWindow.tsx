@@ -5,7 +5,7 @@ import { CanalBadge } from "@/components/ui/CanalBadge";
 import { useContactos } from "@/hooks/useContactos";
 import { IndicadorIA } from "@/components/ui/IndicadorIA";
 import { cn } from "@/lib/utils";
-import { Send, Paperclip, Smile, Sparkles, CheckCircle2, UserPlus, MoreVertical, MessageCircle, ChevronDown, CheckCircle, Clock, AlertTriangle, FileText, ChevronRight, ImageIcon, X, CornerUpRight, Search as SearchIcon } from "lucide-react";
+import { Send, Paperclip, Smile, Sparkles, CheckCircle2, UserPlus, MoreVertical, MessageCircle, ChevronDown, CheckCircle, Clock, AlertTriangle, FileText, ChevronRight, ImageIcon, X, CornerUpRight, Search as SearchIcon, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { db, storage } from "@/lib/firebase";
@@ -32,6 +32,13 @@ import { Loader2 } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+
+const shouldShowText = (text: string, mediaType?: string) => {
+  if (!text) return false;
+  if (mediaType === 'audio' && text === '[Audio]') return false;
+  const isLabel = /^\[(Imagen|Video|Audio|Archivo|Sticker)(:\s*.*)?\]$/i.test(text.trim());
+  return !isLabel;
+};
 
 interface ChatWindowProps {
   conversacion: any;
@@ -681,19 +688,45 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
                     {msg.metadata?.mediaUrl && (
                       <div className="w-full">
                         {msg.metadata.mediaType === "image" && (
-                          <img 
-                            src={msg.metadata.mediaUrl} 
-                            alt={msg.metadata.fileName || "Imagen"} 
-                            className="max-w-xs max-h-60 rounded-xl object-cover cursor-pointer hover:opacity-95 active:scale-98 transition-all"
-                            onClick={() => window.open(msg.metadata.mediaUrl, "_blank")}
-                          />
+                          <div className="relative group/media inline-block">
+                            <img 
+                              src={msg.metadata.mediaUrl} 
+                              alt={msg.metadata.fileName || "Imagen"} 
+                              className="max-w-xs max-h-60 rounded-xl object-cover cursor-pointer hover:opacity-95 active:scale-98 transition-all"
+                              onClick={() => window.open(msg.metadata.mediaUrl, "_blank")}
+                            />
+                            <a
+                              href={`/api/download?url=${encodeURIComponent(msg.metadata.mediaUrl)}&filename=${encodeURIComponent(msg.metadata.fileName || "imagen")}`}
+                              download={msg.metadata.fileName || "imagen"}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="absolute top-2 right-2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-lg opacity-0 group-hover/media:opacity-100 transition-opacity duration-200 shadow-lg flex items-center justify-center"
+                              title="Descargar imagen"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Download className="w-4 h-4" />
+                            </a>
+                          </div>
                         )}
                         {msg.metadata.mediaType === "video" && (
-                          <video 
-                            src={msg.metadata.mediaUrl} 
-                            controls 
-                            className="max-w-xs rounded-xl shadow-sm"
-                          />
+                          <div className="relative group/media inline-block">
+                            <video 
+                              src={msg.metadata.mediaUrl} 
+                              controls 
+                              className="max-w-xs rounded-xl shadow-sm"
+                            />
+                            <a
+                              href={`/api/download?url=${encodeURIComponent(msg.metadata.mediaUrl)}&filename=${encodeURIComponent(msg.metadata.fileName || "video.mp4")}`}
+                              download={msg.metadata.fileName || "video.mp4"}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="absolute top-2 right-2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-lg opacity-0 group-hover/media:opacity-100 transition-opacity duration-200 shadow-lg flex items-center justify-center z-10"
+                              title="Descargar video"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Download className="w-4 h-4" />
+                            </a>
+                          </div>
                         )}
                         {(msg.metadata.mediaType === "audio" || (msg.metadata.fileName && (msg.metadata.fileName.endsWith('.bin') || msg.metadata.fileName.endsWith('.ogg') || msg.metadata.fileName.endsWith('.opus') || msg.metadata.fileName.endsWith('.aac') || msg.metadata.fileName.endsWith('.mp3')) && msg.text === '[Audio]')) && (
                           <audio controls className="max-w-xs rounded-xl shadow-sm">
@@ -704,24 +737,42 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
                           </audio>
                         )}
                         {msg.metadata.mediaType === "document" && !(msg.metadata.fileName && (msg.metadata.fileName.endsWith('.bin') || msg.metadata.fileName.endsWith('.ogg') || msg.metadata.fileName.endsWith('.opus') || msg.metadata.fileName.endsWith('.aac') || msg.metadata.fileName.endsWith('.mp3')) && msg.text === '[Audio]') && (
-                          <a 
-                            href={msg.metadata.mediaUrl} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className={cn(
-                              "flex items-center gap-2.5 p-3 rounded-xl border transition-all text-xs font-semibold select-none",
-                              isMe 
-                                ? "bg-white/10 hover:bg-white/20 border-white/20 text-white" 
-                                : "bg-[var(--bg-input)] hover:bg-[var(--bg-main)] border-[var(--border-light)] text-[var(--text-primary-light)]"
-                            )}
-                          >
-                            <FileText className="size-5 shrink-0" />
-                            <span className="truncate max-w-[200px]">{msg.metadata.fileName || "Descargar archivo"}</span>
-                          </a>
+                          <div className="relative group/media w-full">
+                            <a 
+                              href={msg.metadata.mediaUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className={cn(
+                                "flex items-center gap-2.5 p-3 pr-10 rounded-xl border transition-all text-xs font-semibold select-none",
+                                isMe 
+                                  ? "bg-white/10 hover:bg-white/20 border-white/20 text-white" 
+                                  : "bg-[var(--bg-input)] hover:bg-[var(--bg-main)] border-[var(--border-light)] text-[var(--text-primary-light)]"
+                              )}
+                            >
+                              <FileText className="size-5 shrink-0" />
+                              <span className="truncate max-w-[160px]">{msg.metadata.fileName || "Descargar archivo"}</span>
+                            </a>
+                            <a
+                              href={`/api/download?url=${encodeURIComponent(msg.metadata.mediaUrl)}&filename=${encodeURIComponent(msg.metadata.fileName || "archivo")}`}
+                              download={msg.metadata.fileName || "archivo"}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={cn(
+                                "absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 rounded-lg opacity-0 group-hover/media:opacity-100 transition-opacity duration-200 shadow-sm flex items-center justify-center",
+                                isMe 
+                                  ? "bg-white/20 hover:bg-white/30 text-white" 
+                                  : "bg-[var(--bg-input)] hover:bg-[var(--border-light-strong)] text-[var(--text-secondary-light)]"
+                              )}
+                              title="Descargar archivo"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </a>
+                          </div>
                         )}
                       </div>
                     )}
-                    {msg.text && (
+                    {msg.text && (!msg.metadata?.mediaUrl || shouldShowText(msg.text, msg.metadata?.mediaType)) && (
                       <span>{renderMessage(msg.text)}</span>
                     )}
                   </div>

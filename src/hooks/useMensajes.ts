@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { collection, query, onSnapshot, orderBy, limit, startAfter } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
 import { COLLECTIONS } from '@/lib/types/firestore';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 
@@ -10,7 +10,7 @@ export function useMensajes(conversationId: string | null) {
   const { currentWorkspaceId } = useWorkspaceStore();
 
   useEffect(() => {
-    if (!currentWorkspaceId || !conversationId) {
+    if (!currentWorkspaceId || !conversationId || !auth.currentUser) {
       setMensajes([]);
       return;
     }
@@ -45,7 +45,7 @@ export function useMensajes(conversationId: string | null) {
     );
 
     return () => unsubscribe();
-  }, [currentWorkspaceId, conversationId]);
+  }, [currentWorkspaceId, conversationId, auth.currentUser]);
 
   return { mensajes, loading };
 }

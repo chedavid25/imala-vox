@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { collection, query, onSnapshot, orderBy, where } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
 import { COLLECTIONS } from '@/lib/types/firestore';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 
@@ -11,7 +11,7 @@ export function useConversaciones() {
   const { currentWorkspaceId } = useWorkspaceStore();
 
   useEffect(() => {
-    if (!currentWorkspaceId) {
+    if (!currentWorkspaceId || !auth.currentUser) {
       setConversaciones([]);
       setLoading(false);
       return;
@@ -41,7 +41,7 @@ export function useConversaciones() {
     );
 
     return () => unsubscribe();
-  }, [currentWorkspaceId]);
+  }, [currentWorkspaceId, auth.currentUser]);
 
   return { conversaciones, loading, error };
 }
