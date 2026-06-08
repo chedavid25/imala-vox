@@ -101,6 +101,14 @@ export async function procesarMensajeConIA({
       return "";
     }).trim();
 
+    // Extraer acción de resolución [ACCION: RESOLVER]
+    const resolverRegex = /\[ACCION:\s*RESOLVER\]/gi;
+    let requiereResolucion = false;
+    respuestaTexto = respuestaTexto.replace(resolverRegex, () => {
+      requiereResolucion = true;
+      return "";
+    }).trim();
+
     // 4. Registrar respuesta en Firestore (mensaje de 'bot')
     if (isCopiloto) {
       const convRef = adminDb
@@ -126,6 +134,18 @@ export async function procesarMensajeConIA({
           etiquetasIA: etiquetasAplicadas
         }
       });
+
+      // Si la IA identificó resolver la conversación de forma autónoma
+      if (requiereResolucion) {
+        const convRef = adminDb
+          .collection(COLLECTIONS.ESPACIOS).doc(wsId)
+          .collection(COLLECTIONS.CONVERSACIONES).doc(conversacionId);
+        await convRef.update({
+          estado: 'resuelto',
+          actualizadoEl: Timestamp.now()
+        });
+        console.log(`[RESOLUCION-IA] Conversación ${conversacionId} marcada como resuelta por la IA.`);
+      }
     }
 
     // 4.5 Persistir etiquetas en el contacto si se detectaron

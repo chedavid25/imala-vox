@@ -263,12 +263,26 @@ export default function EstadisticasPage() {
       }
 
       // Resolución
-      if (c.necesitaHumano === true) {
-        derivacionHumano++;
-      } else if (c.respuestasIAContador && c.respuestasIAContador > 0) {
-        resolucionIA++;
+      if (c.estado === 'resuelto') {
+        if (c.necesitaHumano === true || (c.respuestasHumanoContador && c.respuestasHumanoContador > 0)) {
+          derivacionHumano++;
+        } else if (c.respuestasIAContador && c.respuestasIAContador > 0) {
+          resolucionIA++;
+        } else {
+          sinIntervencion++;
+        }
       } else {
-        sinIntervencion++;
+        // Si sigue abierta, la clasificamos según quién la esté atendiendo
+        if (c.necesitaHumano === true || (c.respuestasHumanoContador && c.respuestasHumanoContador > 0)) {
+          derivacionHumano++;
+        } else {
+          // Asumimos temporalmente sinIntervencion o resolucionIA dependiendo de si la IA ya habló
+          if (c.respuestasIAContador && c.respuestasIAContador > 0) {
+            resolucionIA++;
+          } else {
+            sinIntervencion++;
+          }
+        }
       }
 
       // Mapa de calor (Día de la semana y Bloque de hora)

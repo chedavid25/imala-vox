@@ -536,12 +536,20 @@ async function procesarMensajeMeta(messagingItem: any, pageId: string, isInstagr
     } else {
       convId = convExistente.id;
       console.log(`💬 Conversación existente: ${convId}`);
+      const convData = convExistente.data();
+      const isClosed = convData?.estado === 'resuelto';
+      
       await convRef.doc(convId).update({
         ultimoMensaje: textoPreviewMeta,
         contactoNombre,
         canal: canalType,
         ultimaActividad: Timestamp.now(),
-        unreadCount: (convExistente.data().unreadCount || 0) + 1
+        unreadCount: (convData?.unreadCount || 0) + 1,
+        ...(isClosed && {
+          estado: 'abierto',
+          modoIA: 'auto',
+          necesitaHumano: false
+        })
       });
     }
 
@@ -1075,12 +1083,20 @@ export async function procesarMensajeWhatsapp(value: any, wabaId: string) {
     } else {
       convId = convExistente.id;
       console.log(`💬 Conversación WA existente: ${convId}`);
+      const convData = convExistente.data();
+      const isClosed = convData?.estado === 'resuelto';
+      
       await convRef.doc(convId).update({
         ultimoMensaje: textoPreview,
         contactoNombre,
         ultimaActividad: Timestamp.now(),
         ultimoMensajeCliente: Timestamp.now(),
-        unreadCount: (convExistente.data().unreadCount || 0) + 1
+        unreadCount: (convData?.unreadCount || 0) + 1,
+        ...(isClosed && {
+          estado: 'abierto',
+          modoIA: 'auto',
+          necesitaHumano: false
+        })
       });
     }
 

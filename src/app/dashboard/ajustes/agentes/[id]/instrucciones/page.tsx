@@ -13,7 +13,8 @@ import {
   ListOrdered, 
   FilePlus, 
   LayoutTemplate,
-  Info
+  Info,
+  CheckCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,6 +26,7 @@ import { MODELOS } from "@/lib/ai/anthropic";
 const SNIPPETS = [
   { label: "Seguir pasos", icon: ListOrdered, text: "Seguí estos pasos en orden:\n1. \n2. \n3. " },
   { label: "Hacer preguntas", icon: HelpCircle, text: "Si no tenés la información, preguntá brevemente: " },
+  { label: "Resolver chat", icon: CheckCircle, text: "Cuando el cliente confirme que solucionó su duda (ej. diciendo 'gracias', 'eso es todo' o despidiéndose), añade exactamente al final del mensaje la etiqueta de acción [ACCION: RESOLVER] para archivar el chat." },
   { label: "Enviar recurso", icon: FilePlus, text: "Si el cliente pregunta sobre [tema], enviá el recurso [nombre]." },
   { label: "Usar plantillas", icon: LayoutTemplate, text: "Respondé usando esta estructura:\n- Saludo\n- Respuesta\n- Cierre" },
 ];
@@ -219,6 +221,10 @@ export default function InstruccionesAgente() {
               <li className="flex gap-2">
                 <span className="text-[var(--accent)]">•</span>
                 <span>Si usas catálogos, indícale cómo debe presentar los precios.</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="text-[var(--accent)]">•</span>
+                <span className="text-emerald-600 font-bold">Usa [ACCION: RESOLVER] para que la IA auto-archive el chat cuando termine la consulta.</span>
               </li>
             </ul>
           </div>

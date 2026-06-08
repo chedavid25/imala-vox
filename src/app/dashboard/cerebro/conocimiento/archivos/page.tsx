@@ -207,7 +207,18 @@ export default function ArchivosGlobalPage() {
               </div>
 
               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button variant="ghost" size="icon" className="w-8 h-8 rounded-full text-[var(--text-tertiary-light)] hover:text-[var(--text-primary-light)] hover:bg-[var(--bg-input)]">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  disabled={!archivo.archivoUrl}
+                  onClick={() => {
+                    if (archivo.archivoUrl) {
+                      window.open(`/api/download?url=${encodeURIComponent(archivo.archivoUrl)}&filename=${encodeURIComponent(archivo.archivoNombre || "archivo")}`, "_blank");
+                    }
+                  }}
+                  className="w-8 h-8 rounded-full text-[var(--text-tertiary-light)] hover:text-[var(--text-primary-light)] hover:bg-[var(--bg-input)]"
+                  title="Descargar archivo"
+                >
                   <Download className="w-4 h-4" />
                 </Button>
                 <Button 
