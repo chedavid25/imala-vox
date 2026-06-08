@@ -397,14 +397,18 @@ export default function CanalesPage() {
   // WhatsApp NO va acá — usa su propio Embedded Signup (handleEmbeddedSignup).
   //
   // Permisos según documentación oficial de Meta (Instagram API con Facebook Login):
-  //  · Páginas/identidad:  pages_show_list, pages_read_engagement, pages_manage_metadata
+  //  · Páginas/identidad:  pages_show_list, pages_read_engagement, pages_manage_metadata,
+  //                        pages_read_user_content (dependencia de instagram_basic)
   //  · Messenger:          pages_messaging
   //  · Instagram:          instagram_basic, instagram_manage_messages, instagram_manage_comments,
   //                        instagram_manage_insights
   //  · Leads de campañas:  leads_retrieval, pages_manage_ads (prerrequisito), ads_read, business_management
+  //    (ads_management figura como dependencia en la doc pero se omite: la app solo LEE leads
+  //     y leads_retrieval ya está aprobado; pedir ads_management complica el review)
   const META_LOGIN_SCOPES = [
     'pages_show_list',
     'pages_read_engagement',
+    'pages_read_user_content',
     'pages_manage_metadata',
     'pages_messaging',
     'instagram_basic',
