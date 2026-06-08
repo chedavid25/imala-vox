@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { BottomSheet } from "@/components/mobile/shared/BottomSheet";
 import { useContactos } from "@/hooks/useContactos";
-import { Phone, Mail, Calendar, Tag, ShieldAlert, MessageCircle, Edit2, Check, X, User, Plus, Trash2, Loader2, PhoneCall, MessageSquare, Clock, TimerReset, FileText, MoreVertical, History, Pencil } from "lucide-react";
+import { Phone, Mail, Calendar, Tag, ShieldAlert, MessageCircle, Edit2, Check, X, User, Plus, Trash2, Loader2, PhoneCall, MessageSquare, Clock, TimerReset, FileText, MoreVertical, History, Pencil, CheckCircle2 } from "lucide-react";
 import { COLLECTIONS, EtiquetaCRM, Contacto, CategoriaCRM, InteraccionCRM } from "@/lib/types/firestore";
 import { db } from "@/lib/firebase";
 import { collection, query, onSnapshot, doc, updateDoc, Timestamp, arrayRemove, orderBy, deleteDoc, addDoc } from "firebase/firestore";
@@ -37,9 +37,10 @@ interface MobileContactSheetProps {
   open: boolean;
   onClose: () => void;
   contactoId: string;
+  conversacion?: any;
 }
 
-export function MobileContactSheet({ open, onClose, contactoId }: MobileContactSheetProps) {
+export function MobileContactSheet({ open, onClose, contactoId, conversacion }: MobileContactSheetProps) {
   const { contactos } = useContactos();
   const [allTags, setAllTags] = useState<EtiquetaCRM[]>([]);
   const [categories, setCategories] = useState<CategoriaCRM[]>([]);
@@ -256,6 +257,34 @@ export function MobileContactSheet({ open, onClose, contactoId }: MobileContactS
               </>
             ) : (
               <>
+                {conversacion && (
+                  <button 
+                    onClick={async () => {
+                      if (!currentWorkspaceId || !conversacion.id) return;
+                      try {
+                        const newEstado = conversacion.estado === 'resuelto' ? 'abierto' : 'resuelto';
+                        const convRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES, conversacion.id);
+                        await updateDoc(convRef, {
+                          estado: newEstado,
+                          actualizadoEl: Timestamp.now()
+                        });
+                        toast.success(newEstado === 'resuelto' ? "Conversación resuelta" : "Conversación reabierta");
+                        onClose();
+                      } catch (e) {
+                        toast.error("Error al actualizar la conversación");
+                      }
+                    }}
+                    className={cn(
+                      "p-2.5 rounded-full active:scale-90 transition-all border",
+                      conversacion.estado === 'resuelto'
+                        ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                        : "bg-slate-50 text-slate-400 border-slate-100 active:bg-emerald-50 active:text-emerald-600"
+                    )}
+                    title={conversacion.estado === 'resuelto' ? "Reabrir conversación" : "Marcar como resuelta"}
+                  >
+                    <CheckCircle2 size={20} />
+                  </button>
+                )}
                 <button 
                   onClick={async () => {
                     if (window.confirm("¿Estás seguro de que deseas eliminar este contacto?")) {

@@ -454,6 +454,7 @@ export function MobileConversationView({
         open={isSheetOpen} 
         onClose={() => setIsSheetOpen(false)} 
         contactoId={conversacion.contactoId} 
+        conversacion={conversacion}
       />
 
       {/* Modal de Reenvío Móvil */}
