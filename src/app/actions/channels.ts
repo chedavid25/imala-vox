@@ -418,10 +418,11 @@ export async function enviarMensajeAccion(
   texto?: string,
   media?: { url: string; tipo: 'image' | 'video' | 'document' },
   senderAction?: 'typing_on' | 'typing_off' | 'mark_read',
-  tag?: 'CONFIRMED_EVENT_UPDATE' | 'POST_PURCHASE_UPDATE' | 'ACCOUNT_UPDATE' | 'HUMAN_AGENT'
+  tag?: 'CONFIRMED_EVENT_UPDATE' | 'POST_PURCHASE_UPDATE' | 'ACCOUNT_UPDATE' | 'HUMAN_AGENT',
+  contextMessageId?: string
 ) {
   try {
-    console.log("[enviarMensajeAccion] Iniciando envío de mensaje:", { wsId, canalId, destinatario, textoLength: texto?.length });
+    console.log("[enviarMensajeAccion] Iniciando envío de mensaje:", { wsId, canalId, destinatario, textoLength: texto?.length, contextMessageId });
 
     if (!wsId || !canalId || !destinatario || (!texto && !media && !senderAction)) {
       console.warn("[enviarMensajeAccion] Faltan parámetros de envío");
@@ -487,7 +488,8 @@ export async function enviarMensajeAccion(
           recipient_type: "individual",
           to: destinatarioLimpio,
           type: media.tipo,
-          [media.tipo]: { link: media.url, caption: texto || "" }
+          [media.tipo]: { link: media.url, caption: texto || "" },
+          ...(contextMessageId && { context: { message_id: contextMessageId } })
         };
       } else {
         body = {
@@ -495,7 +497,8 @@ export async function enviarMensajeAccion(
           recipient_type: "individual",
           to: destinatarioLimpio,
           type: "text",
-          text: { body: texto }
+          text: { body: texto },
+          ...(contextMessageId && { context: { message_id: contextMessageId } })
         };
       }
     } else {

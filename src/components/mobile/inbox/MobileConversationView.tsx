@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Send, Sparkles, ChevronLeft, Info, Plus, Paperclip, Smile, Loader2, Clock, CornerUpRight, Search as SearchIcon, FileText, Download } from "lucide-react";
+import { Send, Sparkles, ChevronLeft, Info, Plus, Paperclip, Smile, Loader2, Clock, CornerUpRight, CornerUpLeft, X, Search as SearchIcon, FileText, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar } from "@/components/ui/Avatar";
@@ -29,7 +29,7 @@ const shouldShowText = (text: string, mediaType?: string) => {
 interface MobileConversationViewProps {
   conversacion: any;
   mensajes: any[];
-  onSendMessage: (text: string, isInternal?: boolean) => void;
+  onSendMessage: (text: string, isInternal?: boolean, replyToMsg?: any) => void;
   onBack: () => void;
   onOpenIAAssistant?: () => void;
   isRequestingSuggestion?: boolean;
@@ -52,6 +52,7 @@ export function MobileConversationView({
   const [forwardSearch, setForwardSearch] = useState("");
   const [allConversaciones, setAllConversaciones] = useState<any[]>([]);
   const [isForwarding, setIsForwarding] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<any | null>(null);
 
   const renderMessage = (text: string) => {
     if (!text) return null;
@@ -168,8 +169,9 @@ export function MobileConversationView({
       navigator.vibrate(10);
     }
 
-    onSendMessage(inputText, false);
+    onSendMessage(inputText, false, replyingTo);
     setInputText("");
+    setReplyingTo(null);
   };
 
   return (
@@ -247,14 +249,24 @@ export function MobileConversationView({
               )}
 
               <div className="flex items-center gap-1.5 group max-w-[85%]">
-                {/* Botón Reenviar en Celular (Antes para el cliente, después para el operador) */}
+                {/* Botones de Acción Móvil al lado del mensaje (Cliente) */}
                 {!isMe && !isNote && (
-                  <button 
-                    onClick={() => setForwardMsg(msg)}
-                    className="p-1 active:bg-slate-200/50 rounded-full text-slate-400"
-                  >
-                    <CornerUpRight size={16} />
-                  </button>
+                  <div className="flex items-center">
+                    <button 
+                      onClick={() => setReplyingTo(msg)}
+                      className="p-1.5 active:bg-slate-200/50 rounded-full text-slate-400"
+                      title="Responder"
+                    >
+                      <CornerUpLeft size={16} />
+                    </button>
+                    <button 
+                      onClick={() => setForwardMsg(msg)}
+                      className="p-1.5 active:bg-slate-200/50 rounded-full text-slate-400"
+                      title="Reenviar"
+                    >
+                      <CornerUpRight size={16} />
+                    </button>
+                  </div>
                 )}
 
                 <div className={cn(
@@ -265,6 +277,31 @@ export function MobileConversationView({
                       ? "bg-[#D9FDD3] text-slate-800 rounded-tr-none after:absolute after:top-0 after:-right-2 after:w-3 after:h-4 after:bg-[#D9FDD3] after:[clip-path:polygon(0_0,0_100%,100%_0)]" 
                       : "bg-white text-slate-800 rounded-tl-none after:absolute after:top-0 after:-left-2 after:w-3 after:h-4 after:bg-white after:[clip-path:polygon(100%_0,100%_100%,0_0)]"
                 )}>
+                  {/* Mensaje Citado en Celular */}
+                  {msg.metadata?.replyToText && (
+                    <div className={cn(
+                      "p-2 rounded-lg border-l-4 text-xs mb-1 flex flex-col gap-0.5 max-w-full select-none cursor-pointer",
+                      isMe 
+                        ? "bg-black/10 border-slate-700 text-slate-800" 
+                        : "bg-slate-100 border-slate-500 text-slate-700"
+                    )}
+                    onClick={() => {
+                      const target = document.getElementById(msg.metadata.replyToId);
+                      if (target) {
+                        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }
+                    }}
+                    >
+                      <span className={cn(
+                        "font-bold text-[9px] uppercase",
+                        isMe ? "text-slate-800" : "text-slate-500"
+                      )}>
+                        {msg.metadata.replyToFrom === 'operator' ? 'Tú (Operador)' : 'Cliente'}
+                      </span>
+                      <span className="truncate max-w-[180px]">{msg.metadata.replyToText}</span>
+                    </div>
+                  )}
+
                   {msg.metadata?.mediaUrl && (
                     <div className="w-full">
                       {msg.metadata.mediaType === "image" && (
@@ -363,13 +400,24 @@ export function MobileConversationView({
                   </div>
                 </div>
 
+                {/* Botones de Acción Móvil al lado del mensaje (Operador) */}
                 {isMe && !isNote && (
-                  <button 
-                    onClick={() => setForwardMsg(msg)}
-                    className="p-1 active:bg-slate-200/50 rounded-full text-slate-400"
-                  >
-                    <CornerUpRight size={16} />
-                  </button>
+                  <div className="flex items-center">
+                    <button 
+                      onClick={() => setReplyingTo(msg)}
+                      className="p-1.5 active:bg-slate-200/50 rounded-full text-slate-400"
+                      title="Responder"
+                    >
+                      <CornerUpLeft size={16} />
+                    </button>
+                    <button 
+                      onClick={() => setForwardMsg(msg)}
+                      className="p-1.5 active:bg-slate-200/50 rounded-full text-slate-400"
+                      title="Reenviar"
+                    >
+                      <CornerUpRight size={16} />
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -404,6 +452,24 @@ export function MobileConversationView({
                   Usar texto
                 </Button>
              </div>
+          </div>
+        )}
+
+        {/* Visualización de responder/citar en Móvil */}
+        {replyingTo && (
+          <div className="mx-2 bg-white rounded-2xl p-3 shadow-lg border-l-4 border-emerald-500 flex items-center justify-between gap-3 animate-in slide-in-from-top-2">
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-semibold text-emerald-600 uppercase tracking-widest">
+                Respondiendo a {replyingTo.from === 'operator' ? 'Tú (Operador)' : 'Cliente'}
+              </p>
+              <p className="text-sm text-slate-600 truncate mt-0.5">{replyingTo.text}</p>
+            </div>
+            <button 
+              onClick={() => setReplyingTo(null)}
+              className="p-1 active:bg-slate-100 rounded-full text-slate-400 hover:text-red-500"
+            >
+              <X size={18} />
+            </button>
           </div>
         )}
 

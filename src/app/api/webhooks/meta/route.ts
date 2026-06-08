@@ -1113,13 +1113,40 @@ export async function procesarMensajeWhatsapp(value: any, wabaId: string) {
 
     // 5. Guardar mensaje y evitar duplicados
     const metaMessageId = message.id;
+    
+    // Obtener información de cita context si existe
+    let replyMetadata: Record<string, any> = {};
+    if (message.context?.id) {
+      replyMetadata.replyToId = message.context.id;
+      replyMetadata.replyToFrom = message.context.from === value.metadata?.display_phone_number ? 'user' : 'operator';
+      
+      try {
+        // Intentar buscar el texto del mensaje citado en la base de datos de mensajes
+        const quotedMsgSnap = await convRef.doc(convId).collection(COLLECTIONS.MENSAJES).doc(message.context.id).get();
+        if (quotedMsgSnap.exists) {
+          replyMetadata.replyToText = quotedMsgSnap.data()?.text || "";
+        } else {
+          replyMetadata.replyToText = "Mensaje citado";
+        }
+      } catch (err) {
+        console.warn("[WA-WEBHOOK] Error al buscar mensaje citado:", err);
+        replyMetadata.replyToText = "Mensaje citado";
+      }
+    }
+
     const msgPayloadWA: Record<string, unknown> = {
       text: textoMensaje,
       from: 'user',
       creadoEl: Timestamp.now(),
       visto: false
     };
-    if (mensajeMetadata) msgPayloadWA.metadata = mensajeMetadata;
+    
+    if (mensajeMetadata || message.context?.id) {
+      msgPayloadWA.metadata = {
+        ...(mensajeMetadata || {}),
+        ...(message.context?.id ? replyMetadata : {})
+      };
+    }
 
     let savedMsgIdWA: string;
     if (metaMessageId) {

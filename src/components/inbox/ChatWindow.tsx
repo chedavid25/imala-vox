@@ -5,7 +5,7 @@ import { CanalBadge } from "@/components/ui/CanalBadge";
 import { useContactos } from "@/hooks/useContactos";
 import { IndicadorIA } from "@/components/ui/IndicadorIA";
 import { cn } from "@/lib/utils";
-import { Send, Paperclip, Smile, Sparkles, CheckCircle2, UserPlus, MoreVertical, MessageCircle, ChevronDown, CheckCircle, Clock, AlertTriangle, FileText, ChevronRight, ImageIcon, X, CornerUpRight, Search as SearchIcon, Download } from "lucide-react";
+import { Send, Paperclip, Smile, Sparkles, CheckCircle2, UserPlus, MoreVertical, MessageCircle, ChevronDown, CheckCircle, Clock, AlertTriangle, FileText, ChevronRight, ImageIcon, X, CornerUpRight, CornerUpLeft, Search as SearchIcon, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { db, storage } from "@/lib/firebase";
@@ -43,7 +43,7 @@ const shouldShowText = (text: string, mediaType?: string) => {
 interface ChatWindowProps {
   conversacion: any;
   mensajes: any[];
-  onSendMessage: (text: string, isInternal?: boolean) => void;
+  onSendMessage: (text: string, isInternal?: boolean, replyToMsg?: any) => void;
 }
 
 export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindowProps) {
@@ -56,6 +56,7 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
   const [forwardSearch, setForwardSearch] = useState("");
   const [allConversaciones, setAllConversaciones] = useState<any[]>([]);
   const [isForwarding, setIsForwarding] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<any | null>(null);
   const { currentWorkspaceId } = useWorkspaceStore();
   const [isRequestingSuggestion, setIsRequestingSuggestion] = useState(false);
   const [plantillas, setPlantillas] = useState<PlantillaWA[]>([]);
@@ -130,8 +131,9 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
 
   const handleSend = () => {
     if (!inputText.trim()) return;
-    onSendMessage(inputText, mode === 'internal');
+    onSendMessage(inputText, mode === 'internal', replyingTo);
     setInputText("");
+    setReplyingTo(null);
   };
 
   const handleResolve = async () => {
@@ -666,15 +668,24 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
                 )}
                 
                 <div className="relative flex items-center gap-2 w-full">
-                  {/* Botón Reenviar en Hover (Antes del mensaje para operador, después para cliente) */}
+                  {/* Botón Reenviar y Responder en Hover (Antes del mensaje para operador, después para cliente) */}
                   {!isMe && !isNote && (
-                    <button
-                      onClick={() => setForwardMsg(msg)}
-                      className="opacity-0 group-hover/msg:opacity-100 transition-opacity p-1.5 hover:bg-[var(--bg-input)] rounded-full text-[var(--text-tertiary-light)] hover:text-[var(--accent)]"
-                      title="Reenviar mensaje"
-                    >
-                      <CornerUpRight className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1 opacity-0 group-hover/msg:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => setReplyingTo(msg)}
+                        className="p-1.5 hover:bg-[var(--bg-input)] rounded-full text-slate-500 hover:text-slate-900 transition-colors"
+                        title="Responder"
+                      >
+                        <CornerUpLeft className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setForwardMsg(msg)}
+                        className="p-1.5 hover:bg-[var(--bg-input)] rounded-full text-slate-500 hover:text-slate-900 transition-colors"
+                        title="Reenviar mensaje"
+                      >
+                        <CornerUpRight className="w-4 h-4" />
+                      </button>
+                    </div>
                   )}
 
                   <div className={cn(
@@ -685,6 +696,33 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
                         ? "bg-[var(--accent)] text-[var(--accent-text)] font-semibold rounded-2xl rounded-tr-none" 
                         : "bg-[var(--bg-card)] border border-[var(--border-light)] text-[var(--text-primary-light)] rounded-2xl rounded-tl-none"
                   )}>
+                    {/* Render del mensaje citado si existe */}
+                    {msg.metadata?.replyToText && (
+                      <div className={cn(
+                        "p-2.5 rounded-lg border-l-4 text-xs mb-1 flex flex-col gap-0.5 max-w-full select-none cursor-pointer",
+                        isMe 
+                          ? "bg-black/10 border-slate-700 text-slate-900" 
+                          : "bg-[var(--bg-main)] border-slate-400 text-[var(--text-secondary-light)]"
+                      )}
+                      onClick={() => {
+                        const target = document.getElementById(msg.metadata.replyToId);
+                        if (target) {
+                          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          target.classList.add('bg-yellow-100/50');
+                          setTimeout(() => target.classList.remove('bg-yellow-100/50'), 2000);
+                        }
+                      }}
+                      >
+                        <span className={cn(
+                          "font-bold text-[9px] uppercase",
+                          isMe ? "text-slate-800" : "text-slate-500"
+                        )}>
+                          {msg.metadata.replyToFrom === 'operator' ? 'Tú (Operador)' : 'Cliente'}
+                        </span>
+                        <span className="truncate max-w-xs">{msg.metadata.replyToText}</span>
+                      </div>
+                    )}
+
                     {msg.metadata?.mediaUrl && (
                       <div className="w-full">
                         {msg.metadata.mediaType === "image" && (
@@ -778,13 +816,22 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
                   </div>
 
                   {isMe && !isNote && (
-                    <button
-                      onClick={() => setForwardMsg(msg)}
-                      className="opacity-0 group-hover/msg:opacity-100 transition-opacity p-1.5 hover:bg-[var(--bg-input)] rounded-full text-[var(--text-tertiary-light)] hover:text-[var(--accent)]"
-                      title="Reenviar mensaje"
-                    >
-                      <CornerUpRight className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1 opacity-0 group-hover/msg:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => setReplyingTo(msg)}
+                        className="p-1.5 hover:bg-[var(--bg-input)] rounded-full text-slate-500 hover:text-slate-900 transition-colors"
+                        title="Responder"
+                      >
+                        <CornerUpLeft className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setForwardMsg(msg)}
+                        className="p-1.5 hover:bg-[var(--bg-input)] rounded-full text-slate-500 hover:text-slate-900 transition-colors"
+                        title="Reenviar mensaje"
+                      >
+                        <CornerUpRight className="w-4 h-4" />
+                      </button>
+                    </div>
                   )}
                 </div>
 
@@ -996,6 +1043,26 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
             "rounded-xl border transition-all duration-200 focus-within:ring-2 focus-within:ring-[var(--accent)]/20 overflow-hidden",
             mode === 'internal' ? "bg-yellow-50/30 border-yellow-200" : "bg-[var(--bg-input)] border-[var(--border-light)]"
           )}>
+            {/* Visualización de responder/citar */}
+            {replyingTo && (
+              <div className="px-4 py-2 bg-[var(--bg-card)] border-b border-[var(--border-light)] flex items-center justify-between gap-3 animate-in slide-in-from-top-1">
+                <div className="flex-1 min-w-0 border-l-4 border-[var(--accent)] pl-3 py-1 bg-[var(--bg-main)]/50 rounded-r-lg">
+                  <p className="text-[10px] font-black uppercase text-[var(--accent)]">
+                    Respondiendo a {replyingTo.from === 'operator' ? 'Tú (Operador)' : 'Cliente'}
+                  </p>
+                  <p className="text-[12px] text-[var(--text-secondary-light)] truncate max-w-2xl mt-0.5">
+                    {replyingTo.text}
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setReplyingTo(null)}
+                  className="p-1 hover:bg-[var(--bg-input)] rounded-full text-[var(--text-tertiary-light)] hover:text-red-500 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
             <Textarea
               ref={textareaRef}
               placeholder={mode === 'internal' ? "Escribe una nota interna para tu equipo..." : "Responde al cliente..."}

@@ -8,7 +8,7 @@ import { useConversaciones } from "@/hooks/useConversaciones";
 import { useMensajes } from "@/hooks/useMensajes";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, updateDoc, doc, Timestamp, getDocs, limit, query as firestoreQuery, where } from "firebase/firestore";
+import { collection, addDoc, updateDoc, doc, Timestamp, getDocs, limit, query as firestoreQuery, where, setDoc } from "firebase/firestore";
 import { COLLECTIONS, Contacto } from "@/lib/types/firestore";
 import { enviarMensajeAccion } from "@/app/actions/channels";
 import { getDoc } from "firebase/firestore";
@@ -117,11 +117,11 @@ function InboxContent() {
     }
   };
 
-  const handleSendMessage = async (text: string, isInternal: boolean = false) => {
+  const handleSendMessage = async (text: string, isInternal: boolean = false, replyToMsg?: any) => {
     const wsId = workspaceIdRef.current;
     const chatId = selectedChatIdRef.current;
 
-    console.log("[handleSendMessage] Iniciando envío:", { wsId, chatId, isInternal, textLength: text?.length });
+    console.log("[handleSendMessage] Iniciando envío:", { wsId, chatId, isInternal, textLength: text?.length, replyToMsgId: replyToMsg?.id });
 
     if (!wsId || !chatId) {
       console.warn("[handleSendMessage] wsId o chatId nulos, abortando");
@@ -291,7 +291,7 @@ function InboxContent() {
       console.log("[handleSendMessage] Destinatario:", destinatario, "CanalID Final:", canalIdValido);
 
       console.log("[handleSendMessage] Llamando a enviarMensajeAccion...");
-      const res = await enviarMensajeAccion(wsId, canalIdValido, destinatario, text);
+      const res = await enviarMensajeAccion(wsId, canalIdValido, destinatario, text, undefined, undefined, undefined, replyToMsg?.id);
       console.log("[handleSendMessage] Respuesta de enviarMensajeAccion:", res);
       
       if (!res.success) {
@@ -299,11 +299,29 @@ function InboxContent() {
         return;
       }
 
-      await addDoc(messagesRef, {
+      // Preparar metadata para guardar la cita si replyToMsg existe
+      const metadataPayload: Record<string, any> = {};
+      if (replyToMsg) {
+        metadataPayload.replyToId = replyToMsg.id;
+        metadataPayload.replyToFrom = replyToMsg.from;
+        metadataPayload.replyToText = replyToMsg.text;
+      }
+
+      const msgPayload: Record<string, any> = {
         text,
         from: 'operator',
         creadoEl: Timestamp.now()
-      });
+      };
+      if (replyToMsg) {
+        msgPayload.metadata = metadataPayload;
+      }
+
+      // Si Meta devuelve el ID del mensaje enviado, lo usamos como ID del documento en Firestore
+      if (res.messageId) {
+        await setDoc(doc(messagesRef, res.messageId), msgPayload);
+      } else {
+        await addDoc(messagesRef, msgPayload);
+      }
 
       await updateDoc(convRef, {
         ultimoMensaje: text,
