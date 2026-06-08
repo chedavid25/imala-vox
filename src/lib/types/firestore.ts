@@ -273,6 +273,8 @@ export interface Conversacion {
   ultimoMensaje: string;
   ultimaActividad: Timestamp;
   unreadCount: number;
+  estado?: 'abierto' | 'resuelto' | 'pendiente'; // Estado de archivado/cierre del chat
+  pendiente?: boolean;
   
   // CONTROL IA
   aiActive: boolean;               // Toggle manual del operador
