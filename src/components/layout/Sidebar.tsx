@@ -88,7 +88,7 @@ export function Sidebar() {
       const total = snap.docs.reduce((sum, doc) => {
         const data = doc.data();
         if (data.estado === 'resuelto') return sum;
-        return sum + (data.unreadCount || 0);
+        return sum + ((data.unreadCount || 0) > 0 ? 1 : 0);
       }, 0);
       setTotalUnread(total);
     });
