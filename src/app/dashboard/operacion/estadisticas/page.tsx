@@ -225,6 +225,8 @@ export default function EstadisticasPage() {
     let resolucionIA = 0;
     let derivacionHumano = 0;
     let sinIntervencion = 0;
+    let chatsPendientes = 0;
+    let chatsAbiertos = 0;
 
     // Mapa de calor (Lunes=0 a Domingo=6, 6 bloques de 4 horas: 00-04, 04-08, 08-12, 12-16, 16-20, 20-00)
     const heatMapData = Array.from({ length: 7 }, () => Array(6).fill(0));
@@ -262,7 +264,11 @@ export default function EstadisticasPage() {
         respuestasHumanoCount += c.respuestasHumanoContador;
       }
 
-      // Resolución
+      // Clasificación según estado de la bandeja e intervención de IA/Humano
+      if (c.pendiente === true) {
+        chatsPendientes++;
+      }
+
       if (c.estado === 'resuelto') {
         if (c.necesitaHumano === true || (c.respuestasHumanoContador && c.respuestasHumanoContador > 0)) {
           derivacionHumano++;
@@ -271,18 +277,8 @@ export default function EstadisticasPage() {
         } else {
           sinIntervencion++;
         }
-      } else {
-        // Si sigue abierta, la clasificamos según quién la esté atendiendo
-        if (c.necesitaHumano === true || (c.respuestasHumanoContador && c.respuestasHumanoContador > 0)) {
-          derivacionHumano++;
-        } else {
-          // Asumimos temporalmente sinIntervencion o resolucionIA dependiendo de si la IA ya habló
-          if (c.respuestasIAContador && c.respuestasIAContador > 0) {
-            resolucionIA++;
-          } else {
-            sinIntervencion++;
-          }
-        }
+      } else if (c.pendiente !== true) {
+        chatsAbiertos++;
       }
 
       // Mapa de calor (Día de la semana y Bloque de hora)
@@ -311,8 +307,19 @@ export default function EstadisticasPage() {
       return `${horas}h ${mins}m`;
     };
 
-    const convAI = resolucionIA;
-    const convManual = convAct.length - convAI;
+    // Medir la gestión real (IA vs Humano)
+    let totalIAAuto = 0;
+    let totalManual = 0;
+    convAct.forEach(c => {
+      if (c.necesitaHumano === true || (c.respuestasHumanoContador && c.respuestasHumanoContador > 0)) {
+        totalManual++;
+      } else if (c.respuestasIAContador && c.respuestasIAContador > 0) {
+        totalIAAuto++;
+      }
+    });
+
+    const convAI = totalIAAuto;
+    const convManual = totalManual;
     const chatSourceData = [
       { name: 'IA Auto', value: convAI, color: 'var(--accent-active)' },
       { name: 'Manual', value: convManual, color: '#94a3b8' }
@@ -440,9 +447,18 @@ export default function EstadisticasPage() {
         promedioPrimeraRespuesta: formatDuration(promedioPrimeraRespuesta),
         promedioRespuestaIA: formatDuration(promedioRespuestaIA),
         promedioRespuestaHumano: formatDuration(promedioRespuestaHumano),
-        tasaIA: convAct.length > 0 ? Math.round((resolucionIA / convAct.length) * 100) : 0,
-        tasaHumano: convAct.length > 0 ? Math.round((derivacionHumano / convAct.length) * 100) : 0,
+        tasaIA: (resolucionIA + derivacionHumano + sinIntervencion) > 0 
+          ? Math.round((resolucionIA / (resolucionIA + derivacionHumano + sinIntervencion)) * 100) 
+          : 0,
+        tasaHumano: (resolucionIA + derivacionHumano + sinIntervencion) > 0 
+          ? Math.round((derivacionHumano / (resolucionIA + derivacionHumano + sinIntervencion)) * 100) 
+          : 0,
         chatResolutionData,
+        chatStatusData: [
+          { name: 'Abiertos', value: chatsAbiertos, color: '#3b82f6' },
+          { name: 'Pendientes', value: chatsPendientes, color: '#f59e0b' },
+          { name: 'Resueltos', value: (resolucionIA + derivacionHumano + sinIntervencion), color: '#10b981' }
+        ].filter(s => s.value > 0),
         heatMapData,
         desgloseTiempos: [
           { name: '< 1 min', value: rangosPrimeraRespuesta.rapido, color: '#10b981' },
@@ -623,6 +639,22 @@ export default function EstadisticasPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <ChartContainer title="Estado de la Bandeja" subtitle="Distribución actual de conversaciones" className="lg:col-span-1">
+              <PieChart>
+                <Pie 
+                  data={data.chatAdvanced.chatStatusData} 
+                  innerRadius={65} 
+                  outerRadius={90} 
+                  paddingAngle={5} 
+                  dataKey="value"
+                >
+                  {data.chatAdvanced.chatStatusData.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                </Pie>
+                <Tooltip formatter={(value: any) => [value, "Conversaciones"]} />
+                <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px' }} />
+              </PieChart>
+            </ChartContainer>
+
             <ChartContainer title="Resolución de Chats" subtitle="IA vs Derivaciones a Humano" className="lg:col-span-1">
               <PieChart>
                 <Pie 
@@ -639,10 +671,10 @@ export default function EstadisticasPage() {
               </PieChart>
             </ChartContainer>
 
-            <ChartContainer title="Distribución de Tiempos" subtitle="Tiempo de primera respuesta" className="lg:col-span-2">
+            <ChartContainer title="Distribución de Tiempos" subtitle="Tiempo de primera respuesta" className="lg:col-span-1">
               <BarChart data={data.chatAdvanced.desgloseTiempos}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10}} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9}} />
                 <YAxis axisLine={false} tickLine={false} />
                 <Tooltip cursor={{fill: 'transparent'}} formatter={(value: any) => [value, "Conversaciones"]} />
                 <Bar dataKey="value" name="Conversaciones" radius={[8, 8, 0, 0]}>
