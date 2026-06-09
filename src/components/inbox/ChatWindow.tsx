@@ -515,17 +515,20 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-[var(--bg-card)]">
       {/* Header */}
-      <header className="px-6 py-4 border-b border-[var(--border-light)] flex items-center justify-between bg-[var(--bg-card)] shadow-sm">
-        <div className="flex items-center gap-4">
+      <header className="px-6 py-4 border-b border-[var(--border-light)] flex items-center justify-between bg-[var(--bg-card)] shadow-sm gap-4">
+        <div className="flex items-center gap-4 min-w-0 flex-1">
           <Avatar 
             src={contactFoto} 
             name={contactName} 
             size="md"
             className="shadow-sm"
           />
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h3 className="text-[15px] font-bold text-[var(--text-primary-light)] tracking-tight">
+              <h3 
+                className="text-[15px] font-bold text-[var(--text-primary-light)] tracking-tight truncate max-w-[150px] sm:max-w-[250px] md:max-w-[350px]"
+                title={contactName}
+              >
                 {contactName}
               </h3>
               <CanalBadge canal={conversacion.canal || 'whatsapp'} showIcon={false} className="scale-90" />
@@ -547,7 +550,7 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <Button
             size="sm"
             onClick={handleTogglePendiente}

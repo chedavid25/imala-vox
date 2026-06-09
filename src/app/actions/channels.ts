@@ -23,6 +23,36 @@ export async function guardarTokenCanal(wsId: string, canalId: string, token: st
   }
 }
 
+/**
+ * Resuelve y marca como vistas las notificaciones de salud previas de un canal
+ * cuando este se reconecta, actualiza o sincroniza con éxito.
+ */
+async function resolverNotificacionesCanal(wsId: string, canalId: string) {
+  try {
+    const notiId = `canal_health_${canalId}`;
+    const notificationsSnapshot = await adminDb
+      .collection(COLLECTIONS.ESPACIOS).doc(wsId)
+      .collection(COLLECTIONS.NOTIFICACIONES)
+      .where('metadata.id', '==', notiId)
+      .where('visto', '==', false)
+      .get();
+
+    if (!notificationsSnapshot.empty) {
+      const batch = adminDb.batch();
+      notificationsSnapshot.docs.forEach(doc => {
+        batch.update(doc.ref, { 
+          visto: true,
+          resueltoEl: Timestamp.now()
+        });
+      });
+      await batch.commit();
+      console.log(`[HEALTH-CHECK] Notificaciones previas resueltas para canal ${canalId} en ws ${wsId}`);
+    }
+  } catch (error) {
+    console.error("Error al resolver notificaciones del canal:", error);
+  }
+}
+
 export async function conectarCanalManual(wsId: string, datos: {
   tipo: 'whatsapp' | 'instagram' | 'facebook';
   nombre: string;
@@ -122,6 +152,8 @@ export async function conectarCanalManual(wsId: string, datos: {
       });
     }
 
+    await resolverNotificacionesCanal(wsId, canalId);
+
     revalidatePath('/dashboard/ajustes/canales');
     return { success: true, canalId };
 
@@ -181,6 +213,8 @@ export async function conectarCanal360dialog(wsId: string, datos: {
     }
 
     await guardarTokenCanal(wsId, canalId, datos.accessToken);
+
+    await resolverNotificacionesCanal(wsId, canalId);
 
     revalidatePath('/dashboard/ajustes/canales');
     return { success: true, canalId };
@@ -311,6 +345,7 @@ export async function sincronizarWebhooks(wsId: string, canalId: string) {
         webhookVerified: true,
         actualizadoEl: Timestamp.now()
       });
+      await resolverNotificacionesCanal(wsId, canalId);
       return { success: true };
     }
 
@@ -399,6 +434,8 @@ export async function sincronizarWebhooksWhatsApp(wsId: string, canalId: string)
       ...(wabaId && { metaWABAId: wabaId }),
       actualizadoEl: Timestamp.now()
     });
+
+    await resolverNotificacionesCanal(wsId, canalId);
 
     revalidatePath('/dashboard/ajustes/canales');
     return { success: true, phoneNumber: verifyData.display_phone_number };
@@ -754,6 +791,8 @@ export async function actualizarTokenAcceso(wsId: string, canalId: string, nuevo
         actualizadoEl: Timestamp.now(),
       });
 
+    await resolverNotificacionesCanal(wsId, canalId);
+
     revalidatePath('/dashboard/ajustes/canales');
     return { success: true };
 
@@ -967,6 +1006,7 @@ export async function finalizarConexion(
         if (subRes.success) {
           await workspaceRef.collection(COLLECTIONS.CANALES).doc(canalId).update({ webhookVerified: true });
         }
+        await resolverNotificacionesCanal(wsId, canalId);
         conectadosCount++;
       } catch (err: any) {
         console.error(`[finalizarConexion] Error procesando página ${pageId}:`, err.message);
@@ -1012,6 +1052,7 @@ export async function finalizarConexion(
             igUrl.searchParams.set('access_token', page.accessToken);
             await fetch(igUrl.toString(), { method: 'POST' });
           } catch {}
+          await resolverNotificacionesCanal(wsId, igCanalId);
           conectadosCount++;
         } catch (err: any) {
           console.error(`[finalizarConexion] Error procesando IG de página ${pageId}:`, err.message);
@@ -1054,6 +1095,7 @@ export async function finalizarConexion(
         }
         await guardarTokenCanal(wsId, waCanalId, userToken);
         await propagarTokenCrossWorkspace('metaPhoneNumberId', phone.id, userToken, wsId);
+        await resolverNotificacionesCanal(wsId, waCanalId);
         conectadosCount++;
       } catch (err: any) {
         console.error(`[finalizarConexion] Error procesando WABA phone ${phoneId}:`, err.message);
