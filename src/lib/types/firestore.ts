@@ -334,6 +334,11 @@ export interface Canal {
     openAutomatically: boolean;
   };
 
+  // Propiedades de salud añadidas por el healthCheck
+  healthStatus?: 'ok' | 'token_invalid' | 'missing_scope' | 'no_subscription' | 'no_activity_30d' | 'unknown_error';
+  healthIssue?: string | null;
+  lastHealthCheck?: Timestamp;
+
   creadoEl: Timestamp;
   actualizadoEl: Timestamp;
 }
