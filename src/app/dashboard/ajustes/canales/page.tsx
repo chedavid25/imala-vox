@@ -61,7 +61,8 @@ import {
   actualizarTokenAcceso,
   obtenerTokenCanal,
   conectarCanalManual,
-  conectarCanal360dialog
+  conectarCanal360dialog,
+  resolverNotificacionesCanal
 } from "@/app/actions/channels";
 
 const WhatsAppIcon = ({ className }: { className?: string }) => (
@@ -272,6 +273,19 @@ export default function CanalesPage() {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
+
+  // Limpiar notificaciones huérfanas de canales que ya figuran como conectados y saludables
+  useEffect(() => {
+    if (!currentWorkspaceId || canales.length === 0) return;
+    canales.forEach(canal => {
+      const isHealthy = canal.status === 'connected' && (!canal.healthStatus || canal.healthStatus === 'ok');
+      if (isHealthy) {
+        resolverNotificacionesCanal(currentWorkspaceId, canal.id).catch(err => {
+          console.error("Error al limpiar notificaciones huérfanas del canal:", err);
+        });
+      }
+    });
+  }, [currentWorkspaceId, canales]);
 
   const triggerBackendSignup = async (code: string) => {
     if (!currentWorkspaceId) return;

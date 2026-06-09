@@ -27,7 +27,7 @@ export async function guardarTokenCanal(wsId: string, canalId: string, token: st
  * Resuelve y marca como vistas las notificaciones de salud previas de un canal
  * cuando este se reconecta, actualiza o sincroniza con éxito.
  */
-async function resolverNotificacionesCanal(wsId: string, canalId: string) {
+export async function resolverNotificacionesCanal(wsId: string, canalId: string) {
   try {
     const notiId = `canal_health_${canalId}`;
     const notificationsSnapshot = await adminDb
