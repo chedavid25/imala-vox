@@ -11,6 +11,7 @@ import {
   ShieldAlert,
   RefreshCw,
   CreditCard,
+  Trash2,
 } from "lucide-react";
 import { 
   Table, 
@@ -30,7 +31,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { obtenerMetricasSuperAdmin, bloquearWorkspace, extenderPrueba, cambiarPlanManual } from "@/app/actions/superadmin";
+import { obtenerMetricasSuperAdmin, bloquearWorkspace, extenderPrueba, cambiarPlanManual, eliminarWorkspaceAdmin } from "@/app/actions/superadmin";
 import { sincronizarSuscripcionMP } from "@/app/actions/billing";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -106,8 +107,21 @@ export default function EspaciosAdminPage() {
         toast.info(`Estado sync: ${res.mpStatus} — sin cambios de plan`, { id: toastId });
       }
       load();
-    } else {
-      toast.error(`Error: ${res.error}`, { id: toastId });
+    }
+  };
+
+  const handleEliminarWorkspace = async (id: string, nombre: string) => {
+    const confirmation = prompt(`¿Estás COMPLETAMENTE SEGURO de eliminar el espacio "${nombre}"? Escribe ELIMINAR para confirmar.`);
+    if (confirmation === "ELIMINAR") {
+      const res = await eliminarWorkspaceAdmin(id);
+      if (res.success) {
+        toast.success(`Espacio ${nombre} eliminado.`);
+        load();
+      } else {
+        toast.error(res.error || "Error al eliminar el espacio");
+      }
+    } else if (confirmation !== null) {
+      toast.error("Confirmación incorrecta. El espacio no fue eliminado.");
     }
   };
 
@@ -251,6 +265,10 @@ export default function EspaciosAdminPage() {
                             <ShieldAlert className="size-4" />
                             <span className="text-sm font-bold">Bloquear Acceso</span>
                          </DropdownMenuItem>
+                         <DropdownMenuItem className="gap-3 px-4 py-3 rounded-xl hover:bg-red-600/20 text-red-500 cursor-pointer" onClick={() => handleEliminarWorkspace(ws.id, ws.nombre)}>
+                             <Trash2 className="size-4" />
+                             <span className="text-sm font-bold">Eliminar Espacio</span>
+                          </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

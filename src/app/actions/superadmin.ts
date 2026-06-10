@@ -204,3 +204,14 @@ export async function bloquearWorkspace(wsId: string) {
   });
   return { success: true };
 }
+
+export async function eliminarWorkspaceAdmin(wsId: string) {
+  try {
+    await adminDb.collection(COLLECTIONS.ESPACIOS).doc(wsId).delete();
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error al eliminar workspace desde superadmin:", error);
+    return { success: false, error: error.message };
+  }
+}
+
