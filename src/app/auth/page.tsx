@@ -38,14 +38,16 @@ function AuthPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectUrl = searchParams.get("redirect");
+  const prefillEmail = searchParams.get("email") || "";
+  const initialTab = searchParams.get("mode") === "register" ? "register" : "login";
 
   // Estados para Login
-  const [loginEmail, setLoginEmail] = useState("");
+  const [loginEmail, setLoginEmail] = useState(prefillEmail);
   const [loginPassword, setLoginPassword] = useState("");
 
   // Estados para Registro
   const [registerName, setRegisterName] = useState("");
-  const [registerEmail, setRegisterEmail] = useState("");
+  const [registerEmail, setRegisterEmail] = useState(prefillEmail);
   const [registerPassword, setRegisterPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
@@ -233,7 +235,7 @@ function AuthPageContent() {
             <h1 className="text-xl font-black tracking-tight text-[var(--text-primary-light)]">Imalá Vox</h1>
           </Link>
 
-          <Tabs defaultValue="login" className="w-full" onValueChange={() => setResetMode(false)}>
+          <Tabs defaultValue={initialTab} className="w-full" onValueChange={() => setResetMode(false)}>
             <TabsList className="grid w-full grid-cols-2 mb-8 bg-[var(--bg-input)] p-1 h-12 rounded-xl">
               <TabsTrigger value="login" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 Iniciar sesión

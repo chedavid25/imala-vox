@@ -129,11 +129,24 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
           setWorkspacesList(combinedList);
 
-          let wsDocData = null;
+          let wsDocData: Workspace | null = null;
           if (combinedList.length > 0) {
             // Usar el workspace id actual si es que sigue en la lista, de lo contrario el primero
             const existing = currentWorkspaceId ? combinedList.find(w => w.id === currentWorkspaceId) : null;
             wsDocData = existing || combinedList[0];
+          } else if (currentWorkspaceId) {
+            // Fallback: si tenemos un espacio persistido (p. ej. recién aceptada una invitación)
+            // pero la consulta de membresías aún no lo refleja (índice propagando), intentamos
+            // cargar el documento directamente para no mandar al usuario a onboarding por error.
+            try {
+              const wsSnap = await getDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId));
+              if (wsSnap.exists()) {
+                wsDocData = { ...wsSnap.data(), id: wsSnap.id } as Workspace;
+                setWorkspacesList([wsDocData]);
+              }
+            } catch (fallbackError) {
+              console.warn("No se pudo cargar el espacio persistido como fallback:", fallbackError);
+            }
           }
 
           // Resolver check de admin (ya corrió en paralelo)

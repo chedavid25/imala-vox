@@ -39,7 +39,15 @@ export function TeamChatBubble() {
   const [inputText, setInputText] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Conteo de mensajes no leídos del canal general (cuando el chat está cerrado/minimizado)
+  const [generalMsgs, setGeneralMsgs] = useState<{ uid: string; ms: number }[]>([]);
+  const [lastSeen, setLastSeen] = useState<number>(0);
+  const [unreadCount, setUnreadCount] = useState(0);
+
   const currentUser = auth.currentUser;
+
+  // Se considera "viendo" el general solo cuando el chat está abierto, no minimizado y en esa pestaña
+  const isViewingGeneral = isOpen && !isMinimized && activeTab === "general";
   
   // Determinar si el chat está habilitado
   const isChatEnabled = workspace && workspace.plan !== "starter" && workspace.chatInternoHabilitado !== false;
@@ -108,6 +116,51 @@ export function TeamChatBubble() {
     }
   }, [messages]);
 
+  // Inicializar "última lectura" desde localStorage al cambiar de espacio
+  useEffect(() => {
+    if (!currentWorkspaceId) return;
+    const stored = Number(localStorage.getItem(`teamchat_lastseen_${currentWorkspaceId}`) || 0);
+    setLastSeen(stored);
+  }, [currentWorkspaceId]);
+
+  // Listener SIEMPRE activo del canal general para detectar mensajes nuevos
+  // aunque el chat esté cerrado o minimizado.
+  useEffect(() => {
+    if (!currentWorkspaceId || !isChatEnabled) return;
+
+    const colRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, "chatsEquipo", "general", "mensajes");
+    const q = query(colRef, orderBy("creadoEl", "desc"), limit(30));
+    const unsub = onSnapshot(q, (snap) => {
+      const arr = snap.docs.map((d) => {
+        const data = d.data();
+        const ms = data.creadoEl?.toMillis ? data.creadoEl.toMillis() : 0;
+        return { uid: data.remitenteUid as string, ms };
+      });
+      setGeneralMsgs(arr);
+    });
+
+    return () => unsub();
+  }, [currentWorkspaceId, isChatEnabled]);
+
+  // Recalcular el contador de no leídos (mensajes de otros más nuevos que la última lectura)
+  useEffect(() => {
+    if (isViewingGeneral) {
+      setUnreadCount(0);
+      return;
+    }
+    const count = generalMsgs.filter((m) => m.ms > lastSeen && m.uid !== currentUser?.uid).length;
+    setUnreadCount(count);
+  }, [generalMsgs, lastSeen, isViewingGeneral, currentUser?.uid]);
+
+  // Marcar como leído al ver el canal general (al abrir o maximizar)
+  useEffect(() => {
+    if (isViewingGeneral && currentWorkspaceId) {
+      const now = Date.now();
+      localStorage.setItem(`teamchat_lastseen_${currentWorkspaceId}`, String(now));
+      setLastSeen(now);
+    }
+  }, [isViewingGeneral, currentWorkspaceId, generalMsgs]);
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim() || !currentUser || !currentWorkspaceId) return;
@@ -145,9 +198,14 @@ export function TeamChatBubble() {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="w-14 h-14 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] flex items-center justify-center shadow-[0_10px_30px_rgba(0,0,0,0.3)] transition-all hover:scale-105 active:scale-95"
+          className="relative w-14 h-14 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] flex items-center justify-center shadow-[0_10px_30px_rgba(0,0,0,0.3)] transition-all hover:scale-105 active:scale-95"
         >
           <MessageSquare className="w-6 h-6 text-black" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[22px] h-[22px] bg-red-500 text-white text-[11px] font-black rounded-full flex items-center justify-center px-1.5 leading-none border-2 border-[var(--bg-main)] shadow-lg">
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
+          )}
         </button>
       )}
 
@@ -164,6 +222,11 @@ export function TeamChatBubble() {
             <div className="flex items-center gap-2">
               <div className="w-2.5 h-2.5 rounded-full bg-[#C8FF00] animate-pulse" />
               <span className="text-xs font-black text-white/95 uppercase tracking-widest">Chat de Equipo</span>
+              {isMinimized && unreadCount > 0 && (
+                <span className="min-w-[20px] h-[20px] bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center px-1.5 leading-none shadow">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <button 

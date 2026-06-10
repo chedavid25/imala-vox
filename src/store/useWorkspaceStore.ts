@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { Workspace } from '@/lib/types/firestore';
 
 interface WorkspaceState {
@@ -18,19 +19,28 @@ interface WorkspaceState {
   setIsAdmin: (v: boolean) => void;
 }
 
-export const useWorkspaceStore = create<WorkspaceState>((set) => ({
-  currentWorkspaceId: null,
-  workspace: null,
-  workspacesList: [],
-  selectedContactId: null,
-  selectedChatId: null,
-  currentAgentName: null,
-  isAdmin: false,
-  setWorkspaceId: (id) => set({ currentWorkspaceId: id }),
-  setWorkspace: (workspace) => set({ workspace }),
-  setWorkspacesList: (workspacesList) => set({ workspacesList }),
-  setSelectedContactId: (id) => set({ selectedContactId: id }),
-  setSelectedChatId: (id) => set({ selectedChatId: id }),
-  setCurrentAgentName: (name) => set({ currentAgentName: name }),
-  setIsAdmin: (isAdmin) => set({ isAdmin }),
-}));
+export const useWorkspaceStore = create<WorkspaceState>()(
+  persist(
+    (set) => ({
+      currentWorkspaceId: null,
+      workspace: null,
+      workspacesList: [],
+      selectedContactId: null,
+      selectedChatId: null,
+      currentAgentName: null,
+      isAdmin: false,
+      setWorkspaceId: (id) => set({ currentWorkspaceId: id }),
+      setWorkspace: (workspace) => set({ workspace }),
+      setWorkspacesList: (workspacesList) => set({ workspacesList }),
+      setSelectedContactId: (id) => set({ selectedContactId: id }),
+      setSelectedChatId: (id) => set({ selectedChatId: id }),
+      setCurrentAgentName: (name) => set({ currentAgentName: name }),
+      setIsAdmin: (isAdmin) => set({ isAdmin }),
+    }),
+    {
+      name: 'imala-workspace',
+      // Solo persistimos el id del espacio activo; el resto se rehidrata desde Firestore al cargar
+      partialize: (state) => ({ currentWorkspaceId: state.currentWorkspaceId }),
+    }
+  )
+);

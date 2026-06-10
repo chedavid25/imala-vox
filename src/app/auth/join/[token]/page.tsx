@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "sonner";
 import { Loader2, Users, CheckCircle2, ChevronRight, Inbox } from "lucide-react";
 import { COLLECTIONS } from "@/lib/types/firestore";
+import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 
 export default function JoinPage() {
   const params = useParams();
@@ -18,6 +19,7 @@ export default function JoinPage() {
   const token = params.token as string;
   const wsId = searchParams.get("wsId");
   const router = useRouter();
+  const { setWorkspaceId } = useWorkspaceStore();
   
   const [loading, setLoading] = useState(true);
   const [invitation, setInvitation] = useState<any>(null);
@@ -66,6 +68,17 @@ export default function JoinPage() {
     return () => unsubscribe();
   }, [token, wsId]);
 
+  // Construye la URL de /auth conservando el redirect de vuelta a esta invitación,
+  // el email destino pre-cargado y la pestaña (login/register) a mostrar.
+  const buildAuthUrl = (mode: "login" | "register") => {
+    const redirect = `/auth/join/${token}${wsId ? `?wsId=${wsId}` : ""}`;
+    const params = new URLSearchParams();
+    params.set("redirect", redirect);
+    params.set("mode", mode);
+    if (invitation?.email) params.set("email", invitation.email);
+    return `/auth?${params.toString()}`;
+  };
+
   const handleJoin = async () => {
     if (!user || !token) return;
 
@@ -78,6 +91,9 @@ export default function JoinPage() {
       }, wsId || undefined);
 
       if (res.success) {
+        // Fijar el espacio recién aceptado como activo (persistido) para que AppLayout
+        // lo priorice tras la recarga y no mande al usuario a onboarding.
+        if (res.wsId) setWorkspaceId(res.wsId);
         toast.success("¡Bienvenido al equipo!");
         window.location.href = "/dashboard/operacion/inbox";
       } else {
@@ -169,12 +185,21 @@ export default function JoinPage() {
                 {!processing && <ChevronRight className="ml-2 w-5 h-5" />}
               </Button>
             ) : (
-              <Button 
-                onClick={() => router.push(`/auth?redirect=/auth/join/${token}${wsId ? `?wsId=${wsId}` : ""}`)}
-                className="w-full bg-white text-black hover:bg-white/90 font-black text-sm uppercase tracking-widest h-16 rounded-[1.5rem] shadow-xl"
-              >
-                Iniciar Sesión Primero
-              </Button>
+              <div className="space-y-3">
+                <Button
+                  onClick={() => router.push(buildAuthUrl("register"))}
+                  className="w-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-black text-sm uppercase tracking-widest h-16 rounded-[1.5rem] shadow-xl shadow-[var(--accent)]/20"
+                >
+                  Crear cuenta
+                </Button>
+                <Button
+                  onClick={() => router.push(buildAuthUrl("login"))}
+                  variant="outline"
+                  className="w-full bg-white text-black hover:bg-white/90 font-black text-sm uppercase tracking-widest h-14 rounded-[1.5rem] border-none shadow-lg"
+                >
+                  Ya tengo cuenta
+                </Button>
+              </div>
             )}
             
             <p className="text-[10px] text-[var(--text-tertiary-light)] font-medium">

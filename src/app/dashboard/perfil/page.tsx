@@ -14,7 +14,9 @@ import {
   Lightbulb,
   ChevronDown,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  Building2,
+  Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,7 +39,7 @@ import { cn } from "@/lib/utils";
 export default function PerfilPage() {
   const user = auth.currentUser;
   const router = useRouter();
-  const { workspace } = useWorkspaceStore();
+  const { workspace, workspacesList, currentWorkspaceId, setWorkspace, setWorkspaceId } = useWorkspaceStore();
   const [loading, setLoading] = useState(false);
   const [displayName, setDisplayName] = useState(user?.displayName || "");
   const [showHelp, setShowHelp] = useState(false);
@@ -200,6 +202,60 @@ export default function PerfilPage() {
                </div>
             </CardFooter>
           </Card>
+
+          {/* MIS ESPACIOS DE TRABAJO */}
+          {workspacesList.length > 0 && (
+            <Card className="bg-white border border-[var(--border-light)] rounded-[32px] shadow-sm overflow-hidden">
+              <CardHeader className="p-8 pb-5 border-b border-slate-50 bg-slate-50/30">
+                <CardTitle className="text-base font-bold text-[var(--text-primary-light)] flex items-center gap-2.5 tracking-tight">
+                  <Building2 className="w-4 h-4 text-[var(--text-tertiary-light)]" />
+                  Mis Espacios
+                </CardTitle>
+                <p className="text-xs text-[var(--text-tertiary-light)] font-medium mt-1">
+                  {workspacesList.length > 1
+                    ? "Cambiá entre los espacios a los que perteneces."
+                    : "Espacio al que perteneces actualmente."}
+                </p>
+              </CardHeader>
+              <CardContent className="p-3 space-y-1">
+                {workspacesList.map((ws) => {
+                  const isActive = (currentWorkspaceId || workspace?.id) === ws.id;
+                  return (
+                    <button
+                      key={ws.id}
+                      onClick={() => {
+                        if (isActive) return;
+                        setWorkspaceId(ws.id);
+                        setWorkspace(ws);
+                        toast.success(`Cambiaste a ${ws.nombre}`);
+                        router.push("/dashboard/operacion/inbox");
+                      }}
+                      className={cn(
+                        "w-full flex items-center gap-3 p-3 rounded-2xl transition-all text-left",
+                        isActive
+                          ? "bg-[var(--accent)]/10 border border-[var(--accent)]/30"
+                          : "hover:bg-slate-50 border border-transparent"
+                      )}
+                    >
+                      <div className={cn(
+                        "size-9 rounded-xl flex items-center justify-center font-black text-sm shrink-0",
+                        isActive ? "bg-[var(--accent)] text-black" : "bg-slate-100 text-slate-500"
+                      )}>
+                        {ws.nombre?.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-[var(--text-primary-light)] truncate">{ws.nombre}</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-tertiary-light)]">
+                          Plan {ws.plan || 'Free'}
+                        </p>
+                      </div>
+                      {isActive && <Check className="w-4 h-4 text-[var(--accent-active)] shrink-0" />}
+                    </button>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* COLUMNA DERECHA: PESTAÑAS Y FORMULARIOS */}

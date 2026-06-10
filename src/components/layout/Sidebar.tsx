@@ -278,7 +278,8 @@ export function Sidebar() {
 function SidebarFooter({ collapsed }: { collapsed: boolean }) {
   const [user, setUser] = useState<User | null>(null);
   const [mounted, setMounted] = useState(false);
-  const { workspace, workspacesList, setWorkspace, setWorkspaceId } = useWorkspaceStore();
+  const [memberRole, setMemberRole] = useState<string | null>(null);
+  const { workspace, workspacesList, currentWorkspaceId, setWorkspace, setWorkspaceId } = useWorkspaceStore();
   const router = useRouter();
 
   useEffect(() => {
@@ -286,6 +287,36 @@ function SidebarFooter({ collapsed }: { collapsed: boolean }) {
     const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
     return () => unsubscribe();
   }, []);
+
+  // Cargar el rol del usuario actual dentro del espacio activo (para identificar invitados)
+  useEffect(() => {
+    if (!user || !currentWorkspaceId) {
+      setMemberRole(null);
+      return;
+    }
+    // El propietario siempre es "Propietario", sin importar el doc de miembro
+    if (workspace?.propietarioUid === user.uid) {
+      setMemberRole("Propietario");
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const ref = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.MIEMBROS, user.uid);
+        const snap = await getDoc(ref);
+        if (cancelled) return;
+        if (snap.exists()) {
+          const rol = snap.data().rol;
+          setMemberRole(rol === "admin" ? "Admin" : rol === "operador" ? "Usuario" : rol || null);
+        } else {
+          setMemberRole(null);
+        }
+      } catch {
+        if (!cancelled) setMemberRole(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user, currentWorkspaceId, workspace?.propietarioUid]);
 
   if (!mounted) return null;
 
@@ -318,8 +349,8 @@ function SidebarFooter({ collapsed }: { collapsed: boolean }) {
                   <p className="text-[var(--text-primary-dark)] font-semibold truncate leading-tight">
                     {userName}
                   </p>
-                  <p className="text-[var(--text-tertiary-dark)] font-bold uppercase tracking-tighter text-[9px] mt-0.5 opacity-80">
-                    Plan {workspace?.plan || 'Free'}
+                  <p className="text-[var(--text-tertiary-dark)] font-bold uppercase tracking-tighter text-[9px] mt-0.5 opacity-80 truncate">
+                    {memberRole ? `${memberRole} · ${workspace?.nombre || 'Espacio'}` : `Plan ${workspace?.plan || 'Free'}`}
                   </p>
                 </div>
                 <ChevronsUpDown className="w-4 h-4 text-[var(--text-tertiary-dark)] group-hover:text-[var(--text-secondary-dark)] transition-colors mr-1" />
