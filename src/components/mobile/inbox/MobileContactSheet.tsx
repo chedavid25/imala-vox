@@ -266,6 +266,10 @@ export function MobileContactSheet({ open, onClose, contactoId, conversacion }: 
                         const convRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES, conversacion.id);
                         await updateDoc(convRef, {
                           estado: newEstado,
+                          // Al resolver, re-armamos la IA para que retome sola si el cliente vuelve
+                          // a escribir (el webhook aplica las guardas de etiqueta/canal). Al reabrir
+                          // manualmente no tocamos modoIA para no pisar una pausa intencional.
+                          ...(newEstado === 'resuelto' && { modoIA: 'auto' }),
                           actualizadoEl: Timestamp.now()
                         });
                         toast.success(newEstado === 'resuelto' ? "Conversación resuelta" : "Conversación reabierta");

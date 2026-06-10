@@ -33,9 +33,11 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { COLLECTIONS } from "@/lib/types/firestore";
+import { SplashScreen } from "@/components/layout/SplashScreen";
 
 export default function OnboardingPage() {
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
   const [userName, setUserName] = useState("");
   const [empresaNombre, setEmpresaNombre] = useState("");
   const [rubro, setRubro] = useState("");
@@ -45,26 +47,49 @@ export default function OnboardingPage() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         router.push("/auth");
-      } else {
-        setUserName(user.displayName?.split(" ")[0] || "en Imalá Vox");
+        return;
+      }
 
-        // Verificar si ya tiene workspace para evitar duplicados
+      setUserName(user.displayName?.split(" ")[0] || "en Imalá Vox");
+
+      // Verificar si ya pertenece a algún espacio (como propietario o como miembro invitado)
+      // antes de mostrar el formulario, para no parpadear el onboarding a quien ya tiene espacio.
+      try {
+        const { collection, query, where, getDocs, limit, collectionGroup } = await import('firebase/firestore');
+
+        // 1. ¿Es propietario de algún espacio?
+        const qOwner = query(
+          collection(db, COLLECTIONS.ESPACIOS),
+          where('propietarioUid', '==', user.uid),
+          limit(1)
+        );
+        const ownerSnap = await getDocs(qOwner);
+        if (!ownerSnap.empty) {
+          router.push('/dashboard/operacion/inbox');
+          return;
+        }
+
+        // 2. ¿Es miembro invitado de algún espacio?
         try {
-          const { collection, query, where, getDocs, limit } = await import('firebase/firestore');
-          const q = query(
-            collection(db, COLLECTIONS.ESPACIOS),
-            where('propietarioUid', '==', user.uid),
+          const qMember = query(
+            collectionGroup(db, COLLECTIONS.MIEMBROS),
+            where('email', '==', user.email),
             limit(1)
           );
-          const snap = await getDocs(q);
-          if (!snap.empty) {
-            // Ya tiene workspace, redirigir al dashboard
+          const memberSnap = await getDocs(qMember);
+          if (!memberSnap.empty) {
             router.push('/dashboard/operacion/inbox');
             return;
           }
-        } catch (err) {
-          console.error('Error verificando workspace:', err);
+        } catch (memberErr) {
+          console.warn('No se pudo verificar membresía en onboarding:', memberErr);
         }
+
+        // Sin ningún espacio: corresponde mostrar el formulario de onboarding
+        setChecking(false);
+      } catch (err) {
+        console.error('Error verificando workspace:', err);
+        setChecking(false);
       }
     });
 
@@ -144,6 +169,12 @@ export default function OnboardingPage() {
       setLoading(false);
     }
   };
+
+  // Mientras verificamos si el usuario ya pertenece a un espacio, mostramos el splash
+  // con el logo en lugar del formulario, para evitar el parpadeo del onboarding.
+  if (checking) {
+    return <SplashScreen />;
+  }
 
   return (
     <div className="min-h-screen bg-[var(--bg-main)] flex flex-col items-center justify-center p-6 sm:p-12 relative overflow-hidden font-sans">

@@ -144,6 +144,10 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
       const convRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES, conversacion.id);
       await updateDoc(convRef, {
         estado: 'resuelto',
+        // Re-armamos la IA: si el cliente vuelve a escribir más adelante, el webhook
+        // reabre la conversación y la IA responde automáticamente (respetando etiquetas
+        // bloqueantes y el canal apagado). No se envía ningún mensaje al resolver.
+        modoIA: 'auto',
         actualizadoEl: Timestamp.now()
       });
       toast.success("Conversación marcada como resuelta");
@@ -646,8 +650,18 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
         </div>
       </header>
 
+      {/* Aviso: conversación resuelta — la IA retomará sola si el cliente vuelve a escribir */}
+      {conversacion.estado === 'resuelto' && (
+        <div className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-50/60 border-b border-emerald-100 text-emerald-700">
+          <Sparkles className="w-3.5 h-3.5 shrink-0" />
+          <span className="text-[11px] font-semibold tracking-tight">
+            Conversación resuelta. La IA retomará automáticamente si el cliente vuelve a escribir.
+          </span>
+        </div>
+      )}
+
       {/* Messages View */}
-      <div 
+      <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto p-6 space-y-6 bg-[var(--bg-main)]/30 no-scrollbar"
       >
