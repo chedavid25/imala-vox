@@ -92,6 +92,45 @@ export async function invitarUsuarioAction(wsId: string, email: string, role: st
 }
 
 /**
+ * Obtiene los detalles de una invitación de forma segura en el servidor.
+ */
+export async function obtenerInvitacionAction(token: string, wsId?: string) {
+  try {
+    let inviteData = null;
+
+    if (wsId) {
+      const docRef = adminDb.collection(COLLECTIONS.ESPACIOS).doc(wsId).collection("invitaciones").doc(token);
+      const snap = await docRef.get();
+      if (snap.exists && snap.data()?.status === "pendiente") {
+        inviteData = snap.data();
+      }
+    } else {
+      const inviteSnap = await adminDb.collectionGroup("invitaciones")
+        .where("token", "==", token)
+        .where("status", "==", "pendiente")
+        .limit(1)
+        .get();
+
+      if (!inviteSnap.empty) {
+        inviteData = inviteSnap.docs[0].data();
+      }
+    }
+
+    if (!inviteData) {
+      return { success: false, error: "Invitación no encontrada o ya utilizada." };
+    }
+
+    // Convertir Timestamps a objetos simples para pasarlos al cliente
+    const dataJSON = JSON.parse(JSON.stringify(inviteData));
+
+    return { success: true, invitation: dataJSON };
+  } catch (error: any) {
+    console.error("Error al obtener invitación en servidor:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * Procesa la aceptación de una invitación
  */
 export async function aceptarInvitacionAction(token: string, user: { uid: string, email: string, displayName: string }, wsId?: string) {

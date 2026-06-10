@@ -2,18 +2,9 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { auth, db } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { 
-  collectionGroup, 
-  query, 
-  where, 
-  getDocs, 
-  getDoc,
-  doc,
-  Timestamp 
-} from "firebase/firestore";
-import { aceptarInvitacionAction } from "@/app/actions/team";
+import { aceptarInvitacionAction, obtenerInvitacionAction } from "@/app/actions/team";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
@@ -40,39 +31,26 @@ export default function JoinPage() {
 
     const fetchInvitation = async () => {
       try {
-        let inviteData = null;
-
-        if (wsId) {
-          // Búsqueda directa (Mucho más robusta y no requiere índices)
-          const docRef = doc(db, COLLECTIONS.ESPACIOS, wsId, "invitaciones", token);
-          const snap = await getDoc(docRef);
-          if (snap.exists() && snap.data().status === "pendiente") {
-            inviteData = snap.data();
-          }
-        } else {
-          // Fallback a búsqueda global (requiere índices de Firestore)
-          const q = query(
-            collectionGroup(db, "invitaciones"),
-            where("token", "==", token),
-            where("status", "==", "pendiente")
-          );
-          const snap = await getDocs(q);
-          if (!snap.empty) {
-            inviteData = snap.docs[0].data();
-          }
-        }
+        const res = await obtenerInvitacionAction(token, wsId || undefined);
         
-        if (!inviteData) {
-          toast.error("Invitación no encontrada o ya utilizada.");
+        if (!res.success || !res.invitation) {
+          toast.error(res.error || "Invitación no encontrada o ya utilizada.");
           setLoading(false);
           return;
         }
+
+        const inviteData = res.invitation;
 
         // Verificar si venció
-        if (inviteData.venceEl && inviteData.venceEl.toDate() < new Date()) {
-          toast.error("La invitación ha expirado.");
-          setLoading(false);
-          return;
+        if (inviteData.venceEl) {
+          // Firebase Admin timestamp JSON serialize es un objeto de tipo { _seconds, _nanoseconds } o string
+          const seconds = inviteData.venceEl._seconds || (typeof inviteData.venceEl === "string" ? Date.parse(inviteData.venceEl) / 1000 : 0);
+          const venceDate = new Date(seconds * 1000);
+          if (venceDate < new Date()) {
+            toast.error("La invitación ha expirado.");
+            setLoading(false);
+            return;
+          }
         }
 
         setInvitation(inviteData);
