@@ -79,7 +79,7 @@ export default function JoinPage() {
 
       if (res.success) {
         toast.success("¡Bienvenido al equipo!");
-        router.push("/dashboard/operacion/inbox");
+        window.location.href = "/dashboard/operacion/inbox";
       } else {
         toast.error(res.error || "No se pudo unir al espacio.");
       }
