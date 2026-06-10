@@ -170,7 +170,7 @@ export default function JoinPage() {
               </Button>
             ) : (
               <Button 
-                onClick={() => router.push(`/auth?redirect=/auth/join/${token}`)}
+                onClick={() => router.push(`/auth?redirect=/auth/join/${token}${wsId ? `?wsId=${wsId}` : ""}`)}
                 className="w-full bg-white text-black hover:bg-white/90 font-black text-sm uppercase tracking-widest h-16 rounded-[1.5rem] shadow-xl"
               >
                 Iniciar Sesión Primero

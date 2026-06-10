@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, Suspense } from "react";
 import { auth } from "@/lib/firebase";
 import { 
   signInWithEmailAndPassword, 
@@ -10,7 +10,7 @@ import {
   signInWithPopup,
   sendPasswordResetEmail
 } from "firebase/auth";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { 
@@ -32,10 +32,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { verificarYSetearAdmin } from "@/app/actions/superadmin";
 
-export default function AuthPage() {
+function AuthPageContent() {
   const [loading, setLoading] = useState(false);
   const [resetMode, setResetMode] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get("redirect");
 
   // Estados para Login
   const [loginEmail, setLoginEmail] = useState("");
@@ -89,6 +91,8 @@ export default function AuthPage() {
       
       if (esAdmin) {
         window.location.href = "/superadmin";
+      } else if (redirectUrl) {
+        router.push(redirectUrl);
       } else {
         router.push(snap.empty ? "/onboarding" : "/dashboard/operacion/inbox");
       }
@@ -116,7 +120,11 @@ export default function AuthPage() {
       const { user } = await createUserWithEmailAndPassword(auth, registerEmail, registerPassword);
       await updateProfile(user, { displayName: registerName });
       toast.success("Cuenta creada exitosamente");
-      router.push("/onboarding");
+      if (redirectUrl) {
+        router.push(redirectUrl);
+      } else {
+        router.push("/onboarding");
+      }
     } catch (error: any) {
       console.error("Error registro:", error);
       toast.error(error.message || "Error al crear cuenta");
@@ -149,6 +157,8 @@ export default function AuthPage() {
       
       if (esAdmin) {
         window.location.href = "/superadmin";
+      } else if (redirectUrl) {
+        router.push(redirectUrl);
       } else {
         router.push(snap.empty ? '/onboarding' : '/dashboard/operacion/inbox');
       }
@@ -486,3 +496,16 @@ function SVGGoogle() {
     </svg>
   );
 }
+
+export default function AuthPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-main)]">
+        <Loader2 className="w-10 h-10 animate-spin text-[var(--accent)]" />
+      </div>
+    }>
+      <AuthPageContent />
+    </Suspense>
+  );
+}
+
