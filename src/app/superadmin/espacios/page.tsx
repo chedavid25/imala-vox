@@ -70,7 +70,24 @@ export default function EspaciosAdminPage() {
         const snap = await getDocs(
           collection(db, COLLECTIONS.ESPACIOS, selectedWs!.id, COLLECTIONS.MIEMBROS)
         );
-        setMembers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+
+        // El propietario puede no tener documento en "miembros" (espacios antiguos).
+        // Lo agregamos sintéticamente para que siempre aparezca en la lista del equipo.
+        if (
+          selectedWs!.propietarioUid &&
+          !list.some(m => m.id === selectedWs!.propietarioUid)
+        ) {
+          list.unshift({
+            id: selectedWs!.propietarioUid,
+            nombre: selectedWs!.propietarioEmail?.split("@")[0] || "Propietario",
+            email: selectedWs!.propietarioEmail,
+            rol: "admin",
+            status: "activo",
+          });
+        }
+
+        setMembers(list);
       } catch (error) {
         console.error("Error al cargar miembros del espacio:", error);
         toast.error("Error al cargar colaboradores");
@@ -400,23 +417,25 @@ export default function EspaciosAdminPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right space-x-2 py-3">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="bg-transparent border-white/10 hover:bg-white/5 text-white/70 hover:text-white font-bold text-[9px] uppercase tracking-widest h-8 px-3 rounded-lg"
-                              onClick={() => handleCambiarRolMiembro(member.id, member.rol)}
-                            >
-                              Cambiar Rol
-                            </Button>
                             {selectedWs?.propietarioUid !== member.id ? (
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                className="bg-red-950/40 border border-red-500/20 hover:bg-red-600 hover:text-white text-red-400 font-bold text-[9px] uppercase tracking-widest h-8 px-3 rounded-lg shadow-lg"
-                                onClick={() => handleEliminarMiembro(member.id, member.nombre || member.email)}
-                              >
-                                Remover
-                              </Button>
+                              <>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="bg-transparent border-white/10 hover:bg-white/5 text-white/70 hover:text-white font-bold text-[9px] uppercase tracking-widest h-8 px-3 rounded-lg"
+                                  onClick={() => handleCambiarRolMiembro(member.id, member.rol)}
+                                >
+                                  Cambiar Rol
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  className="bg-red-950/40 border border-red-500/20 hover:bg-red-600 hover:text-white text-red-400 font-bold text-[9px] uppercase tracking-widest h-8 px-3 rounded-lg shadow-lg"
+                                  onClick={() => handleEliminarMiembro(member.id, member.nombre || member.email)}
+                                >
+                                  Remover
+                                </Button>
+                              </>
                             ) : (
                               <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest italic pr-2">Propietario</span>
                             )}

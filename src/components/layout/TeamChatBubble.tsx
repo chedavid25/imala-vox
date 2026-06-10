@@ -1,15 +1,17 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { 
-  MessageSquare, Send, X, Users, Minimize2, Maximize2, Sparkles, User, AlertCircle
+import {
+  MessageSquare, Send, X, Users, Minimize2, Maximize2, Sparkles, User, AlertCircle,
+  Paperclip, FileText, Download, Loader2
 } from "lucide-react";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
-import { auth, db } from "@/lib/firebase";
-import { 
-  collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, 
+import { auth, db, storage } from "@/lib/firebase";
+import {
+  collection, query, orderBy, onSnapshot, addDoc, serverTimestamp,
   where, doc, getDocs, limit, Timestamp
 } from "firebase/firestore";
+import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +28,9 @@ interface Message {
   remitenteNombre: string;
   contenido: string;
   creadoEl: any;
+  mediaUrl?: string;
+  mediaTipo?: "image" | "file";
+  nombreArchivo?: string;
 }
 
 export function TeamChatBubble() {
@@ -37,7 +42,9 @@ export function TeamChatBubble() {
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
+  const [uploading, setUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Conteo de mensajes no leídos del canal general (cuando el chat está cerrado/minimizado)
   const [generalMsgs, setGeneralMsgs] = useState<{ uid: string; ms: number }[]>([]);
@@ -133,7 +140,10 @@ export function TeamChatBubble() {
           remitenteUid: data.remitenteUid,
           remitenteNombre: data.remitenteNombre || "Operador",
           contenido: data.contenido || "",
-          creadoEl: data.creadoEl
+          creadoEl: data.creadoEl,
+          mediaUrl: data.mediaUrl,
+          mediaTipo: data.mediaTipo,
+          nombreArchivo: data.nombreArchivo
         });
       });
       setMessages(msgs);
@@ -233,6 +243,27 @@ export function TeamChatBubble() {
     }
   }, [isViewingDM, currentWorkspaceId, selectedMember?.uid, messages]);
 
+  // Resuelve la ruta de la colección de mensajes (general o DM) y el chatId actual
+  const getCurrentChat = (): { colPath: string; chatId: string } | null => {
+    if (!currentUser || !currentWorkspaceId) return null;
+    if (activeTab === "general") {
+      return {
+        chatId: "general",
+        colPath: `${COLLECTIONS.ESPACIOS}/${currentWorkspaceId}/chatsEquipo/general/mensajes`,
+      };
+    }
+    if (!selectedMember) return null;
+    const ids = [currentUser.uid, selectedMember.uid].sort();
+    const chatId = `${ids[0]}_${ids[1]}`;
+    return {
+      chatId,
+      colPath: `${COLLECTIONS.ESPACIOS}/${currentWorkspaceId}/chatsEquipo/${chatId}/mensajes`,
+    };
+  };
+
+  const remitenteNombre = () =>
+    currentUser?.displayName || currentUser?.email?.split("@")[0] || "Operador";
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim() || !currentUser || !currentWorkspaceId) return;
@@ -241,24 +272,61 @@ export function TeamChatBubble() {
     setInputText("");
 
     try {
-      let colPath = "";
-      if (activeTab === "general") {
-        colPath = `${COLLECTIONS.ESPACIOS}/${currentWorkspaceId}/chatsEquipo/general/mensajes`;
-      } else {
-        if (!selectedMember) return;
-        const ids = [currentUser.uid, selectedMember.uid].sort();
-        const chatId = `${ids[0]}_${ids[1]}`;
-        colPath = `${COLLECTIONS.ESPACIOS}/${currentWorkspaceId}/chatsEquipo/${chatId}/mensajes`;
-      }
+      const chat = getCurrentChat();
+      if (!chat) return;
 
-      await addDoc(collection(db, colPath), {
+      await addDoc(collection(db, chat.colPath), {
         remitenteUid: currentUser.uid,
-        remitenteNombre: currentUser.displayName || currentUser.email?.split("@")[0] || "Operador",
+        remitenteNombre: remitenteNombre(),
         contenido: text,
         creadoEl: serverTimestamp()
       });
     } catch (error) {
       console.error("Error al enviar mensaje de equipo:", error);
+    }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permitir re-seleccionar el mismo archivo
+    if (!file || !currentUser || !currentWorkspaceId) return;
+
+    // Límite de 15 MB
+    if (file.size > 15 * 1024 * 1024) {
+      console.warn("Archivo demasiado grande para el chat interno (máx. 15 MB)");
+      return;
+    }
+
+    const chat = getCurrentChat();
+    if (!chat) return;
+
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop() || "bin";
+      const isImage = file.type.startsWith("image/");
+      const path = `workspaces/${currentWorkspaceId}/team-chat/${chat.chatId}/${Date.now()}.${ext}`;
+      const fileRef = storageRef(storage, path);
+      const uploadTask = uploadBytesResumable(fileRef, file);
+
+      await new Promise<void>((resolve, reject) => {
+        uploadTask.on("state_changed", null, reject, () => resolve());
+      });
+
+      const downloadUrl = await getDownloadURL(fileRef);
+
+      await addDoc(collection(db, chat.colPath), {
+        remitenteUid: currentUser.uid,
+        remitenteNombre: remitenteNombre(),
+        contenido: "",
+        mediaUrl: downloadUrl,
+        mediaTipo: isImage ? "image" : "file",
+        nombreArchivo: file.name,
+        creadoEl: serverTimestamp()
+      });
+    } catch (error) {
+      console.error("Error al subir archivo al chat de equipo:", error);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -417,15 +485,39 @@ export function TeamChatBubble() {
                               {!isMe && (
                                 <span className="text-[9px] text-white/30 font-bold mb-1 ml-1">{m.remitenteNombre}</span>
                               )}
-                              <div 
+                              <div
                                 className={cn(
-                                  "max-w-[80%] px-3.5 py-2 rounded-2xl text-[12px] leading-relaxed font-semibold",
-                                  isMe 
-                                    ? "bg-[#C8FF00]/10 border border-[#C8FF00]/20 text-white rounded-tr-sm" 
+                                  "max-w-[80%] px-3.5 py-2 rounded-2xl text-[12px] leading-relaxed font-semibold space-y-2",
+                                  isMe
+                                    ? "bg-[#C8FF00]/10 border border-[#C8FF00]/20 text-white rounded-tr-sm"
                                     : "bg-white/5 border border-white/5 text-white/90 rounded-tl-sm"
                                 )}
                               >
-                                {m.contenido}
+                                {m.mediaUrl && m.mediaTipo === "image" && (
+                                  <a href={m.mediaUrl} target="_blank" rel="noopener noreferrer" className="block">
+                                    <img
+                                      src={m.mediaUrl}
+                                      alt={m.nombreArchivo || "imagen"}
+                                      className="rounded-xl max-h-48 w-auto object-cover border border-white/10"
+                                    />
+                                  </a>
+                                )}
+                                {m.mediaUrl && m.mediaTipo === "file" && (
+                                  <a
+                                    href={m.mediaUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    download={m.nombreArchivo}
+                                    className="flex items-center gap-2.5 px-1 py-1 group/file"
+                                  >
+                                    <div className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
+                                      <FileText className="w-4 h-4 text-[#C8FF00]" />
+                                    </div>
+                                    <span className="text-[11px] font-bold truncate max-w-[160px]">{m.nombreArchivo || "Archivo"}</span>
+                                    <Download className="w-3.5 h-3.5 opacity-50 group-hover/file:opacity-100 shrink-0" />
+                                  </a>
+                                )}
+                                {m.contenido && <p>{m.contenido}</p>}
                               </div>
                             </div>
                           );
@@ -436,14 +528,32 @@ export function TeamChatBubble() {
 
                     {/* Input bar */}
                     <form onSubmit={handleSend} className="p-3 border-t border-white/5 flex gap-2">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        className="hidden"
+                        accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"
+                        onChange={handleFileSelect}
+                      />
+                      <Button
+                        type="button"
+                        size="icon"
+                        disabled={uploading}
+                        onClick={() => fileInputRef.current?.click()}
+                        title="Adjuntar archivo o imagen"
+                        className="bg-white/5 hover:bg-white/10 text-white/70 hover:text-white h-10 w-10 shrink-0 rounded-xl border border-white/5"
+                      >
+                        {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
+                      </Button>
                       <Input
                         value={inputText}
                         onChange={(e) => setInputText(e.target.value)}
-                        placeholder="Escribe un mensaje..."
+                        placeholder={uploading ? "Subiendo archivo..." : "Escribe un mensaje..."}
+                        disabled={uploading}
                         className="bg-white/5 border-white/5 rounded-xl h-10 text-xs font-semibold text-white placeholder-white/20 focus:ring-1 focus:ring-[#C8FF00]/30"
                       />
-                      <Button 
-                        type="submit" 
+                      <Button
+                        type="submit"
                         size="icon"
                         className="bg-[#C8FF00] hover:bg-[#C8FF00]/90 text-black h-10 w-10 shrink-0 rounded-xl"
                       >
