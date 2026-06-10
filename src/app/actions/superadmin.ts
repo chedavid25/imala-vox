@@ -215,3 +215,43 @@ export async function eliminarWorkspaceAdmin(wsId: string) {
   }
 }
 
+/**
+ * Modifica el rol de un miembro de cualquier espacio (acción de superadmin)
+ */
+export async function cambiarRolMiembroAdminAction(wsId: string, uid: string, nuevoRol: string) {
+  try {
+    await adminDb
+      .collection(COLLECTIONS.ESPACIOS)
+      .doc(wsId)
+      .collection(COLLECTIONS.MIEMBROS)
+      .doc(uid)
+      .update({
+        rol: nuevoRol,
+        actualizadoEl: Timestamp.now()
+      });
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error al cambiar rol desde superadmin:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Elimina a un miembro de cualquier espacio (acción de superadmin)
+ */
+export async function eliminarMiembroAdminAction(wsId: string, uid: string) {
+  try {
+    await adminDb
+      .collection(COLLECTIONS.ESPACIOS)
+      .doc(wsId)
+      .collection(COLLECTIONS.MIEMBROS)
+      .doc(uid)
+      .delete();
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error al eliminar miembro desde superadmin:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+

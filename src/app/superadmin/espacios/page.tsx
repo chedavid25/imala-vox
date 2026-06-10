@@ -31,17 +31,88 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { obtenerMetricasSuperAdmin, bloquearWorkspace, extenderPrueba, cambiarPlanManual, eliminarWorkspaceAdmin } from "@/app/actions/superadmin";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { obtenerMetricasSuperAdmin, bloquearWorkspace, extenderPrueba, cambiarPlanManual, eliminarWorkspaceAdmin, cambiarRolMiembroAdminAction, eliminarMiembroAdminAction } from "@/app/actions/superadmin";
 import { sincronizarSuscripcionMP } from "@/app/actions/billing";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Workspace } from "@/lib/types/firestore";
+import { db } from "@/lib/firebase";
+import { collection, getDocs } from "firebase/firestore";
+import { COLLECTIONS } from "@/lib/types/firestore";
 
 export default function EspaciosAdminPage() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+
+  // Estados para detalles y miembros del espacio
+  const [selectedWs, setSelectedWs] = useState<Workspace | null>(null);
+  const [members, setMembers] = useState<any[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+
+  useEffect(() => {
+    if (!selectedWs) {
+      setMembers([]);
+      return;
+    }
+
+    async function loadMembers() {
+      setLoadingMembers(true);
+      try {
+        const snap = await getDocs(
+          collection(db, COLLECTIONS.ESPACIOS, selectedWs!.id, COLLECTIONS.MIEMBROS)
+        );
+        setMembers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      } catch (error) {
+        console.error("Error al cargar miembros del espacio:", error);
+        toast.error("Error al cargar colaboradores");
+      } finally {
+        setLoadingMembers(false);
+      }
+    }
+
+    loadMembers();
+  }, [selectedWs]);
+
+  const handleCambiarRolMiembro = async (memberId: string, currentRole: string) => {
+    if (!selectedWs) return;
+    const nuevoRol = currentRole === "admin" ? "operador" : "admin";
+    try {
+      const res = await cambiarRolMiembroAdminAction(selectedWs.id, memberId, nuevoRol);
+      if (res.success) {
+        toast.success("Rol actualizado correctamente");
+        setMembers(prev => prev.map(m => m.id === memberId ? { ...m, rol: nuevoRol } : m));
+      } else {
+        toast.error(res.error || "Error al actualizar rol");
+      }
+    } catch (error) {
+      toast.error("Error de conexión");
+    }
+  };
+
+  const handleEliminarMiembro = async (memberId: string, nombre: string) => {
+    if (!selectedWs) return;
+    if (!confirm(`¿Remover a ${nombre} de este espacio de trabajo?`)) return;
+    try {
+      const res = await eliminarMiembroAdminAction(selectedWs.id, memberId);
+      if (res.success) {
+        toast.success(`${nombre} fue removido del espacio`);
+        setMembers(prev => prev.filter(m => m.id !== memberId));
+      } else {
+        toast.error(res.error || "Error al remover miembro");
+      }
+    } catch (error) {
+      toast.error("Error de conexión");
+    }
+  };
 
   useEffect(() => {
     load();
@@ -222,13 +293,13 @@ export default function EspaciosAdminPage() {
                         </Button>
                       } />
                       <DropdownMenuContent align="end" className="w-56 bg-zinc-900 border-white/5 text-white rounded-2xl p-2 shadow-2xl">
-                         <DropdownMenuItem 
-                            className="gap-3 px-4 py-3 rounded-xl hover:bg-white/10 cursor-pointer"
-                            onClick={() => toast.info(`Detalles de ${ws.nombre}: ID ${ws.id}`)}
-                         >
-                            <Eye className="size-4 text-blue-400" />
-                            <span className="text-sm font-bold">Ver Detalles</span>
-                         </DropdownMenuItem>
+                          <DropdownMenuItem 
+                             className="gap-3 px-4 py-3 rounded-xl hover:bg-white/10 cursor-pointer"
+                             onClick={() => setSelectedWs(ws)}
+                          >
+                             <Eye className="size-4 text-blue-400" />
+                             <span className="text-sm font-bold">Ver Detalles</span>
+                          </DropdownMenuItem>
                          {ws.estado === 'prueba' && (
                            <DropdownMenuItem className="gap-3 px-4 py-3 rounded-xl hover:bg-white/10 cursor-pointer" onClick={() => handleExtender(ws.id)}>
                               <Clock className="size-4 text-amber-400" />
@@ -278,6 +349,97 @@ export default function EspaciosAdminPage() {
           </Table>
         )}
       </div>
+
+      {/* MODAL DETALLES DEL ESPACIO (SUPERADMIN) */}
+      <Dialog open={!!selectedWs} onOpenChange={(open) => !open && setSelectedWs(null)}>
+        <DialogContent className="max-w-4xl bg-zinc-950 border border-white/5 text-white rounded-[2.5rem] p-8 shadow-2xl overflow-hidden">
+          <DialogHeader className="pb-6 border-b border-white/5">
+            <DialogTitle className="text-2xl font-black tracking-tight text-white flex items-center gap-3">
+              <Eye className="size-6 text-[var(--accent)]" />
+              Detalles: {selectedWs?.nombre}
+            </DialogTitle>
+            <DialogDescription className="text-white/40 text-xs font-semibold uppercase tracking-widest pt-1.5">
+              ID del Espacio: {selectedWs?.id} • Plan Actual: {selectedWs?.plan}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-6 space-y-6">
+            <div>
+              <h3 className="text-sm font-black text-white/50 uppercase tracking-widest mb-4">Integrantes del Equipo</h3>
+              
+              {loadingMembers ? (
+                <div className="h-48 flex items-center justify-center">
+                  <Loader2 className="size-6 text-[var(--accent)] animate-spin" />
+                </div>
+              ) : members.length === 0 ? (
+                <div className="p-8 text-center text-white/30 text-xs font-bold bg-white/5 rounded-2xl border border-white/5">
+                  No hay miembros activos en este espacio
+                </div>
+              ) : (
+                <div className="border border-white/5 rounded-2xl overflow-hidden bg-black/20">
+                  <Table>
+                    <TableHeader className="bg-white/5 border-b border-white/5">
+                      <TableRow className="hover:bg-transparent border-none">
+                        <TableHead className="text-[10px] font-black uppercase tracking-widest h-12 text-white/60">Nombre</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase tracking-widest h-12 text-white/60">Email</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase tracking-widest h-12 text-white/60">Rol</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase tracking-widest h-12 text-white/60 text-right">Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {members.map((member) => (
+                        <TableRow key={member.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                          <TableCell className="font-bold text-sm text-white py-3">{member.nombre || "Sin nombre"}</TableCell>
+                          <TableCell className="text-white/50 text-xs font-semibold">{member.email}</TableCell>
+                          <TableCell>
+                            <Badge className={cn(
+                              "rounded-xl px-2 py-0.5 text-[9px] font-black uppercase tracking-widest border border-white/10",
+                              member.rol === "admin" ? "bg-purple-500/10 text-purple-400" : "bg-blue-500/10 text-blue-400"
+                            )}>
+                              {member.rol}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right space-x-2 py-3">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="bg-transparent border-white/10 hover:bg-white/5 text-white/70 hover:text-white font-bold text-[9px] uppercase tracking-widest h-8 px-3 rounded-lg"
+                              onClick={() => handleCambiarRolMiembro(member.id, member.rol)}
+                            >
+                              Cambiar Rol
+                            </Button>
+                            {selectedWs?.propietarioUid !== member.id ? (
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                className="bg-red-950/40 border border-red-500/20 hover:bg-red-600 hover:text-white text-red-400 font-bold text-[9px] uppercase tracking-widest h-8 px-3 rounded-lg shadow-lg"
+                                onClick={() => handleEliminarMiembro(member.id, member.nombre || member.email)}
+                              >
+                                Remover
+                              </Button>
+                            ) : (
+                              <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest italic pr-2">Propietario</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-white/5 flex justify-end">
+            <Button
+              className="bg-white/5 hover:bg-white/10 text-white font-bold text-xs uppercase tracking-widest px-6 h-12 rounded-xl border border-white/5"
+              onClick={() => setSelectedWs(null)}
+            >
+              Cerrar Detalles
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

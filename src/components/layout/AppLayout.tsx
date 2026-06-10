@@ -28,7 +28,7 @@ interface AppLayoutProps {
 export default function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { setWorkspace, setWorkspaceId, currentWorkspaceId, currentAgentName, setCurrentAgentName, setIsAdmin, isAdmin, selectedContactId } = useWorkspaceStore();
+  const { setWorkspace, setWorkspaceId, setWorkspacesList, currentWorkspaceId, currentAgentName, setCurrentAgentName, setIsAdmin, isAdmin, selectedContactId } = useWorkspaceStore();
   const [isSessionLoading, setIsSessionLoading] = useState(true);
   const isMobile = useMobileLayout();
   const adminJwtSetRef = useRef(false);
@@ -89,36 +89,46 @@ export default function AppLayout({ children }: AppLayoutProps) {
           // Verificar admin y buscar workspace en paralelo
           const configPromise = getDoc(doc(db, 'plataforma', 'config'));
 
+          // 1. Buscar espacios propios
           const qOwner = query(
             collection(db, COLLECTIONS.ESPACIOS),
-            where("propietarioUid", "==", user.uid),
-            limit(1)
+            where("propietarioUid", "==", user.uid)
           );
           const ownerSnap = await getDocs(qOwner);
+          const ownerList = ownerSnap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Workspace));
 
-          let wsDocData = null;
-
-          if (!ownerSnap.empty) {
-            const ownerDoc = ownerSnap.docs[0];
-            wsDocData = { ...ownerDoc.data(), id: ownerDoc.id } as Workspace;
-          } else {
-            const qMember = query(
-              collectionGroup(db, COLLECTIONS.MIEMBROS),
-              where("email", "==", user.email),
-              limit(1)
-            );
-            const memberSnap = await getDocs(qMember);
-
-            if (!memberSnap.empty) {
-              const memberDoc = memberSnap.docs[0];
-              const wsRef = memberDoc.ref.parent.parent;
-              if (wsRef) {
-                const wsSnap = await getDoc(wsRef);
-                if (wsSnap.exists()) {
-                  wsDocData = { ...wsSnap.data(), id: wsSnap.id } as Workspace;
-                }
+          // 2. Buscar espacios donde soy miembro
+          const qMember = query(
+            collectionGroup(db, COLLECTIONS.MIEMBROS),
+            where("email", "==", user.email)
+          );
+          const memberSnap = await getDocs(qMember);
+          const memberListPromises = memberSnap.docs.map(async (memberDoc) => {
+            const wsRef = memberDoc.ref.parent.parent;
+            if (wsRef) {
+              const wsSnap = await getDoc(wsRef);
+              if (wsSnap.exists()) {
+                return { ...wsSnap.data(), id: wsSnap.id } as Workspace;
               }
             }
+            return null;
+          });
+          const memberListRaw = await Promise.all(memberListPromises);
+          const memberList = memberListRaw.filter((ws): ws is Workspace => ws !== null);
+
+          // Combinar de forma única por ID
+          const combinedMap = new Map<string, Workspace>();
+          ownerList.forEach(ws => combinedMap.set(ws.id, ws));
+          memberList.forEach(ws => combinedMap.set(ws.id, ws));
+          const combinedList = Array.from(combinedMap.values());
+
+          setWorkspacesList(combinedList);
+
+          let wsDocData = null;
+          if (combinedList.length > 0) {
+            // Usar el workspace id actual si es que sigue en la lista, de lo contrario el primero
+            const existing = currentWorkspaceId ? combinedList.find(w => w.id === currentWorkspaceId) : null;
+            wsDocData = existing || combinedList[0];
           }
 
           // Resolver check de admin (ya corrió en paralelo)
@@ -127,8 +137,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           const isAdminUser = !!(user.email && adminEmails.includes(user.email));
           if (isAdminUser) {
             setIsAdmin(true);
-            // Setear cookie JWT si aún no se hizo en esta sesión (backup para cuando
-            // el flujo del popup de Google falla por COOP del navegador)
+            // Setear cookie JWT si aún no se hizo en esta sesión
             if (!adminJwtSetRef.current) {
               adminJwtSetRef.current = true;
               verificarYSetearAdmin(user.uid, user.email ?? undefined).catch(console.error);
@@ -139,7 +148,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             if (isAdminUser) {
               // Admin sin workspace propio va al panel superadmin
               if (isPublicRoute && !isLanding) router.push("/superadmin");
-            } else if (normalizedPathname !== "/onboarding") {
+            } else if (normalizedPathname !== "/onboarding" && !normalizedPathname.startsWith("/auth/join")) {
               router.push("/onboarding");
             }
           } else {

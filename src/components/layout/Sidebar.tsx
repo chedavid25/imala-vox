@@ -278,7 +278,7 @@ export function Sidebar() {
 function SidebarFooter({ collapsed }: { collapsed: boolean }) {
   const [user, setUser] = useState<User | null>(null);
   const [mounted, setMounted] = useState(false);
-  const { workspace } = useWorkspaceStore();
+  const { workspace, workspacesList, setWorkspace, setWorkspaceId } = useWorkspaceStore();
   const router = useRouter();
 
   useEffect(() => {
@@ -352,6 +352,35 @@ function SidebarFooter({ collapsed }: { collapsed: boolean }) {
                 <span className="text-sm font-medium">Ajustes</span>
             </DropdownMenuItem>
           </DropdownMenuGroup>
+          {workspacesList.length > 1 && (
+            <>
+              <DropdownMenuSeparator className="bg-[var(--border-dark)] mx-1 my-1" />
+              <DropdownMenuLabel className="px-3 py-2 text-[10px] font-bold text-[var(--text-tertiary-dark)] uppercase tracking-widest opacity-70">
+                Cambiar Espacio
+              </DropdownMenuLabel>
+              {workspacesList.map((ws) => (
+                <DropdownMenuItem
+                  key={ws.id}
+                  onClick={() => {
+                    setWorkspaceId(ws.id);
+                    setWorkspace(ws);
+                    router.push("/dashboard/operacion/inbox");
+                  }}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer outline-none transition-all",
+                    workspace?.id === ws.id
+                      ? "bg-[var(--accent)]/10 text-[var(--accent)]"
+                      : "hover:bg-[var(--bg-sidebar-hover)] focus:bg-[var(--bg-sidebar-hover)]"
+                  )}
+                >
+                  <div className="size-6 rounded-md bg-white/5 border border-white/5 flex items-center justify-center font-black text-[10px] text-[var(--accent)] shrink-0">
+                    {ws.nombre.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="text-sm font-semibold truncate">{ws.nombre}</span>
+                </DropdownMenuItem>
+              ))}
+            </>
+          )}
           <DropdownMenuSeparator className="bg-[var(--border-dark)] mx-1 my-1" />
           <DropdownMenuItem 
             onClick={handleSignOut}
