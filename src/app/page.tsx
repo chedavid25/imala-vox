@@ -968,6 +968,13 @@ const PRICING_FEATURES: Record<Plan, { tag?: string; inheritsFrom?: string; grou
         ],
       },
       {
+        label: "Equipo & Comunicación",
+        items: [
+          "2 usuarios del panel (asientos)",
+          "Chat de Equipo (Interno)",
+        ],
+      },
+      {
         label: "Marketing",
         items: [
           "2 números WhatsApp",
@@ -990,7 +997,13 @@ const PRICING_FEATURES: Record<Plan, { tag?: string; inheritsFrom?: string; grou
         items: [
           "10 Agentes Inteligentes especializados",
           "10.000 conversaciones IA/mes",
-          "5 usuarios del panel",
+        ],
+      },
+      {
+        label: "Equipo & Comunicación",
+        items: [
+          "5 usuarios del panel (asientos)",
+          "Chat de Equipo (Interno) ilimitado",
         ],
       },
       {
@@ -1041,12 +1054,13 @@ function PricingCompareTable({ isAnual }: { isAnual: boolean }) {
     { label: "Scraping automático desde sitio web", starter: false, pro: true, agencia: true, description: "Ingresás la URL de tu tienda o inmobiliaria y el sistema extrae los productos o propiedades automáticamente, sin carga manual." },
     { label: "Re-sincronización periódica del catálogo", starter: false, pro: false, agencia: true, description: "El catálogo se actualiza solo de forma periódica. Si cambiás un precio o añadís un ítem en tu web, se refleja sin que hagas nada." },
 
-    { label: "▸ Canales", starter: "", pro: "", agencia: "", highlight: true },
+    { label: "▸ Canales & Comunicación", starter: "", pro: "", agencia: "", highlight: true },
     { label: "WhatsApp Business", starter: "1 número", pro: "2 números", agencia: "5 números", description: "Cantidad de líneas de WhatsApp Business que podés conectar. Cada número puede tener su propio agente asignado." },
     { label: "Instagram DMs", starter: true, pro: true, agencia: true, description: "El agente responde automáticamente los mensajes directos que lleguen a tu cuenta de Instagram." },
     { label: "Facebook Messenger", starter: true, pro: true, agencia: true, description: "El agente gestiona los mensajes de tu página de Facebook, igual que en WhatsApp." },
     { label: "Meta Leads (anuncios)", starter: true, pro: true, agencia: true, description: "Cada vez que alguien completa un formulario de tus campañas de Meta Ads, el lead entra directo al CRM sin intervención manual." },
     { label: "Chat en vivo para sitio web", starter: false, pro: false, agencia: true, description: "Un widget de chat que insertás en tu web. Los visitantes chatean ahí y el agente los atiende igual que en WhatsApp." },
+    { label: "Chat de Equipo (Interno)", starter: false, pro: true, agencia: true, description: "Chat interno privado para la comunicación directa entre los miembros de tu equipo de trabajo." },
 
     { label: "▸ CRM", starter: "", pro: "", agencia: "", highlight: true },
     { label: "Contactos", starter: "500", pro: "Ilimitados", agencia: "Ilimitados", description: "Personas guardadas en tu base de contactos. Incluye historial de conversaciones, etiquetas y datos personalizados." },
@@ -1061,7 +1075,7 @@ function PricingCompareTable({ isAnual }: { isAnual: boolean }) {
     { label: "Programación de campañas", starter: false, pro: true, agencia: true, description: "Configurás el envío para una fecha y hora específica. La campaña sale sola sin que tengas que estar presente." },
 
     { label: "▸ Equipo & Acceso", starter: "", pro: "", agencia: "", highlight: true },
-    { label: "Usuarios del panel", starter: "1", pro: "1", agencia: "5", description: "Personas de tu equipo que pueden entrar al dashboard con su propio usuario y gestionar conversaciones." },
+    { label: "Usuarios del panel (asientos)", starter: "1", pro: "2", agencia: "5", description: "Personas de tu equipo que pueden entrar al dashboard con su propio usuario y gestionar conversaciones." },
     { label: "API access", starter: false, pro: false, agencia: true, description: "Conectás Imalá Vox con tus propias herramientas o sistemas externos mediante nuestra API." },
     { label: "Soporte", starter: "Email", pro: "Email + chat", agencia: "Prioritario", description: "Canal por el que podés contactar al equipo de Imalá Vox ante dudas o problemas." },
   ];
@@ -1089,7 +1103,9 @@ function PricingCompareTable({ isAnual }: { isAnual: boolean }) {
           const isPro = p === "pro";
           return (
             <div key={p} className={cn("px-4 py-4 text-center", isPro && "bg-[#C8FF00]")}>
-              <p className={cn("text-[10px] font-black uppercase tracking-widest mb-0.5", isPro ? "text-black/50" : "text-white/30")}>{p}</p>
+              <p className={cn("text-[10px] font-black uppercase tracking-widest mb-0.5", isPro ? "text-black/50" : "text-white/30")}>
+                {p === "agencia" ? "empresa" : p}
+              </p>
               <p className={cn("text-lg font-black", isPro ? "text-black" : "text-white")}>
                 ${price}
                 <span className={cn("text-[10px] font-bold ml-0.5", isPro ? "text-black/40" : "text-white/30")}>/mes</span>
@@ -1202,7 +1218,7 @@ function PricingSection() {
                   )}
                   <div className="p-8 space-y-1">
                     <h3 className={cn("text-xs font-black uppercase tracking-widest", isPro ? "text-black/50" : "text-white/40")}>
-                      {p}
+                      {p === "agencia" ? "empresa" : p}
                     </h3>
                     <div className="flex items-baseline gap-1 mt-1">
                       <span className={cn("text-4xl font-black", isPro ? "text-black" : "text-white")}>${price}</span>

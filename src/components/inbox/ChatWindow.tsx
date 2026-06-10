@@ -102,7 +102,8 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
       const membersRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, "miembros");
       onSnapshot(query(membersRef), (mSnap) => {
         const miembrosData = mSnap.docs.map(doc => ({ 
-          id: doc.id, 
+          id: doc.id,
+          uid: doc.id, 
           nombre: doc.data().nombre || doc.data().displayName || "Miembro",
           tipo: 'humano'
         }));
@@ -111,6 +112,7 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
         const currentUser = auth.currentUser;
         const currentData = currentUser ? [{
           id: currentUser.uid,
+          uid: currentUser.uid,
           nombre: `${currentUser.displayName || currentUser.email?.split('@')[0] || "Yo"} (Tú)`,
           tipo: 'humano'
         }] : [];

@@ -19,6 +19,8 @@ import { SplashScreen } from "./SplashScreen";
 import { TrialExpiredGate } from "./TrialExpiredGate";
 import { verificarYSetearAdmin } from "@/app/actions/superadmin";
 
+import { TeamChatBubble } from "./TeamChatBubble";
+
 interface AppLayoutProps {
   children: React.ReactNode;
 }
@@ -257,6 +259,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </div>
       </main>
       {showContextPanel && <ContextPanel />}
+      <TeamChatBubble />
     </div>
   );
 }

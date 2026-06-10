@@ -117,6 +117,13 @@ const PLAN_DISPLAY: Record<'starter' | 'pro' | 'agencia', PlanDisplay> = {
         ],
       },
       {
+        label: "Equipo & Comunicación",
+        items: [
+          { text: "2 usuarios del panel (asientos)", tooltip: "Operadores humanos que pueden entrar a responder y gestionar chats." },
+          { text: "Chat de Equipo (Interno)", tooltip: "Comunicación directa y privada entre miembros de tu equipo." },
+        ],
+      },
+      {
         label: "Marketing",
         items: [
           { text: "2 números WhatsApp" },
@@ -142,7 +149,7 @@ const PLAN_DISPLAY: Record<'starter' | 'pro' | 'agencia', PlanDisplay> = {
         items: [
           { text: "10 Agentes Inteligentes especializados" },
           { text: "10.000 conversaciones IA/mes" },
-          { text: "5 usuarios del panel" },
+          { text: "5 usuarios del panel (asientos)" },
         ],
       },
       {
@@ -151,6 +158,7 @@ const PLAN_DISPLAY: Record<'starter' | 'pro' | 'agencia', PlanDisplay> = {
           { text: "Catálogo ilimitado con re-sincronización automática" },
           { text: "5 números WhatsApp" },
           { text: "Chat en vivo para tu sitio web" },
+          { text: "Chat de Equipo (Interno) ilimitado" },
         ],
       },
       {
@@ -360,7 +368,9 @@ export default function FacturacionPage() {
                 <Zap className="size-10 text-[var(--accent)]" />
               </div>
               <div>
-                <h3 className="text-2xl font-black text-[var(--text-primary-light)] uppercase tracking-tight">Plan {workspace.plan}</h3>
+                <h3 className="text-2xl font-black text-[var(--text-primary-light)] uppercase tracking-tight">
+                  Plan {workspace.plan === 'agencia' ? 'Empresa' : workspace.plan}
+                </h3>
                 <Badge className={cn("mt-2 rounded-xl px-4 py-1 border font-black text-[10px] uppercase tracking-widest", statusLabels[workspace.estado as keyof typeof statusLabels]?.color)}>
                   {statusLabels[workspace.estado as keyof typeof statusLabels]?.label}
                 </Badge>
@@ -488,7 +498,9 @@ export default function FacturacionPage() {
                     </div>
                   )}
                   <CardHeader className="text-center p-8 space-y-2">
-                    <CardTitle className="text-sm font-black uppercase tracking-widest text-[var(--text-primary-light)]">{p}</CardTitle>
+                    <CardTitle className="text-sm font-black uppercase tracking-widest text-[var(--text-primary-light)]">
+                      {p === 'agencia' ? 'empresa' : p}
+                    </CardTitle>
                     <div className="flex flex-col items-center pt-2">
                        {p === 'pro' && !isCurrent && (
                         <div className="flex flex-col items-center mb-2">

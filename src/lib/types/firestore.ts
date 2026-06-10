@@ -36,6 +36,7 @@ export interface Workspace {
   uso: WorkspaceUsage;
   usoReiniciaEl: Timestamp;
   facturacion: FacturacionConfig;
+  chatInternoHabilitado?: boolean;
   creadoEl: Timestamp;
   actualizadoEl: Timestamp;
 }

@@ -38,7 +38,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 export default function AjustesPage() {
-  const { workspace, currentWorkspaceId } = useWorkspaceStore();
+  const { workspace, currentWorkspaceId, setWorkspace } = useWorkspaceStore();
   const [loading, setLoading] = useState(false);
   const [wsName, setWsName] = useState(workspace?.nombre || "");
   const [showHelp, setShowHelp] = useState(false);
@@ -51,6 +51,9 @@ export default function AjustesPage() {
     try {
       const wsRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId);
       await updateDoc(wsRef, { nombre: wsName });
+      if (workspace) {
+        setWorkspace({ ...workspace, nombre: wsName });
+      }
       toast.success("Ajustes del espacio actualizados");
     } catch (error) {
       toast.error("Error al actualizar");
@@ -192,6 +195,54 @@ export default function AjustesPage() {
                 </div>
 
                 <div className="pt-6 border-t border-[var(--border-light)] space-y-4">
+                  {/* Chat de Equipo Switch */}
+                  <div className="flex items-center justify-between p-4 bg-slate-50/50 rounded-2xl border border-[var(--border-light)]">
+                     <div className="space-y-0.5">
+                       <p className="text-[11px] font-bold text-[var(--text-primary-light)] flex items-center gap-1.5">
+                         Chat de Equipo Interno
+                         {workspace?.plan === 'starter' && (
+                           <span className="text-[8px] bg-rose-500 text-white px-2 py-0.5 rounded-full font-black uppercase tracking-widest">
+                             Pro / Empresa
+                           </span>
+                         )}
+                       </p>
+                       <p className="text-[10px] text-[var(--text-tertiary-light)] font-medium">Habilita el chat interno entre operadores</p>
+                     </div>
+                     <Switch 
+                       disabled={workspace?.plan === 'starter' || loading} 
+                       checked={workspace?.chatInternoHabilitado !== false && workspace?.plan !== 'starter'}
+                       onCheckedChange={async (checked) => {
+                         if (!currentWorkspaceId) return;
+                         setLoading(true);
+                         try {
+                           const wsRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId);
+                           await updateDoc(wsRef, { chatInternoHabilitado: checked });
+                           if (workspace) {
+                             setWorkspace({ ...workspace, chatInternoHabilitado: checked });
+                           }
+                           toast.success(checked ? "Chat interno habilitado" : "Chat interno deshabilitado");
+                         } catch (error) {
+                           toast.error("Error al actualizar la configuración");
+                         } finally {
+                           setLoading(false);
+                         }
+                       }}
+                       className="data-[state=checked]:bg-[var(--accent)]" 
+                     />
+                  </div>
+
+                  {workspace?.plan === 'starter' && (
+                    <div className="p-3 bg-rose-50/50 border border-rose-100 rounded-xl flex items-center justify-between">
+                      <p className="text-[9px] text-rose-700 font-bold leading-normal">
+                        El chat interno de equipo está disponible a partir del plan Pro. ¡Mejora tu plan para habilitarlo!
+                      </p>
+                      <Link href="/dashboard/ajustes/facturacion" className="text-[9px] text-rose-600 font-black uppercase tracking-widest hover:underline flex items-center gap-1 shrink-0 pl-2">
+                        Upgrade
+                        <ArrowRight className="size-2.5" />
+                      </Link>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between p-4 bg-slate-50/50 rounded-2xl border border-[var(--border-light)]">
                      <div className="space-y-0.5">
                        <p className="text-[11px] font-bold text-[var(--text-primary-light)]">Modo Mantenimiento</p>

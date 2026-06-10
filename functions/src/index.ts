@@ -14,6 +14,9 @@ admin.initializeApp();
 // Cron diario: health check de canales Meta (ver healthCheckCanales.ts)
 export { healthCheckCanales } from "./healthCheckCanales";
 
+// Cron diario: limpieza de chats internos de equipo de más de 60 días
+export { cleanOldInternalChats } from "./cleanInternalChats";
+
 /**
  * validarLimitesWorkspaceInternal
  * Helper interno para verificar límites sin necesidad de contexto de autenticación

@@ -72,17 +72,27 @@ const PLAN_DISPLAY: Record<Plan, { inheritsFrom?: string; groups: FeatureGroup[]
         ],
       },
       {
+        label: "Equipo & Comunicación",
+        items: [
+          { text: "2 usuarios del panel (asientos)" },
+          { text: "Chat de Equipo (Interno)" },
+        ],
+      },
+      {
         label: "Marketing",
         items: [
-          { text: "Catálogo de productos (200 items)" },
-          { text: "Difusión masiva (hasta 1.000/envío)" },
+          { text: "Catálogo de productos (300 items)" },
+          { text: "Difusión masiva (hasta 2.000/envío)" },
           { text: "Meta Ads · Leads de campañas" },
         ],
       },
       {
         label: "No incluido",
         locked: true,
-        items: [{ text: "Workflows automatizados" }],
+        items: [
+          { text: "Workflows automatizados" },
+          { text: "Chat en vivo para sitio web" },
+        ],
       },
     ],
   },
@@ -94,14 +104,16 @@ const PLAN_DISPLAY: Record<Plan, { inheritsFrom?: string; groups: FeatureGroup[]
         items: [
           { text: "Hasta 10 Agentes Inteligentes" },
           { text: "10.000 conversaciones/mes" },
-          { text: "Contactos ilimitados" },
+          { text: "5 usuarios del panel (asientos)" },
         ],
       },
       {
-        label: "Marketing ampliado",
+        label: "Marketing & Comunicación",
         items: [
           { text: "Catálogo ilimitado de productos" },
           { text: "Difusión masiva sin límite" },
+          { text: "Chat de Equipo (Interno) ilimitado" },
+          { text: "Chat en vivo para sitio web" },
         ],
       },
       {
@@ -246,7 +258,9 @@ export function MobileFacturacionSheet({ open, onClose }: Props) {
                 </div>
                 <div>
                   <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Plan Actual</p>
-                  <p className="text-2xl font-black text-white uppercase tracking-tight mt-0.5">Plan {currentPlan}</p>
+                  <p className="text-2xl font-black text-white uppercase tracking-tight mt-0.5">
+                    Plan {currentPlan === "agencia" ? "empresa" : currentPlan}
+                  </p>
                 </div>
                 <span className={cn("text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full border", statusCfg.color)}>
                   {statusCfg.label}
@@ -454,7 +468,9 @@ export function MobileFacturacionSheet({ open, onClose }: Props) {
 
                     {/* Header del plan */}
                     <div className="text-center px-6 pt-7 pb-5 space-y-2">
-                      <p className="text-sm font-black uppercase tracking-widest text-[var(--text-primary-light)]">{plan}</p>
+                      <p className="text-sm font-black uppercase tracking-widest text-[var(--text-primary-light)]">
+                        {plan === "agencia" ? "empresa" : plan}
+                      </p>
                       {isPro && !isCurrent && (
                         <span className="inline-block bg-emerald-500 text-white text-[8px] font-black uppercase px-3 py-1 rounded-full shadow-lg shadow-emerald-500/20 tracking-widest">
                           Recomendado
