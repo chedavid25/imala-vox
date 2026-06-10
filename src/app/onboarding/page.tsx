@@ -3,11 +3,13 @@
 import React, { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { 
-  collection, 
-  addDoc, 
-  serverTimestamp, 
-  Timestamp 
+import {
+  collection,
+  addDoc,
+  doc,
+  setDoc,
+  serverTimestamp,
+  Timestamp
 } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { 
@@ -107,6 +109,15 @@ export default function OnboardingPage() {
         usoReiniciaEl: Timestamp.fromDate(mesSiguiente),
         creadoEl: serverTimestamp(),
         actualizadoEl: serverTimestamp()
+      });
+
+      // 3.1 Registrar al propietario como miembro (para que aparezca en el equipo y el chat interno)
+      await setDoc(doc(db, COLLECTIONS.ESPACIOS, docRef.id, COLLECTIONS.MIEMBROS, user.uid), {
+        email: user.email,
+        nombre: user.displayName || user.email?.split("@")[0] || "Propietario",
+        rol: "admin",
+        creadoEl: serverTimestamp(),
+        status: "activo"
       });
 
       // 3.2 Etapas default del embudo

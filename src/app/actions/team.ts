@@ -25,9 +25,14 @@ export async function invitarUsuarioAction(wsId: string, email: string, role: st
     // Verificar límites
     const currentMembersSnap = await wsRef.collection(COLLECTIONS.MIEMBROS).get();
     const currentInvitationsSnap = await wsRef.collection("invitaciones").where("status", "==", "pendiente").get();
-    
+
     const limit = PLAN_LIMITS[wsData.plan as keyof typeof PLAN_LIMITS].seats;
-    const totalCount = currentMembersSnap.size + currentInvitationsSnap.size;
+
+    // El propietario siempre ocupa un asiento. En espacios antiguos puede no tener
+    // documento en "miembros", así que lo sumamos manualmente si falta.
+    const ownerHasMemberDoc = currentMembersSnap.docs.some((d) => d.id === wsData.propietarioUid);
+    const ownerSeat = ownerHasMemberDoc ? 0 : 1;
+    const totalCount = currentMembersSnap.size + ownerSeat + currentInvitationsSnap.size;
 
     if (totalCount >= limit) {
       throw new Error(`Has alcanzado el límite de ${limit} usuarios para el plan ${wsData.plan}.`);

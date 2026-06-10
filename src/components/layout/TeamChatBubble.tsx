@@ -44,23 +44,41 @@ export function TeamChatBubble() {
   const [lastSeen, setLastSeen] = useState<number>(0);
   const [unreadCount, setUnreadCount] = useState(0);
 
+  // No leídos por mensaje directo, indexado por uid del otro miembro
+  const [dmUnread, setDmUnread] = useState<Record<string, number>>({});
+
   const currentUser = auth.currentUser;
 
   // Se considera "viendo" el general solo cuando el chat está abierto, no minimizado y en esa pestaña
   const isViewingGeneral = isOpen && !isMinimized && activeTab === "general";
+  // Se considera "viendo" un DM cuando el chat está abierto, no minimizado, en pestaña DM y con un miembro seleccionado
+  const isViewingDM = isOpen && !isMinimized && activeTab === "dm" && !!selectedMember;
+
+  // Helper para el chatId ordenado de un DM
+  const dmChatId = (otherUid: string) => {
+    if (!currentUser) return null;
+    const ids = [currentUser.uid, otherUid].sort();
+    return `${ids[0]}_${ids[1]}`;
+  };
+
+  // Totales para los badges
+  const dmTotalUnread = Object.values(dmUnread).reduce((a, b) => a + b, 0);
+  const totalUnread = unreadCount + dmTotalUnread;
   
   // Determinar si el chat está habilitado
   const isChatEnabled = workspace && workspace.plan !== "starter" && workspace.chatInternoHabilitado !== false;
 
-  // Cargar miembros del equipo
+  // Cargar miembros del equipo (siempre activo: necesario para detectar DMs entrantes en segundo plano)
   useEffect(() => {
-    if (!currentWorkspaceId || !isChatEnabled || !isOpen) return;
+    if (!currentWorkspaceId || !isChatEnabled) return;
 
     const membersRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, "miembros");
     const unsub = onSnapshot(membersRef, (snap) => {
       const list: Member[] = [];
+      const ids = new Set<string>();
       snap.forEach((d) => {
         const data = d.data();
+        ids.add(d.id);
         if (d.id !== currentUser?.uid) {
           list.push({
             uid: d.id,
@@ -68,11 +86,26 @@ export function TeamChatBubble() {
           });
         }
       });
+
+      // El propietario puede no tener documento en "miembros" (los espacios antiguos
+      // solo crean docs para invitados). Lo agregamos sintéticamente para que los
+      // invitados puedan enviarle mensajes directos.
+      if (
+        workspace?.propietarioUid &&
+        workspace.propietarioUid !== currentUser?.uid &&
+        !ids.has(workspace.propietarioUid)
+      ) {
+        list.unshift({
+          uid: workspace.propietarioUid,
+          nombre: workspace.propietarioEmail?.split("@")[0] || "Propietario"
+        });
+      }
+
       setMembers(list);
     });
 
     return () => unsub();
-  }, [currentWorkspaceId, isChatEnabled, isOpen, currentUser?.uid]);
+  }, [currentWorkspaceId, isChatEnabled, currentUser?.uid, workspace?.propietarioUid, workspace?.propietarioEmail]);
 
   // Cargar mensajes según el canal seleccionado
   useEffect(() => {
@@ -161,6 +194,45 @@ export function TeamChatBubble() {
     }
   }, [isViewingGeneral, currentWorkspaceId, generalMsgs]);
 
+  // Listener SIEMPRE activo por cada DM, para detectar mensajes directos entrantes
+  // aunque el chat esté cerrado, minimizado o en otra conversación.
+  useEffect(() => {
+    if (!currentWorkspaceId || !isChatEnabled || !currentUser || members.length === 0) return;
+
+    const unsubs: (() => void)[] = [];
+
+    members.forEach((m) => {
+      const chatId = dmChatId(m.uid);
+      if (!chatId) return;
+      const colRef = collection(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, "chatsEquipo", chatId, "mensajes");
+      const q = query(colRef, orderBy("creadoEl", "desc"), limit(30));
+      const unsub = onSnapshot(q, (snap) => {
+        const seenKey = `teamchat_dm_lastseen_${currentWorkspaceId}_${chatId}`;
+        const seen = Number(localStorage.getItem(seenKey) || 0);
+        let count = 0;
+        snap.forEach((d) => {
+          const data = d.data();
+          const ms = data.creadoEl?.toMillis ? data.creadoEl.toMillis() : 0;
+          if (ms > seen && data.remitenteUid !== currentUser.uid) count++;
+        });
+        setDmUnread((prev) => ({ ...prev, [m.uid]: count }));
+      });
+      unsubs.push(unsub);
+    });
+
+    return () => unsubs.forEach((u) => u());
+  }, [currentWorkspaceId, isChatEnabled, currentUser?.uid, members]);
+
+  // Marcar el DM activo como leído al verlo (al abrir, maximizar o llegar nuevos mensajes)
+  useEffect(() => {
+    if (isViewingDM && currentWorkspaceId && selectedMember) {
+      const chatId = dmChatId(selectedMember.uid);
+      if (!chatId) return;
+      localStorage.setItem(`teamchat_dm_lastseen_${currentWorkspaceId}_${chatId}`, String(Date.now()));
+      setDmUnread((prev) => ({ ...prev, [selectedMember.uid]: 0 }));
+    }
+  }, [isViewingDM, currentWorkspaceId, selectedMember?.uid, messages]);
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim() || !currentUser || !currentWorkspaceId) return;
@@ -201,9 +273,9 @@ export function TeamChatBubble() {
           className="relative w-14 h-14 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] flex items-center justify-center shadow-[0_10px_30px_rgba(0,0,0,0.3)] transition-all hover:scale-105 active:scale-95"
         >
           <MessageSquare className="w-6 h-6 text-black" />
-          {unreadCount > 0 && (
+          {totalUnread > 0 && (
             <span className="absolute -top-1 -right-1 min-w-[22px] h-[22px] bg-red-500 text-white text-[11px] font-black rounded-full flex items-center justify-center px-1.5 leading-none border-2 border-[var(--bg-main)] shadow-lg">
-              {unreadCount > 99 ? "99+" : unreadCount}
+              {totalUnread > 99 ? "99+" : totalUnread}
             </span>
           )}
         </button>
@@ -222,9 +294,9 @@ export function TeamChatBubble() {
             <div className="flex items-center gap-2">
               <div className="w-2.5 h-2.5 rounded-full bg-[#C8FF00] animate-pulse" />
               <span className="text-xs font-black text-white/95 uppercase tracking-widest">Chat de Equipo</span>
-              {isMinimized && unreadCount > 0 && (
+              {isMinimized && totalUnread > 0 && (
                 <span className="min-w-[20px] h-[20px] bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center px-1.5 leading-none shadow">
-                  {unreadCount > 99 ? "99+" : unreadCount}
+                  {totalUnread > 99 ? "99+" : totalUnread}
                 </span>
               )}
             </div>
@@ -268,6 +340,11 @@ export function TeamChatBubble() {
                 >
                   <User className="w-3.5 h-3.5" />
                   Directos (DMs)
+                  {dmTotalUnread > 0 && (
+                    <span className="min-w-[16px] h-[16px] bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-1 leading-none">
+                      {dmTotalUnread > 99 ? "99+" : dmTotalUnread}
+                    </span>
+                  )}
                 </button>
               </div>
 
@@ -293,7 +370,12 @@ export function TeamChatBubble() {
                             <div className="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center text-xs font-bold text-[#C8FF00] uppercase">
                               {m.nombre.charAt(0)}
                             </div>
-                            <span className="text-[12px] font-bold text-white/80">{m.nombre}</span>
+                            <span className="text-[12px] font-bold text-white/80 flex-1">{m.nombre}</span>
+                            {(dmUnread[m.uid] || 0) > 0 && (
+                              <span className="min-w-[18px] h-[18px] bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-1 leading-none shrink-0">
+                                {dmUnread[m.uid] > 99 ? "99+" : dmUnread[m.uid]}
+                              </span>
+                            )}
                           </button>
                         ))}
                       </div>

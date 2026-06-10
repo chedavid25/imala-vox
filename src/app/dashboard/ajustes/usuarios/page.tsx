@@ -217,7 +217,10 @@ export default function UsuariosPage() {
   };
 
   const planLimit = workspace ? PLAN_LIMITS[workspace.plan as keyof typeof PLAN_LIMITS].seats : 1;
-  const totalOccupied = members.length + invitations.filter(i => i.status === 'pendiente').length;
+  // El propietario siempre ocupa un asiento; en espacios antiguos puede no tener doc en "miembros"
+  const ownerHasMemberDoc = members.some(m => m.id === workspace?.propietarioUid);
+  const ownerSeat = workspace?.propietarioUid && !ownerHasMemberDoc ? 1 : 0;
+  const totalOccupied = members.length + ownerSeat + invitations.filter(i => i.status === 'pendiente').length;
   const canInvite = totalOccupied < planLimit;
 
   return (
