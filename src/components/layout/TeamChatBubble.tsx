@@ -3,15 +3,15 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   MessageSquare, Send, X, Users, Minimize2, Maximize2, Sparkles, User, AlertCircle,
-  Paperclip, FileText, Download, Loader2
+  Paperclip, FileText, Download, Loader2, Trash2
 } from "lucide-react";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { auth, db, storage } from "@/lib/firebase";
 import {
   collection, query, orderBy, onSnapshot, addDoc, serverTimestamp,
-  where, doc, getDocs, limit, Timestamp
+  where, doc, getDocs, limit, Timestamp, deleteDoc
 } from "firebase/firestore";
-import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -330,6 +330,30 @@ export function TeamChatBubble() {
     }
   };
 
+  const handleDeleteMessage = async (m: Message) => {
+    if (!currentWorkspaceId || m.remitenteUid !== currentUser?.uid) return;
+    if (!window.confirm("¿Eliminar este mensaje? Esta acción no se puede deshacer.")) return;
+
+    const chat = getCurrentChat();
+    if (!chat) return;
+
+    try {
+      // Borrar el documento del mensaje
+      await deleteDoc(doc(db, chat.colPath, m.id));
+
+      // Si tenía adjunto, intentar borrar también el archivo de Storage
+      if (m.mediaUrl) {
+        try {
+          await deleteObject(storageRef(storage, m.mediaUrl));
+        } catch (storageError) {
+          console.warn("No se pudo borrar el archivo de Storage (puede que ya no exista):", storageError);
+        }
+      }
+    } catch (error) {
+      console.error("Error al eliminar mensaje de equipo:", error);
+    }
+  };
+
   if (!isChatEnabled) return null;
 
   return (
@@ -481,10 +505,20 @@ export function TeamChatBubble() {
                         messages.map((m) => {
                           const isMe = m.remitenteUid === currentUser?.uid;
                           return (
-                            <div key={m.id} className={cn("flex flex-col", isMe ? "items-end" : "items-start")}>
+                            <div key={m.id} className={cn("group/msg flex flex-col", isMe ? "items-end" : "items-start")}>
                               {!isMe && (
                                 <span className="text-[9px] text-white/30 font-bold mb-1 ml-1">{m.remitenteNombre}</span>
                               )}
+                              <div className={cn("flex items-center gap-1.5 max-w-full", isMe ? "flex-row" : "flex-row-reverse")}>
+                                {isMe && (
+                                  <button
+                                    onClick={() => handleDeleteMessage(m)}
+                                    title="Eliminar mensaje"
+                                    className="opacity-0 group-hover/msg:opacity-100 transition-opacity w-6 h-6 rounded-lg flex items-center justify-center text-white/30 hover:text-red-400 hover:bg-red-500/10 shrink-0"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
                               <div
                                 className={cn(
                                   "max-w-[80%] px-3.5 py-2 rounded-2xl text-[12px] leading-relaxed font-semibold space-y-2",
@@ -518,6 +552,7 @@ export function TeamChatBubble() {
                                   </a>
                                 )}
                                 {m.contenido && <p>{m.contenido}</p>}
+                              </div>
                               </div>
                             </div>
                           );
