@@ -104,7 +104,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           } else {
             const qMember = query(
               collectionGroup(db, COLLECTIONS.MIEMBROS),
-              where("__name__", "==", user.uid),
+              where("email", "==", user.email),
               limit(1)
             );
             const memberSnap = await getDocs(qMember);
