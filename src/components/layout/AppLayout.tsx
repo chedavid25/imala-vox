@@ -98,23 +98,28 @@ export default function AppLayout({ children }: AppLayoutProps) {
           const ownerList = ownerSnap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Workspace));
 
           // 2. Buscar espacios donde soy miembro
-          const qMember = query(
-            collectionGroup(db, COLLECTIONS.MIEMBROS),
-            where("email", "==", user.email)
-          );
-          const memberSnap = await getDocs(qMember);
-          const memberListPromises = memberSnap.docs.map(async (memberDoc) => {
-            const wsRef = memberDoc.ref.parent.parent;
-            if (wsRef) {
-              const wsSnap = await getDoc(wsRef);
-              if (wsSnap.exists()) {
-                return { ...wsSnap.data(), id: wsSnap.id } as Workspace;
+          let memberList: Workspace[] = [];
+          try {
+            const qMember = query(
+              collectionGroup(db, COLLECTIONS.MIEMBROS),
+              where("email", "==", user.email)
+            );
+            const memberSnap = await getDocs(qMember);
+            const memberListPromises = memberSnap.docs.map(async (memberDoc) => {
+              const wsRef = memberDoc.ref.parent.parent;
+              if (wsRef) {
+                const wsSnap = await getDoc(wsRef);
+                if (wsSnap.exists()) {
+                  return { ...wsSnap.data(), id: wsSnap.id } as Workspace;
+                }
               }
-            }
-            return null;
-          });
-          const memberListRaw = await Promise.all(memberListPromises);
-          const memberList = memberListRaw.filter((ws): ws is Workspace => ws !== null);
+              return null;
+            });
+            const memberListRaw = await Promise.all(memberListPromises);
+            memberList = memberListRaw.filter((ws): ws is Workspace => ws !== null);
+          } catch (memberError) {
+            console.warn("Advertencia: No se pudieron cargar las membresías del usuario. Es posible que falte el índice de collectionGroup de miembros por email.", memberError);
+          }
 
           // Combinar de forma única por ID
           const combinedMap = new Map<string, Workspace>();
