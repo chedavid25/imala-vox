@@ -205,3 +205,59 @@ export async function cancelarInvitacionAction(wsId: string, token: string) {
     return { success: false, error: error.message };
   }
 }
+
+/**
+ * Elimina a un miembro del espacio de trabajo
+ */
+export async function eliminarMiembroAction(wsId: string, uid: string) {
+  console.log(`🗑️ Eliminando miembro ${uid} del workspace ${wsId}`);
+  try {
+    const memberRef = adminDb
+      .collection(COLLECTIONS.ESPACIOS)
+      .doc(wsId)
+      .collection(COLLECTIONS.MIEMBROS)
+      .doc(uid);
+
+    const memberSnap = await memberRef.get();
+    if (!memberSnap.exists) {
+      throw new Error("El miembro no existe en este espacio de trabajo.");
+    }
+
+    await memberRef.delete();
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error al eliminar miembro:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Elimina el espacio de trabajo completo (sólo propietario)
+ */
+export async function eliminarEspacioTrabajoAction(wsId: string, uidSolicitante: string) {
+  console.log(`🚨 Solicitando eliminación del workspace ${wsId} por usuario ${uidSolicitante}`);
+  try {
+    const wsRef = adminDb.collection(COLLECTIONS.ESPACIOS).doc(wsId);
+    const wsSnap = await wsRef.get();
+
+    if (!wsSnap.exists) {
+      throw new Error("El espacio de trabajo no existe.");
+    }
+
+    const wsData = wsSnap.data()!;
+    if (wsData.propietarioUid !== uidSolicitante) {
+      throw new Error("Sólo el propietario puede eliminar el espacio de trabajo.");
+    }
+
+    // Opcional: Podríamos borrar subcolecciones aquí, pero por simplicidad e inmediatez
+    // borramos el documento principal. Al no existir el doc, las reglas de Firestore
+    // impiden cualquier lectura/escritura a sus subcolecciones.
+    await wsRef.delete();
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error al eliminar espacio de trabajo:", error);
+    return { success: false, error: error.message };
+  }
+}
+

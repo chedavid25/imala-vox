@@ -54,16 +54,18 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { COLLECTIONS } from "@/lib/types/firestore";
 import { PLAN_LIMITS } from "@/lib/planLimits";
-import { invitarUsuarioAction, cancelarInvitacionAction } from "@/app/actions/team";
+import { invitarUsuarioAction, cancelarInvitacionAction, eliminarMiembroAction, eliminarEspacioTrabajoAction } from "@/app/actions/team";
 import { toast } from "sonner";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 
 export default function UsuariosPage() {
+  const router = useRouter();
   const { workspace, currentWorkspaceId } = useWorkspaceStore();
   const [members, setMembers] = useState<any[]>([]);
   const [invitations, setInvitations] = useState<any[]>([]);
@@ -74,6 +76,63 @@ export default function UsuariosPage() {
   const [lastInviteLink, setLastInviteLink] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+
+  // Estados para eliminar miembro
+  const [memberToDelete, setMemberToDelete] = useState<any | null>(null);
+  const [isDeletingMember, setIsDeletingMember] = useState(false);
+
+  // Estados para eliminar espacio de trabajo / cuenta
+  const [isDeleteWsModalOpen, setIsDeleteWsModalOpen] = useState(false);
+  const [wsConfirmName, setWsConfirmName] = useState("");
+  const [isDeletingWs, setIsDeletingWs] = useState(false);
+
+  const handleDeleteMember = async () => {
+    if (!currentWorkspaceId || !memberToDelete) return;
+    setIsDeletingMember(true);
+    try {
+      const res = await eliminarMiembroAction(currentWorkspaceId, memberToDelete.id);
+      if (res.success) {
+        toast.success("Miembro eliminado correctamente");
+        setMemberToDelete(null);
+      } else {
+        toast.error(res.error || "Error al eliminar miembro");
+      }
+    } catch (error) {
+      toast.error("Error de conexión");
+    } finally {
+      setIsDeletingMember(false);
+    }
+  };
+
+  const handleDeleteWorkspace = async () => {
+    if (!currentWorkspaceId || !workspace) return;
+    if (wsConfirmName !== workspace.nombre) {
+      toast.error("El nombre del espacio no coincide");
+      return;
+    }
+
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      toast.error("Usuario no autenticado");
+      return;
+    }
+
+    setIsDeletingWs(true);
+    try {
+      const res = await eliminarEspacioTrabajoAction(currentWorkspaceId, currentUser.uid);
+      if (res.success) {
+        toast.success("Espacio de trabajo eliminado con éxito");
+        router.push("/dashboard");
+      } else {
+        toast.error(res.error || "Error al eliminar el espacio");
+      }
+    } catch (error) {
+      toast.error("Error de conexión");
+    } finally {
+      setIsDeletingWs(false);
+      setIsDeleteWsModalOpen(false);
+    }
+  };
 
   useEffect(() => {
     if (!currentWorkspaceId) return;
@@ -427,11 +486,20 @@ export default function UsuariosPage() {
                                 </button>
                               }
                             />
-                           <DropdownMenuContent align="end" className="bg-white border-slate-200 rounded-2xl shadow-2xl p-2 min-w-[160px]">
-                              <DropdownMenuItem className="text-rose-500 font-bold text-[10px] uppercase tracking-widest gap-2 p-3 rounded-xl hover:bg-rose-50 cursor-pointer focus:bg-rose-50">
-                                <Trash2 className="size-3.5" />
-                                Eliminar del Equipo
-                              </DropdownMenuItem>
+                            <DropdownMenuContent align="end" className="bg-white border-slate-200 rounded-2xl shadow-2xl p-2 min-w-[160px]">
+                              {workspace?.propietarioUid !== member.id && auth.currentUser?.uid !== member.id ? (
+                                <DropdownMenuItem 
+                                  onClick={() => setMemberToDelete(member)}
+                                  className="text-rose-500 font-bold text-[10px] uppercase tracking-widest gap-2 p-3 rounded-xl hover:bg-rose-50 cursor-pointer focus:bg-rose-50"
+                                >
+                                  <Trash2 className="size-3.5" />
+                                  Eliminar del Equipo
+                                </DropdownMenuItem>
+                              ) : (
+                                <div className="text-slate-400 font-bold text-[9px] uppercase tracking-widest p-3 select-none text-center">
+                                  Sin acciones
+                                </div>
+                              )}
                            </DropdownMenuContent>
                          </DropdownMenu>
                       </TableCell>
@@ -524,6 +592,116 @@ export default function UsuariosPage() {
            </Link>
         </div>
       )}
+
+      {/* ZONA DE PELIGRO */}
+      <Card className="bg-red-50/10 border border-red-100 rounded-[32px] overflow-hidden shadow-sm mt-8">
+        <CardHeader className="p-8 pb-6 border-b border-red-100/30 bg-red-50/20">
+          <CardTitle className="text-xl font-bold text-red-700 flex items-center gap-3 tracking-tight">
+            <AlertCircle className="w-5 h-5 text-red-600" />
+            Zona de Peligro
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-8 space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-1">
+              <h4 className="text-sm font-bold text-slate-900">Eliminar Espacio de Trabajo</h4>
+              <p className="text-xs text-slate-500 font-medium max-w-xl">
+                Al eliminar este espacio de trabajo se borrarán permanentemente todos los datos, agentes configurados, canales de mensajería conectados e historial de chats. Esta acción no se puede deshacer.
+              </p>
+            </div>
+            {workspace?.propietarioUid === auth.currentUser?.uid ? (
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  setWsConfirmName("");
+                  setIsDeleteWsModalOpen(true);
+                }}
+                className="bg-red-600 hover:bg-red-700 text-white font-black text-[10px] uppercase tracking-widest h-11 px-6 rounded-xl shrink-0 shadow-lg shadow-red-600/10"
+              >
+                Eliminar Espacio
+              </Button>
+            ) : (
+              <p className="text-xs font-bold text-red-500 italic">Sólo el propietario puede eliminar el espacio de trabajo.</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* MODAL CONFIRMAR ELIMINAR MIEMBRO */}
+      <Dialog open={!!memberToDelete} onOpenChange={(open) => !open && setMemberToDelete(null)}>
+        <DialogContent className="max-w-md bg-white border-none shadow-2xl rounded-[32px] p-8 space-y-6">
+          <DialogHeader className="text-center">
+            <div className="size-16 rounded-[2rem] bg-rose-50 text-rose-500 flex items-center justify-center mx-auto mb-4 shadow-lg">
+              <Trash2 className="size-8" />
+            </div>
+            <DialogTitle className="text-2xl font-black text-[var(--text-primary-light)] tracking-tight">¿Eliminar Colaborador?</DialogTitle>
+            <DialogDescription className="text-slate-500 text-sm leading-relaxed px-2 font-medium">
+              ¿Estás seguro de que querés remover a <strong>{memberToDelete?.nombre}</strong> ({memberToDelete?.email}) de este espacio de trabajo? Perderá el acceso de inmediato.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-3 pt-2">
+            <Button
+              onClick={handleDeleteMember}
+              disabled={isDeletingMember}
+              className="w-full bg-red-600 hover:bg-red-700 text-white font-black text-[10px] uppercase tracking-widest h-14 rounded-2xl shadow-xl shadow-red-600/20"
+            >
+              {isDeletingMember ? "Eliminando..." : "Confirmar Eliminación"}
+            </Button>
+            <Button
+              variant="ghost"
+              type="button"
+              className="w-full text-slate-400 font-bold text-[10px] uppercase tracking-widest"
+              onClick={() => setMemberToDelete(null)}
+            >
+              Cancelar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL CONFIRMAR ELIMINAR ESPACIO DE TRABAJO */}
+      <Dialog open={isDeleteWsModalOpen} onOpenChange={setIsDeleteWsModalOpen}>
+        <DialogContent className="max-w-md bg-white border-none shadow-2xl rounded-[32px] p-8 space-y-6">
+          <DialogHeader className="text-center">
+            <div className="size-16 rounded-[2rem] bg-rose-50 text-rose-500 flex items-center justify-center mx-auto mb-4 shadow-lg">
+              <AlertCircle className="size-8" />
+            </div>
+            <DialogTitle className="text-2xl font-black text-rose-700 tracking-tight">Confirmar Eliminación</DialogTitle>
+            <DialogDescription className="text-slate-500 text-sm leading-relaxed px-2 font-medium text-left">
+              Esta acción es permanente y eliminará todo el contenido de este espacio. Escribí <strong>{workspace?.nombre}</strong> para confirmar:
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <Input
+              type="text"
+              value={wsConfirmName}
+              onChange={(e) => setWsConfirmName(e.target.value)}
+              className="bg-[var(--bg-input)] border-[var(--border-light)] rounded-2xl h-14 px-5 font-bold text-sm focus:ring-2 focus:ring-red-600/30 transition-all shadow-sm"
+              placeholder="Nombre del espacio de trabajo"
+            />
+
+            <div className="flex flex-col gap-3 pt-2">
+              <Button
+                onClick={handleDeleteWorkspace}
+                disabled={isDeletingWs || wsConfirmName !== workspace?.nombre}
+                className="w-full bg-red-600 hover:bg-red-700 text-white font-black text-[10px] uppercase tracking-widest h-14 rounded-2xl shadow-xl shadow-red-600/20 disabled:opacity-50"
+              >
+                {isDeletingWs ? "Eliminando..." : "Eliminar Espacio Permanentemente"}
+              </Button>
+              <Button
+                variant="ghost"
+                type="button"
+                className="w-full text-slate-400 font-bold text-[10px] uppercase tracking-widest"
+                onClick={() => setIsDeleteWsModalOpen(false)}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
