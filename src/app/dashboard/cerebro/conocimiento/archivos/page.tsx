@@ -210,10 +210,25 @@ export default function ArchivosGlobalPage() {
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  disabled={!archivo.archivoUrl}
+                  disabled={!archivo.archivoUrl && !archivo.contenidoTexto}
                   onClick={() => {
                     if (archivo.archivoUrl) {
                       window.open(`/api/download?url=${encodeURIComponent(archivo.archivoUrl)}&filename=${encodeURIComponent(archivo.archivoNombre || "archivo")}`, "_blank");
+                    } else if (archivo.contenidoTexto) {
+                      const blob = new Blob([archivo.contenidoTexto], { type: "text/plain;charset=utf-8" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      const originalName = archivo.archivoNombre || "archivo.txt";
+                      const downloadName = originalName.endsWith(".txt") || originalName.endsWith(".md")
+                        ? originalName
+                        : `${originalName.substring(0, originalName.lastIndexOf('.')) || originalName}_contenido.txt`;
+                      a.download = downloadName;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                      toast.info("Descargando texto extraído (el archivo original no se conservó)");
                     }
                   }}
                   className="w-8 h-8 rounded-full text-[var(--text-tertiary-light)] hover:text-[var(--text-primary-light)] hover:bg-[var(--bg-input)]"

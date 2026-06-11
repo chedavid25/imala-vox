@@ -1,6 +1,6 @@
 "use server";
 
-import { adminDb } from "@/lib/firebase-admin";
+import { adminDb, adminStorage } from "@/lib/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS } from "@/lib/types/firestore";
 
@@ -45,7 +45,33 @@ export async function subirYProcesarArchivoAction(
       throw new Error("No se pudo extraer texto legible del archivo.");
     }
 
-    // 2. Guardar en Firestore (Base de Conocimiento Global)
+    // 2. Subir a Firebase Storage si está configurado
+    let archivoUrl: string | null = null;
+    const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+    if (bucketName) {
+      try {
+        const token = crypto.randomUUID();
+        const bucket = adminStorage.bucket(bucketName);
+        const storagePath = `workspaces/${wsId}/conocimiento/${Date.now()}_${file.name}`;
+        const fileRef = bucket.file(storagePath);
+        
+        await fileRef.save(buffer, { 
+          metadata: { contentType: file.type || "application/octet-stream" }, 
+          resumable: false 
+        });
+        
+        await fileRef.setMetadata({ 
+          metadata: { firebaseStorageDownloadTokens: token } 
+        });
+        
+        const encodedPath = encodeURIComponent(storagePath);
+        archivoUrl = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodedPath}?alt=media&token=${token}`;
+      } catch (storageErr) {
+        console.error("Error al subir archivo a Storage:", storageErr);
+      }
+    }
+
+    // 3. Guardar en Firestore (Base de Conocimiento Global)
     const docRef = await adminDb
       .collection(COLLECTIONS.ESPACIOS)
       .doc(wsId)
@@ -56,6 +82,7 @@ export async function subirYProcesarArchivoAction(
         archivoNombre: file.name,
         archivoTamano: file.size,
         archivoTipo: file.type,
+        archivoUrl, // URL del archivo en Storage
         contenidoTexto: extractedText, // AQUí ESTÁ EL CEREBRO
         estado: 'activo',
         descripcion: `Archivo procesado automáticamente: ${file.name}`,
