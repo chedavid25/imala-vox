@@ -8,6 +8,7 @@ import {
   obtenerOCrearConversacion,
   extraerMetadatosIA
 } from "./ai";
+import { segundosHabiles, HorarioHumano } from "./horarioHabil";
 
 admin.initializeApp();
 
@@ -1215,19 +1216,53 @@ export const onMensajeCreado = functions.firestore
         const updates: any = {};
 
         if (convData.ultimoMensajeClienteEl) {
-          const diffSegundos = Math.max(0, timeNow.seconds - convData.ultimoMensajeClienteEl.seconds);
+          const diffReloj = Math.max(0, timeNow.seconds - convData.ultimoMensajeClienteEl.seconds);
+
+          // Cargar el horario de atención humana del agente (si está activo) para
+          // medir el tiempo de respuesta HUMANO y la primera respuesta solo dentro
+          // del horario hábil. La IA (bot) se mide siempre en tiempo de reloj (24/7).
+          let horarioHumano: HorarioHumano | null = null;
+          if (msgData.from === 'operator' && convData.agenteId) {
+            try {
+              const agenteSnap = await db.doc(`espaciosDeTrabajo/${wsId}/agentes/${convData.agenteId}`).get();
+              const agenteData = agenteSnap.data();
+              if (agenteData?.horarioHumanoActivo && agenteData?.horarioHumano) {
+                horarioHumano = agenteData.horarioHumano as HorarioHumano;
+              }
+            } catch (e) {
+              console.warn("No se pudo leer el horario del agente para métricas:", e);
+            }
+          }
+
+          const startMs = convData.ultimoMensajeClienteEl.seconds * 1000;
+          const endMs = timeNow.seconds * 1000;
 
           if (msgData.from === 'bot') {
             updates.respuestasIAContador = admin.firestore.FieldValue.increment(1);
-            updates.tiempoRespuestaIAAcumulado = admin.firestore.FieldValue.increment(diffSegundos);
+            updates.tiempoRespuestaIAAcumulado = admin.firestore.FieldValue.increment(diffReloj);
           } else {
+            // Tiempo humano en horario hábil (fallback a reloj si no hay horario)
+            const diffHumano = horarioHumano ? segundosHabiles(startMs, endMs, horarioHumano) : diffReloj;
             updates.respuestasHumanoContador = admin.firestore.FieldValue.increment(1);
-            updates.tiempoRespuestaHumanoAcumulado = admin.firestore.FieldValue.increment(diffSegundos);
+            updates.tiempoRespuestaHumanoAcumulado = admin.firestore.FieldValue.increment(diffHumano);
+
+            // Atribución por operador (para el ranking de estadísticas)
+            const opUid = msgData.operadorUid;
+            if (opUid) {
+              updates[`tiemposPorOperador.${opUid}.tiempoAcumulado`] = admin.firestore.FieldValue.increment(diffHumano);
+              updates[`tiemposPorOperador.${opUid}.contador`] = admin.firestore.FieldValue.increment(1);
+              if (msgData.operadorNombre) {
+                updates[`tiemposPorOperador.${opUid}.nombre`] = msgData.operadorNombre;
+              }
+            }
           }
 
           // Registrar tiempo de primera respuesta si corresponde
           if (convData.primerMensajeClienteEl && !convData.tiempoPrimeraRespuesta) {
-            const diffPrimera = Math.max(0, timeNow.seconds - convData.primerMensajeClienteEl.seconds);
+            const startPrimeraMs = convData.primerMensajeClienteEl.seconds * 1000;
+            const diffPrimera = (msgData.from === 'operator' && horarioHumano)
+              ? segundosHabiles(startPrimeraMs, endMs, horarioHumano)
+              : Math.max(0, timeNow.seconds - convData.primerMensajeClienteEl.seconds);
             updates.tiempoPrimeraRespuesta = diffPrimera;
           }
         }

@@ -55,7 +55,23 @@ import {
 import { db } from "@/lib/firebase";
 import { COLLECTIONS, Lead, EtapaEmbudo, TareaCRM, Contacto, Conversacion, Agente, CategoriaCRM, EtiquetaCRM } from "@/lib/types/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
+import { estaEnHorario, HorarioHumano } from "@/lib/horarioHabil";
 import { subDays, format, isAfter, startOfDay, endOfDay, isBefore } from "date-fns";
+
+// Objetivo de SLA para "primera respuesta" (en segundos). 15 minutos por defecto.
+const SLA_OBJETIVO_SEG = 15 * 60;
+
+// Formatea segundos como "Xh Ym" / "Xm Ys" / "Xs" (uso en JSX)
+const fmtDur = (segundos: number) => {
+  if (!segundos) return "0s";
+  if (segundos < 60) return `${segundos}s`;
+  const minutos = Math.floor(segundos / 60);
+  const segs = segundos % 60;
+  if (minutos < 60) return `${minutos}m ${segs}s`;
+  const horas = Math.floor(minutos / 60);
+  const mins = minutos % 60;
+  return `${horas}h ${mins}m`;
+};
 import { es } from "date-fns/locale";
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -192,7 +208,9 @@ export default function EstadisticasPage() {
     const iteracionesLabel = diasAtras > 30 ? (diasAtras > 365 ? 'MM/yy' : 'MMM') : 'EEE';
     
     if (diasAtras > 60) {
-      for (let i = 11; i >= 0; i--) {
+      // Construir solo los meses que abarca el rango (evita meses vacíos en rangos cortos)
+      const mesesRango = Math.min(12, Math.max(1, Math.ceil(diasAtras / 30)));
+      for (let i = mesesRango - 1; i >= 0; i--) {
         const d = subDays(hoy, i * 30);
         const label = format(d, 'MMM', { locale: es });
         evolutionMap[label] = { name: label, leads: 0, contactos: 0 };
@@ -264,20 +282,22 @@ export default function EstadisticasPage() {
         respuestasHumanoCount += c.respuestasHumanoContador;
       }
 
-      // Clasificación según estado de la bandeja e intervención de IA/Humano
-      if (c.pendiente === true) {
-        chatsPendientes++;
-      }
+      // Clasificación según quién RESPONDIÓ realmente (no por banderas de escalada)
+      const tuvoHumano = (c.respuestasHumanoContador || 0) > 0;
+      const tuvoIA = (c.respuestasIAContador || 0) > 0;
 
+      // Estado de la bandeja: mutuamente excluyente (resuelto > pendiente > abierto)
       if (c.estado === 'resuelto') {
-        if (c.necesitaHumano === true || (c.respuestasHumanoContador && c.respuestasHumanoContador > 0)) {
+        if (tuvoHumano) {
           derivacionHumano++;
-        } else if (c.respuestasIAContador && c.respuestasIAContador > 0) {
+        } else if (tuvoIA) {
           resolucionIA++;
         } else {
           sinIntervencion++;
         }
-      } else if (c.pendiente !== true) {
+      } else if (c.pendiente === true) {
+        chatsPendientes++;
+      } else {
         chatsAbiertos++;
       }
 
@@ -307,28 +327,104 @@ export default function EstadisticasPage() {
       return `${horas}h ${mins}m`;
     };
 
-    // Medir la gestión real (IA vs Humano)
+    // === MÉTRICAS NUEVAS (horario hábil) ===
+
+    // Mapa de agentes para conocer su horario de atención humana
+    const agentesMap = new Map(agentes.map(a => [a.id, a]));
+
+    // A) Cumplimiento de SLA (primera respuesta dentro del objetivo)
+    let slaTotal = 0;
+    let slaCumplidos = 0;
+
+    // B) Ranking por operador (acumulado desde tiemposPorOperador)
+    const operadorAgg: Record<string, { nombre: string; tiempo: number; count: number }> = {};
+
+    // C) Dentro vs fuera de horario (según primer mensaje del cliente)
+    let dentroHorario = 0;
+    let fueraHorario = 0;
+
+    // D) Tendencia de primera respuesta por día
+    const trendMap: Record<string, { total: number; count: number }> = {};
+
+    convAct.forEach(c => {
+      // SLA
+      if (c.tiempoPrimeraRespuesta !== undefined && c.tiempoPrimeraRespuesta !== null) {
+        slaTotal++;
+        if (c.tiempoPrimeraRespuesta <= SLA_OBJETIVO_SEG) slaCumplidos++;
+
+        // Tendencia: agrupar por día del primer mensaje del cliente
+        const fechaBase = c.primerMensajeClienteEl?.toDate?.() || c.ultimaActividad?.toDate?.();
+        if (fechaBase && fechaBase >= fechaInicio) {
+          const label = format(fechaBase, diasAtras > 60 ? 'MMM' : iteracionesLabel, { locale: es });
+          if (!trendMap[label]) trendMap[label] = { total: 0, count: 0 };
+          trendMap[label].total += c.tiempoPrimeraRespuesta;
+          trendMap[label].count++;
+        }
+      }
+
+      // Por operador
+      if (c.tiemposPorOperador) {
+        Object.entries(c.tiemposPorOperador).forEach(([uid, datos]: [string, any]) => {
+          if (!operadorAgg[uid]) operadorAgg[uid] = { nombre: datos?.nombre || 'Operador', tiempo: 0, count: 0 };
+          if (datos?.nombre) operadorAgg[uid].nombre = datos.nombre;
+          operadorAgg[uid].tiempo += datos?.tiempoAcumulado || 0;
+          operadorAgg[uid].count += datos?.contador || 0;
+        });
+      }
+
+      // Dentro vs fuera de horario (solo si el agente tiene horario humano activo)
+      const agente = c.agenteId ? agentesMap.get(c.agenteId) : null;
+      const fechaEntrada = c.primerMensajeClienteEl?.toDate?.() || c.ultimaActividad?.toDate?.();
+      if (agente?.horarioHumanoActivo && agente.horarioHumano && fechaEntrada) {
+        if (estaEnHorario(fechaEntrada.getTime(), agente.horarioHumano as HorarioHumano)) dentroHorario++;
+        else fueraHorario++;
+      }
+    });
+
+    const tasaSLA = slaTotal > 0 ? Math.round((slaCumplidos / slaTotal) * 100) : 0;
+
+    const operadorRankingData = Object.values(operadorAgg)
+      .filter(o => o.count > 0)
+      .map(o => ({ nombre: o.nombre, promedio: Math.round(o.tiempo / o.count), total: o.count }))
+      .sort((a, b) => a.promedio - b.promedio)
+      .slice(0, 8);
+
+    const horarioEntradaData = [
+      { name: 'En horario', value: dentroHorario, color: '#10b981' },
+      { name: 'Fuera de horario', value: fueraHorario, color: '#94a3b8' }
+    ].filter(s => s.value > 0);
+
+    // Tendencia ordenada según los buckets de evolución ya generados
+    const tendenciaRespuestaData = Object.keys(evolutionMap).map(label => ({
+      name: label,
+      segundos: trendMap[label] ? Math.round(trendMap[label].total / trendMap[label].count) : 0
+    }));
+
+    // Medir la gestión real (IA vs Humano) — según quién respondió de verdad
     let totalIAAuto = 0;
     let totalManual = 0;
     convAct.forEach(c => {
-      if (c.necesitaHumano === true || (c.respuestasHumanoContador && c.respuestasHumanoContador > 0)) {
+      if ((c.respuestasHumanoContador || 0) > 0) {
         totalManual++;
-      } else if (c.respuestasIAContador && c.respuestasIAContador > 0) {
+      } else if ((c.respuestasIAContador || 0) > 0) {
         totalIAAuto++;
       }
     });
 
     const convAI = totalIAAuto;
     const convManual = totalManual;
+    // Tasa de resolución IA del PERÍODO: de las conversaciones que tuvieron respuesta,
+    // qué proporción gestionó la IA sola (numerador y denominador en el mismo rango).
+    const tasaResolucionIA = (convAI + convManual) > 0 ? Math.round((convAI / (convAI + convManual)) * 100) : 0;
     const chatSourceData = [
       { name: 'IA Auto', value: convAI, color: 'var(--accent-active)' },
       { name: 'Manual', value: convManual, color: '#94a3b8' }
     ].filter(s => s.value > 0);
 
     const chatResolutionData = [
-      { name: 'Resuelto IA', value: resolucionIA, color: '#10b981' },
-      { name: 'Derivado Humano', value: derivacionHumano, color: '#f59e0b' },
-      { name: 'Sin Intervención', value: sinIntervencion, color: '#94a3b8' }
+      { name: 'Resuelto por IA', value: resolucionIA, color: '#10b981' },
+      { name: 'Con Intervención Humana', value: derivacionHumano, color: '#f59e0b' },
+      { name: 'Cerrado sin Respuesta', value: sinIntervencion, color: '#94a3b8' }
     ].filter(s => s.value > 0);
 
     // C. Tareas Stats
@@ -427,6 +523,7 @@ export default function EstadisticasPage() {
       },
       totalLeads: leadsAct.length,
       convAI,
+      tasaResolucionIA,
       evolutionData: Object.values(evolutionMap),
       chatSourceData,
       tareasStatusData: [
@@ -468,7 +565,14 @@ export default function EstadisticasPage() {
           { name: '> 60 min', value: rangosPrimeraRespuesta.muyLento, color: '#7c2d12' }
         ],
         demandEtiquetasData,
-        demandCategoriasData
+        demandCategoriasData,
+        // Nuevas métricas (horario hábil)
+        tasaSLA,
+        slaCumplidos,
+        slaTotal,
+        operadorRankingData,
+        horarioEntradaData,
+        tendenciaRespuestaData
       }
     };
   }, [leads, etapas, conversaciones, tareas, contactos, agentes, categorias, etiquetas, loading, dateRange]);
@@ -554,14 +658,46 @@ export default function EstadisticasPage() {
 
         <TabsContent value="resumen" className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <StatsCard title="Leads Totales" value={data.overview.leads.val.toString()} change={data.overview.leads.change} trend={data.overview.leads.trend} icon={<Target className="w-5 h-5" />} color="blue" />
-            <StatsCard title="Chats Activos" value={data.overview.chats.val.toString()} change={data.overview.chats.change} trend={data.overview.chats.trend} icon={<Inbox className="w-5 h-5" />} color="emerald" />
-            <StatsCard title="Tareas Pendientes" value={data.overview.tasks.val.toString()} change={data.overview.tasks.change} trend="up" icon={<Clock className="w-5 h-5" />} color="amber" />
-            <StatsCard title="Contactos CRM" value={data.overview.contacts.val.toString()} change={data.overview.contacts.change} trend={data.overview.contacts.trend} icon={<Users className="w-5 h-5" />} color="purple" />
+            <StatsCard
+              title="Conversaciones"
+              value={data.overview.chats.val.toString()}
+              change={data.overview.chats.change}
+              trend={data.overview.chats.trend}
+              icon={<Inbox className="w-5 h-5" />}
+              color="emerald"
+              tooltip="Total de conversaciones con actividad en el período seleccionado, comparado con el período anterior."
+            />
+            <StatsCard
+              title="Primer Respuesta Promedio"
+              value={data.chatAdvanced.promedioPrimeraRespuesta}
+              change="Hábil"
+              trend="up"
+              icon={<Clock className="w-5 h-5" />}
+              color="blue"
+              tooltip="Tiempo promedio hasta la primera respuesta. Medido dentro del horario de atención humana cuando está configurado."
+            />
+            <StatsCard
+              title="Resolución IA"
+              value={`${data.tasaResolucionIA}%`}
+              change="Autónomo"
+              trend="up"
+              icon={<Zap className="w-5 h-5" />}
+              color="purple"
+              tooltip="De las conversaciones que tuvieron respuesta en el período, qué porcentaje gestionó la IA sola, sin intervención humana."
+            />
+            <StatsCard
+              title="Leads Nuevos"
+              value={data.overview.leads.val.toString()}
+              change={data.overview.leads.change}
+              trend={data.overview.leads.trend}
+              icon={<Target className="w-5 h-5" />}
+              color="amber"
+              tooltip="Nuevos leads captados en el período, comparado con el período anterior."
+            />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <ChartContainer title="Crecimiento General" subtitle="Leads vs Nuevos Contactos" className="lg:col-span-2">
+            <ChartContainer title="Crecimiento General" subtitle="Leads vs Nuevos Contactos" className="lg:col-span-2" tooltip="Evolución de nuevos leads y nuevos contactos del CRM a lo largo del período seleccionado.">
               <AreaChart data={data.evolutionData}>
                 <defs>
                   <linearGradient id="colorL" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="var(--accent-active)" stopOpacity={0.1}/><stop offset="95%" stopColor="var(--accent-active)" stopOpacity={0}/></linearGradient>
@@ -578,6 +714,9 @@ export default function EstadisticasPage() {
 
             <div className="bg-[var(--bg-sidebar)] rounded-[32px] p-8 shadow-2xl relative overflow-hidden flex flex-col justify-between group">
               <div className="absolute top-0 right-0 w-64 h-64 bg-[var(--accent)]/10 rounded-full -mr-32 -mt-32 blur-3xl group-hover:scale-110 transition-transform duration-1000" />
+              <div className="absolute top-6 right-6 z-20">
+                <HelpTip text="Porcentaje de conversaciones que la IA gestionó de forma autónoma sobre el total. Es tu eficiencia operativa: cuánto resuelve el bot sin intervención humana." iconClassName="text-white/40 hover:text-white/80" />
+              </div>
               <div className="relative z-10">
                 <div className="w-12 h-12 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center mb-6 backdrop-blur-md">
                   <Zap className="text-[var(--accent)] w-6 h-6" />
@@ -589,7 +728,7 @@ export default function EstadisticasPage() {
               </div>
               <div className="mt-8 relative z-10">
                 <span className="text-6xl font-black text-[var(--accent)] tracking-tighter">
-                  {conversaciones.length > 0 ? Math.round((data.convAI / conversaciones.length) * 100) : 0}%
+                  {data.tasaResolucionIA}%
                 </span>
                 <span className="block text-[10px] font-black text-[var(--text-tertiary-dark)] uppercase tracking-[0.2em] mt-2">Eficiencia Operativa</span>
               </div>
@@ -605,9 +744,9 @@ export default function EstadisticasPage() {
               value={data.chatAdvanced.promedioPrimeraRespuesta} 
               change="General" 
               trend="up" 
-              icon={<Clock className="w-5 h-5" />} 
-              color="blue" 
-              tooltip="Tiempo promedio que transcurre desde que el cliente envía su primer mensaje hasta que recibe una respuesta de la IA o de un operador."
+              icon={<Clock className="w-5 h-5" />}
+              color="blue"
+              tooltip="Tiempo promedio desde el primer mensaje del cliente hasta la primera respuesta. Si hay horario de atención humana configurado, se mide solo dentro de ese horario (no cuenta noches ni fines de semana)."
             />
             <StatsCard 
               title="Tasa de Resolución IA" 
@@ -632,14 +771,105 @@ export default function EstadisticasPage() {
               value={data.chatAdvanced.promedioRespuestaHumano} 
               change="Soporte" 
               trend="up" 
-              icon={<Users className="w-5 h-5" />} 
-              color="amber" 
-              tooltip="Tiempo promedio que tardan los operadores humanos en responder tras la intervención o asignación del chat."
+              icon={<Users className="w-5 h-5" />}
+              color="amber"
+              tooltip="Tiempo promedio que tardan los operadores humanos en responder. Se mide dentro del horario de atención humana configurado (descuenta noches y fines de semana)."
             />
           </div>
 
+          {/* SLA + Tendencia + Dentro/Fuera de horario */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <ChartContainer title="Estado de la Bandeja" subtitle="Distribución actual de conversaciones" className="lg:col-span-1">
+            <div className="flex flex-col gap-8">
+              <StatsCard
+                title="Cumplimiento de SLA"
+                value={`${data.chatAdvanced.tasaSLA}%`}
+                change={`${data.chatAdvanced.slaCumplidos}/${data.chatAdvanced.slaTotal}`}
+                trend="up"
+                icon={<CheckCircle2 className="w-5 h-5" />}
+                color="emerald"
+                tooltip={`Porcentaje de conversaciones respondidas dentro del objetivo de ${Math.round(SLA_OBJETIVO_SEG / 60)} minutos (medido en horario de atención humana).`}
+              />
+              <div className="bg-[var(--bg-card)] rounded-[32px] p-8 border border-[var(--border-light)] shadow-sm flex-1 flex flex-col">
+                <div className="mb-4 flex items-start justify-between gap-2">
+                  <div>
+                    <h3 className="text-lg font-bold text-[var(--text-primary-light)] tracking-tight">Dentro vs Fuera de Horario</h3>
+                    <p className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest mt-1">Mensajes entrantes según atención humana</p>
+                  </div>
+                  <HelpTip text="De las conversaciones del período, cuántas iniciaron dentro del horario de atención humana y cuántas fuera. Muestra cuánto volumen entra cuando no hay nadie atendiendo (lo cubre la IA)." />
+                </div>
+                {data.chatAdvanced.horarioEntradaData.length > 0 ? (
+                  <div className="flex-1 min-h-[220px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={data.chatAdvanced.horarioEntradaData} innerRadius={55} outerRadius={80} paddingAngle={5} dataKey="value">
+                          {data.chatAdvanced.horarioEntradaData.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                        </Pie>
+                        <Tooltip formatter={(value: any) => [value, "Conversaciones"]} />
+                        <Legend content={<PieLegend data={data.chatAdvanced.horarioEntradaData} />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="flex-1 min-h-[200px] flex flex-col items-center justify-center text-center text-[var(--text-tertiary-light)] px-4">
+                    <Clock className="w-10 h-10 mb-3 opacity-20" />
+                    <p className="text-[11px] font-bold leading-relaxed">Configurá el horario de atención humana para ver esta métrica.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <ChartContainer title="Tendencia de Primera Respuesta" subtitle="Evolución del tiempo de respuesta" className="lg:col-span-2" tooltip="Promedio del tiempo de primera respuesta por día/período, medido en horario de atención humana cuando está configurado. Sirve para ver si el equipo mejora con el tiempo.">
+              <AreaChart data={data.chatAdvanced.tendenciaRespuestaData}>
+                <defs>
+                  <linearGradient id="colorTrend" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--accent-active)" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="var(--accent-active)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: 'var(--text-tertiary-light)', fontSize: 10, fontWeight: 700 }} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--text-tertiary-light)', fontSize: 10, fontWeight: 700 }} tickFormatter={(v: any) => fmtDur(v)} width={60} />
+                <Tooltip formatter={(value: any) => [fmtDur(value), "Primera respuesta"]} contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)' }} />
+                <Area type="monotone" dataKey="segundos" name="Primera respuesta" stroke="var(--accent-active)" strokeWidth={3} fill="url(#colorTrend)" />
+              </AreaChart>
+            </ChartContainer>
+          </div>
+
+          {/* Respuesta por operador */}
+          <div className="bg-[var(--bg-card)] rounded-[32px] p-8 border border-[var(--border-light)] shadow-sm">
+            <div className="flex items-start justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-bold text-[var(--text-primary-light)] tracking-tight">Respuesta por Miembro del Staff</h3>
+                <p className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest mt-1">Velocidad promedio del equipo humano (horario hábil)</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <HelpTip text="Tiempo promedio de respuesta de cada miembro del equipo humano y cantidad de respuestas, medido dentro del horario de atención. El más rápido aparece primero." />
+                <Users className="text-[var(--accent-active)] w-6 h-6 opacity-50" />
+              </div>
+            </div>
+            {data.chatAdvanced.operadorRankingData.length > 0 ? (
+              <div className="space-y-3">
+                {data.chatAdvanced.operadorRankingData.map((op: any, idx: number) => (
+                  <div key={idx} className="flex items-center gap-4 p-4 bg-[var(--bg-input)]/50 rounded-2xl border border-transparent hover:border-[var(--accent-active)] transition-all">
+                    <div className="w-9 h-9 rounded-xl bg-[var(--bg-card)] border border-[var(--border-light)] flex items-center justify-center font-black text-sm text-[var(--text-secondary-light)] shrink-0">
+                      {idx === 0 ? <Trophy className="w-4 h-4 text-amber-500" /> : op.nombre?.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="text-sm font-bold text-[var(--text-primary-light)] flex-1 truncate">{op.nombre}</span>
+                    <span className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest">{op.total} resp.</span>
+                    <span className="text-base font-black text-[var(--accent-active)] w-20 text-right">{fmtDur(op.promedio)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-10 flex flex-col items-center justify-center text-[var(--text-tertiary-light)]">
+                <Users className="w-12 h-12 mb-4 opacity-20" />
+                <p className="text-[10px] font-black uppercase tracking-widest text-center">Aún no hay respuestas humanas<br />registradas en este rango</p>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <ChartContainer title="Estado de la Bandeja" subtitle="Distribución actual de conversaciones" className="lg:col-span-1" tooltip="Cómo se reparten las conversaciones del período entre abiertas, pendientes y resueltas.">
               <PieChart>
                 <Pie 
                   data={data.chatAdvanced.chatStatusData} 
@@ -651,11 +881,11 @@ export default function EstadisticasPage() {
                   {data.chatAdvanced.chatStatusData.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                 </Pie>
                 <Tooltip formatter={(value: any) => [value, "Conversaciones"]} />
-                <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px' }} />
+                <Legend content={<PieLegend data={data.chatAdvanced.chatStatusData} />} />
               </PieChart>
             </ChartContainer>
 
-            <ChartContainer title="Resolución de Chats" subtitle="IA vs Derivaciones a Humano" className="lg:col-span-1">
+            <ChartContainer title="Resolución de Chats" subtitle="IA vs Derivaciones a Humano" className="lg:col-span-1" tooltip="De las conversaciones resueltas, cuántas las cerró la IA sola, cuántas se derivaron a un humano y cuántas no tuvieron intervención.">
               <PieChart>
                 <Pie 
                   data={data.chatAdvanced.chatResolutionData} 
@@ -667,11 +897,11 @@ export default function EstadisticasPage() {
                   {data.chatAdvanced.chatResolutionData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                 </Pie>
                 <Tooltip formatter={(value: any) => [value, "Conversaciones"]} />
-                <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px' }} />
+                <Legend content={<PieLegend data={data.chatAdvanced.chatResolutionData} />} />
               </PieChart>
             </ChartContainer>
 
-            <ChartContainer title="Distribución de Tiempos" subtitle="Tiempo de primera respuesta" className="lg:col-span-1">
+            <ChartContainer title="Distribución de Tiempos" subtitle="Tiempo de primera respuesta" className="lg:col-span-1" tooltip="Cuántas conversaciones cayeron en cada franja de tiempo de primera respuesta (menos de 1 min, 1-5 min, etc.).">
               <BarChart data={data.chatAdvanced.desgloseTiempos}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9}} />
@@ -686,7 +916,7 @@ export default function EstadisticasPage() {
 
           {/* Gráficos de Demanda por Etiqueta y Categoría */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <ChartContainer title="Demanda por Etiqueta" subtitle="Top 10 etiquetas con más chats" className="lg:col-span-2">
+            <ChartContainer title="Demanda por Etiqueta" subtitle="Top 10 etiquetas con más chats" className="lg:col-span-2" tooltip="Las 10 etiquetas de CRM más frecuentes entre las conversaciones del período. Útil para saber qué temas consultan más.">
               {data.chatAdvanced.demandEtiquetasData.length > 0 ? (
                 <BarChart data={data.chatAdvanced.demandEtiquetasData} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
@@ -705,7 +935,7 @@ export default function EstadisticasPage() {
               )}
             </ChartContainer>
 
-            <ChartContainer title="Demanda por Categoría" subtitle="Chats agrupados por categoría" className="lg:col-span-1">
+            <ChartContainer title="Demanda por Categoría" subtitle="Chats agrupados por categoría" className="lg:col-span-1" tooltip="Conversaciones agrupadas por la categoría de sus etiquetas de CRM.">
               {data.chatAdvanced.demandCategoriasData.length > 0 ? (
                 <PieChart>
                   <Pie 
@@ -718,7 +948,7 @@ export default function EstadisticasPage() {
                     {data.chatAdvanced.demandCategoriasData.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                   </Pie>
                   <Tooltip formatter={(value: any) => [value, "Conversaciones"]} />
-                  <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px' }} />
+                  <Legend content={<PieLegend data={data.chatAdvanced.demandCategoriasData} />} />
                 </PieChart>
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-[var(--text-tertiary-light)]">
@@ -736,13 +966,16 @@ export default function EstadisticasPage() {
                 <h3 className="text-lg font-bold text-[var(--text-primary-light)] tracking-tight">Mapa de Calor de Conversaciones</h3>
                 <p className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest mt-1">Volumen de actividad según Día y Franja Horaria</p>
               </div>
-              <div className="flex items-center gap-1.5 text-xs text-[var(--text-tertiary-light)]">
-                <span>Menos</span>
-                <div className="w-3.5 h-3.5 bg-emerald-50 rounded" />
-                <div className="w-3.5 h-3.5 bg-emerald-200 rounded" />
-                <div className="w-3.5 h-3.5 bg-emerald-400 rounded" />
-                <div className="w-3.5 h-3.5 bg-emerald-600 rounded" />
-                <span>Más</span>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 text-xs text-[var(--text-tertiary-light)]">
+                  <span>Menos</span>
+                  <div className="w-3.5 h-3.5 bg-emerald-50 rounded" />
+                  <div className="w-3.5 h-3.5 bg-emerald-200 rounded" />
+                  <div className="w-3.5 h-3.5 bg-emerald-400 rounded" />
+                  <div className="w-3.5 h-3.5 bg-emerald-600 rounded" />
+                  <span>Más</span>
+                </div>
+                <HelpTip text="Volumen de conversaciones según el día de la semana y la franja horaria. Cuanto más oscuro, más actividad. Ayuda a identificar tus horas pico." />
               </div>
             </div>
 
@@ -833,13 +1066,14 @@ export default function EstadisticasPage() {
 
         <TabsContent value="leads" className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <ChartContainer title="Fuentes de Tráfico" subtitle="Distribución de origen" className="lg:col-span-1">
+            <ChartContainer title="Fuentes de Tráfico" subtitle="Distribución de origen" className="lg:col-span-1" tooltip="De dónde provienen tus leads (WhatsApp, Meta Ads, etc.) en el período seleccionado.">
               {data.leadSourceData.length > 0 ? (
                 <PieChart>
-                  <Pie data={data.leadSourceData} innerRadius={60} outerRadius={90} paddingAngle={5} dataKey="value" label={({name, value}: any) => `${name}: ${value}`}>
+                  <Pie data={data.leadSourceData} innerRadius={60} outerRadius={90} paddingAngle={5} dataKey="value">
                     {data.leadSourceData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                   </Pie>
                   <Tooltip formatter={(value: any) => [value, "Leads"]} />
+                  <Legend content={<PieLegend data={data.leadSourceData} />} />
                 </PieChart>
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-[var(--text-tertiary-light)]">
@@ -849,7 +1083,7 @@ export default function EstadisticasPage() {
               )}
             </ChartContainer>
             
-            <ChartContainer title="Embudo Comercial" subtitle="Leads por etapa" className="lg:col-span-2">
+            <ChartContainer title="Embudo Comercial" subtitle="Leads por etapa" className="lg:col-span-2" tooltip="Distribución de leads por etapa del embudo de ventas, con el porcentaje sobre el total.">
               <div className="space-y-8 pt-4">
                 {data.funnelData.map((stage, idx) => {
                   const percentage = data.totalLeads > 0 ? (stage.count / data.totalLeads) * 100 : 0;
@@ -889,7 +1123,10 @@ export default function EstadisticasPage() {
                   <h3 className="text-lg font-bold text-[var(--text-primary-light)] tracking-tight">Top Campañas</h3>
                   <p className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest mt-1">Ranking de Meta Ads</p>
                 </div>
-                <Award className="text-[var(--accent-active)] w-6 h-6 opacity-50" />
+                <div className="flex items-center gap-3">
+                  <HelpTip text="Las campañas de Meta Ads que más leads generaron en el período." />
+                  <Award className="text-[var(--accent-active)] w-6 h-6 opacity-50" />
+                </div>
               </div>
               <div className="space-y-4">
                 {data.topCampaigns.length > 0 ? data.topCampaigns.map((camp, idx) => (
@@ -907,7 +1144,10 @@ export default function EstadisticasPage() {
                   <h3 className="text-lg font-bold text-[var(--text-primary-light)] tracking-tight">Top Formularios</h3>
                   <p className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest mt-1">Conversión de Meta Leads</p>
                 </div>
-                <FileText className="text-[var(--accent-active)] w-6 h-6 opacity-50" />
+                <div className="flex items-center gap-3">
+                  <HelpTip text="Los formularios de Meta Leads que más contactos convirtieron en el período." />
+                  <FileText className="text-[var(--accent-active)] w-6 h-6 opacity-50" />
+                </div>
               </div>
               <div className="space-y-4">
                 {data.topForms.length > 0 ? data.topForms.map((form, idx) => (
@@ -923,7 +1163,7 @@ export default function EstadisticasPage() {
 
         <TabsContent value="tareas" className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <ChartContainer title="Estado de Productividad" subtitle="Completadas vs Pendientes">
+            <ChartContainer title="Estado de Productividad" subtitle="Completadas vs Pendientes" tooltip="Proporción de tareas completadas frente a las que siguen pendientes.">
               <PieChart>
                 <Pie 
                   data={data.tareasStatusData} 
@@ -940,7 +1180,7 @@ export default function EstadisticasPage() {
               </PieChart>
             </ChartContainer>
 
-            <ChartContainer title="Prioridad de Pendientes" subtitle="Carga de trabajo por urgencia">
+            <ChartContainer title="Prioridad de Pendientes" subtitle="Carga de trabajo por urgencia" tooltip="Tareas pendientes agrupadas por prioridad (alta, media, baja) para ver la carga del equipo.">
               <BarChart data={data.tareasPriorityData} layout="vertical">
                 <XAxis type="number" hide />
                 <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700}} width={70} />
@@ -954,7 +1194,7 @@ export default function EstadisticasPage() {
         </TabsContent>
 
         <TabsContent value="contactos" className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
-          <ChartContainer title="Adquisición de Contactos" subtitle="Nuevos registros en el CRM">
+          <ChartContainer title="Adquisición de Contactos" subtitle="Nuevos registros en el CRM" tooltip="Cantidad de nuevos contactos cargados en el CRM a lo largo del período.">
             <AreaChart data={data.evolutionData}>
               <defs>
                 <linearGradient id="colorContacts" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2}/><stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/></linearGradient>
@@ -981,6 +1221,36 @@ export default function EstadisticasPage() {
 }
 
 // --- COMPONENTES AUXILIARES ---
+
+// Botón de ayuda reutilizable (ícono + tooltip al pasar el mouse)
+function HelpTip({ text, iconClassName }: { text: string; iconClassName?: string }) {
+  return (
+    <div className="relative group/tooltip shrink-0">
+      <HelpCircle className={`w-4 h-4 cursor-help transition-colors ${iconClassName || "text-[var(--text-tertiary-light)] hover:text-[var(--text-secondary-light)]"}`} />
+      <div className="absolute bottom-full right-0 mb-2 w-64 bg-slate-900 text-white text-[11px] p-3 rounded-xl shadow-xl opacity-0 group-hover/tooltip:opacity-100 pointer-events-none transition-all duration-300 z-50 leading-relaxed font-normal normal-case tracking-normal text-left">
+        {text}
+        <div className="absolute top-full right-2 border-4 border-transparent border-t-slate-900" />
+      </div>
+    </div>
+  );
+}
+
+// Leyenda de torta que muestra nombre + cantidad + porcentaje en cada ítem
+function PieLegend({ data }: { data: { name: string; value: number; color: string }[] }) {
+  const total = data.reduce((s, d) => s + (d.value || 0), 0);
+  return (
+    <ul className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 pt-3 px-2">
+      {data.map((entry, i) => (
+        <li key={i} className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--text-secondary-light)]">
+          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: entry.color }} />
+          <span>{entry.name}</span>
+          <span className="font-black text-[var(--text-primary-light)]">{entry.value}</span>
+          <span className="text-[var(--text-tertiary-light)]">({total > 0 ? Math.round((entry.value / total) * 100) : 0}%)</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 function StatsCard({ title, value, change, trend, icon, color, tooltip }: any) {
   const isUp = trend === 'up';
@@ -1021,17 +1291,15 @@ function StatsCard({ title, value, change, trend, icon, color, tooltip }: any) {
   );
 }
 
-function ChartContainer({ title, subtitle, children, className }: any) {
+function ChartContainer({ title, subtitle, children, className, tooltip }: any) {
   return (
     <div className={`bg-[var(--bg-card)] rounded-[32px] p-8 border border-[var(--border-light)] shadow-sm ${className}`}>
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-start justify-between mb-8">
         <div>
           <h3 className="text-lg font-bold text-[var(--text-primary-light)] tracking-tight">{title}</h3>
           <p className="text-[10px] font-black text-[var(--text-tertiary-light)] uppercase tracking-widest mt-1">{subtitle}</p>
         </div>
-        <Button variant="ghost" size="icon" className="rounded-full">
-          <MoreVertical className="w-4 h-4 text-[var(--text-tertiary-light)]" />
-        </Button>
+        {tooltip && <HelpTip text={tooltip} />}
       </div>
       <div className="h-[300px] w-full">
         <ResponsiveContainer width="100%" height="100%">

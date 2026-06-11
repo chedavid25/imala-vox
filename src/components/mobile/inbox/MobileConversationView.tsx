@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar } from "@/components/ui/Avatar";
 import { MobileContactSheet } from "./MobileContactSheet";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 import { doc, updateDoc, Timestamp, collection, addDoc, getDocs, query } from "firebase/firestore";
 import { COLLECTIONS, Contacto } from "@/lib/types/firestore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
@@ -111,6 +111,8 @@ export function MobileConversationView({
         text,
         from: 'operator',
         creadoEl: Timestamp.now(),
+        operadorUid: auth.currentUser?.uid || null,
+        operadorNombre: auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0] || 'Operador',
         metadata
       });
 

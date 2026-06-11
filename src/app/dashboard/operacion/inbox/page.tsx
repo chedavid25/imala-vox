@@ -7,7 +7,7 @@ import { ContextPanel } from "@/components/layout/ContextPanel";
 import { useConversaciones } from "@/hooks/useConversaciones";
 import { useMensajes } from "@/hooks/useMensajes";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 import { collection, addDoc, updateDoc, doc, Timestamp, getDocs, limit, query as firestoreQuery, where, setDoc } from "firebase/firestore";
 import { COLLECTIONS, Contacto } from "@/lib/types/firestore";
 import { enviarMensajeAccion } from "@/app/actions/channels";
@@ -310,7 +310,9 @@ function InboxContent() {
       const msgPayload: Record<string, any> = {
         text,
         from: 'operator',
-        creadoEl: Timestamp.now()
+        creadoEl: Timestamp.now(),
+        operadorUid: auth.currentUser?.uid || null,
+        operadorNombre: auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0] || 'Operador'
       };
       if (replyToMsg) {
         msgPayload.metadata = metadataPayload;

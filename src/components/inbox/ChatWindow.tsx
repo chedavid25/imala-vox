@@ -259,6 +259,8 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
         text,
         from: 'operator',
         creadoEl: Timestamp.now(),
+        operadorUid: auth.currentUser?.uid || null,
+        operadorNombre: auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0] || 'Operador',
         metadata
       });
 
@@ -373,6 +375,8 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
         text: `[${tipo === 'image' ? 'Imagen' : tipo === 'video' ? 'Video' : 'Archivo'}: ${file.name}]`,
         from: 'operator',
         creadoEl: Timestamp.now(),
+        operadorUid: auth.currentUser?.uid || null,
+        operadorNombre: auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0] || 'Operador',
         metadata: { mediaUrl: downloadUrl, mediaType: tipo, fileName: file.name }
       });
       await updateDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES, conversacion.id), {
@@ -460,6 +464,8 @@ export function ChatWindow({ conversacion, mensajes, onSendMessage }: ChatWindow
         text: textoEnviado,
         from: 'operator',
         creadoEl: Timestamp.now(),
+        operadorUid: auth.currentUser?.uid || null,
+        operadorNombre: auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0] || 'Operador',
         metadata: { isTemplate: true, templateName: selectedPlantilla.name }
       });
       await updateDoc(doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.CONVERSACIONES, conversacion.id), {

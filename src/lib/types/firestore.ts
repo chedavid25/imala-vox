@@ -291,6 +291,9 @@ export interface Conversacion {
   tiempoRespuestaHumanoAcumulado?: number;
   respuestasIAContador?: number;
   tiempoRespuestaIAAcumulado?: number;
+
+  // Tiempo de respuesta humano acumulado por operador (en horario hábil), para el ranking de estadísticas
+  tiemposPorOperador?: Record<string, { nombre?: string; tiempoAcumulado?: number; contador?: number }>;
 }
 
 export interface Mensaje {
@@ -299,6 +302,8 @@ export interface Mensaje {
   from: 'operator' | 'user' | 'bot' | 'system';
   creadoEl: Timestamp;
   visto: boolean;
+  operadorUid?: string;            // uid del operador humano que envió el mensaje (para métricas por operador)
+  operadorNombre?: string;
   metadata?: {
     model?: string;
     intent?: string;
