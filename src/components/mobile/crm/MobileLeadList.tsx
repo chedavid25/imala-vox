@@ -32,6 +32,7 @@ export function MobileLeadList({ leads, etapas, onSelect, onNewLead, onConvert, 
   const [activeFilter, setActiveFilter] = useState<'todos' | 'meta_ads' | 'organico'>('todos');
   const [activeCampana, setActiveCampana] = useState<string>('todas');
   const [activeEtapaId, setActiveEtapaId] = useState<string>('todas');
+  const [showFilters, setShowFilters] = useState(false);
   const [selectedLead, setSelectedLead] = useState<any>(null);
 
   const campanasDisponibles = Array.from(new Set(leads.map(l => l.campana).filter(Boolean))).sort();
@@ -87,93 +88,113 @@ export function MobileLeadList({ leads, etapas, onSelect, onNewLead, onConvert, 
            </button>
         </div>
 
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
-          <Input 
-            placeholder="Buscar por nombre o teléfono..." 
-            className="pl-11 bg-slate-50 border-none focus:bg-white text-sm h-12 rounded-2xl shadow-inner transition-all"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
-          {[
-            { id: 'todos', label: 'Todos', count: leads.length },
-            { id: 'meta_ads', label: 'Meta Ads', count: leads.filter(l => l.origen === 'meta_ads').length },
-            { id: 'organico', label: 'Orgánico', count: leads.filter(l => l.origen === 'organico').length }
-          ].map(f => (
-            <button
-              key={f.id}
-              onClick={() => setActiveFilter(f.id as any)}
-              className={cn(
-                "px-4 py-2 rounded-xl text-[10px] font-semibold uppercase tracking-widest transition-all border-2 shrink-0",
-                activeFilter === f.id 
-                  ? "bg-[var(--accent)] border-[var(--accent)] text-slate-900 shadow-sm" 
-                  : "bg-white border-slate-50 text-slate-400"
-              )}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
-          <button
-            onClick={() => setActiveCampana('todas')}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+            <Input 
+              placeholder="Buscar por nombre o teléfono..." 
+              className="pl-11 bg-slate-50 border-none focus:bg-white text-sm h-12 rounded-2xl shadow-inner transition-all"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <button 
+            type="button"
+            onClick={() => setShowFilters(!showFilters)}
             className={cn(
-              "px-4 py-2 rounded-xl text-[10px] font-semibold uppercase tracking-widest transition-all border-2 shrink-0",
-              activeCampana === 'todas' 
-                ? "bg-[var(--accent)] border-[var(--accent)] text-slate-900 shadow-sm" 
-                : "bg-white border-slate-50 text-slate-400"
+              "size-12 rounded-2xl flex items-center justify-center border transition-all active:scale-90",
+              showFilters 
+                ? "bg-slate-900 border-slate-900 text-white shadow-md" 
+                : (activeFilter !== 'todos' || activeCampana !== 'todas' || activeEtapaId !== 'todas')
+                  ? "bg-[var(--accent)] border-[var(--accent)] text-slate-900 shadow-sm"
+                  : "bg-slate-50 border-slate-100 text-slate-400"
             )}
           >
-            Todas las campañas
+            <Filter size={18} className={cn(showFilters ? "rotate-180" : "", "transition-transform duration-200")} />
           </button>
-          {campanasDisponibles.map(c => (
-            <button
-              key={c as string}
-              onClick={() => setActiveCampana(c as string)}
-              className={cn(
-                "px-4 py-2 rounded-xl text-[10px] font-semibold uppercase tracking-widest transition-all border-2 shrink-0",
-                activeCampana === c 
-                  ? "bg-[var(--accent)] border-[var(--accent)] text-slate-900 shadow-sm" 
-                  : "bg-white border-slate-50 text-slate-400"
-              )}
-            >
-              {c as string}
-            </button>
-          ))}
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
-          <button
-            onClick={() => setActiveEtapaId('todas')}
-            className={cn(
-              "px-4 py-2 rounded-xl text-[10px] font-semibold uppercase tracking-widest transition-all border-2 shrink-0",
-              activeEtapaId === 'todas' 
-                ? "bg-[var(--accent)] border-[var(--accent)] text-slate-900 shadow-sm" 
-                : "bg-white border-slate-50 text-slate-400"
-            )}
-          >
-            Todas las etapas
-          </button>
-          {etapas.map(e => (
-            <button
-              key={e.id}
-              onClick={() => setActiveEtapaId(e.id)}
-              className={cn(
-                "px-4 py-2 rounded-xl text-[10px] font-semibold uppercase tracking-widest transition-all border-2 shrink-0 flex items-center gap-1.5",
-                activeEtapaId === e.id 
-                  ? "bg-slate-900 border-slate-900 text-white shadow-sm" 
-                  : "bg-white border-slate-50 text-slate-500"
-              )}
-            >
-              <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: e.color }} />
-              {e.nombre}
-            </button>
-          ))}
-        </div>
+        {showFilters && (
+          <div className="space-y-4 pt-1 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+              {[
+                { id: 'todos', label: 'Todos', count: leads.length },
+                { id: 'meta_ads', label: 'Meta Ads', count: leads.filter(l => l.origen === 'meta_ads').length },
+                { id: 'organico', label: 'Orgánico', count: leads.filter(l => l.origen === 'organico').length }
+              ].map(f => (
+                <button
+                  key={f.id}
+                  onClick={() => setActiveFilter(f.id as any)}
+                  className={cn(
+                    "px-4 py-2 rounded-xl text-[10px] font-semibold uppercase tracking-widest transition-all border-2 shrink-0",
+                    activeFilter === f.id 
+                      ? "bg-[var(--accent)] border-[var(--accent)] text-slate-900 shadow-sm" 
+                      : "bg-white border-slate-50 text-slate-400"
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+              <button
+                onClick={() => setActiveCampana('todas')}
+                className={cn(
+                  "px-4 py-2 rounded-xl text-[10px] font-semibold uppercase tracking-widest transition-all border-2 shrink-0",
+                  activeCampana === 'todas' 
+                    ? "bg-[var(--accent)] border-[var(--accent)] text-slate-900 shadow-sm" 
+                    : "bg-white border-slate-50 text-slate-400"
+                )}
+              >
+                Todas las campañas
+              </button>
+              {campanasDisponibles.map(c => (
+                <button
+                  key={c as string}
+                  onClick={() => setActiveCampana(c as string)}
+                  className={cn(
+                    "px-4 py-2 rounded-xl text-[10px] font-semibold uppercase tracking-widest transition-all border-2 shrink-0",
+                    activeCampana === c 
+                      ? "bg-[var(--accent)] border-[var(--accent)] text-slate-900 shadow-sm" 
+                      : "bg-white border-slate-50 text-slate-400"
+                  )}
+                >
+                  {c as string}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+              <button
+                onClick={() => setActiveEtapaId('todas')}
+                className={cn(
+                  "px-4 py-2 rounded-xl text-[10px] font-semibold uppercase tracking-widest transition-all border-2 shrink-0",
+                  activeEtapaId === 'todas' 
+                    ? "bg-[var(--accent)] border-[var(--accent)] text-slate-900 shadow-sm" 
+                    : "bg-white border-slate-50 text-slate-400"
+                )}
+              >
+                Todas las etapas
+              </button>
+              {etapas.map(e => (
+                <button
+                  key={e.id}
+                  onClick={() => setActiveEtapaId(e.id)}
+                  className={cn(
+                    "px-4 py-2 rounded-xl text-[10px] font-semibold uppercase tracking-widest transition-all border-2 shrink-0 flex items-center gap-1.5",
+                    activeEtapaId === e.id 
+                      ? "bg-slate-900 border-slate-900 text-white shadow-sm" 
+                      : "bg-white border-slate-50 text-slate-500"
+                  )}
+                >
+                  <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: e.color }} />
+                  {e.nombre}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Lista de Cards */}
