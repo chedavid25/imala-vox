@@ -33,9 +33,10 @@ interface MobileLeadDetailSheetProps {
   onConvert: () => void;
   onWhatsApp: () => void;
   etapas: any[];
+  onUpdateStage?: (leadId: string, etapaId: string) => Promise<void>;
 }
 
-export function MobileLeadDetailSheet({ lead, open, onClose, onConvert, onWhatsApp, etapas }: MobileLeadDetailSheetProps) {
+export function MobileLeadDetailSheet({ lead, open, onClose, onConvert, onWhatsApp, etapas, onUpdateStage }: MobileLeadDetailSheetProps) {
   const { currentWorkspaceId } = useWorkspaceStore();
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
@@ -304,15 +305,59 @@ export function MobileLeadDetailSheet({ lead, open, onClose, onConvert, onWhatsA
                  )}
               </div>
             </div>
-            <div className="flex items-center gap-4 p-4 bg-white border border-slate-100 rounded-[22px] shadow-sm">
-              <div className="size-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400">
-                 <Hash size={18} />
-              </div>
-              <div className="flex-1 min-w-0">
-                 <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-widest">Etapa en el Embudo</p>
-                 <p className="text-sm font-semibold" style={{ color: etapa?.color }}>{etapa?.nombre || "Sin clasificar"}</p>
-              </div>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <button className="w-full text-left outline-none active:scale-[0.98] transition-all">
+                    <div className="flex items-center gap-4 p-4 bg-white border border-slate-100 rounded-[22px] shadow-sm cursor-pointer hover:border-slate-200">
+                      <div className="size-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400">
+                         <Hash size={18} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                         <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-widest">Etapa en el Embudo</p>
+                         <p className="text-sm font-semibold flex items-center gap-1.5" style={{ color: etapa?.color }}>
+                           <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: etapa?.color || '#ccc' }} />
+                           {etapa?.nombre || "Sin clasificar"}
+                         </p>
+                      </div>
+                    </div>
+                  </button>
+                }
+              />
+              <DropdownMenuPortal>
+                <DropdownMenuContent className="w-[220px] bg-white border border-slate-100 shadow-xl rounded-xl p-1 z-[300]">
+                  {etapas.map(e => (
+                    <DropdownMenuItem 
+                      key={e.id} 
+                      className="rounded-lg py-2.5 text-xs font-semibold cursor-pointer flex items-center gap-2 focus:bg-slate-50"
+                      onClick={async () => {
+                        if (onUpdateStage) {
+                          const toastId = toast.loading("Actualizando etapa...");
+                          try {
+                            await onUpdateStage(lead.id, e.id);
+                            toast.success("Etapa actualizada", { id: toastId });
+                          } catch {
+                            toast.error("Error al actualizar etapa", { id: toastId });
+                          }
+                        } else if (currentWorkspaceId) {
+                          const toastId = toast.loading("Actualizando etapa...");
+                          try {
+                            const leadRef = doc(db, COLLECTIONS.ESPACIOS, currentWorkspaceId, COLLECTIONS.LEADS, lead.id);
+                            await updateDoc(leadRef, { etapaId: e.id, actualizadoEl: Timestamp.now() });
+                            toast.success("Etapa actualizada", { id: toastId });
+                          } catch {
+                            toast.error("Error al actualizar etapa", { id: toastId });
+                          }
+                        }
+                      }}
+                    >
+                      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: e.color }} />
+                      {e.nombre}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenuPortal>
+            </DropdownMenu>
           </div>
         </div>
 

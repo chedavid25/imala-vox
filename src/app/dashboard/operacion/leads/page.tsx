@@ -585,6 +585,7 @@ export default function LeadsPage() {
           onNewLead={() => setIsNewLeadModalOpen(true)}
           onConvert={handleConvertLead}
           onWhatsApp={handleStartWhatsApp}
+          onUpdateStage={(leadId, etapaId) => handleUpdateLeadField(leadId, 'etapaId', etapaId)}
         />
       ) : (
         <div className="p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">

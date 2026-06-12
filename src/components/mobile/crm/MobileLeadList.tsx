@@ -9,6 +9,13 @@ import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { MobileLeadDetailSheet } from "./MobileLeadDetailSheet";
 import { toast } from "sonner";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuPortal
+} from "@/components/ui/dropdown-menu";
 
 interface MobileLeadListProps {
   leads: any[];
@@ -17,12 +24,14 @@ interface MobileLeadListProps {
   onNewLead: () => void;
   onConvert: (lead: any) => void;
   onWhatsApp: (lead: any) => void;
+  onUpdateStage?: (leadId: string, etapaId: string) => Promise<void>;
 }
 
-export function MobileLeadList({ leads, etapas, onSelect, onNewLead, onConvert, onWhatsApp }: MobileLeadListProps) {
+export function MobileLeadList({ leads, etapas, onSelect, onNewLead, onConvert, onWhatsApp, onUpdateStage }: MobileLeadListProps) {
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<'todos' | 'meta_ads' | 'organico'>('todos');
   const [activeCampana, setActiveCampana] = useState<string>('todas');
+  const [activeEtapaId, setActiveEtapaId] = useState<string>('todas');
   const [selectedLead, setSelectedLead] = useState<any>(null);
 
   const campanasDisponibles = Array.from(new Set(leads.map(l => l.campana).filter(Boolean))).sort();
@@ -32,7 +41,8 @@ export function MobileLeadList({ leads, etapas, onSelect, onNewLead, onConvert, 
                           (l.telefono || "").includes(search);
     const matchesFilter = activeFilter === 'todos' || l.origen === activeFilter;
     const matchesCampana = activeCampana === 'todas' || l.campana === activeCampana;
-    return matchesSearch && matchesFilter && matchesCampana;
+    const matchesEtapa = activeEtapaId === 'todas' || l.etapaId === activeEtapaId;
+    return matchesSearch && matchesFilter && matchesCampana && matchesEtapa;
   });
 
   const getEtapaColor = (etapaId: string) => {
@@ -59,6 +69,7 @@ export function MobileLeadList({ leads, etapas, onSelect, onNewLead, onConvert, 
           setSelectedLead(null);
         }}
         etapas={etapas}
+        onUpdateStage={onUpdateStage}
       />
 
       {/* Header Premium */}
@@ -134,6 +145,35 @@ export function MobileLeadList({ leads, etapas, onSelect, onNewLead, onConvert, 
             </button>
           ))}
         </div>
+
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+          <button
+            onClick={() => setActiveEtapaId('todas')}
+            className={cn(
+              "px-4 py-2 rounded-xl text-[10px] font-semibold uppercase tracking-widest transition-all border-2 shrink-0",
+              activeEtapaId === 'todas' 
+                ? "bg-[var(--accent)] border-[var(--accent)] text-slate-900 shadow-sm" 
+                : "bg-white border-slate-50 text-slate-400"
+            )}
+          >
+            Todas las etapas
+          </button>
+          {etapas.map(e => (
+            <button
+              key={e.id}
+              onClick={() => setActiveEtapaId(e.id)}
+              className={cn(
+                "px-4 py-2 rounded-xl text-[10px] font-semibold uppercase tracking-widest transition-all border-2 shrink-0 flex items-center gap-1.5",
+                activeEtapaId === e.id 
+                  ? "bg-slate-900 border-slate-900 text-white shadow-sm" 
+                  : "bg-white border-slate-50 text-slate-500"
+              )}
+            >
+              <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: e.color }} />
+              {e.nombre}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Lista de Cards */}
@@ -178,12 +218,45 @@ export function MobileLeadList({ leads, etapas, onSelect, onNewLead, onConvert, 
                   </div>
                 </div>
                 
-                <Badge 
-                  className="text-[9px] font-semibold px-2 py-1 rounded-lg border-none shadow-none uppercase tracking-tighter"
-                  style={{ backgroundColor: getEtapaColor(lead.etapaId) + '15', color: getEtapaColor(lead.etapaId) }}
-                >
-                  {getEtapaNombre(lead.etapaId)}
-                </Badge>
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <button onClick={(e) => e.stopPropagation()} className="outline-none active:scale-95 transition-all">
+                        <Badge 
+                          className="text-[9px] font-semibold px-2 py-1 rounded-lg border-none shadow-none uppercase tracking-tighter cursor-pointer"
+                          style={{ backgroundColor: getEtapaColor(lead.etapaId) + '15', color: getEtapaColor(lead.etapaId) }}
+                        >
+                          {getEtapaNombre(lead.etapaId)}
+                        </Badge>
+                      </button>
+                    }
+                  />
+                  <DropdownMenuPortal>
+                    <DropdownMenuContent className="w-[180px] bg-white border border-slate-100 shadow-xl rounded-xl p-1 z-[150]">
+                      {etapas.map(e => (
+                        <DropdownMenuItem 
+                          key={e.id} 
+                          className="rounded-lg py-2.5 text-xs font-semibold cursor-pointer flex items-center gap-2 focus:bg-slate-50"
+                          onClick={async (eClick) => {
+                            eClick.stopPropagation();
+                            if (onUpdateStage) {
+                              const toastId = toast.loading("Actualizando etapa...");
+                              try {
+                                await onUpdateStage(lead.id, e.id);
+                                toast.success("Etapa actualizada", { id: toastId });
+                              } catch {
+                                toast.error("Error al actualizar etapa", { id: toastId });
+                              }
+                            }
+                          }}
+                        >
+                          <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: e.color }} />
+                          {e.nombre}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenuPortal>
+                </DropdownMenu>
               </div>
 
               {/* Acciones Rápidas */}
